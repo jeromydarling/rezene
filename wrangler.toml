@@ -1,0 +1,61 @@
+# Maison Atlantique — Cloudflare Workers configuration
+#
+# Full-stack Worker: serves the built Vite client via static assets and the
+# API from src/worker. Local dev runs through @cloudflare/vite-plugin
+# (single `npm run dev` server, Worker executing in workerd).
+#
+# Before first deploy:
+#   1. wrangler d1 create maison-atlantique-db      -> paste database_id below
+#   2. wrangler kv namespace create KV              -> paste id below
+#   3. wrangler r2 bucket create maison-atlantique-files
+#   4. wrangler secret put STRIPE_SECRET_KEY (and the other secrets in .dev.vars.example)
+
+name = "maison-atlantique"
+main = "./src/worker/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+# All /api traffic must reach the Worker, never the asset layer.
+run_worker_first = ["/api/*"]
+
+[observability]
+enabled = true
+
+# Non-secret runtime config. Secrets (Stripe, Anthropic, session) belong in
+# `wrangler secret put` / .dev.vars — never here.
+[vars]
+APP_ENV = "development"
+APP_URL = "http://localhost:5173"
+BRAND_NAME = "Maison Atlantique"
+BRAND_SLUG = "maison-atlantique"
+R2_PUBLIC_BASE_URL = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "maison-atlantique-db"
+database_id = "00000000-0000-0000-0000-000000000000" # TODO: replace with output of `wrangler d1 create maison-atlantique-db`
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "maison-atlantique-files"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "00000000000000000000000000000000" # TODO: replace with output of `wrangler kv namespace create KV`
+
+# Daily ops digest / low-stock + late-task sweep (see scheduled handler in src/worker/index.ts).
+[triggers]
+crons = ["0 6 * * *"]
+
+# --- Future bindings (uncomment when the account has them enabled) -----------
+# Async pipelines (webhook fan-out, AI batch jobs, export rendering):
+# [[queues.producers]]
+# binding = "JOBS"
+# queue = "maison-atlantique-jobs"
+#
+# [[queues.consumers]]
+# queue = "maison-atlantique-jobs"

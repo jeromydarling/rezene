@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/*
+ * Maison Atlantique design tokens.
+ *
+ * Palette follows the business plan: chalk/sand/cream/ivory neutrals,
+ * olive + terracotta + deep navy + faded indigo accents, seasonal
+ * saffron/palm/dusty-rose/faded-blue/coffee.
+ *
+ * Typography pairing: Fraunces (elegant serif display) + Inter (clean grotesk).
+ */
+@theme {
+  --font-display: "Fraunces", "Georgia", "Times New Roman", serif;
+  --font-sans: "Inter", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+
+  /* Core neutrals */
+  --color-chalk: #faf7f0;
+  --color-cream: #f5eedd;
+  --color-ivory: #f8f3e7;
+  --color-sand: #e3d4b4;
+  --color-sand-deep: #c9b58c;
+  --color-warmgrey: #8c8577;
+  --color-ink: #23201b;
+
+  /* Core accents */
+  --color-olive: #74744e;
+  --color-olive-deep: #565639;
+  --color-terracotta: #c06e52;
+  --color-terracotta-deep: #a2583f;
+  --color-navy: #1f2a44;
+  --color-navy-deep: #141d31;
+  --color-indigo-faded: #5c6b8a;
+  --color-bark: #5b4636;
+
+  /* Seasonal */
+  --color-saffron: #d9a441;
+  --color-palm: #4f6b4f;
+  --color-rose-dusty: #c4998f;
+  --color-blue-faded: #7e97ad;
+  --color-coffee: #2e211a;
+
+  --tracking-editorial: 0.18em;
+}
+
+@layer base {
+  html {
+    @apply bg-chalk text-ink antialiased;
+    font-family: var(--font-sans);
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* ---- Editorial (public site) ---- */
+  .display-hero {
+    @apply font-display font-light leading-[1.05] tracking-tight;
+  }
+  .eyebrow {
+    @apply font-sans text-[0.7rem] font-medium uppercase tracking-editorial text-warmgrey;
+  }
+  .prose-editorial {
+    @apply font-sans text-[0.95rem] leading-relaxed text-ink/80;
+  }
+  .link-quiet {
+    @apply underline decoration-sand-deep underline-offset-4 transition-colors hover:decoration-terracotta;
+  }
+
+  /* ---- Buttons (compose in markup: "btn btn-primary") ---- */
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-none border px-5 py-2.5 font-sans text-[0.8rem] font-medium uppercase tracking-editorial transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-navy bg-navy text-chalk hover:bg-navy-deep;
+  }
+  .btn-secondary {
+    @apply border-ink/25 bg-transparent text-ink hover:border-ink;
+  }
+  .btn-terracotta {
+    @apply border-terracotta bg-terracotta text-chalk hover:bg-terracotta-deep;
+  }
+  .btn-danger {
+    @apply border-red-800 bg-red-800 text-chalk hover:bg-red-900;
+  }
+
+  /* ---- Admin chrome (premium SaaS) ---- */
+  .admin-card {
+    @apply rounded-md border border-ink/10 bg-white shadow-[0_1px_2px_rgba(35,32,27,0.05)];
+  }
+  .admin-table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .admin-table thead th {
+    @apply border-b border-ink/10 px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wider text-warmgrey;
+  }
+  .admin-table tbody td {
+    @apply border-b border-ink/5 px-3 py-2.5 align-middle text-ink/90;
+  }
+  .admin-table tbody tr:hover {
+    @apply bg-cream/40;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink placeholder:text-warmgrey/70 focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy;
+  }
+  .label {
+    @apply mb-1 block text-[0.72rem] font-semibold uppercase tracking-wider text-warmgrey;
+  }
+  .field-error {
+    @apply mt-1 text-xs text-red-700;
+  }
+
+  /* ---- Badges (compose in markup: "badge badge-olive") ---- */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wider;
+  }
+  .badge-neutral {
+    @apply bg-ink/8 text-ink/70;
+  }
+  .badge-olive {
+    @apply bg-olive/15 text-olive-deep;
+  }
+  .badge-terracotta {
+    @apply bg-terracotta/15 text-terracotta-deep;
+  }
+  .badge-navy {
+    @apply bg-navy/10 text-navy;
+  }
+  .badge-saffron {
+    @apply bg-saffron/20 text-bark;
+  }
+  .badge-danger {
+    @apply bg-red-100 text-red-800;
+  }
+  .badge-success {
+    @apply bg-palm/15 text-palm;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded bg-ink/8;
+  }
+}
+
+/* Printable tech pack export */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    break-after: page;
+  }
+  html {
+    background: white;
+  }
+}
