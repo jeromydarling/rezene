@@ -25,6 +25,18 @@ export const VERTO_META: Record<string, RouteMeta> = {
       "Storefront, CMS, production, shipping, and AI marketing in one purpose-built platform for independent fashion brands. From first sample to sold out.",
     image: null,
   },
+  "/why": {
+    title: "Why Verto exists — Verto",
+    description:
+      "Fashion tech forgot the people who make fashion. The problem with running an independent label on generic commerce tools — and how Verto solves it.",
+    image: null,
+  },
+  "/compare": {
+    title: "Verto vs. Shopify, fashion ERPs & the spreadsheet patchwork — Verto",
+    description:
+      "An honest, capability-by-capability comparison of Verto against Shopify plus apps, retail ERP/PLM suites, and the DIY spreadsheet stack.",
+    image: null,
+  },
   "/pricing": {
     title: "Pricing — Verto",
     description:
@@ -244,6 +256,8 @@ export async function buildSitemap(env: Env): Promise<string> {
   const shopBase = await getPrimaryShopBase(env.DB);
   const urls: { loc: string; lastmod?: string }[] = [
     { loc: "/" },
+    { loc: "/why" },
+    { loc: "/compare" },
     { loc: "/pricing" },
     { loc: `${shopBase}/` },
     { loc: `${shopBase}/products` },

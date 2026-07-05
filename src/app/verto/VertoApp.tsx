@@ -12,6 +12,7 @@ import {
   useSceneProgress,
   useScrolledPast,
 } from "./cinema";
+import { VertoCompare, VertoWhy } from "./VertoStory";
 
 /**
  * Verto — the platform's marketing site as a cinematic scroll journey.
@@ -89,16 +90,25 @@ function VertoLayout({ children }: { children: ReactNode }) {
             Verto<span className="text-terracotta">.</span>
           </Link>
           <nav className="flex items-center gap-6">
-            <NavLink
-              to="/pricing"
-              className={({ isActive }) =>
-                `text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 ${
-                  isActive ? "text-terracotta" : onHero ? "text-chalk/80 hover:text-chalk" : "text-ink/70 hover:text-ink"
-                }`
-              }
-            >
-              Pricing
-            </NavLink>
+            {[
+              { to: "/why", label: "Why", always: true },
+              { to: "/compare", label: "Compare", always: false },
+              { to: "/pricing", label: "Pricing", always: true },
+            ].map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 ${
+                    item.always ? "" : "hidden sm:block "
+                  }${
+                    isActive ? "text-terracotta" : onHero ? "text-chalk/80 hover:text-chalk" : "text-ink/70 hover:text-ink"
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
             <a
               href="/rezene"
               className={`hidden text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 sm:block ${
@@ -125,6 +135,12 @@ function VertoLayout({ children }: { children: ReactNode }) {
             <p className="text-xs text-chalk/60">The operating system for independent clothing labels.</p>
           </div>
           <div className="flex gap-6 text-xs text-chalk/70">
+            <Link to="/why" className="hover:text-chalk">
+              Why Verto
+            </Link>
+            <Link to="/compare" className="hover:text-chalk">
+              Compare
+            </Link>
             <Link to="/pricing" className="hover:text-chalk">
               Pricing
             </Link>
@@ -787,6 +803,8 @@ export function VertoApp() {
     <VertoLayout>
       <Routes>
         <Route index element={<VertoHome />} />
+        <Route path="why" element={<VertoWhy />} />
+        <Route path="compare" element={<VertoCompare />} />
         <Route path="pricing" element={<VertoPricing />} />
         <Route path="signup" element={<VertoSignup />} />
         <Route path="*" element={<VertoNotFound />} />

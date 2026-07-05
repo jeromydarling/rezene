@@ -25,6 +25,8 @@ const CLIENT_RESERVED = new Set([
   "features",
   "signup",
   "login",
+  "why",
+  "compare",
   "api",
   "assets",
   "media",
