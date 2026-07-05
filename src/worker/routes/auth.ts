@@ -9,7 +9,7 @@ import {
   verifyPassword,
 } from "../services/auth";
 import { first, run, writeAudit } from "../services/db";
-import { changePasswordSchema, loginSchema, parseBody } from "../services/validators";
+import { changePasswordSchema, demoAccessSchema, loginSchema, parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import type { AppContext } from "../types/env";
 
@@ -97,3 +97,59 @@ authRoutes.post("/change-password", async (c) => {
   await writeAudit(c.var.db, c.var.userId, "auth.change_password", "user", c.var.userId);
   return c.json({ ok: true });
 });
+
+/**
+ * Email gate for the public demo shop's admin. A visitor leaves their
+ * email, we record the lead in the platform's own database (never the
+ * demo shop's — demo viewers can read that one) and mint a session for
+ * the shared read-only viewer account. Only answers on the demo shop.
+ */
+authRoutes.post(
+  "/demo-access",
+  rateLimit({ key: "demo_access", limit: 20, windowSeconds: 3600 }),
+  async (c) => {
+    const { DEMO_SHOP_SLUG, DEMO_VIEWER_EMAIL } = await import("../services/shops");
+    if (c.var.shopSlug !== DEMO_SHOP_SLUG) return c.json({ error: "Not found" }, 404);
+
+    const { email, name } = await parseBody(c, demoAccessSchema);
+
+    const viewer = await first<{ id: string }>(
+      c.var.db,
+      `SELECT id FROM users WHERE email = ? AND is_active = 1`,
+      DEMO_VIEWER_EMAIL,
+    );
+    if (!viewer) return c.json({ error: "Demo is not provisioned yet" }, 503);
+
+    // The lead lands in the platform (primary) database — founder-only.
+    const { newId } = await import("../utils/id");
+    await run(
+      c.env.DB,
+      `INSERT INTO leads (id, kind, email, name, message, source_path)
+       VALUES (?, 'contact', ?, ?, 'Verto demo admin access', ?)`,
+      newId("lead"),
+      email.toLowerCase(),
+      name ?? null,
+      `/${DEMO_SHOP_SLUG}/admin`,
+    );
+    const { sendNotification } = await import("../services/email");
+    await sendNotification(c.env, {
+      subject: `Verto demo: ${email} entered the demo admin`,
+      text: `${name ? `${name} <${email}>` : email} opened the demo admin gate.`,
+    }).catch(() => {});
+
+    const { token, expiresAt } = await createSession(c.var.db, viewer.id, {
+      ip: c.req.header("cf-connecting-ip"),
+      userAgent: c.req.header("user-agent"),
+    });
+    await writeAudit(c.var.db, viewer.id, "auth.demo_access", "user", viewer.id);
+
+    setCookie(c, SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: c.env.APP_ENV !== "development",
+      path: "/",
+      expires: new Date(expiresAt),
+    });
+    return c.json({ ok: true });
+  },
+);

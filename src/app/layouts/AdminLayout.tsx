@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
+import { isDemoShop } from "../lib/shop";
 
 const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: typeof Shirt }[] }[] = [
   {
@@ -238,6 +239,14 @@ export function AdminLayout() {
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
+        {isDemoShop() && (
+          <div className="bg-terracotta px-4 py-1.5 text-center text-xs text-chalk">
+            You're touring the {brand.brandName} demo (read-only).{" "}
+            <a href="/signup" className="font-semibold underline">
+              Open your own shop →
+            </a>
+          </div>
+        )}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink/10 bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
           <button
             type="button"

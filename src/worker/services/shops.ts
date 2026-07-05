@@ -22,6 +22,15 @@ export interface Shop {
 /** The flagship shop, which lives on the bound D1 (all others get a DO). */
 export const PRIMARY_SHOP_ID = "shop_rezene";
 
+/**
+ * The public demo shop (fake brand, seeded catalog). Its storefront is the
+ * marketing site's "live demo" and its admin sits behind an email gate that
+ * opens a read-only viewer session.
+ */
+export const DEMO_SHOP_SLUG = "maison";
+export const DEMO_SHOP_ID = "shop_demo_maison";
+export const DEMO_VIEWER_EMAIL = "demo-viewer@verto.style";
+
 /** Slugs that can never become shops (platform + app routes). */
 export const RESERVED_SLUGS = new Set([
   "api",

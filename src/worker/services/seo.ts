@@ -25,6 +25,12 @@ export const VERTO_META: Record<string, RouteMeta> = {
       "Storefront, CMS, production, shipping, and AI marketing in one purpose-built platform for independent fashion brands. From first sample to sold out.",
     image: null,
   },
+  "/features": {
+    title: "Features — the full tour — Verto",
+    description:
+      "Production calendar, tech packs, factory portals, multi-carrier shipping, landed cost, block CMS, lookbooks, AI marketing, translations, wholesale, analytics — one platform.",
+    image: null,
+  },
   "/why": {
     title: "Why Verto exists — Verto",
     description:
@@ -257,6 +263,7 @@ export async function buildSitemap(env: Env): Promise<string> {
   const urls: { loc: string; lastmod?: string }[] = [
     { loc: "/" },
     { loc: "/why" },
+    { loc: "/features" },
     { loc: "/compare" },
     { loc: "/pricing" },
     { loc: `${shopBase}/` },

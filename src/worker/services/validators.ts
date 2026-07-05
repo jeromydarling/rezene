@@ -38,6 +38,11 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(200),
 });
 
+export const demoAccessSchema = z.object({
+  email: z.string().email().max(200),
+  name: z.string().max(120).optional(),
+});
+
 // ---------- Leads / public forms ----------
 export const leadSchema = z.object({
   kind: z.enum(["newsletter", "waitlist", "drop_notification", "wholesale_inquiry", "contact"]),

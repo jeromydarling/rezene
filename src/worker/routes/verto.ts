@@ -94,3 +94,14 @@ vertoRoutes.get("/slug-check", async (c) => {
   const existing = await first(c.env.DB, `SELECT id FROM shops WHERE slug = ?`, slug);
   return c.json({ available: !existing, reason: existing ? "taken" : null });
 });
+
+/**
+ * One-time bootstrap of the public demo shop. Unauthenticated by design:
+ * it is fully idempotent and can only ever create the single fixed demo
+ * shop with fixed content — there is no caller input to abuse.
+ */
+vertoRoutes.post("/demo-bootstrap", async (c) => {
+  const { bootstrapDemoShop } = await import("../services/demo");
+  const result = await bootstrapDemoShop(c.env);
+  return c.json({ ok: true, ...result });
+});

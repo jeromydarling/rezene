@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Menu, X } from "lucide-react";
 import { api, ApiRequestError } from "../lib/api";
+import { DEMO_SHOP_BASE } from "../lib/shop";
 import {
   MagneticButton,
   ParallaxImage,
@@ -13,6 +15,7 @@ import {
   useScrolledPast,
 } from "./cinema";
 import { VertoCompare, VertoWhy } from "./VertoStory";
+import { VertoFeatures } from "./VertoFeatures";
 
 /**
  * Verto — the platform's marketing site as a cinematic scroll journey.
@@ -69,39 +72,51 @@ const TIERS = [
 // The nav starts transparent over the hero (the image is the statement;
 // chrome would compete with it) and gains a frosted bar the moment the
 // visitor scrolls — orientation appears exactly when it's needed.
+const NAV_ITEMS = [
+  { to: "/why", label: "Why" },
+  { to: "/features", label: "Features" },
+  { to: "/compare", label: "Compare" },
+  { to: "/pricing", label: "Pricing" },
+];
+
 function VertoLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const scrolled = useScrolledPast(60);
   const onHero = location.pathname === "/" && !scrolled;
-  useEffect(() => window.scrollTo(0, 0), [location.pathname]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    setMenuOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
 
   return (
     <div className="flex min-h-screen flex-col bg-chalk">
       <header
         className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ${
-          onHero ? "bg-transparent" : "border-b border-ink/10 bg-chalk/90 backdrop-blur"
+          onHero && !menuOpen ? "bg-transparent" : "border-b border-ink/10 bg-chalk/90 backdrop-blur"
         }`}
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-4">
           <Link
             to="/"
-            className={`shrink-0 font-display text-xl font-light tracking-wide transition-colors duration-500 ${onHero ? "text-chalk" : "text-ink"}`}
+            className={`shrink-0 font-display text-xl font-light tracking-wide transition-colors duration-500 ${onHero && !menuOpen ? "text-chalk" : "text-ink"}`}
           >
             Verto<span className="text-terracotta">.</span>
           </Link>
-          <nav className="flex min-w-0 items-center gap-3.5 sm:gap-6">
-            {[
-              { to: "/why", label: "Why", always: true },
-              { to: "/compare", label: "Compare", always: true },
-              { to: "/pricing", label: "Pricing", always: true },
-            ].map((item) => (
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-6 md:flex">
+            {NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `whitespace-nowrap text-[0.68rem] font-medium uppercase tracking-wider transition-colors duration-500 sm:text-[0.72rem] sm:tracking-editorial ${
-                    item.always ? "" : "hidden sm:block "
-                  }${
+                  `whitespace-nowrap text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 ${
                     isActive ? "text-terracotta" : onHero ? "text-chalk/80 hover:text-chalk" : "text-ink/70 hover:text-ink"
                   }`
                 }
@@ -110,20 +125,80 @@ function VertoLayout({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
             <a
-              href="/rezene"
-              className={`hidden whitespace-nowrap text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 md:block ${
+              href={DEMO_SHOP_BASE}
+              className={`whitespace-nowrap text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 ${
                 onHero ? "text-chalk/80 hover:text-chalk" : "text-ink/70 hover:text-ink"
               }`}
             >
               Live demo
             </a>
-            <Link to="/signup" className="btn btn-primary verto-sheen shrink-0 whitespace-nowrap !px-3.5 !py-2 text-xs sm:!px-5">
-              <span className="sm:hidden">Open shop</span>
-              <span className="hidden sm:inline">Open your shop</span>
+            <Link to="/signup" className="btn btn-primary verto-sheen shrink-0 whitespace-nowrap !py-2 text-xs">
+              Open your shop
             </Link>
           </nav>
+          {/* Mobile: compact CTA + hamburger */}
+          <div className="flex items-center gap-2 md:hidden">
+            <Link to="/signup" className="btn btn-primary verto-sheen shrink-0 whitespace-nowrap !px-3.5 !py-2 text-xs">
+              Open shop
+            </Link>
+            <button
+              type="button"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              className={`rounded p-1.5 transition-colors duration-500 ${
+                onHero && !menuOpen ? "text-chalk" : "text-ink"
+              }`}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <Menu size={22} strokeWidth={1.6} />
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Mobile menu: a full-screen navy interlude — same editorial voice as
+          the site itself, one destination per line. */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-navy-deep text-chalk md:hidden">
+          <div className="flex items-center justify-between px-4 py-3">
+            <Link to="/" className="font-display text-xl font-light" onClick={() => setMenuOpen(false)}>
+              Verto<span className="text-terracotta">.</span>
+            </Link>
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="rounded p-1.5 text-chalk/80 hover:text-chalk"
+              onClick={() => setMenuOpen(false)}
+            >
+              <X size={22} strokeWidth={1.6} />
+            </button>
+          </div>
+          <nav className="flex flex-1 flex-col justify-center gap-1 px-8">
+            {NAV_ITEMS.map((item, i) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `verto-route py-3 font-display text-3xl font-light ${
+                    isActive ? "text-terracotta" : "text-chalk"
+                  }`
+                }
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+            <a href={DEMO_SHOP_BASE} className="verto-route py-3 font-display text-3xl font-light text-chalk" style={{ animationDelay: "240ms" }}>
+              Live demo
+            </a>
+          </nav>
+          <div className="px-8 pb-12">
+            <Link to="/signup" className="btn btn-primary w-full">
+              Open your shop
+            </Link>
+          </div>
+        </div>
+      )}
       {/* Route transitions: a soft rise-in per page keeps navigation feeling
           like cuts in the same film rather than hard reloads. */}
       <main key={location.pathname} className="verto-route flex-1">
@@ -145,7 +220,7 @@ function VertoLayout({ children }: { children: ReactNode }) {
             <Link to="/pricing" className="hover:text-chalk">
               Pricing
             </Link>
-            <a href="/rezene" className="hover:text-chalk">
+            <a href={DEMO_SHOP_BASE} className="hover:text-chalk">
               See a live shop
             </a>
             <Link to="/signup" className="hover:text-chalk">
@@ -195,7 +270,7 @@ function Hero() {
             <MagneticButton className="btn btn-primary" onClick={() => navigate("/signup")}>
               Open your shop
             </MagneticButton>
-            <a href="/rezene" className="btn border-chalk/60 text-chalk hover:bg-chalk hover:text-navy">
+            <a href={DEMO_SHOP_BASE} className="btn border-chalk/60 text-chalk hover:bg-chalk hover:text-navy">
               Browse a live shop
             </a>
           </div>
@@ -805,6 +880,7 @@ export function VertoApp() {
       <Routes>
         <Route index element={<VertoHome />} />
         <Route path="why" element={<VertoWhy />} />
+        <Route path="features" element={<VertoFeatures />} />
         <Route path="compare" element={<VertoCompare />} />
         <Route path="pricing" element={<VertoPricing />} />
         <Route path="signup" element={<VertoSignup />} />

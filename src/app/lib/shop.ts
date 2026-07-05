@@ -49,3 +49,11 @@ export function getShop(): VertoShop | null {
 export function getShopBase(): string {
   return getShop()?.basePath ?? "";
 }
+
+/** The public demo shop (fake brand, email-gated admin). Mirrors the worker constant. */
+export const DEMO_SHOP_SLUG = "maison";
+export const DEMO_SHOP_BASE = `/${DEMO_SHOP_SLUG}`;
+
+export function isDemoShop(): boolean {
+  return getShop()?.slug === DEMO_SHOP_SLUG;
+}
