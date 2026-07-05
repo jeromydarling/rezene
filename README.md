@@ -9,6 +9,25 @@ Business context lives in [`BUSINESS_PLAN_CONTEXT.md`](./BUSINESS_PLAN_CONTEXT.m
 the build brief in [`CLAUDE_CODE_PROMPT.md`](./CLAUDE_CODE_PROMPT.md).
 The brand name is a placeholder — it is data (Settings → brand), not code.
 
+## Verto — the platform layer
+
+This app now serves two things from one Worker:
+
+- **`/` — Verto**, the platform's marketing site (features, pricing,
+  signup). Signups reserve a slug as a `pending` row in the `shops` table
+  and notify the founder; provisioning/tenant scoping is the next phase.
+- **`/<shop-slug>` — a shop.** Each active row in `shops` routes its slug
+  to the storefront + admin (Rezene is shop #1 at `/rezene` — same data,
+  same login, only the URL prefix changed; legacy paths 301-redirect).
+  `shops.custom_domain` is already consulted first during resolution, so
+  putting a customer's CNAME on the Worker later is just DNS + one column.
+
+The edge injects `window.__VERTO__` (the resolved shop or null) into the
+document shell; the SPA boots the Verto marketing app or the shop app
+under a router basename accordingly. Shop *data* is still single-tenant —
+the registry, routing, and signup exist so tenant scoping can land without
+another URL migration.
+
 ## Architecture
 
 ```
@@ -262,6 +281,7 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | AI content suite: interview drafting, selection rewrite, SEO meta, image alt text, brand voice, site-starter interview | admin Content (needs Anthropic key) | ✅ working |
 | Storefront translations: EN/FR toggle, on-demand Llama translation via Workers AI, cached in D1 | `services/translate.ts` | ✅ working |
 | Marketing suite: AI campaign kits (IG/story/TikTok/Pinterest/X/FB, email, blog, press release, Google/Meta ads), posting calendar, graphics studio (SVG→PNG), subscriber email sends w/ unsubscribe, SEO content ideas | admin Marketing (Anthropic key or Workers AI Llama) | ✅ working |
+| Verto platform: marketing site + pricing + signup at `/`, shop registry with path routing (`/rezene`) and CNAME-ready domain mapping, legacy 301s | `services/shops.ts`, `verto/VertoApp.tsx` | ✅ working (tenant scoping next) |
 | Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
 | Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |

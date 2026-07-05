@@ -67,43 +67,73 @@ app.get("/media/:fileId", async (c) => {
 });
 
 // --- Edge SEO ------------------------------------------------------------
-// Document routes run worker-first (wrangler.toml): serve the SPA shell
-// with per-route <title>/meta/OG tags injected so crawlers and link
-// unfurlers see real content. Client-side routing takes over after load.
-import { buildSitemap, injectMeta, resolveRouteMeta } from "./services/seo";
+// All document traffic runs worker-first (wrangler.toml): the platform
+// root serves Verto's marketing site, /<shop-slug> (or a CNAME'd custom
+// domain) serves that shop's storefront — same SPA shell, with the shop
+// context and per-route SEO meta injected at the edge. Legacy Rezene-era
+// paths 301 to the shop-prefixed equivalents.
+import { buildSitemap, injectMeta, injectShopContext, resolveRouteMeta, VERTO_META } from "./services/seo";
+import { getPrimaryShopBase, resolveShop } from "./services/shops";
 import type { Context } from "hono";
 
-async function serveDocument(c: Context<AppContext>): Promise<Response> {
-  const url = new URL(c.req.url);
-  const shell = await c.env.ASSETS.fetch(new Request(`${url.origin}/index.html`));
-  if (!shell.ok) return shell as unknown as Response;
-  const meta = await resolveRouteMeta(c.env, url.pathname);
-  const canonicalBase = (c.env.APP_URL || url.origin).replace(/\/$/, "");
-  const html = injectMeta(await shell.text(), meta, `${canonicalBase}${url.pathname}`);
-  return c.html(html, 200, { "cache-control": "public, max-age=60" });
-}
-
-const DOCUMENT_ROUTES = [
-  "/",
-  "/p/:slug",
-  "/journal",
-  "/journal/:slug",
+/** Storefront/app paths that existed before the shop prefix (for 301s). */
+const LEGACY_SHOP_PREFIXES = [
   "/products",
-  "/products/:slug",
   "/collections",
-  "/collections/:slug",
+  "/journal",
+  "/lookbook",
   "/story",
   "/atelier",
-  "/lookbook",
   "/contact",
   "/cart",
+  "/checkout",
+  "/p/",
   "/size-guide",
   "/shipping-returns",
   "/stockists",
-  "/privacy",
-  "/terms",
+  "/factory/",
+  "/linesheet/",
+  "/admin",
 ];
-for (const route of DOCUMENT_ROUTES) app.get(route, serveDocument);
+
+async function serveDocument(c: Context<AppContext>): Promise<Response> {
+  const url = new URL(c.req.url);
+
+  // API/media misses stay JSON 404s — the SPA shell would mask real errors.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/media/")) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  // Static files (hashed bundles, favicons) pass straight to the asset layer.
+  if (/\.[a-z0-9]+$/i.test(url.pathname) && !url.pathname.endsWith(".html")) {
+    return c.env.ASSETS.fetch(c.req.raw) as unknown as Promise<Response>;
+  }
+
+  const { shop, strippedPath, basePath } = await resolveShop(c.env, url);
+
+  // No shop matched: either a Verto platform page, a legacy shop path
+  // (redirect into the flagship shop), or an unknown slug (Verto 404 shell).
+  if (!shop) {
+    if (
+      LEGACY_SHOP_PREFIXES.some(
+        (prefix) => url.pathname === prefix.replace(/\/$/, "") || url.pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`),
+      )
+    ) {
+      const base = await getPrimaryShopBase(c.env.DB);
+      if (base) return c.redirect(`${base}${url.pathname}${url.search}`, 301);
+    }
+  }
+
+  const shell = await c.env.ASSETS.fetch(new Request(`${url.origin}/index.html`));
+  if (!shell.ok) return shell as unknown as Response;
+  const canonicalBase = (c.env.APP_URL || url.origin).replace(/\/$/, "");
+  const meta = shop
+    ? await resolveRouteMeta(c.env, strippedPath)
+    : VERTO_META[url.pathname] ?? VERTO_META["/"];
+  let html = injectMeta(await shell.text(), meta, `${canonicalBase}${basePath}${strippedPath === "/" && shop ? "" : shop ? strippedPath : url.pathname}`);
+  html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
+  return c.html(html, 200, { "cache-control": "public, max-age=60" });
+}
 
 app.get("/sitemap.xml", async (c) =>
   c.text(await buildSitemap(c.env), 200, {
@@ -113,12 +143,18 @@ app.get("/sitemap.xml", async (c) =>
 );
 app.get("/robots.txt", (c) => {
   const base = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
-  return c.text(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`);
+  return c.text(
+    `User-agent: *\nAllow: /\nDisallow: /*/admin\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`,
+  );
 });
 
 // Public API — no auth, rate-limited where it accepts writes.
 app.route("/api/public", publicRoutes);
 app.route("/api/public", commerceRoutes);
+
+// Verto platform — shop signup + slug availability (public).
+import { vertoRoutes } from "./routes/verto";
+app.route("/api/verto", vertoRoutes);
 
 // Stripe webhooks — signature-verified, never session-gated.
 app.route("/api/stripe", stripeWebhookRoutes);
@@ -159,6 +195,10 @@ admin.route("/wholesale", adminWholesaleRoutes);
 admin.route("/marketing", adminMarketingRoutes);
 admin.route("/import", adminImportRoutes);
 app.route("/api/admin", admin);
+
+// Everything else that's a GET is a document: Verto pages, shop
+// storefronts, legacy redirects, unknown slugs (SPA 404).
+app.get("*", serveDocument);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 

@@ -18,6 +18,7 @@ import {
 } from "../../components/admin/cms";
 import { BlockEditor } from "../../components/admin/blocks";
 import { EditorialImage } from "../../components/ImagePlaceholder";
+import { getShopBase } from "../../lib/shop";
 import type {
   AiContentDraft,
   HomeHero,
@@ -62,7 +63,7 @@ function PreviewLink({ path }: { path: string }) {
   const { data } = useFetch<{ token: string | null }>("/api/admin/content/preview-token");
   const [copied, setCopied] = useState(false);
   if (!data?.token) return null;
-  const url = `${window.location.origin}${path}?preview=${data.token}`;
+  const url = `${window.location.origin}${getShopBase()}${path}?preview=${data.token}`;
   return (
     <button
       type="button"
@@ -260,7 +261,7 @@ function HomeHeroCard() {
         {data?.imageUrl ? "background image set" : "gradient background"}
       </p>
       <div className="mt-auto flex items-center justify-between pt-3">
-        <a href="/" target="_blank" rel="noreferrer" className="link-quiet text-xs">
+        <a href={getShopBase() || "/"} target="_blank" rel="noreferrer" className="link-quiet text-xs">
           View live ↗
         </a>
         <button type="button" className="btn btn-secondary" onClick={() => setOpen(true)}>
@@ -953,7 +954,7 @@ function PageEditor({ page, onSaved }: { page: PageRow; onSaved: () => void }) {
         <div className="flex items-center gap-3">
           <PreviewLink path={isHome ? "/" : `/p/${page.slug}`} />
           <a
-            href={isHome ? "/" : `/p/${page.slug}`}
+            href={isHome ? getShopBase() || "/" : `${getShopBase()}/p/${page.slug}`}
             target="_blank"
             rel="noreferrer"
             className="link-quiet text-xs"
@@ -1412,7 +1413,7 @@ function JournalEditor({ post, onSaved }: { post: JournalRow; onSaved: () => voi
         </div>
         <div className="flex items-center gap-3">
           <PreviewLink path={`/journal/${post.slug}`} />
-          <a href={`/journal/${post.slug}`} target="_blank" rel="noreferrer" className="link-quiet text-xs">
+          <a href={`${getShopBase()}/journal/${post.slug}`} target="_blank" rel="noreferrer" className="link-quiet text-xs">
             View live ↗
           </a>
           <button type="button" className="btn btn-primary" disabled={state === "busy"} onClick={() => void save()}>

@@ -585,9 +585,11 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
   );
   if (recipients.length === 0) return c.json({ error: "No subscribers in that audience yet" }, 409);
 
+  const { getPrimaryShopBase } = await import("../services/shops");
   const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const shopBase = await getPrimaryShopBase(c.env.DB);
   const secret = c.env.SESSION_SECRET ?? "";
-  const bodyText = asset.content.replaceAll("{{SHOP_URL}}", `${appUrl}/products`);
+  const bodyText = asset.content.replaceAll("{{SHOP_URL}}", `${appUrl}${shopBase}/products`);
 
   const sendId = newId("mks");
   await run(

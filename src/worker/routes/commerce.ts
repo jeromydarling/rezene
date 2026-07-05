@@ -238,7 +238,10 @@ commerceRoutes.post(
     }
 
     const origin = new URL(c.req.url).origin;
-    const appUrl = c.env.APP_ENV === "development" ? origin : (c.env.APP_URL || origin);
+    const { getPrimaryShopBase } = await import("../services/shops");
+    const shopBase = await getPrimaryShopBase(c.env.DB);
+    const appUrl =
+      (c.env.APP_ENV === "development" ? origin : (c.env.APP_URL || origin)) + shopBase;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       client_reference_id: orderId,

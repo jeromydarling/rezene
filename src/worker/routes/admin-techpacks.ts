@@ -178,7 +178,8 @@ adminTechPackRoutes.post("/:id/shares", requireAdminWrite, async (c) => {
     c.var.userId,
   );
   await writeAudit(c.env.DB, c.var.userId, "tech_pack.share", "tech_pack", id, { shareId });
-  return c.json({ id: shareId, url: `/factory/${token}` }, 201);
+  const { getPrimaryShopBase } = await import("../services/shops");
+  return c.json({ id: shareId, url: `${await getPrimaryShopBase(c.env.DB)}/factory/${token}` }, 201);
 });
 
 adminTechPackRoutes.get("/:id/shares", async (c) => {

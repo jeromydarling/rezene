@@ -20,14 +20,10 @@ not_found_handling = "single-page-application"
 # API traffic and public R2 media must reach the Worker, never the asset
 # layer. Document routes also go worker-first so per-page SEO meta tags can
 # be injected into index.html at the edge (src/worker/services/seo.ts).
-run_worker_first = [
-  "/api/*", "/media/*",
-  "/", "/p/*", "/journal", "/journal/*", "/products", "/products/*",
-  "/collections", "/collections/*",
-  "/story", "/atelier", "/lookbook", "/contact", "/cart",
-  "/size-guide", "/shipping-returns", "/stockists", "/privacy", "/terms",
-  "/sitemap.xml", "/robots.txt",
-]
+# Everything except the hashed bundle files goes worker-first: the worker
+# resolves shops from the path (/rezene/…) or a CNAME'd custom domain and
+# injects shop context + SEO meta into the document shell.
+run_worker_first = ["/*", "!/assets/*"]
 
 [observability]
 enabled = true

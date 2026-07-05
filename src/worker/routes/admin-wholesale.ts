@@ -104,7 +104,8 @@ adminWholesaleRoutes.post("/line-sheets", requireAdminWrite, async (c) => {
   await writeAudit(c.env.DB, c.var.userId, "line_sheet.create", "line_sheet", id, {
     title: body.title,
   });
-  return c.json({ id, url: `/linesheet/${token}` }, 201);
+  const { getPrimaryShopBase } = await import("../services/shops");
+  return c.json({ id, url: `${await getPrimaryShopBase(c.env.DB)}/linesheet/${token}` }, 201);
 });
 
 adminWholesaleRoutes.patch("/line-sheets/items/:itemId", requireAdminWrite, async (c) => {

@@ -17,6 +17,36 @@ export interface RouteMeta {
   noindex?: boolean;
 }
 
+/** Platform (Verto) marketing pages served at the domain root. */
+export const VERTO_META: Record<string, RouteMeta> = {
+  "/": {
+    title: "Verto — The operating system for independent clothing labels",
+    description:
+      "Storefront, CMS, production, shipping, and AI marketing in one purpose-built platform for independent fashion brands. From first sample to sold out.",
+    image: null,
+  },
+  "/pricing": {
+    title: "Pricing — Verto",
+    description:
+      "Plans for every stage of a label — from pre-launch side project to multi-collection house. Start free for 14 days.",
+    image: null,
+  },
+  "/signup": {
+    title: "Open your shop — Verto",
+    description: "Reserve your shop address and be first in when we onboard new labels.",
+    image: null,
+  },
+};
+
+/** Inject the resolved shop (or null for the platform site) into the shell. */
+export function injectShopContext(
+  html: string,
+  shop: { slug: string; name: string; basePath: string } | null,
+): string {
+  const payload = JSON.stringify({ shop }).replaceAll("<", "\\u003c");
+  return html.replace("</head>", `    <script>window.__VERTO__=${payload}</script>\n  </head>`);
+}
+
 function absolute(env: Env, url: string | null): string | null {
   if (!url) return null;
   if (/^https?:\/\//.test(url)) return url;
@@ -205,13 +235,18 @@ export function injectMeta(html: string, meta: RouteMeta, canonicalUrl: string):
 
 export async function buildSitemap(env: Env): Promise<string> {
   const base = env.APP_URL.replace(/\/$/, "");
+  // Shop URLs carry the shop's path prefix (single active shop today).
+  const { getPrimaryShopBase } = await import("./shops");
+  const shopBase = await getPrimaryShopBase(env.DB);
   const urls: { loc: string; lastmod?: string }[] = [
     { loc: "/" },
-    { loc: "/products" },
-    { loc: "/collections" },
-    { loc: "/lookbook" },
-    { loc: "/journal" },
-    { loc: "/contact" },
+    { loc: "/pricing" },
+    { loc: `${shopBase}/` },
+    { loc: `${shopBase}/products` },
+    { loc: `${shopBase}/collections` },
+    { loc: `${shopBase}/lookbook` },
+    { loc: `${shopBase}/journal` },
+    { loc: `${shopBase}/contact` },
   ];
   const pages = await all<{ slug: string; updated_at: string }>(
     env.DB,
@@ -219,7 +254,7 @@ export async function buildSitemap(env: Env): Promise<string> {
   );
   for (const p of pages) {
     urls.push({
-      loc: ROOT_PAGE_SLUGS.has(p.slug) ? `/${p.slug}` : `/p/${p.slug}`,
+      loc: ROOT_PAGE_SLUGS.has(p.slug) ? `${shopBase}/${p.slug}` : `${shopBase}/p/${p.slug}`,
       lastmod: p.updated_at?.slice(0, 10),
     });
   }
@@ -228,21 +263,21 @@ export async function buildSitemap(env: Env): Promise<string> {
     `SELECT slug, published_at FROM journal_posts WHERE is_published = 1`,
   );
   for (const post of posts) {
-    urls.push({ loc: `/journal/${post.slug}`, lastmod: post.published_at?.slice(0, 10) });
+    urls.push({ loc: `${shopBase}/journal/${post.slug}`, lastmod: post.published_at?.slice(0, 10) });
   }
   const products = await all<{ slug: string; updated_at: string }>(
     env.DB,
     `SELECT slug, updated_at FROM products WHERE is_published = 1 AND availability != 'archived'`,
   );
   for (const product of products) {
-    urls.push({ loc: `/products/${product.slug}`, lastmod: product.updated_at?.slice(0, 10) });
+    urls.push({ loc: `${shopBase}/products/${product.slug}`, lastmod: product.updated_at?.slice(0, 10) });
   }
   const collections = await all<{ slug: string; updated_at: string }>(
     env.DB,
     `SELECT slug, updated_at FROM collections WHERE is_published = 1`,
   );
   for (const col of collections) {
-    urls.push({ loc: `/collections/${col.slug}`, lastmod: col.updated_at?.slice(0, 10) });
+    urls.push({ loc: `${shopBase}/collections/${col.slug}`, lastmod: col.updated_at?.slice(0, 10) });
   }
 
   const body = urls
