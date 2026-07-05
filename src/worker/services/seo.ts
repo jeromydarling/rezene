@@ -53,9 +53,9 @@ function absolute(env: Env, url: string | null): string | null {
   return `${env.APP_URL.replace(/\/$/, "")}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
-async function brandBits(env: Env): Promise<{ name: string; tagline: string }> {
+async function brandBits(env: Env, db: D1Database): Promise<{ name: string; tagline: string }> {
   const rows = await all<{ key: string; value: string }>(
-    env.DB,
+    db,
     `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline')`,
   );
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -82,8 +82,12 @@ const ROOT_PAGE_SLUGS = new Set([
   "terms",
 ]);
 
-export async function resolveRouteMeta(env: Env, pathname: string): Promise<RouteMeta> {
-  const brand = await brandBits(env);
+export async function resolveRouteMeta(
+  env: Env,
+  db: D1Database,
+  pathname: string,
+): Promise<RouteMeta> {
+  const brand = await brandBits(env, db);
   const fallback: RouteMeta = { title: brand.name, description: brand.tagline || null, image: null };
 
   const pageMeta = async (slug: string): Promise<RouteMeta | null> => {
@@ -94,7 +98,7 @@ export async function resolveRouteMeta(env: Env, pathname: string): Promise<Rout
       meta_description: string | null;
       hero_image_url: string | null;
     }>(
-      env.DB,
+      db,
       `SELECT title, subtitle, meta_title, meta_description, hero_image_url
        FROM pages WHERE slug = ? AND is_published = 1`,
       slug,
@@ -144,7 +148,7 @@ export async function resolveRouteMeta(env: Env, pathname: string): Promise<Rout
         meta_description: string | null;
         hero_image_url: string | null;
       }>(
-        env.DB,
+        db,
         `SELECT title, excerpt, meta_title, meta_description, hero_image_url
          FROM journal_posts WHERE slug = ? AND is_published = 1`,
         decodeURIComponent(journal[1]),
@@ -165,13 +169,13 @@ export async function resolveRouteMeta(env: Env, pathname: string): Promise<Rout
         subtitle: string | null;
         description: string | null;
       }>(
-        env.DB,
+        db,
         `SELECT id, name, subtitle, description FROM products WHERE slug = ? AND is_published = 1`,
         decodeURIComponent(product[1]),
       );
       if (!row) return fallback;
       const image = await first<{ url: string }>(
-        env.DB,
+        db,
         `SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order LIMIT 1`,
         row.id,
       );
@@ -185,7 +189,7 @@ export async function resolveRouteMeta(env: Env, pathname: string): Promise<Rout
     const collection = pathname.match(/^\/collections\/([^/]+)$/);
     if (collection) {
       const row = await first<{ name: string; description: string | null; hero_image_url: string | null }>(
-        env.DB,
+        db,
         `SELECT name, description, hero_image_url FROM collections WHERE slug = ? AND is_published = 1`,
         decodeURIComponent(collection[1]),
       );

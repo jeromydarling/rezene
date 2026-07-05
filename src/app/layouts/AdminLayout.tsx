@@ -24,6 +24,7 @@ import {
   Settings,
   Shirt,
   ShoppingBag,
+  Store,
   Sparkles,
   Tags,
   Truck,
@@ -98,7 +99,10 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
   },
   {
     title: "System",
-    items: [{ to: "/admin/settings", label: "Settings", icon: Settings }],
+    items: [
+      { to: "/admin/settings", label: "Settings", icon: Settings },
+      { to: "/admin/platform", label: "Verto Shops", icon: Store },
+    ],
   },
 ];
 

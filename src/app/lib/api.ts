@@ -10,9 +10,17 @@ export class ApiRequestError extends Error {
   }
 }
 
+import { getShop } from "./shop";
+
+/** Tenant selector: tells the worker which shop's database serves this call. */
+function shopHeaders(): Record<string, string> {
+  const shop = getShop();
+  return shop ? { "x-verto-shop": shop.slug } : {};
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: { "content-type": "application/json", ...shopHeaders(), ...init?.headers },
     credentials: "same-origin",
     ...init,
   });
@@ -39,7 +47,12 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   /** Multipart upload (no JSON content-type header). */
   upload: async <T>(path: string, form: FormData): Promise<T> => {
-    const res = await fetch(path, { method: "POST", body: form, credentials: "same-origin" });
+    const res = await fetch(path, {
+      method: "POST",
+      body: form,
+      headers: shopHeaders(),
+      credentials: "same-origin",
+    });
     const body = await res.json().catch(() => null);
     if (!res.ok) {
       throw new ApiRequestError(

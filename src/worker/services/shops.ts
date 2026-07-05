@@ -19,6 +19,9 @@ export interface Shop {
   custom_domain: string | null;
 }
 
+/** The flagship shop, which lives on the bound D1 (all others get a DO). */
+export const PRIMARY_SHOP_ID = "shop_rezene";
+
 /** Slugs that can never become shops (platform + app routes). */
 export const RESERVED_SLUGS = new Set([
   "api",

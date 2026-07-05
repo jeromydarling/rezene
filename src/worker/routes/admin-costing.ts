@@ -45,14 +45,14 @@ function mapScenario(row: Record<string, unknown>): AdminLandedCostScenario {
 
 adminCostingRoutes.get("/cost-sheets", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT cs.*, s.name AS style_name FROM cost_sheets cs
      JOIN styles s ON s.id = cs.style_id ORDER BY cs.updated_at DESC`,
   );
   const sheets: AdminCostSheet[] = [];
   for (const row of rows) {
     const scenarios = await all<Record<string, unknown>>(
-      c.env.DB,
+      c.var.db,
       `SELECT * FROM landed_cost_scenarios WHERE cost_sheet_id = ? ORDER BY name`,
       row.id,
     );
@@ -87,21 +87,21 @@ adminCostingRoutes.get("/cost-sheets", async (c) => {
 adminCostingRoutes.post("/cost-sheets", requireAdminWrite, async (c) => {
   const body = await parseBody(c, costSheetCreateSchema);
   const style = await first<{ id: string; name: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, name FROM styles WHERE id = ?`,
     body.styleId,
   );
   if (!style) return c.json({ error: "Style not found" }, 404);
   const id = newId("cost");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO cost_sheets (id, style_id, name, wholesale_price_cents) VALUES (?, ?, ?, ?)`,
     id,
     style.id,
     body.name ?? `${style.name} costing`,
     body.wholesalePriceCents ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "cost_sheet.create", "cost_sheet", id, {
+  await writeAudit(c.var.db, c.var.userId, "cost_sheet.create", "cost_sheet", id, {
     styleId: style.id,
   });
   return c.json({ id }, 201);
@@ -116,7 +116,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
   const sheetId = c.req.param("id");
   const body = await parseBody(c, scenarioCreateSchema);
   const sheet = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM cost_sheets WHERE id = ?`,
     sheetId,
   );
@@ -140,7 +140,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
 
   const id = newId("lcs");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO landed_cost_scenarios
        (id, cost_sheet_id, name, destination_region, duty_rate_used, freight_cents,
         insurance_cents, landed_cost_cents, retail_price_cents, gross_margin_pct, notes)
@@ -157,7 +157,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
     margin,
     body.notes ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "landed_scenario.create", "cost_sheet", sheetId, {
+  await writeAudit(c.var.db, c.var.userId, "landed_scenario.create", "cost_sheet", sheetId, {
     name: body.name,
     region: body.destinationRegion,
   });
@@ -166,7 +166,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
 
 adminCostingRoutes.delete("/scenarios/:id", requireAdminWrite, async (c) => {
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `DELETE FROM landed_cost_scenarios WHERE id = ?`,
     c.req.param("id"),
   );
@@ -177,7 +177,7 @@ adminCostingRoutes.delete("/scenarios/:id", requireAdminWrite, async (c) => {
 adminCostingRoutes.patch("/cost-sheets/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, costSheetUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM cost_sheets WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM cost_sheets WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Cost sheet not found" }, 404);
 
   const fieldMap: Record<string, string> = {
@@ -206,14 +206,14 @@ adminCostingRoutes.patch("/cost-sheets/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE cost_sheets SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "cost_sheet.update", "cost_sheet", id, body);
+  await run(c.var.db, `UPDATE cost_sheets SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "cost_sheet.update", "cost_sheet", id, body);
   return c.json({ ok: true });
 });
 
 adminCostingRoutes.get("/duty-rules", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM duty_rules ORDER BY destination_region, is_preferential DESC`,
   );
   const rules: AdminDutyRule[] = rows.map((r) => ({
@@ -235,7 +235,7 @@ adminCostingRoutes.get("/duty-rules", async (c) => {
 adminCostingRoutes.patch("/duty-rules/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, dutyRuleUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM duty_rules WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM duty_rules WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Duty rule not found" }, 404);
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -261,14 +261,14 @@ adminCostingRoutes.patch("/duty-rules/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE duty_rules SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "duty_rule.update", "duty_rule", id, body);
+  await run(c.var.db, `UPDATE duty_rules SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "duty_rule.update", "duty_rule", id, body);
   return c.json({ ok: true });
 });
 
 adminCostingRoutes.get("/margin-targets", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, channel, category, target_gross_margin_pct, floor_gross_margin_pct, notes FROM margin_targets`,
   );
   return c.json(rows);
@@ -287,7 +287,7 @@ adminCostingRoutes.get("/estimate", async (c) => {
     return c.json({ error: "baseCents must be a positive integer" }, 400);
   }
   const rules = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM duty_rules WHERE destination_region = ? AND is_active = 1`,
     region,
   );

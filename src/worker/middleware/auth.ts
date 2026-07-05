@@ -6,7 +6,7 @@ import type { AppContext } from "../types/env";
 /** Populate c.var with the session user (or nulls). Never rejects. */
 export const sessionMiddleware: MiddlewareHandler<AppContext> = async (c, next) => {
   const token = getCookie(c, SESSION_COOKIE);
-  const user = await resolveSession(c.env.DB, token);
+  const user = await resolveSession(c.var.db, token);
   c.set("userId", user?.id ?? null);
   c.set("userEmail", user?.email ?? null);
   c.set("roles", user?.roles ?? []);

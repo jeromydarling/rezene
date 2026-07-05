@@ -249,7 +249,7 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
       : parseSimpleRows(header, rows, result.errors);
 
   const maxSort = await first<{ n: number }>(
-    c.env.DB,
+    c.var.db,
     `SELECT COALESCE(MAX(sort_order), 0) AS n FROM products`,
   );
   let sortOrder = (maxSort?.n ?? 0) + 1;
@@ -260,7 +260,7 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
       continue;
     }
     const existing = await first(
-      c.env.DB,
+      c.var.db,
       `SELECT id FROM products WHERE slug = ?`,
       product.slug,
     );
@@ -271,7 +271,7 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
 
     const productId = newId("prd");
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO products (id, slug, name, description, gender, category,
          base_price_cents, availability, is_published, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?)`,
@@ -293,7 +293,7 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
       seen.add(key);
       const variantId = newId("var");
       await run(
-        c.env.DB,
+        c.var.db,
         `INSERT INTO product_variants (id, product_id, colorway_name, size, price_cents)
          VALUES (?, ?, ?, ?, ?)`,
         variantId,
@@ -305,7 +305,7 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
           : null,
       );
       await run(
-        c.env.DB,
+        c.var.db,
         `INSERT INTO inventory_items (id, variant_id, on_hand) VALUES (?, ?, 0)`,
         newId("inv"),
         variantId,
@@ -314,7 +314,7 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
     result.created++;
   }
 
-  await writeAudit(c.env.DB, c.var.userId, "products.import", "product", "csv", {
+  await writeAudit(c.var.db, c.var.userId, "products.import", "product", "csv", {
     mode,
     created: result.created,
     skipped: result.skipped.length,

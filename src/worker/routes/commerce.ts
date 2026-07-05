@@ -83,7 +83,7 @@ commerceRoutes.post(
         on_hand: number | null;
         reserved: number | null;
       }>(
-        c.env.DB,
+        c.var.db,
         `SELECT v.id, v.colorway_name, v.size, v.price_cents, v.currency, v.is_active,
                 p.id AS product_id, p.name AS product_name, p.slug, p.base_price_cents,
                 p.availability, p.is_published, i.on_hand, i.reserved
@@ -112,7 +112,7 @@ commerceRoutes.post(
           cutoff_date: string | null;
           max_units: number | null;
         }>(
-          c.env.DB,
+          c.var.db,
           `SELECT status, cutoff_date, max_units FROM preorder_campaigns WHERE product_id = ?`,
           variant.product_id,
         );
@@ -131,7 +131,7 @@ commerceRoutes.post(
           }
           if (campaign.max_units != null) {
             const ordered = await first<{ n: number }>(
-              c.env.DB,
+              c.var.db,
               `SELECT COALESCE(SUM(oi.quantity), 0) AS n FROM order_items oi
                JOIN orders o ON o.id = oi.order_id
                WHERE oi.product_id = ? AND oi.is_pre_order = 1
@@ -175,11 +175,11 @@ commerceRoutes.post(
     const anyPreOrder = resolved.some((r) => r.isPreOrder);
 
     const orderId = newId("ord");
-    const seq = await first<{ n: number }>(c.env.DB, `SELECT COUNT(*) AS n FROM orders`);
+    const seq = await first<{ n: number }>(c.var.db, `SELECT COUNT(*) AS n FROM orders`);
     const orderNumber = `MA-${1000 + (seq?.n ?? 0) + 1}`;
 
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO orders (id, order_number, currency, subtotal_cents, total_cents,
          payment_status, is_pre_order)
        VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
@@ -190,9 +190,9 @@ commerceRoutes.post(
       subtotal,
       anyPreOrder ? 1 : 0,
     );
-    await c.env.DB.batch(
+    await c.var.db.batch(
       resolved.map((r) =>
-        c.env.DB.prepare(
+        c.var.db.prepare(
           `INSERT INTO order_items (id, order_id, product_id, variant_id, description, quantity, unit_price_cents, currency, is_pre_order)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).bind(
@@ -216,7 +216,7 @@ commerceRoutes.post(
     let shippingOptions: Stripe.Checkout.SessionCreateParams.ShippingOption[] = [];
     if (parsed.shippingCountry) {
       try {
-        const req = await buildRateRequest(c.env.DB, {
+        const req = await buildRateRequest(c.var.db, {
           to: { country: parsed.shippingCountry },
           items: resolved.map((r) => ({
             description: r.description,
@@ -227,7 +227,7 @@ commerceRoutes.post(
           currency,
           subtotalCents: subtotal,
         });
-        const { quotes } = await quoteEnabledProviders(c.env.DB, req, {
+        const { quotes } = await quoteEnabledProviders(c.var.db, req, {
           checkoutOnly: true,
           timeoutMs: 8_000,
         });
@@ -239,7 +239,7 @@ commerceRoutes.post(
 
     const origin = new URL(c.req.url).origin;
     const { getPrimaryShopBase } = await import("../services/shops");
-    const shopBase = await getPrimaryShopBase(c.env.DB);
+    const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
     const appUrl =
       (c.env.APP_ENV === "development" ? origin : (c.env.APP_URL || origin)) + shopBase;
     const session = await stripe.checkout.sessions.create({
@@ -268,7 +268,7 @@ commerceRoutes.post(
     });
 
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE orders SET stripe_checkout_session_id = ?, updated_at = datetime('now') WHERE id = ?`,
       session.id,
       orderId,
@@ -337,7 +337,7 @@ commerceRoutes.post(
         currency: string;
         name: string;
       }>(
-        c.env.DB,
+        c.var.db,
         `SELECT v.price_cents, p.base_price_cents, v.currency, p.name
          FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = ?`,
         item.variantId,
@@ -352,13 +352,13 @@ commerceRoutes.post(
     }
     if (lines.length === 0) return c.json({ quotes: [] });
     const subtotal = lines.reduce((sum, l) => sum + l.valueCents * l.quantity, 0);
-    const req = await buildRateRequest(c.env.DB, {
+    const req = await buildRateRequest(c.var.db, {
       to: { country: body.country },
       items: lines,
       currency: lines[0].currency,
       subtotalCents: subtotal,
     });
-    const { quotes } = await quoteEnabledProviders(c.env.DB, req, {
+    const { quotes } = await quoteEnabledProviders(c.var.db, req, {
       checkoutOnly: true,
       timeoutMs: 8_000,
     });
@@ -387,7 +387,7 @@ commerceRoutes.get("/checkout/confirm", async (c) => {
     currency: string;
     is_pre_order: number;
   }>(
-    c.env.DB,
+    c.var.db,
     `SELECT order_number, payment_status, total_cents, currency, is_pre_order
      FROM orders WHERE stripe_checkout_session_id = ?`,
     sessionId,
@@ -414,7 +414,7 @@ commerceRoutes.post("/customer-portal", async (c) => {
     return c.json({ error: "customerId required — customer accounts land in a later phase" }, 400);
   }
   const customer = await first<{ stripe_customer_id: string | null }>(
-    c.env.DB,
+    c.var.db,
     `SELECT stripe_customer_id FROM customers WHERE id = ?`,
     body.customerId,
   );

@@ -6,7 +6,7 @@ import type { DashboardSummary } from "../../shared/types";
 export const adminDashboardRoutes = new Hono<AppContext>();
 
 adminDashboardRoutes.get("/", async (c) => {
-  const db = c.env.DB;
+  const db = c.var.db;
   const today = new Date().toISOString().slice(0, 10);
 
   const revenue = await first<{ total: number | null; n: number; paid: number }>(

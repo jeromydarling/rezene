@@ -28,7 +28,7 @@ const lineSheetItemUpdateSchema = z.object({
 
 adminWholesaleRoutes.get("/line-sheets", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT ls.id, ls.title, ls.season, ls.currency, ls.note, ls.status, ls.created_at,
             ls.token_hash IS NOT NULL AS is_shared,
             (SELECT COUNT(*) FROM line_sheet_items i WHERE i.line_sheet_id = ls.id) AS item_count
@@ -39,13 +39,13 @@ adminWholesaleRoutes.get("/line-sheets", async (c) => {
 
 adminWholesaleRoutes.get("/line-sheets/:id", async (c) => {
   const sheet = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, title, season, currency, note, status, created_at FROM line_sheets WHERE id = ?`,
     c.req.param("id"),
   );
   if (!sheet) return c.json({ error: "Line sheet not found" }, 404);
   const items = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT i.id, i.product_id, i.wholesale_price_cents, i.min_qty, i.sort_order,
             p.name AS product_name, p.base_price_cents AS msrp_cents
      FROM line_sheet_items i JOIN products p ON p.id = i.product_id
@@ -60,7 +60,7 @@ adminWholesaleRoutes.post("/line-sheets", requireAdminWrite, async (c) => {
   const id = newId("ls");
   const token = randomToken(24);
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO line_sheets (id, title, season, note, token_hash, created_by)
      VALUES (?, ?, ?, ?, ?, ?)`,
     id,
@@ -74,7 +74,7 @@ adminWholesaleRoutes.post("/line-sheets", requireAdminWrite, async (c) => {
   let sortOrder = 0;
   for (const productId of body.productIds) {
     const product = await first<{ id: string; base_price_cents: number; style_id: string | null }>(
-      c.env.DB,
+      c.var.db,
       `SELECT id, base_price_cents, style_id FROM products WHERE id = ?`,
       productId,
     );
@@ -84,14 +84,14 @@ adminWholesaleRoutes.post("/line-sheets", requireAdminWrite, async (c) => {
     let wholesale: number | null = null;
     if (product.style_id) {
       const cs = await first<{ wholesale_price_cents: number | null }>(
-        c.env.DB,
+        c.var.db,
         `SELECT wholesale_price_cents FROM cost_sheets WHERE style_id = ? ORDER BY updated_at DESC LIMIT 1`,
         product.style_id,
       );
       wholesale = cs?.wholesale_price_cents ?? null;
     }
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO line_sheet_items (id, line_sheet_id, product_id, wholesale_price_cents, min_qty, sort_order)
        VALUES (?, ?, ?, ?, 1, ?)`,
       newId("lsi"),
@@ -101,11 +101,12 @@ adminWholesaleRoutes.post("/line-sheets", requireAdminWrite, async (c) => {
       sortOrder++,
     );
   }
-  await writeAudit(c.env.DB, c.var.userId, "line_sheet.create", "line_sheet", id, {
+  await writeAudit(c.var.db, c.var.userId, "line_sheet.create", "line_sheet", id, {
     title: body.title,
   });
   const { getPrimaryShopBase } = await import("../services/shops");
-  return c.json({ id, url: `${await getPrimaryShopBase(c.env.DB)}/linesheet/${token}` }, 201);
+  const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
+  return c.json({ id, url: `${shopBase}/linesheet/${token}` }, 201);
 });
 
 adminWholesaleRoutes.patch("/line-sheets/items/:itemId", requireAdminWrite, async (c) => {
@@ -122,7 +123,7 @@ adminWholesaleRoutes.patch("/line-sheets/items/:itemId", requireAdminWrite, asyn
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE line_sheet_items SET ${sets.join(", ")} WHERE id = ?`,
     ...params,
     c.req.param("itemId"),
@@ -133,7 +134,7 @@ adminWholesaleRoutes.patch("/line-sheets/items/:itemId", requireAdminWrite, asyn
 
 adminWholesaleRoutes.post("/line-sheets/:id/revoke", requireAdminWrite, async (c) => {
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE line_sheets SET status = 'revoked' WHERE id = ? AND status = 'active'`,
     c.req.param("id"),
   );

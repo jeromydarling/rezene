@@ -134,7 +134,7 @@ const campaignSchema = z.object({
 
 adminMarketingRoutes.get("/campaigns", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT mc.*, p.name AS product_name, col.name AS collection_name,
        (SELECT COUNT(*) FROM marketing_assets a WHERE a.campaign_id = mc.id) AS asset_count,
        (SELECT COUNT(*) FROM marketing_assets a WHERE a.campaign_id = mc.id AND a.posted_at IS NOT NULL) AS posted_count,
@@ -152,7 +152,7 @@ adminMarketingRoutes.post("/campaigns", requireAdminWrite, async (c) => {
   const body = await parseBody(c, campaignSchema);
   const id = newId("mkc");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO marketing_campaigns (id, name, objective, subject, key_message, audience, product_id, collection_id, starts_on, ends_on)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
@@ -166,7 +166,7 @@ adminMarketingRoutes.post("/campaigns", requireAdminWrite, async (c) => {
     body.startsOn ?? null,
     body.endsOn ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "marketing.campaign.create", "marketing_campaign", id, {
+  await writeAudit(c.var.db, c.var.userId, "marketing.campaign.create", "marketing_campaign", id, {
     name: body.name,
   });
   return c.json({ id }, 201);
@@ -174,7 +174,7 @@ adminMarketingRoutes.post("/campaigns", requireAdminWrite, async (c) => {
 
 adminMarketingRoutes.get("/campaigns/:id", async (c) => {
   const campaign = await first(
-    c.env.DB,
+    c.var.db,
     `SELECT mc.*, p.name AS product_name, col.name AS collection_name
      FROM marketing_campaigns mc
      LEFT JOIN products p ON p.id = mc.product_id
@@ -184,7 +184,7 @@ adminMarketingRoutes.get("/campaigns/:id", async (c) => {
   );
   if (!campaign) return c.json({ error: "Campaign not found" }, 404);
   const assets = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM marketing_assets WHERE campaign_id = ? ORDER BY sort_order, created_at`,
     c.req.param("id"),
   );
@@ -214,7 +214,7 @@ adminMarketingRoutes.patch("/campaigns/:id", requireAdminWrite, async (c) => {
     }
   }
   await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE marketing_campaigns SET ${sets.join(", ")} WHERE id = ?`,
     ...params,
     c.req.param("id"),
@@ -224,12 +224,12 @@ adminMarketingRoutes.patch("/campaigns/:id", requireAdminWrite, async (c) => {
 
 adminMarketingRoutes.delete("/campaigns/:id", requireAdminWrite, async (c) => {
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `DELETE FROM marketing_campaigns WHERE id = ?`,
     c.req.param("id"),
   );
   if (!result.meta.changes) return c.json({ error: "Campaign not found" }, 404);
-  await writeAudit(c.env.DB, c.var.userId, "marketing.campaign.delete", "marketing_campaign", c.req.param("id"));
+  await writeAudit(c.var.db, c.var.userId, "marketing.campaign.delete", "marketing_campaign", c.req.param("id"));
   return c.json({ ok: true });
 });
 
@@ -248,10 +248,10 @@ interface CampaignRow {
   ends_on: string | null;
 }
 
-async function campaignContext(env: Env, campaign: CampaignRow): Promise<string> {
-  const brandName = await getBrandName(env);
+async function campaignContext(env: Env, db: D1Database, campaign: CampaignRow): Promise<string> {
+  const brandName = await getBrandName(env, db);
   const settings = await all<{ key: string; value: string }>(
-    env.DB,
+    db,
     `SELECT key, value FROM settings WHERE key IN ('brand_tagline','brand_voice')`,
   );
   const map = Object.fromEntries(settings.map((s) => [s.key, s.value]));
@@ -276,7 +276,7 @@ async function campaignContext(env: Env, campaign: CampaignRow): Promise<string>
       currency: string;
       slug: string;
     }>(
-      env.DB,
+      db,
       `SELECT name, subtitle, description, fabric_composition, origin_statement, base_price_cents, currency, slug
        FROM products WHERE id = ?`,
       campaign.product_id,
@@ -294,7 +294,7 @@ async function campaignContext(env: Env, campaign: CampaignRow): Promise<string>
   }
   if (campaign.collection_id) {
     const collection = await first<{ name: string; season: string | null; editorial_copy: string | null; slug: string }>(
-      env.DB,
+      db,
       `SELECT name, season, editorial_copy, slug FROM collections WHERE id = ?`,
       campaign.collection_id,
     );
@@ -317,10 +317,11 @@ const SYSTEM_MARKETER =
 
 async function generateAssets(
   env: Env,
+  db: D1Database,
   campaign: CampaignRow,
   channels: string[],
 ): Promise<{ channel: string; kind: string; title: string | null; content: string; meta: unknown }[]> {
-  const context = await campaignContext(env, campaign);
+  const context = await campaignContext(env, db, campaign);
   const specs = channels
     .map((slug) => {
       const def = CHANNELS.find((ch) => ch.channel === slug)!;
@@ -370,7 +371,7 @@ const generateSchema = z.object({
 adminMarketingRoutes.post("/campaigns/:id/generate", requireAdminWrite, async (c) => {
   const body = await parseBody(c, generateSchema);
   const campaign = await first<CampaignRow>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM marketing_campaigns WHERE id = ?`,
     c.req.param("id"),
   );
@@ -378,7 +379,7 @@ adminMarketingRoutes.post("/campaigns/:id/generate", requireAdminWrite, async (c
 
   let assets;
   try {
-    assets = await generateAssets(c.env, campaign, body.channels);
+    assets = await generateAssets(c.env, c.var.db, campaign, body.channels);
   } catch (err) {
     if (err instanceof AiUnavailableError) return c.json({ error: err.message }, 503);
     return c.json({ error: "Generation produced unusable output — try again" }, 502);
@@ -390,7 +391,7 @@ adminMarketingRoutes.post("/campaigns/:id/generate", requireAdminWrite, async (c
   // Replace prior unposted assets for the regenerated channels only.
   const placeholders = assets.map(() => "?").join(",");
   await run(
-    c.env.DB,
+    c.var.db,
     `DELETE FROM marketing_assets
      WHERE campaign_id = ? AND posted_at IS NULL AND channel IN (${placeholders})`,
     campaign.id,
@@ -398,7 +399,7 @@ adminMarketingRoutes.post("/campaigns/:id/generate", requireAdminWrite, async (c
   );
   for (const [i, asset] of assets.entries()) {
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO marketing_assets (id, campaign_id, channel, kind, title, content, meta_json, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       newId("mka"),
@@ -411,7 +412,7 @@ adminMarketingRoutes.post("/campaigns/:id/generate", requireAdminWrite, async (c
       i,
     );
   }
-  await writeAudit(c.env.DB, c.var.userId, "marketing.kit.generate", "marketing_campaign", campaign.id, {
+  await writeAudit(c.var.db, c.var.userId, "marketing.kit.generate", "marketing_campaign", campaign.id, {
     channels: body.channels,
   });
   return c.json({ created: assets.length });
@@ -436,7 +437,7 @@ adminMarketingRoutes.patch("/assets/:id", requireAdminWrite, async (c) => {
   if (body.posted !== undefined)
     (sets.push("posted_at = ?"), params.push(body.posted ? new Date().toISOString() : null));
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE marketing_assets SET ${sets.join(", ")} WHERE id = ?`,
     ...params,
     c.req.param("id"),
@@ -446,29 +447,29 @@ adminMarketingRoutes.patch("/assets/:id", requireAdminWrite, async (c) => {
 });
 
 adminMarketingRoutes.delete("/assets/:id", requireAdminWrite, async (c) => {
-  const result = await run(c.env.DB, `DELETE FROM marketing_assets WHERE id = ?`, c.req.param("id"));
+  const result = await run(c.var.db, `DELETE FROM marketing_assets WHERE id = ?`, c.req.param("id"));
   if (!result.meta.changes) return c.json({ error: "Asset not found" }, 404);
   return c.json({ ok: true });
 });
 
 adminMarketingRoutes.post("/assets/:id/regenerate", requireAdminWrite, async (c) => {
   const asset = await first<{ id: string; campaign_id: string; channel: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, campaign_id, channel FROM marketing_assets WHERE id = ?`,
     c.req.param("id"),
   );
   if (!asset) return c.json({ error: "Asset not found" }, 404);
   const campaign = await first<CampaignRow>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM marketing_campaigns WHERE id = ?`,
     asset.campaign_id,
   );
   if (!campaign) return c.json({ error: "Campaign not found" }, 404);
   try {
-    const [generated] = await generateAssets(c.env, campaign, [asset.channel]);
+    const [generated] = await generateAssets(c.env, c.var.db, campaign, [asset.channel]);
     if (!generated) return c.json({ error: "Generation produced nothing — try again" }, 502);
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE marketing_assets SET title = ?, content = ?, meta_json = ?, updated_at = datetime('now')
        WHERE id = ?`,
       generated.title,
@@ -487,7 +488,7 @@ adminMarketingRoutes.post("/assets/:id/regenerate", requireAdminWrite, async (c)
 
 adminMarketingRoutes.get("/calendar", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT a.id, a.channel, a.title, a.scheduled_for, a.posted_at,
             mc.id AS campaign_id, mc.name AS campaign_name
      FROM marketing_assets a
@@ -502,14 +503,14 @@ adminMarketingRoutes.get("/calendar", async (c) => {
 
 adminMarketingRoutes.post("/content-ideas", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { theme?: string };
-  const brandName = await getBrandName(c.env);
+  const brandName = await getBrandName(c.env, c.var.db);
   const settings = await all<{ key: string; value: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT key, value FROM settings WHERE key IN ('brand_tagline','brand_voice')`,
   );
   const map = Object.fromEntries(settings.map((s) => [s.key, s.value]));
   const products = await all<{ name: string; category: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT name, category FROM products WHERE is_published = 1 LIMIT 12`,
   );
   try {
@@ -544,7 +545,7 @@ function audienceWhere(audience: string): { where: string; params: string[] } {
 
 adminMarketingRoutes.get("/email-audience", async (c) => {
   const counts = await all<{ kind: string; n: number }>(
-    c.env.DB,
+    c.var.db,
     `SELECT kind, COUNT(DISTINCT email) AS n FROM leads
      WHERE unsubscribed_at IS NULL AND kind IN ('newsletter','waitlist','drop_notification')
      GROUP BY kind`,
@@ -569,7 +570,7 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
   }
   const body = await parseBody(c, sendSchema);
   const asset = await first<{ id: string; title: string | null; content: string; campaign_id: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, title, content, campaign_id FROM marketing_assets WHERE id = ? AND campaign_id = ?`,
     body.assetId,
     c.req.param("id"),
@@ -579,7 +580,7 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
 
   const { where, params } = audienceWhere(body.audience);
   const recipients = await all<{ email: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT DISTINCT email FROM leads WHERE unsubscribed_at IS NULL AND ${where} LIMIT 500`,
     ...params,
   );
@@ -587,13 +588,13 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
 
   const { getPrimaryShopBase } = await import("../services/shops");
   const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
-  const shopBase = await getPrimaryShopBase(c.env.DB);
+  const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
   const secret = c.env.SESSION_SECRET ?? "";
   const bodyText = asset.content.replaceAll("{{SHOP_URL}}", `${appUrl}${shopBase}/products`);
 
   const sendId = newId("mks");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO marketing_sends (id, campaign_id, asset_id, subject, audience, recipient_count)
      VALUES (?, ?, ?, ?, ?, ?)`,
     sendId,
@@ -604,25 +605,28 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
     recipients.length,
   );
   await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE marketing_assets SET posted_at = ?, updated_at = datetime('now') WHERE id = ?`,
     new Date().toISOString(),
     asset.id,
   );
-  await writeAudit(c.env.DB, c.var.userId, "marketing.email.send", "marketing_send", sendId, {
+  await writeAudit(c.var.db, c.var.userId, "marketing.email.send", "marketing_send", sendId, {
     audience: body.audience,
     recipients: recipients.length,
   });
 
   // Fan the sends out after responding — 500 sequential sends would block.
   const env = c.env;
+  const shopParam = c.var.shopSlug ? `&shop=${encodeURIComponent(c.var.shopSlug)}` : "";
+  const shopBrand = await (await import("../services/brand")).getBrandName(c.env, c.var.db);
   c.executionCtx.waitUntil(
     (async () => {
       for (const r of recipients) {
         const token = (await sha256Hex(`${r.email.toLowerCase()}${secret}`)).slice(0, 32);
-        const unsubscribe = `${appUrl}/api/public/unsubscribe?email=${encodeURIComponent(r.email)}&token=${token}`;
+        const unsubscribe = `${appUrl}/api/public/unsubscribe?email=${encodeURIComponent(r.email)}&token=${token}${shopParam}`;
         await sendBuyerEmail(env, {
           to: r.email,
+          fromName: shopBrand,
           subject: asset.title!,
           text: `${bodyText}\n\n—\nYou're receiving this because you joined the list at ${appUrl}.\nUnsubscribe: ${unsubscribe}`,
         });
@@ -635,7 +639,7 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
 // ---------- Sends history ----------
 adminMarketingRoutes.get("/sends", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT ms.*, mc.name AS campaign_name FROM marketing_sends ms
      LEFT JOIN marketing_campaigns mc ON mc.id = ms.campaign_id
      ORDER BY ms.sent_at DESC LIMIT 50`,

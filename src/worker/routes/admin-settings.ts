@@ -8,11 +8,11 @@ export const adminSettingsRoutes = new Hono<AppContext>();
 
 adminSettingsRoutes.get("/", async (c) => {
   const rows = await all<{ key: string; value: string; description: string | null }>(
-    c.env.DB,
+    c.var.db,
     `SELECT key, value, description FROM settings ORDER BY key`,
   );
   const integrations = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT provider, status, note, last_verified_at FROM integration_credentials_metadata`,
   );
   // Live secret presence (booleans only — never values).
@@ -37,21 +37,21 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
   if (updates.length === 0) return c.json({ error: "No editable settings provided" }, 400);
   for (const [key, value] of updates) {
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO settings (key, value) VALUES (?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
       key,
       value,
     );
   }
-  await writeAudit(c.env.DB, c.var.userId, "settings.update", "settings", null, Object.fromEntries(updates));
+  await writeAudit(c.var.db, c.var.userId, "settings.update", "settings", null, Object.fromEntries(updates));
   return c.json({ ok: true });
 });
 
 // ---------- Audit log ----------
 adminSettingsRoutes.get("/audit", requireAdminOnly, async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT a.id, a.action, a.entity_type, a.entity_id, a.detail, a.created_at, u.email AS user_email
      FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
      ORDER BY a.created_at DESC LIMIT 200`,

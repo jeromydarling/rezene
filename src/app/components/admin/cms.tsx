@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiRequestError } from "../../lib/api";
+import { getShopBase } from "../../lib/shop";
 import { formatDate } from "../../lib/format";
 import { Markdown } from "../Markdown";
 import { ErrorNote } from "./ui";
@@ -144,7 +145,7 @@ export function ImageUploadButton({
       form.set("entityType", entityType);
       form.set("isPublic", "1");
       const uploaded = await api.upload<AdminFile>("/api/admin/files/upload", form);
-      onUploaded(`/media/${uploaded.id}`);
+      onUploaded(`${getShopBase()}/media/${uploaded.id}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Upload failed");
     } finally {
@@ -254,11 +255,11 @@ export function MediaLibrary({ onPick }: { onPick: (url: string, alt: string | n
             <button
               type="button"
               className="block w-full overflow-hidden rounded border border-ink/10 hover:border-navy"
-              onClick={() => onPick(`/media/${file.id}`, file.altText)}
+              onClick={() => onPick(`${getShopBase()}/media/${file.id}`, file.altText)}
               title="Use this image"
             >
               <img
-                src={`/media/${file.id}`}
+                src={`${getShopBase()}/media/${file.id}`}
                 alt={file.altText ?? file.filename}
                 className="aspect-[4/3] w-full object-cover"
                 loading="lazy"

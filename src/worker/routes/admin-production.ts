@@ -24,7 +24,7 @@ export const adminProductionRoutes = new Hono<AppContext>();
 // ---------- Stages ----------
 adminProductionRoutes.get("/stages", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, name, sort_order, description FROM production_stages ORDER BY sort_order`,
   );
   const stages: AdminProductionStage[] = rows.map((r) => ({
@@ -71,7 +71,7 @@ adminProductionRoutes.get("/tasks", async (c) => {
     params.push(status);
   }
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `${TASK_SELECT} ${where} ORDER BY CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date`,
     ...params,
   );
@@ -82,7 +82,7 @@ adminProductionRoutes.post("/tasks", requireAdminWrite, async (c) => {
   const body = await parseBody(c, taskCreateSchema);
   const id = newId("task");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO production_tasks
        (id, title, stage_id, status, owner, style_id, supplier_id, due_date, risk_flag, notes)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -97,10 +97,10 @@ adminProductionRoutes.post("/tasks", requireAdminWrite, async (c) => {
     body.riskFlag ? 1 : 0,
     body.notes ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "production_task.create", "production_task", id, {
+  await writeAudit(c.var.db, c.var.userId, "production_task.create", "production_task", id, {
     title: body.title,
   });
-  const row = await first(c.env.DB, `${TASK_SELECT} WHERE t.id = ?`, id);
+  const row = await first(c.var.db, `${TASK_SELECT} WHERE t.id = ?`, id);
   return c.json(mapTask(row!), 201);
 });
 
@@ -108,7 +108,7 @@ adminProductionRoutes.patch("/tasks/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, taskUpdateSchema);
   const existing = await first<{ id: string; status: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, status FROM production_tasks WHERE id = ?`,
     id,
   );
@@ -141,10 +141,10 @@ adminProductionRoutes.patch("/tasks/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE production_tasks SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await run(c.var.db, `UPDATE production_tasks SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
   if (body.status && body.status !== existing.status) {
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO analytics_events (id, event, entity_type, entity_id, properties_json)
        VALUES (?, 'production_stage_changed', 'production_task', ?, ?)`,
       newId("evt"),
@@ -152,15 +152,15 @@ adminProductionRoutes.patch("/tasks/:id", requireAdminWrite, async (c) => {
       JSON.stringify({ from: existing.status, to: body.status }),
     );
   }
-  await writeAudit(c.env.DB, c.var.userId, "production_task.update", "production_task", id, body);
-  const row = await first(c.env.DB, `${TASK_SELECT} WHERE t.id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "production_task.update", "production_task", id, body);
+  const row = await first(c.var.db, `${TASK_SELECT} WHERE t.id = ?`, id);
   return c.json(mapTask(row!));
 });
 
 // ---------- Calendar ----------
 adminProductionRoutes.get("/calendar", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT e.*, ps.name AS stage_name FROM production_calendar_events e
      LEFT JOIN production_stages ps ON ps.id = e.stage_id
      ORDER BY e.starts_on`,
@@ -182,7 +182,7 @@ adminProductionRoutes.post("/calendar", requireAdminWrite, async (c) => {
   const body = await parseBody(c, calendarEventCreateSchema);
   const id = newId("cal");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO production_calendar_events (id, title, kind, stage_id, starts_on, ends_on, notes)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     id,
@@ -219,7 +219,7 @@ function mapSample(row: Record<string, unknown>): AdminSample {
 }
 
 adminProductionRoutes.get("/samples", async (c) => {
-  const rows = await all(c.env.DB, `${SAMPLE_SELECT} ORDER BY sm.created_at DESC`);
+  const rows = await all(c.var.db, `${SAMPLE_SELECT} ORDER BY sm.created_at DESC`);
   return c.json(rows.map(mapSample));
 });
 
@@ -227,7 +227,7 @@ adminProductionRoutes.post("/samples", requireAdminWrite, async (c) => {
   const body = await parseBody(c, sampleCreateSchema);
   const id = newId("smp");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO samples (id, style_id, supplier_id, round, kind, status, requested_at, notes)
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)`,
     id,
@@ -238,7 +238,7 @@ adminProductionRoutes.post("/samples", requireAdminWrite, async (c) => {
     body.status ?? "requested",
     body.notes ?? null,
   );
-  const row = await first(c.env.DB, `${SAMPLE_SELECT} WHERE sm.id = ?`, id);
+  const row = await first(c.var.db, `${SAMPLE_SELECT} WHERE sm.id = ?`, id);
   return c.json(mapSample(row!), 201);
 });
 
@@ -246,7 +246,7 @@ adminProductionRoutes.patch("/samples/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, sampleUpdateSchema);
   const existing = await first<{ id: string; status: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, status FROM samples WHERE id = ?`,
     id,
   );
@@ -269,31 +269,31 @@ adminProductionRoutes.patch("/samples/:id", requireAdminWrite, async (c) => {
   if (body.status === "received") sets.push(`received_at = datetime('now')`);
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE samples SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await run(c.var.db, `UPDATE samples SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
   if (body.status === "approved" && existing.status !== "approved") {
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO analytics_events (id, event, entity_type, entity_id)
        VALUES (?, 'sample_approved', 'sample', ?)`,
       newId("evt"),
       id,
     );
   }
-  const row = await first(c.env.DB, `${SAMPLE_SELECT} WHERE sm.id = ?`, id);
+  const row = await first(c.var.db, `${SAMPLE_SELECT} WHERE sm.id = ?`, id);
   return c.json(mapSample(row!));
 });
 
 // ---------- Fabrics & materials ----------
 adminProductionRoutes.get("/materials", async (c) => {
   const fabrics = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT f.id, f.name, f.composition, f.weight_gsm, f.origin_country,
             f.price_per_meter_cents, f.currency, f.lead_time_days, f.moq_meters, f.notes,
             sup.name AS supplier_name
      FROM fabrics f LEFT JOIN suppliers sup ON sup.id = f.supplier_id ORDER BY f.name`,
   );
   const trims = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT t.id, t.name, t.spec, t.price_per_unit_cents, t.currency, t.notes,
             sup.name AS supplier_name
      FROM trims t LEFT JOIN suppliers sup ON sup.id = t.supplier_id ORDER BY t.name`,
@@ -304,7 +304,7 @@ adminProductionRoutes.get("/materials", async (c) => {
 // ---------- Production orders ----------
 adminProductionRoutes.get("/orders", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT po.*, sup.name AS supplier_name,
        (SELECT COUNT(*) FROM production_order_items i WHERE i.production_order_id = po.id) AS item_count
      FROM production_orders po JOIN suppliers sup ON sup.id = po.supplier_id
@@ -327,14 +327,14 @@ adminProductionRoutes.get("/orders", async (c) => {
 
 adminProductionRoutes.get("/orders/:id", async (c) => {
   const row = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT po.*, sup.name AS supplier_name FROM production_orders po
      JOIN suppliers sup ON sup.id = po.supplier_id WHERE po.id = ?`,
     c.req.param("id"),
   );
   if (!row) return c.json({ error: "Production order not found" }, 404);
   const items = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT i.*, s.name AS style_name FROM production_order_items i
      LEFT JOIN styles s ON s.id = i.style_id WHERE i.production_order_id = ?`,
     row.id,

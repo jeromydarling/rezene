@@ -27,10 +27,19 @@ import { adminContentRoutes } from "./routes/admin-content";
 import { adminWholesaleRoutes } from "./routes/admin-wholesale";
 import { adminMarketingRoutes } from "./routes/admin-marketing";
 import { adminImportRoutes } from "./routes/admin-import";
+import { adminPlatformRoutes } from "./routes/admin-platform";
+import { tenantMiddleware } from "./middleware/tenant";
+import { getShopDb } from "./services/tenant-db";
 import type { AppContext, Env } from "./types/env";
+
+// Per-shop SQLite databases (Durable Object class must be exported here).
+export { ShopDatabase } from "./do/shop-database";
 
 const app = new Hono<AppContext>();
 
+// Order matters: the tenant is resolved first so authentication itself is
+// scoped to the shop's own database.
+app.use("*", tenantMiddleware);
 app.use("*", sessionMiddleware);
 
 app.onError((err, c) => {
@@ -49,11 +58,13 @@ app.get("/api/health", (c) =>
 
 // Public media: streams R2 objects flagged is_public (storefront imagery
 // uploaded through the CMS). File ids are unique per upload → immutable cache.
-app.get("/media/:fileId", async (c) => {
-  const row = await c.env.DB.prepare(
-    `SELECT r2_key, content_type FROM files WHERE id = ? AND is_public = 1`,
-  )
-    .bind(c.req.param("fileId"))
+// Served per tenant: /media/:id uses the request's resolved shop (custom
+// domain or header, defaulting to the primary shop for legacy URLs), and
+// /:shop/media/:id addresses a shop explicitly (what new uploads emit).
+async function serveMedia(c: Context<AppContext>, db: D1Database, fileId: string) {
+  const row = await db
+    .prepare(`SELECT r2_key, content_type FROM files WHERE id = ? AND is_public = 1`)
+    .bind(fileId)
     .first<{ r2_key: string; content_type: string | null }>();
   if (!row) return c.json({ error: "Not found" }, 404);
   const object = await c.env.FILES.get(row.r2_key);
@@ -64,6 +75,14 @@ app.get("/media/:fileId", async (c) => {
       "cache-control": "public, max-age=31536000, immutable",
     },
   });
+}
+app.get("/media/:fileId", (c) => serveMedia(c, c.var.db, c.req.param("fileId")));
+app.get("/:shopSlug/media/:fileId", async (c) => {
+  const { getShopBySlug } = await import("./services/shops");
+  const shop = await getShopBySlug(c.env.DB, c.req.param("shopSlug"));
+  if (!shop) return c.json({ error: "Not found" }, 404);
+  const { PRIMARY_SHOP_ID } = await import("./services/shops");
+  return serveMedia(c, getShopDb(c.env, shop.id, PRIMARY_SHOP_ID), c.req.param("fileId"));
 });
 
 // --- Edge SEO ------------------------------------------------------------
@@ -73,7 +92,7 @@ app.get("/media/:fileId", async (c) => {
 // context and per-route SEO meta injected at the edge. Legacy Rezene-era
 // paths 301 to the shop-prefixed equivalents.
 import { buildSitemap, injectMeta, injectShopContext, resolveRouteMeta, VERTO_META } from "./services/seo";
-import { getPrimaryShopBase, resolveShop } from "./services/shops";
+import { getPrimaryShopBase, PRIMARY_SHOP_ID, resolveShop } from "./services/shops";
 import type { Context } from "hono";
 
 /** Storefront/app paths that existed before the shop prefix (for 301s). */
@@ -128,7 +147,11 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
   if (!shell.ok) return shell as unknown as Response;
   const canonicalBase = (c.env.APP_URL || url.origin).replace(/\/$/, "");
   const meta = shop
-    ? await resolveRouteMeta(c.env, strippedPath)
+    ? await resolveRouteMeta(
+        c.env,
+        getShopDb(c.env, shop.id, PRIMARY_SHOP_ID),
+        strippedPath,
+      )
     : VERTO_META[url.pathname] ?? VERTO_META["/"];
   let html = injectMeta(await shell.text(), meta, `${canonicalBase}${basePath}${strippedPath === "/" && shop ? "" : shop ? strippedPath : url.pathname}`);
   html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
@@ -193,6 +216,7 @@ admin.route("/analytics", adminAnalyticsRoutes);
 admin.route("/content", adminContentRoutes);
 admin.route("/wholesale", adminWholesaleRoutes);
 admin.route("/marketing", adminMarketingRoutes);
+admin.route("/platform", adminPlatformRoutes);
 admin.route("/import", adminImportRoutes);
 app.route("/api/admin", admin);
 
@@ -220,16 +244,29 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-/** Flip due scheduled drafts live (publish_at in the past). */
+/** Flip due scheduled drafts live (publish_at in the past) — every shop. */
 async function publishDueContent(env: Env): Promise<void> {
+  const shops = await env.DB.prepare(
+    `SELECT id FROM shops WHERE status = 'active'`,
+  ).all<{ id: string }>();
+  for (const shop of shops.results) {
+    try {
+      await publishDueForShop(getShopDb(env, shop.id, PRIMARY_SHOP_ID));
+    } catch (err) {
+      console.error(`[cron] publish-due failed for ${shop.id}:`, err);
+    }
+  }
+}
+
+async function publishDueForShop(db: D1Database): Promise<void> {
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
-  await env.DB.prepare(
+  await db.prepare(
     `UPDATE pages SET is_published = 1, publish_at = NULL, updated_at = datetime('now')
      WHERE is_published = 0 AND publish_at IS NOT NULL AND publish_at <= ?`,
   )
     .bind(now)
     .run();
-  await env.DB.prepare(
+  await db.prepare(
     `UPDATE journal_posts SET is_published = 1, publish_at = NULL,
        published_at = COALESCE(published_at, date('now'))
      WHERE is_published = 0 AND publish_at IS NOT NULL AND publish_at <= ?`,

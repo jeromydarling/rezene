@@ -6,10 +6,10 @@ import type { Env } from "../types/env";
  * email sender names). Settings table wins; the wrangler.toml var is
  * only the fallback for a fresh database.
  */
-export async function getBrandName(env: Env): Promise<string> {
+export async function getBrandName(env: Env, db: D1Database = env.DB): Promise<string> {
   try {
     const row = await first<{ value: string }>(
-      env.DB,
+      db,
       `SELECT value FROM settings WHERE key = 'brand_name'`,
     );
     const value = row?.value?.trim();

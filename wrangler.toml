@@ -72,6 +72,17 @@ name = "EMAIL"
 [ai]
 binding = "AI"
 
+# Per-shop SQLite databases: every non-primary shop's data lives in its own
+# ShopDatabase Durable Object — physical tenant isolation, one object per
+# shop, schema bootstrapped from the embedded migrations.
+[[durable_objects.bindings]]
+name = "SHOP_DB"
+class_name = "ShopDatabase"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShopDatabase"]
+
 # 06:00 daily — ops digest / low-stock + late-task sweep.
 # :30 hourly — publish scheduled pages & journal posts that are due.
 # (see scheduled handler in src/worker/index.ts)

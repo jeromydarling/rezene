@@ -18,7 +18,7 @@ export function buyerEmailConfigured(env: Env): boolean {
 
 export async function sendBuyerEmail(
   env: Env,
-  opts: { to: string; subject: string; text: string },
+  opts: { to: string; subject: string; text: string; fromName?: string },
 ): Promise<boolean> {
   if (!buyerEmailConfigured(env)) {
     console.log(`[buyer-email] skipped (not configured): ${opts.subject}`);
@@ -26,7 +26,7 @@ export async function sendBuyerEmail(
   }
   try {
     const msg = createMimeMessage();
-    msg.setSender({ name: await getBrandName(env), addr: env.BUYER_EMAIL_FROM });
+    msg.setSender({ name: opts.fromName ?? (await getBrandName(env)), addr: env.BUYER_EMAIL_FROM });
     msg.setRecipient(opts.to);
     msg.setSubject(opts.subject);
     msg.addMessage({ contentType: "text/plain", data: opts.text });

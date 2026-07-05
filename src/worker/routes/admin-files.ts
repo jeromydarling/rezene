@@ -60,7 +60,7 @@ adminFileRoutes.get("/", async (c) => {
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM files ${where} ORDER BY created_at DESC LIMIT 500`,
     ...params,
   );
@@ -72,7 +72,7 @@ adminFileRoutes.patch("/:id", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { altText?: string | null };
   if (body.altText === undefined) return c.json({ error: "Nothing to update" }, 400);
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE files SET alt_text = ? WHERE id = ?`,
     body.altText ? String(body.altText).slice(0, 300) : null,
     c.req.param("id"),
@@ -84,7 +84,7 @@ adminFileRoutes.patch("/:id", requireAdminWrite, async (c) => {
 /** Vision-generated alt text for an uploaded image. */
 adminFileRoutes.post("/:id/ai-alt", requireAdminWrite, async (c) => {
   const row = await first<{ id: string; r2_key: string; content_type: string | null; size_bytes: number | null }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, r2_key, content_type, size_bytes FROM files WHERE id = ?`,
     c.req.param("id"),
   );
@@ -115,7 +115,7 @@ adminFileRoutes.post("/:id/ai-alt", requireAdminWrite, async (c) => {
     });
     const altText = result.text.trim().replace(/^"|"$/g, "").slice(0, 300);
     if (!altText) return c.json({ error: "The model returned nothing — try again" }, 502);
-    await run(c.env.DB, `UPDATE files SET alt_text = ? WHERE id = ?`, altText, row.id);
+    await run(c.var.db, `UPDATE files SET alt_text = ? WHERE id = ?`, altText, row.id);
     return c.json({ altText });
   } catch (err) {
     const { AnthropicNotConfiguredError } = await import("../services/anthropic");
@@ -158,7 +158,7 @@ adminFileRoutes.post("/upload", requireAdminWrite, async (c) => {
     httpMetadata: { contentType: file.type || "application/octet-stream" },
   });
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
@@ -171,12 +171,12 @@ adminFileRoutes.post("/upload", requireAdminWrite, async (c) => {
     isPublic ? 1 : 0,
     c.var.userId,
   );
-  await writeAudit(c.env.DB, c.var.userId, "file.upload", "file", id, {
+  await writeAudit(c.var.db, c.var.userId, "file.upload", "file", id, {
     filename: file.name,
     entityType,
     entityId,
   });
-  const row = await first(c.env.DB, `SELECT * FROM files WHERE id = ?`, id);
+  const row = await first(c.var.db, `SELECT * FROM files WHERE id = ?`, id);
   return c.json(mapFile(row!), 201);
 });
 
@@ -187,7 +187,7 @@ adminFileRoutes.post("/upload", requireAdminWrite, async (c) => {
  */
 adminFileRoutes.get("/:id/download", async (c) => {
   const row = await first<{ r2_key: string; filename: string; content_type: string | null }>(
-    c.env.DB,
+    c.var.db,
     `SELECT r2_key, filename, content_type FROM files WHERE id = ?`,
     c.req.param("id"),
   );
@@ -206,13 +206,13 @@ adminFileRoutes.get("/:id/download", async (c) => {
 adminFileRoutes.delete("/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const row = await first<{ r2_key: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT r2_key FROM files WHERE id = ?`,
     id,
   );
   if (!row) return c.json({ error: "File not found" }, 404);
   await c.env.FILES.delete(row.r2_key);
-  await run(c.env.DB, `DELETE FROM files WHERE id = ?`, id);
-  await writeAudit(c.env.DB, c.var.userId, "file.delete", "file", id, { r2Key: row.r2_key });
+  await run(c.var.db, `DELETE FROM files WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "file.delete", "file", id, { r2Key: row.r2_key });
   return c.json({ ok: true });
 });

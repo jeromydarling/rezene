@@ -35,7 +35,7 @@ function parseJsonRecord(value: string | null): Record<string, unknown> {
 
 // ---------- Overview: catalog merged with connection state ----------
 adminShippingRoutes.get("/", async (c) => {
-  const rows = await all<ProviderConfigRow>(c.env.DB, `SELECT * FROM shipping_provider_configs`);
+  const rows = await all<ProviderConfigRow>(c.var.db, `SELECT * FROM shipping_provider_configs`);
   const byProvider = new Map(rows.map((r) => [r.provider, r]));
   const providers = PROVIDER_CATALOG.map((entry) => {
     const row = byProvider.get(entry.provider);
@@ -53,14 +53,16 @@ adminShippingRoutes.get("/", async (c) => {
       lastVerifyError: row?.last_verify_error ?? null,
       webhookPath:
         entry.supportsWebhooks && row?.webhook_token
-          ? `/api/shipping/webhooks/${entry.provider}/${row.webhook_token}`
+          ? c.var.shopSlug
+            ? `/api/shipping/webhooks/s/${c.var.shopSlug}/${entry.provider}/${row.webhook_token}`
+            : `/api/shipping/webhooks/${entry.provider}/${row.webhook_token}`
           : null,
     };
   });
   const [origin, parcel, perItemWeightKg] = await Promise.all([
-    getOriginAddress(c.env.DB),
-    getDefaultParcel(c.env.DB),
-    getPerItemWeightKg(c.env.DB),
+    getOriginAddress(c.var.db),
+    getDefaultParcel(c.var.db),
+    getPerItemWeightKg(c.var.db),
   ]);
   return c.json({ providers, origin, parcel, perItemWeightKg });
 });
@@ -97,7 +99,7 @@ adminShippingRoutes.put("/origin", requireAdminWrite, async (c) => {
   ];
   for (const [key, value, description] of entries) {
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO settings (key, value, description) VALUES (?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
       key,
@@ -105,7 +107,7 @@ adminShippingRoutes.put("/origin", requireAdminWrite, async (c) => {
       description,
     );
   }
-  await writeAudit(c.env.DB, c.var.userId, "shipping.origin.update", "settings", null, body);
+  await writeAudit(c.var.db, c.var.userId, "shipping.origin.update", "settings", null, body);
   return c.json({ ok: true });
 });
 
@@ -123,7 +125,7 @@ adminShippingRoutes.put("/providers/:provider", requireAdminOnly, async (c) => {
   if (!entry) return c.json({ error: "Unknown provider" }, 404);
   const body = await parseBody(c, providerUpdateSchema);
 
-  const existing = await getProviderConfig(c.env.DB, provider);
+  const existing = await getProviderConfig(c.var.db, provider);
   const credentials = existing ? parseJsonRecord(existing.credentials_json) : {};
   // Merge: only provided keys change; empty string clears a stored secret.
   const allowedCredKeys = new Set(entry.credentialFields.map((f) => f.key));
@@ -140,7 +142,7 @@ adminShippingRoutes.put("/providers/:provider", requireAdminOnly, async (c) => {
   const webhookToken = existing?.webhook_token ?? randomToken(24);
 
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO shipping_provider_configs
        (id, provider, is_enabled, use_at_checkout, credentials_json, config_json, webhook_token)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -160,7 +162,7 @@ adminShippingRoutes.put("/providers/:provider", requireAdminOnly, async (c) => {
     webhookToken,
   );
   // Audit which credential keys changed — never their values.
-  await writeAudit(c.env.DB, c.var.userId, "shipping.provider.update", "shipping_provider", provider, {
+  await writeAudit(c.var.db, c.var.userId, "shipping.provider.update", "shipping_provider", provider, {
     credentialKeys: Object.keys(body.credentials ?? {}),
     config: body.config,
     isEnabled,
@@ -172,7 +174,7 @@ adminShippingRoutes.put("/providers/:provider", requireAdminOnly, async (c) => {
 /** Live credential check: quote a canned parcel and store the outcome. */
 adminShippingRoutes.post("/providers/:provider/test", requireAdminOnly, async (c) => {
   const provider = c.req.param("provider");
-  const row = await getProviderConfig(c.env.DB, provider);
+  const row = await getProviderConfig(c.var.db, provider);
   if (!row) return c.json({ error: "Provider not configured yet — save credentials first" }, 404);
 
   const body = (await c.req.json().catch(() => ({}))) as { country?: string };
@@ -183,16 +185,16 @@ adminShippingRoutes.post("/providers/:provider/test", requireAdminOnly, async (c
     line1: "1 Test Street",
     name: "Test Recipient",
   };
-  const req = await buildRateRequest(c.env.DB, {
+  const req = await buildRateRequest(c.var.db, {
     to,
     items: [{ description: "Linen shirt", quantity: 1, valueCents: 15000, currency: "USD", hsCode: "620520" }],
     currency: "USD",
     subtotalCents: 15000,
   });
   try {
-    const quotes = await makeAdapter(c.env.DB, row).getRates(req);
+    const quotes = await makeAdapter(c.var.db, row).getRates(req);
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE shipping_provider_configs
        SET last_verified_at = datetime('now'), last_verify_error = NULL, updated_at = datetime('now')
        WHERE provider = ?`,
@@ -203,7 +205,7 @@ adminShippingRoutes.post("/providers/:provider/test", requireAdminOnly, async (c
     const message =
       err instanceof ShippingProviderError ? err.message : "Connection failed — check credentials";
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE shipping_provider_configs
        SET last_verify_error = ?, updated_at = datetime('now') WHERE provider = ?`,
       message.slice(0, 500),
@@ -216,11 +218,11 @@ adminShippingRoutes.post("/providers/:provider/test", requireAdminOnly, async (c
 // ---------- Manual zones & rates ----------
 adminShippingRoutes.get("/zones", async (c) => {
   const zones = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, name, countries_json, sort_order, is_active FROM shipping_zones ORDER BY sort_order`,
   );
   const rates = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, zone_id, name, amount_cents, currency, free_over_cents,
             min_transit_days, max_transit_days, sort_order, is_active
      FROM shipping_rates ORDER BY sort_order`,
@@ -242,7 +244,7 @@ adminShippingRoutes.post("/zones", requireAdminWrite, async (c) => {
   const body = await parseBody(c, zoneSchema);
   const id = newId("zone");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO shipping_zones (id, name, countries_json, sort_order) VALUES (?, ?, ?, ?)`,
     id,
     body.name,
@@ -262,12 +264,12 @@ adminShippingRoutes.patch("/zones/:id", requireAdminWrite, async (c) => {
   if (body.sortOrder !== undefined) (sets.push("sort_order = ?"), params.push(body.sortOrder));
   if (body.isActive !== undefined) (sets.push("is_active = ?"), params.push(body.isActive ? 1 : 0));
   if (sets.length === 0) return c.json({ error: "Nothing to update" }, 400);
-  await run(c.env.DB, `UPDATE shipping_zones SET ${sets.join(", ")} WHERE id = ?`, ...params, c.req.param("id"));
+  await run(c.var.db, `UPDATE shipping_zones SET ${sets.join(", ")} WHERE id = ?`, ...params, c.req.param("id"));
   return c.json({ ok: true });
 });
 
 adminShippingRoutes.delete("/zones/:id", requireAdminWrite, async (c) => {
-  await run(c.env.DB, `DELETE FROM shipping_zones WHERE id = ?`, c.req.param("id"));
+  await run(c.var.db, `DELETE FROM shipping_zones WHERE id = ?`, c.req.param("id"));
   return c.json({ ok: true });
 });
 
@@ -284,11 +286,11 @@ const rateSchema = z.object({
 
 adminShippingRoutes.post("/rates", requireAdminWrite, async (c) => {
   const body = await parseBody(c, rateSchema);
-  const zone = await first(c.env.DB, `SELECT id FROM shipping_zones WHERE id = ?`, body.zoneId);
+  const zone = await first(c.var.db, `SELECT id FROM shipping_zones WHERE id = ?`, body.zoneId);
   if (!zone) return c.json({ error: "Zone not found" }, 404);
   const id = newId("rate");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO shipping_rates
        (id, zone_id, name, amount_cents, currency, free_over_cents, min_transit_days, max_transit_days, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -329,12 +331,12 @@ adminShippingRoutes.patch("/rates/:id", requireAdminWrite, async (c) => {
   }
   if (body.isActive !== undefined) (sets.push("is_active = ?"), params.push(body.isActive ? 1 : 0));
   if (sets.length === 0) return c.json({ error: "Nothing to update" }, 400);
-  await run(c.env.DB, `UPDATE shipping_rates SET ${sets.join(", ")} WHERE id = ?`, ...params, c.req.param("id"));
+  await run(c.var.db, `UPDATE shipping_rates SET ${sets.join(", ")} WHERE id = ?`, ...params, c.req.param("id"));
   return c.json({ ok: true });
 });
 
 adminShippingRoutes.delete("/rates/:id", requireAdminWrite, async (c) => {
-  await run(c.env.DB, `DELETE FROM shipping_rates WHERE id = ?`, c.req.param("id"));
+  await run(c.var.db, `DELETE FROM shipping_rates WHERE id = ?`, c.req.param("id"));
   return c.json({ ok: true });
 });
 
@@ -396,21 +398,21 @@ async function orderRateRequest(db: D1Database, order: OrderRow) {
 
 adminShippingRoutes.get("/orders/:orderId/rates", async (c) => {
   const order = await first<OrderRow>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, currency, subtotal_cents, shipping_country, shipping_address_json, email
      FROM orders WHERE id = ?`,
     c.req.param("orderId"),
   );
   if (!order) return c.json({ error: "Order not found" }, 404);
-  const req = await orderRateRequest(c.env.DB, order);
+  const req = await orderRateRequest(c.var.db, order);
   if (!req) return c.json({ error: "Order has no shipping address yet" }, 409);
-  const outcome = await quoteEnabledProviders(c.env.DB, req, { timeoutMs: 20_000 });
+  const outcome = await quoteEnabledProviders(c.var.db, req, { timeoutMs: 20_000 });
   return c.json(outcome);
 });
 
 adminShippingRoutes.get("/orders/:orderId/shipments", async (c) => {
   const shipments = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, provider, carrier, service, tracking_number, tracking_url, label_url,
             cost_cents, currency, status, created_at, updated_at
      FROM order_shipments WHERE order_id = ? ORDER BY created_at DESC`,
@@ -419,7 +421,7 @@ adminShippingRoutes.get("/orders/:orderId/shipments", async (c) => {
   const events =
     shipments.length > 0
       ? await all(
-          c.env.DB,
+          c.var.db,
           `SELECT shipment_id, status, description, location, occurred_at, created_at
            FROM shipment_events
            WHERE shipment_id IN (${shipments.map(() => "?").join(",")})
@@ -446,7 +448,7 @@ adminShippingRoutes.post("/orders/:orderId/shipments", requireAdminWrite, async 
   const orderId = c.req.param("orderId");
   const body = await parseBody(c, shipmentCreateSchema);
   const order = await first<OrderRow & { fulfillment_status: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, currency, subtotal_cents, shipping_country, shipping_address_json, email, fulfillment_status
      FROM orders WHERE id = ?`,
     orderId,
@@ -467,11 +469,11 @@ adminShippingRoutes.post("/orders/:orderId/shipments", requireAdminWrite, async 
     };
     status = body.trackingNumber ? "in_transit" : "created";
   } else {
-    const row = await getProviderConfig(c.env.DB, body.provider);
+    const row = await getProviderConfig(c.var.db, body.provider);
     if (!row || !row.is_enabled) return c.json({ error: "Provider is not enabled" }, 409);
-    const adapter = makeAdapter(c.env.DB, row);
+    const adapter = makeAdapter(c.var.db, row);
     if (!adapter.createLabel) return c.json({ error: "Provider cannot buy labels" }, 409);
-    const req = await orderRateRequest(c.env.DB, order);
+    const req = await orderRateRequest(c.var.db, order);
     if (!req) return c.json({ error: "Order has no shipping address yet" }, 409);
     try {
       result = await adapter.createLabel({
@@ -499,7 +501,7 @@ adminShippingRoutes.post("/orders/:orderId/shipments", requireAdminWrite, async 
   }
 
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO order_shipments
        (id, order_id, provider, carrier, service, external_id, tracking_number, tracking_url,
         label_url, label_r2_key, cost_cents, currency, status, raw_json)
@@ -524,13 +526,13 @@ adminShippingRoutes.post("/orders/:orderId/shipments", requireAdminWrite, async 
   const nextFulfillment = status === "in_transit" ? "shipped" : "processing";
   if (!["shipped", "delivered", "cancelled"].includes(order.fulfillment_status)) {
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE orders SET fulfillment_status = ?, updated_at = datetime('now') WHERE id = ?`,
       nextFulfillment,
       orderId,
     );
   }
-  await writeAudit(c.env.DB, c.var.userId, "shipping.shipment.create", "order_shipment", id, {
+  await writeAudit(c.var.db, c.var.userId, "shipping.shipment.create", "order_shipment", id, {
     orderId,
     provider: body.provider,
     trackingNumber: result.trackingNumber ?? body.trackingNumber ?? null,
@@ -556,20 +558,20 @@ adminShippingRoutes.patch("/shipments/:id", requireAdminWrite, async (c) => {
     }),
   );
   const shipment = await first<{ id: string; order_id: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, order_id FROM order_shipments WHERE id = ?`,
     c.req.param("id"),
   );
   if (!shipment) return c.json({ error: "Shipment not found" }, 404);
   await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE order_shipments SET status = ?, updated_at = datetime('now') WHERE id = ?`,
     body.status,
     shipment.id,
   );
   if (body.status === "delivered" || body.status === "in_transit") {
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE orders SET fulfillment_status = ?, updated_at = datetime('now')
        WHERE id = ? AND fulfillment_status != 'cancelled'`,
       body.status === "delivered" ? "delivered" : "shipped",
@@ -582,7 +584,7 @@ adminShippingRoutes.patch("/shipments/:id", requireAdminWrite, async (c) => {
 /** Stream a stored label PDF from R2 (labels bought via DHL/Sendcloud). */
 adminShippingRoutes.get("/shipments/:id/label", async (c) => {
   const row = await first<{ label_r2_key: string | null }>(
-    c.env.DB,
+    c.var.db,
     `SELECT label_r2_key FROM order_shipments WHERE id = ?`,
     c.req.param("id"),
   );

@@ -6,7 +6,7 @@
   "description": "Cloudflare-native brand OS and DTC commerce platform for a Morocco-produced Atlantic Riviera clothing brand.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/embed-migrations.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
     "deploy": "npm run build && wrangler deploy",

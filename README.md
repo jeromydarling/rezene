@@ -24,9 +24,24 @@ This app now serves two things from one Worker:
 
 The edge injects `window.__VERTO__` (the resolved shop or null) into the
 document shell; the SPA boots the Verto marketing app or the shop app
-under a router basename accordingly. Shop *data* is still single-tenant —
-the registry, routing, and signup exist so tenant scoping can land without
-another URL migration.
+under a router basename accordingly.
+
+**Tenant isolation is physical.** Every non-primary shop's data lives in
+its own SQLite Durable Object (`ShopDatabase`), bootstrapped from the
+embedded schema migrations (`scripts/embed-migrations.mjs` — rerun after
+adding a migration; it runs on every build). The tenant middleware
+resolves the shop (custom domain → `X-Verto-Shop` header → primary) and
+hangs the right database on the request before authentication runs, so a
+session token only exists in its own shop's database. The primary shop
+(Rezene) stays on the bound D1. Provisioning (Admin → System → Verto
+Shops, primary shop only) turns a pending signup into a live shop: schema
+bootstrap, neutral seed (roles, settings, block homepage, legal drafts),
+owner admin account with a one-time-shown generated password, credentials
+emailed, slug routing instantly. Suspending a shop stops its routing.
+
+Platform-wide for now (per-shop in the Stripe Connect phase): Stripe
+keys, Anthropic key, email sending, R2 bucket (rows per shop DB keep
+objects private per tenant).
 
 ## Architecture
 
@@ -281,7 +296,8 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | AI content suite: interview drafting, selection rewrite, SEO meta, image alt text, brand voice, site-starter interview | admin Content (needs Anthropic key) | ✅ working |
 | Storefront translations: EN/FR toggle, on-demand Llama translation via Workers AI, cached in D1 | `services/translate.ts` | ✅ working |
 | Marketing suite: AI campaign kits (IG/story/TikTok/Pinterest/X/FB, email, blog, press release, Google/Meta ads), posting calendar, graphics studio (SVG→PNG), subscriber email sends w/ unsubscribe, SEO content ideas | admin Marketing (Anthropic key or Workers AI Llama) | ✅ working |
-| Verto platform: marketing site + pricing + signup at `/`, shop registry with path routing (`/rezene`) and CNAME-ready domain mapping, legacy 301s | `services/shops.ts`, `verto/VertoApp.tsx` | ✅ working (tenant scoping next) |
+| Verto platform: marketing site + pricing + signup at `/`, shop registry with path routing (`/rezene`) and CNAME-ready domain mapping, legacy 301s | `services/shops.ts`, `verto/VertoApp.tsx` | ✅ working |
+| Multi-tenancy: per-shop SQLite Durable Object databases, tenant middleware, one-click provisioning of signups, suspend/reactivate, per-shop webhooks/media/SEO/unsubscribe | `do/shop-database.ts`, `services/tenant-db.ts`, `services/provision.ts` | ✅ working |
 | Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
 | Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |

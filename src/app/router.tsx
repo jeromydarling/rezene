@@ -33,6 +33,7 @@ import { AiConceptsPage, ThreeDPage, FilesPage } from "./pages/admin/StudioPages
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
+import { PlatformPage } from "./pages/admin/PlatformPage";
 import {
   PagesEditorPage,
   JournalEditorPage,
@@ -135,6 +136,7 @@ export function AppRouter() {
           <Route path="duties" element={<DutiesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="platform" element={<PlatformPage />} />
           <Route path="content/pages" element={<PagesEditorPage />} />
           <Route path="content/journal" element={<JournalEditorPage />} />
           <Route path="content/lookbooks" element={<LookbooksEditorPage />} />

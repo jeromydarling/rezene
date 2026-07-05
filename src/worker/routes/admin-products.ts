@@ -35,32 +35,32 @@ function mapProduct(row: Record<string, unknown>): AdminProduct {
 }
 
 adminProductRoutes.get("/", async (c) => {
-  const rows = await all(c.env.DB, `${PRODUCT_SELECT} ORDER BY p.sort_order`);
+  const rows = await all(c.var.db, `${PRODUCT_SELECT} ORDER BY p.sort_order`);
   return c.json(rows.map(mapProduct));
 });
 
 adminProductRoutes.get("/:id", async (c) => {
   const row = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `${PRODUCT_SELECT} WHERE p.id = ?`,
     c.req.param("id"),
   );
   if (!row) return c.json({ error: "Product not found" }, 404);
   const variants = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT v.*, i.on_hand, i.reserved, i.incoming FROM product_variants v
      LEFT JOIN inventory_items i ON i.variant_id = v.id
      WHERE v.product_id = ? ORDER BY v.colorway_name, v.size`,
     row.id,
   );
   const images = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, url, alt_text, colorway_name, sort_order FROM product_images
      WHERE product_id = ? ORDER BY sort_order`,
     row.id,
   );
   const mappings = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, variant_id, stripe_product_id, stripe_price_id, currency, synced_at
      FROM stripe_product_mappings WHERE product_id = ?`,
     row.id,
@@ -81,7 +81,7 @@ adminProductRoutes.get("/:id", async (c) => {
 adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, productUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM products WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM products WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Product not found" }, 404);
 
   const sets: string[] = [];
@@ -109,16 +109,16 @@ adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE products SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "product.update", "product", id, body);
-  const row = await first(c.env.DB, `${PRODUCT_SELECT} WHERE p.id = ?`, id);
+  await run(c.var.db, `UPDATE products SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "product.update", "product", id, body);
+  const row = await first(c.var.db, `${PRODUCT_SELECT} WHERE p.id = ?`, id);
   return c.json(mapProduct(row!));
 });
 
 // ---------- Collections ----------
 adminProductRoutes.get("/collections/all", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT c.id, c.slug, c.name, c.season, c.is_published, c.sort_order,
        (SELECT COUNT(*) FROM products p WHERE p.collection_id = c.id) AS product_count,
        (SELECT COUNT(*) FROM styles s WHERE s.collection_id = c.id) AS style_count
@@ -128,14 +128,14 @@ adminProductRoutes.get("/collections/all", async (c) => {
 });
 
 adminProductRoutes.get("/collections/detail", async (c) => {
-  const rows = await all(c.env.DB, `SELECT * FROM collections ORDER BY sort_order`);
+  const rows = await all(c.var.db, `SELECT * FROM collections ORDER BY sort_order`);
   return c.json(rows);
 });
 
 // ---------- Inventory ----------
 adminProductRoutes.get("/inventory/all", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT i.id AS inventory_item_id, i.variant_id, i.on_hand, i.reserved, i.incoming,
             i.pre_order_allocated, i.low_stock_threshold,
             v.colorway_name, v.size, p.name AS product_name, k.sku_code
@@ -169,7 +169,7 @@ adminProductRoutes.get("/inventory/all", async (c) => {
 adminProductRoutes.post("/inventory/adjust", requireAdminWrite, async (c) => {
   const body = await parseBody(c, inventoryAdjustSchema);
   const item = await first<{ id: string; on_hand: number; reserved: number; incoming: number }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, on_hand, reserved, incoming FROM inventory_items WHERE id = ?`,
     body.inventoryItemId,
   );
@@ -211,8 +211,8 @@ adminProductRoutes.post("/inventory/adjust", requireAdminWrite, async (c) => {
   const newReserved = Math.max(0, item.reserved + reservedDelta);
   const newIncoming = Math.max(0, item.incoming + incomingDelta);
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(
+  await c.var.db.batch([
+    c.var.db.prepare(
       `UPDATE inventory_items SET on_hand = ?, reserved = ?, incoming = ?,
          pre_order_allocated = pre_order_allocated + ?, updated_at = datetime('now')
        WHERE id = ?`,
@@ -223,11 +223,11 @@ adminProductRoutes.post("/inventory/adjust", requireAdminWrite, async (c) => {
       body.kind === "preorder_allocate" ? q : 0,
       item.id,
     ),
-    c.env.DB.prepare(
+    c.var.db.prepare(
       `INSERT INTO inventory_movements (id, inventory_item_id, kind, quantity, reference_type, note, created_by)
        VALUES (?, ?, ?, ?, 'manual', ?, ?)`,
     ).bind(newId("mov"), item.id, body.kind, q, body.note ?? null, c.var.userId),
   ]);
-  await writeAudit(c.env.DB, c.var.userId, "inventory.adjust", "inventory_item", item.id, body);
+  await writeAudit(c.var.db, c.var.userId, "inventory.adjust", "inventory_item", item.id, body);
   return c.json({ ok: true, onHand: newOnHand, reserved: newReserved, incoming: newIncoming });
 });

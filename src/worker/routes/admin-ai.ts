@@ -16,7 +16,7 @@ export const adminAiRoutes = new Hono<AppContext>();
 // ---------- Prompt library ----------
 adminAiRoutes.get("/prompts", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM ai_prompts ORDER BY is_preset DESC, category, name`,
   );
   const prompts: AdminAiPrompt[] = rows.map((r) => ({
@@ -36,7 +36,7 @@ adminAiRoutes.post("/prompts", requireAdminWrite, async (c) => {
   const body = await parseBody(c, aiPromptCreateSchema);
   const id = newId("aip");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO ai_prompts (id, name, category, target_tool, prompt_text, notes)
      VALUES (?, ?, ?, ?, ?, ?)`,
     id,
@@ -54,14 +54,14 @@ adminAiRoutes.post("/prompts/:id/version", requireAdminWrite, async (c) => {
   const parentId = c.req.param("id");
   const body = await parseBody(c, aiPromptCreateSchema.pick({ promptText: true, notes: true }).partial({ notes: true }));
   const parent = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM ai_prompts WHERE id = ?`,
     parentId,
   );
   if (!parent) return c.json({ error: "Prompt not found" }, 404);
   const id = newId("aip");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO ai_prompts (id, name, category, target_tool, prompt_text, version, parent_prompt_id, notes)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
@@ -97,19 +97,19 @@ function mapConcept(row: Record<string, unknown>): AdminAiConcept {
 }
 
 adminAiRoutes.get("/concepts", async (c) => {
-  const rows = await all(c.env.DB, `${CONCEPT_SELECT} ORDER BY ac.created_at DESC`);
+  const rows = await all(c.var.db, `${CONCEPT_SELECT} ORDER BY ac.created_at DESC`);
   return c.json(rows.map(mapConcept));
 });
 
 adminAiRoutes.get("/concepts/:id", async (c) => {
   const row = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `${CONCEPT_SELECT} WHERE ac.id = ?`,
     c.req.param("id"),
   );
   if (!row) return c.json({ error: "Concept not found" }, 404);
   const generations = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, tool, model, prompt_text, output_kind, output_text, external_url, created_at
      FROM ai_generations WHERE concept_id = ? ORDER BY created_at DESC`,
     row.id,
@@ -121,7 +121,7 @@ adminAiRoutes.post("/concepts", requireAdminWrite, async (c) => {
   const body = await parseBody(c, aiConceptCreateSchema);
   const id = newId("aic");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO ai_concepts (id, title, brief, prompt_id, style_id, tags, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     id,
@@ -133,19 +133,19 @@ adminAiRoutes.post("/concepts", requireAdminWrite, async (c) => {
     c.var.userId,
   );
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO analytics_events (id, event, entity_type, entity_id) VALUES (?, 'concept_created', 'ai_concept', ?)`,
     newId("evt"),
     id,
   );
-  const row = await first(c.env.DB, `${CONCEPT_SELECT} WHERE ac.id = ?`, id);
+  const row = await first(c.var.db, `${CONCEPT_SELECT} WHERE ac.id = ?`, id);
   return c.json(mapConcept(row!), 201);
 });
 
 adminAiRoutes.patch("/concepts/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, aiConceptUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM ai_concepts WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM ai_concepts WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Concept not found" }, 404);
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -171,15 +171,15 @@ adminAiRoutes.patch("/concepts/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE ai_concepts SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "ai_concept.update", "ai_concept", id, body);
+  await run(c.var.db, `UPDATE ai_concepts SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "ai_concept.update", "ai_concept", id, body);
   return c.json({ ok: true });
 });
 
 // ---------- External tool exports (Midjourney / Firefly / CLO bridges) ----------
 adminAiRoutes.get("/external-exports", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, tool, entity_type, entity_id, title, external_url, metadata_json, created_at
      FROM external_tool_exports ORDER BY created_at DESC LIMIT 200`,
   );
@@ -200,7 +200,7 @@ adminAiRoutes.post("/external-exports", requireAdminWrite, async (c) => {
   }
   const id = newId("ext");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO external_tool_exports (id, tool, entity_type, entity_id, title, external_url, metadata_json)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     id,

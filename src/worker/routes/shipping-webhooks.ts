@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { all, first, run } from "../services/db";
 import { getProviderConfig, makeAdapter, type ShipmentStatus } from "../services/shipping";
 import { newId } from "../utils/id";
@@ -36,14 +36,30 @@ const STATUS_RANK: Record<ShipmentStatus, number> = {
   cancelled: 4,
 };
 
-shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
-  const provider = c.req.param("provider");
-  const token = c.req.param("token");
-  const row = await getProviderConfig(c.env.DB, provider);
+// Two shapes: legacy /webhooks/:provider/:token (primary shop) and
+// /webhooks/s/:shop/:provider/:token (any shop — what new configs emit).
+async function shopDbForWebhook(c: Context<AppContext>): Promise<D1Database | null> {
+  const slug = c.req.param("shop");
+  if (!slug) return c.env.DB;
+  const { getShopBySlug, PRIMARY_SHOP_ID } = await import("../services/shops");
+  const { getShopDb } = await import("../services/tenant-db");
+  const shop = await getShopBySlug(c.env.DB, slug);
+  return shop ? getShopDb(c.env, shop.id, PRIMARY_SHOP_ID) : null;
+}
+
+shippingWebhookRoutes.post("/webhooks/s/:shop/:provider/:token", handleTrackingWebhook);
+shippingWebhookRoutes.post("/webhooks/:provider/:token", handleTrackingWebhook);
+
+async function handleTrackingWebhook(c: Context<AppContext>): Promise<Response> {
+  const provider = c.req.param("provider") ?? "";
+  const token = c.req.param("token") ?? "";
+  const db = await shopDbForWebhook(c);
+  if (!db) return c.json({ error: "Not found" }, 404);
+  const row = await getProviderConfig(db, provider);
   if (!row?.webhook_token || !constantTimeEqual(row.webhook_token, token)) {
     return c.json({ error: "Not found" }, 404);
   }
-  const adapter = makeAdapter(c.env.DB, row);
+  const adapter = makeAdapter(db, row);
   if (!adapter.parseWebhook) return c.json({ error: "Not found" }, 404);
 
   const bodyText = await c.req.text();
@@ -63,7 +79,7 @@ shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
 
   for (const update of updates) {
     const shipment = await first<{ id: string; order_id: string; status: ShipmentStatus }>(
-      c.env.DB,
+      db,
       `SELECT id, order_id, status FROM order_shipments WHERE tracking_number = ? AND provider = ?`,
       update.trackingNumber,
       provider,
@@ -71,7 +87,7 @@ shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
     if (!shipment) continue;
 
     await run(
-      c.env.DB,
+      db,
       `INSERT INTO shipment_events (id, shipment_id, provider, status, description, location, occurred_at, raw_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       newId("sev"),
@@ -86,7 +102,7 @@ shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
 
     if (update.status && STATUS_RANK[update.status] >= STATUS_RANK[shipment.status]) {
       await run(
-        c.env.DB,
+        db,
         `UPDATE order_shipments SET status = ?, updated_at = datetime('now') WHERE id = ?`,
         update.status,
         shipment.id,
@@ -96,7 +112,7 @@ shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
         let fulfillment = update.status === "delivered" ? "delivered" : "shipped";
         if (fulfillment === "delivered") {
           const open = await all(
-            c.env.DB,
+            db,
             `SELECT id FROM order_shipments
              WHERE order_id = ? AND id != ? AND status NOT IN ('delivered','cancelled','returned')`,
             shipment.order_id,
@@ -105,7 +121,7 @@ shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
           if (open.length > 0) fulfillment = "shipped";
         }
         await run(
-          c.env.DB,
+          db,
           `UPDATE orders SET fulfillment_status = ?, updated_at = datetime('now')
            WHERE id = ? AND fulfillment_status != 'cancelled'`,
           fulfillment,
@@ -115,4 +131,4 @@ shippingWebhookRoutes.post("/webhooks/:provider/:token", async (c) => {
     }
   }
   return c.json({ received: true });
-});
+}

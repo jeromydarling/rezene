@@ -142,6 +142,7 @@ export async function resolveSession(
  */
 export async function maybeBootstrapAdmin(
   env: Env,
+  db: D1Database,
   email: string,
   password: string,
 ): Promise<boolean> {
@@ -154,18 +155,18 @@ export async function maybeBootstrapAdmin(
   if (email.trim().toLowerCase() !== adminEmail.toLowerCase()) return false;
   if (password.trim() !== adminPassword) return false;
 
-  const existing = await first<{ n: number }>(env.DB, `SELECT count(*) AS n FROM users`);
+  const existing = await first<{ n: number }>(db, `SELECT count(*) AS n FROM users`);
   if (existing && existing.n > 0) return false;
 
   const userId = newId("usr");
   await run(
-    env.DB,
+    db,
     `INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)`,
     userId,
     adminEmail.toLowerCase(),
     "Founder",
     await hashPassword(adminPassword),
   );
-  await run(env.DB, `INSERT INTO user_roles (user_id, role_id) VALUES (?, 'admin')`, userId);
+  await run(db, `INSERT INTO user_roles (user_id, role_id) VALUES (?, 'admin')`, userId);
   return true;
 }

@@ -22,6 +22,8 @@ export interface Env {
   ASSETS: Fetcher;
   /** Workers AI (optional: absent in very old local dev setups). */
   AI?: WorkersAi;
+  /** Per-shop SQLite databases (Durable Objects); primary shop uses DB. */
+  SHOP_DB: DurableObjectNamespace;
   /** Cloudflare Email Service send binding (optional in local dev). */
   EMAIL?: SendEmail;
 
@@ -56,6 +58,12 @@ export interface AppVariables {
   userEmail: string | null;
   roles: string[];
   sessionId: string | null;
+  /** Tenant context (set by tenantMiddleware before anything else). */
+  shopId: string;
+  shopSlug: string | null;
+  /** The resolved shop's database: bound D1 for the primary shop, a
+   *  ShopDatabase Durable Object facade for every other shop. */
+  db: D1Database;
 }
 
 export type AppContext = { Bindings: Env; Variables: AppVariables };

@@ -167,7 +167,7 @@ adminTechPackAiRoutes.post(
   async (c) => {
     const body = await parseBody(c, fromImageSchema);
     const fileRow = await first<{ r2_key: string; content_type: string | null; filename: string }>(
-      c.env.DB,
+      c.var.db,
       `SELECT r2_key, content_type, filename FROM files WHERE id = ?`,
       body.fileId,
     );
@@ -208,7 +208,7 @@ Respond as ONE JSON object:
       body.name || (typeof draft.name === "string" && draft.name ? draft.name : "Untitled from photo");
     const code = `TP-${packId.slice(3, 11).toUpperCase()}-v1`;
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO tech_packs (id, style_id, code, name, version, status, source, summary, created_by)
        VALUES (?, ?, ?, ?, 1, 'draft', 'photo', ?, ?)`,
       packId,
@@ -228,16 +228,16 @@ Respond as ONE JSON object:
       { kind: "qc_checklist", title: "QC Checklist", content: draft.qc_checklist ?? {} },
       { kind: "flat_sketch", title: "Flat Sketch / Reference", content: { reference_file: fileRow.filename } },
     ];
-    await c.env.DB.batch(
+    await c.var.db.batch(
       sectionSeeds.map((s, i) =>
-        c.env.DB.prepare(
+        c.var.db.prepare(
           `INSERT INTO tech_pack_sections (id, tech_pack_id, kind, title, content_json, sort_order)
            VALUES (?, ?, ?, ?, ?, ?)`,
         ).bind(newId("tps"), packId, s.kind, s.title, JSON.stringify(s.content), i + 1),
       ),
     );
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO tech_pack_files (id, tech_pack_id, file_id, label, kind) VALUES (?, ?, ?, ?, 'reference')`,
       newId("tpf"),
       packId,
@@ -245,7 +245,7 @@ Respond as ONE JSON object:
       "Source photo/sketch",
     );
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO ai_generations (id, tech_pack_id, tool, model, prompt_text, output_kind, output_json, tokens_in, tokens_out)
        VALUES (?, ?, 'claude', ?, 'tech-pack:from-image', 'json', ?, ?, ?)`,
       newId("gen"),
@@ -256,7 +256,7 @@ Respond as ONE JSON object:
       raw.tokensOut,
     );
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO analytics_events (id, event, entity_type, entity_id) VALUES (?, 'tech_pack_created', 'tech_pack', ?)`,
       newId("evt"),
       packId,
@@ -273,12 +273,12 @@ adminTechPackAiRoutes.post(
     const id = c.req.param("id");
     const { action, input, otherTechPackId } = await parseBody(c, assistSchema);
 
-    const ctx = await buildTechPackContext(c.env.DB, id);
+    const ctx = await buildTechPackContext(c.var.db, id);
     if (!ctx) return c.json({ error: "Tech pack not found" }, 404);
     let otherCtx: string | undefined;
     if (action === "compare_versions") {
       if (!otherTechPackId) return c.json({ error: "otherTechPackId required for compare" }, 400);
-      otherCtx = (await buildTechPackContext(c.env.DB, otherTechPackId)) ?? undefined;
+      otherCtx = (await buildTechPackContext(c.var.db, otherTechPackId)) ?? undefined;
       if (!otherCtx) return c.json({ error: "Comparison tech pack not found" }, 404);
     }
 
@@ -302,7 +302,7 @@ adminTechPackAiRoutes.post(
     }
 
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO ai_generations
          (id, tech_pack_id, tool, model, prompt_text, output_kind, output_json, tokens_in, tokens_out)
        VALUES (?, ?, 'claude', ?, ?, 'json', ?, ?, ?)`,

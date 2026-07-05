@@ -66,6 +66,7 @@ async function translateText(env: Env, text: string, targetLang: string): Promis
  */
 export async function translateFields(
   env: Env,
+  db: D1Database,
   entityType: "page" | "journal_post",
   entityId: string,
   lang: string,
@@ -77,7 +78,7 @@ export async function translateFields(
       .join(" "),
   );
   const cached = await first<{ source_hash: string; payload_json: string }>(
-    env.DB,
+    db,
     `SELECT source_hash, payload_json FROM content_translations
      WHERE entity_type = ? AND entity_id = ? AND lang = ?`,
     entityType,
@@ -105,7 +106,7 @@ export async function translateFields(
   }
 
   await run(
-    env.DB,
+    db,
     `INSERT INTO content_translations (id, entity_type, entity_id, lang, source_hash, payload_json)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(entity_type, entity_id, lang) DO UPDATE SET
