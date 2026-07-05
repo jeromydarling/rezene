@@ -322,7 +322,7 @@ publicRoutes.get("/pages/:slug", async (c) => {
       } else if (allowDraft) {
         // Preview-token holders (admins) get the failure reason inline.
         const { lastTranslateError } = await import("../services/translate");
-        (page as Record<string, unknown>).translationError = lastTranslateError;
+        (page as unknown as Record<string, unknown>).translationError = lastTranslateError;
       }
     }
   }
