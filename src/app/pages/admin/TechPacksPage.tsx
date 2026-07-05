@@ -95,32 +95,105 @@ export function TechPacksPage() {
 
 function TechPackCreateForm({ onCreated }: { onCreated: () => void }) {
   const { data: styles } = useFetch<AdminStyle[]>("/api/admin/styles");
+  const [mode, setMode] = useState<"standard" | "photo">("standard");
   const [form, setForm] = useState({ name: "", styleId: "", season: "SS27", summary: "" });
+  const [photo, setPhoto] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/admin/tech-packs", {
-        name: form.name,
-        styleId: form.styleId || undefined,
-        season: form.season || undefined,
-        summary: form.summary || undefined,
-        source: form.styleId ? "style" : "blank",
-      });
+      if (mode === "photo") {
+        if (!photo) {
+          setError("Choose a photo or sketch first");
+          setBusy(false);
+          return;
+        }
+        setPhase("Uploading image…");
+        const uploadForm = new FormData();
+        uploadForm.set("file", photo);
+        uploadForm.set("entityType", "tech_pack");
+        const uploaded = await api.upload<{ id: string }>("/api/admin/files/upload", uploadForm);
+        setPhase("Analyzing garment — this takes ~30 seconds…");
+        await api.post("/api/admin/tech-packs/from-image", {
+          fileId: uploaded.id,
+          name: form.name || undefined,
+          styleId: form.styleId || undefined,
+        });
+      } else {
+        await api.post("/api/admin/tech-packs", {
+          name: form.name,
+          styleId: form.styleId || undefined,
+          season: form.season || undefined,
+          summary: form.summary || undefined,
+          source: form.styleId ? "style" : "blank",
+        });
+      }
       onCreated();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Create failed");
     } finally {
       setBusy(false);
+      setPhase(null);
     }
+  }
+
+  if (mode === "photo") {
+    return (
+      <form onSubmit={submit} className="space-y-4">
+        <ModeToggle mode={mode} setMode={setMode} />
+        <p className="text-xs text-warmgrey">
+          Upload a garment photo or a sketch — AI drafts the overview, BOM, measurement points,
+          construction notes, and QC checklist. Everything is marked as a draft for your review.
+        </p>
+        <div>
+          <label className="label">Photo / sketch * (JPEG, PNG, WebP · max 5MB)</label>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="input"
+            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <div>
+          <label className="label">Name (optional — AI suggests one)</label>
+          <input
+            className="input"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="label">Link to style (optional)</label>
+          <select
+            className="input"
+            value={form.styleId}
+            onChange={(e) => setForm({ ...form, styleId: e.target.value })}
+          >
+            <option value="">—</option>
+            {styles?.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.styleCode} — {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {phase && <p className="text-sm text-navy">{phase}</p>}
+        {error && <p className="field-error">{error}</p>}
+        <button type="submit" disabled={busy || !photo} className="btn btn-terracotta w-full">
+          {busy ? (phase ?? "Working…") : "Draft tech pack from image"}
+        </button>
+      </form>
+    );
   }
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <ModeToggle mode={mode} setMode={setMode} />
       <div>
         <label className="label">Name *</label>
         <input
@@ -168,6 +241,36 @@ function TechPackCreateForm({ onCreated }: { onCreated: () => void }) {
         {busy ? "Creating…" : "Create tech pack"}
       </button>
     </form>
+  );
+}
+
+function ModeToggle({
+  mode,
+  setMode,
+}: {
+  mode: "standard" | "photo";
+  setMode: (m: "standard" | "photo") => void;
+}) {
+  return (
+    <div className="flex overflow-hidden rounded-md border border-ink/15">
+      {(
+        [
+          ["standard", "From style / blank"],
+          ["photo", "From photo / sketch ✨"],
+        ] as const
+      ).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => setMode(value)}
+          className={`flex-1 px-3 py-2 text-xs uppercase tracking-wider ${
+            mode === value ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 

@@ -34,10 +34,25 @@ export async function askClaude(
     prompt: string;
     maxTokens?: number;
     model?: string;
+    /** Optional image for vision tasks (sketch/photo → tech pack). */
+    image?: { base64: string; mediaType: string };
   },
 ): Promise<ClaudeResult> {
   if (!env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
   const model = opts.model ?? DEFAULT_MODEL;
+  const content: unknown[] = opts.image
+    ? [
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: opts.image.mediaType,
+            data: opts.image.base64,
+          },
+        },
+        { type: "text", text: opts.prompt },
+      ]
+    : [{ type: "text", text: opts.prompt }];
   const res = await fetch(BASE_URL, {
     method: "POST",
     headers: {
@@ -49,7 +64,7 @@ export async function askClaude(
       model,
       max_tokens: opts.maxTokens ?? 2048,
       system: opts.system,
-      messages: [{ role: "user", content: opts.prompt }],
+      messages: [{ role: "user", content }],
     }),
   });
   if (!res.ok) {

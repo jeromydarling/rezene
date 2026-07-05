@@ -135,6 +135,136 @@ async function buildTechPackContext(db: D1Database, id: string): Promise<string 
   return lines.join("\n");
 }
 
+const fromImageSchema = z.object({
+  fileId: z.string().min(1).max(80),
+  name: z.string().max(200).optional(),
+  styleId: z.string().max(80).nullable().optional(),
+});
+
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function bufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * The wedge feature: upload a garment photo or sketch, get a draft tech
+ * pack. Creates the pack with seeded sections (overview, BOM, colorways,
+ * measurement points, construction, QC) that a human then reviews —
+ * drafts, not gospel.
+ */
+adminTechPackAiRoutes.post(
+  "/from-image",
+  requireAdminWrite,
+  rateLimit({ key: "ai-from-image", limit: 15, windowSeconds: 3600 }),
+  async (c) => {
+    const body = await parseBody(c, fromImageSchema);
+    const fileRow = await first<{ r2_key: string; content_type: string | null; filename: string }>(
+      c.env.DB,
+      `SELECT r2_key, content_type, filename FROM files WHERE id = ?`,
+      body.fileId,
+    );
+    if (!fileRow) return c.json({ error: "Uploaded file not found" }, 404);
+    if (!fileRow.content_type || !IMAGE_TYPES.has(fileRow.content_type)) {
+      return c.json({ error: "File must be a JPEG, PNG, WebP, or GIF image" }, 400);
+    }
+    const object = await c.env.FILES.get(fileRow.r2_key);
+    if (!object) return c.json({ error: "Image missing from storage" }, 404);
+    const buf = await object.arrayBuffer();
+    if (buf.byteLength > MAX_IMAGE_BYTES) {
+      return c.json({ error: "Image exceeds 5MB — resize and retry" }, 413);
+    }
+
+    let draft: Record<string, unknown>;
+    let raw;
+    try {
+      raw = await askClaude(c.env, {
+        system: SYSTEM,
+        maxTokens: 4096,
+        image: { base64: bufferToBase64(buf), mediaType: fileRow.content_type },
+        prompt: `Analyze this garment photo or sketch and draft a first-pass tech pack for a Casablanca atelier. Be conservative: only state what is visible; mark guesses "TBC".
+
+Respond as ONE JSON object:
+{"name":"garment name","category":"trouser|polo|overshirt|dress|top|set|coverup|accessory|other","gender":"mens|womens|unisex","overview":{"description":"...","fit":"...","fabric":"visible fabric guess (TBC if unclear)","colorways":["..."]},"bom":{"rows":[{"component","material","qty","unit","note"}]},"construction":{"rows":[{"area","note"}]},"measurement_points":{"rows":[{"code","name","how_to_measure","tolerance_cm"}]},"qc_checklist":{"items":["..."]}}`,
+      });
+      draft = parseModelJson(raw.text) as Record<string, unknown>;
+    } catch (err) {
+      if (err instanceof AnthropicNotConfiguredError) {
+        return c.json({ error: "AI needs ANTHROPIC_API_KEY configured." }, 503);
+      }
+      throw err;
+    }
+
+    // Create the pack + seed sections from the draft.
+    const packId = newId("tp");
+    const name =
+      body.name || (typeof draft.name === "string" && draft.name ? draft.name : "Untitled from photo");
+    const code = `TP-${packId.slice(3, 11).toUpperCase()}-v1`;
+    await run(
+      c.env.DB,
+      `INSERT INTO tech_packs (id, style_id, code, name, version, status, source, summary, created_by)
+       VALUES (?, ?, ?, ?, 1, 'draft', 'photo', ?, ?)`,
+      packId,
+      body.styleId ?? null,
+      code,
+      name.slice(0, 200),
+      `Drafted by AI from ${fileRow.filename}. Review before sending to a factory.`,
+      c.var.userId,
+    );
+
+    const sectionSeeds: { kind: string; title: string; content: unknown }[] = [
+      { kind: "cover", title: "Cover", content: { style_name: name, brand: "", date: new Date().toISOString().slice(0, 10), source: "AI draft from photo" } },
+      { kind: "style_overview", title: "Style Overview", content: draft.overview ?? {} },
+      { kind: "bom", title: "Bill of Materials", content: draft.bom ?? {} },
+      { kind: "measurement_points", title: "Measurement Points", content: draft.measurement_points ?? {} },
+      { kind: "construction", title: "Construction Notes", content: draft.construction ?? {} },
+      { kind: "qc_checklist", title: "QC Checklist", content: draft.qc_checklist ?? {} },
+      { kind: "flat_sketch", title: "Flat Sketch / Reference", content: { reference_file: fileRow.filename } },
+    ];
+    await c.env.DB.batch(
+      sectionSeeds.map((s, i) =>
+        c.env.DB.prepare(
+          `INSERT INTO tech_pack_sections (id, tech_pack_id, kind, title, content_json, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        ).bind(newId("tps"), packId, s.kind, s.title, JSON.stringify(s.content), i + 1),
+      ),
+    );
+    await run(
+      c.env.DB,
+      `INSERT INTO tech_pack_files (id, tech_pack_id, file_id, label, kind) VALUES (?, ?, ?, ?, 'reference')`,
+      newId("tpf"),
+      packId,
+      body.fileId,
+      "Source photo/sketch",
+    );
+    await run(
+      c.env.DB,
+      `INSERT INTO ai_generations (id, tech_pack_id, tool, model, prompt_text, output_kind, output_json, tokens_in, tokens_out)
+       VALUES (?, ?, 'claude', ?, 'tech-pack:from-image', 'json', ?, ?, ?)`,
+      newId("gen"),
+      packId,
+      raw.model,
+      JSON.stringify(draft),
+      raw.tokensIn,
+      raw.tokensOut,
+    );
+    await run(
+      c.env.DB,
+      `INSERT INTO analytics_events (id, event, entity_type, entity_id) VALUES (?, 'tech_pack_created', 'tech_pack', ?)`,
+      newId("evt"),
+      packId,
+    );
+    return c.json({ id: packId, code, name }, 201);
+  },
+);
+
 adminTechPackAiRoutes.post(
   "/:id/ai-assist",
   requireAdminWrite,
