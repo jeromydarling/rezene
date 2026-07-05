@@ -3,6 +3,8 @@ import { sessionMiddleware, requireAdminRead } from "./middleware/auth";
 import { ValidationError } from "./services/validators";
 import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
+import { commerceRoutes } from "./routes/commerce";
+import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
 import { adminDashboardRoutes } from "./routes/admin-dashboard";
 import { adminStyleRoutes } from "./routes/admin-styles";
 import { adminProductRoutes } from "./routes/admin-products";
@@ -37,6 +39,10 @@ app.get("/api/health", (c) =>
 
 // Public API — no auth, rate-limited where it accepts writes.
 app.route("/api/public", publicRoutes);
+app.route("/api/public", commerceRoutes);
+
+// Stripe webhooks — signature-verified, never session-gated.
+app.route("/api/stripe", stripeWebhookRoutes);
 
 // Auth
 app.route("/api/auth", authRoutes);

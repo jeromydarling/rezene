@@ -10,6 +10,7 @@ import { ProductDetailPage } from "./pages/public/ProductDetailPage";
 import { LookbookPage } from "./pages/public/LookbookPage";
 import { JournalPage, JournalPostPage } from "./pages/public/JournalPage";
 import { ContactPage } from "./pages/public/ContactPage";
+import { CheckoutSuccessPage } from "./pages/public/CheckoutSuccessPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
@@ -66,6 +67,7 @@ export function AppRouter() {
           <Route path="privacy" element={<MarkdownPage slug="privacy" eyebrow="Legal" />} />
           <Route path="terms" element={<MarkdownPage slug="terms" eyebrow="Legal" />} />
           <Route path="contact" element={<ContactPage />} />
+          <Route path="checkout/success" element={<CheckoutSuccessPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
