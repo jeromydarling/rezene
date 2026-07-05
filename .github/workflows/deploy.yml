@@ -15,9 +15,15 @@
 
 name: Deploy
 
+# The active development branch deploys too: Cloudflare Workers Builds
+# (dashboard-connected) ships this branch's *code* on every push but never
+# runs migrations, so a push containing a new migration would break
+# production until this workflow applies it. Keeping the branch in the
+# trigger list means migrations, deploy, and secret sync always travel
+# together. Trim the list back to [main] once development moves to PRs.
 on:
   push:
-    branches: [main]
+    branches: [main, claude/cloudflare-vite-react-scaffold-aluycl]
   workflow_dispatch:
 
 concurrency:
