@@ -82,24 +82,24 @@ function VertoLayout({ children }: { children: ReactNode }) {
           onHero ? "bg-transparent" : "border-b border-ink/10 bg-chalk/90 backdrop-blur"
         }`}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-4">
           <Link
             to="/"
-            className={`font-display text-xl font-light tracking-wide transition-colors duration-500 ${onHero ? "text-chalk" : "text-ink"}`}
+            className={`shrink-0 font-display text-xl font-light tracking-wide transition-colors duration-500 ${onHero ? "text-chalk" : "text-ink"}`}
           >
             Verto<span className="text-terracotta">.</span>
           </Link>
-          <nav className="flex items-center gap-6">
+          <nav className="flex min-w-0 items-center gap-3.5 sm:gap-6">
             {[
               { to: "/why", label: "Why", always: true },
-              { to: "/compare", label: "Compare", always: false },
+              { to: "/compare", label: "Compare", always: true },
               { to: "/pricing", label: "Pricing", always: true },
             ].map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 ${
+                  `whitespace-nowrap text-[0.68rem] font-medium uppercase tracking-wider transition-colors duration-500 sm:text-[0.72rem] sm:tracking-editorial ${
                     item.always ? "" : "hidden sm:block "
                   }${
                     isActive ? "text-terracotta" : onHero ? "text-chalk/80 hover:text-chalk" : "text-ink/70 hover:text-ink"
@@ -111,14 +111,15 @@ function VertoLayout({ children }: { children: ReactNode }) {
             ))}
             <a
               href="/rezene"
-              className={`hidden text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 sm:block ${
+              className={`hidden whitespace-nowrap text-[0.72rem] font-medium uppercase tracking-editorial transition-colors duration-500 md:block ${
                 onHero ? "text-chalk/80 hover:text-chalk" : "text-ink/70 hover:text-ink"
               }`}
             >
               Live demo
             </a>
-            <Link to="/signup" className="btn btn-primary verto-sheen !py-2 text-xs">
-              Open your shop
+            <Link to="/signup" className="btn btn-primary verto-sheen shrink-0 whitespace-nowrap !px-3.5 !py-2 text-xs sm:!px-5">
+              <span className="sm:hidden">Open shop</span>
+              <span className="hidden sm:inline">Open your shop</span>
             </Link>
           </nav>
         </div>
@@ -223,7 +224,7 @@ function Manifesto() {
   const active = Math.min(MANIFESTO.length - 1, Math.floor(progress * MANIFESTO.length));
 
   return (
-    <section ref={ref} className="relative bg-chalk" style={{ height: "260vh" }}>
+    <section ref={ref} className="relative h-[190vh] bg-chalk md:h-[260vh]">
       <div className="sticky top-0 flex h-screen items-center">
         <div className="mx-auto w-full max-w-4xl px-5 text-center">
           {MANIFESTO.map((line, i) => (

@@ -272,9 +272,12 @@ export function VertoCompare() {
         </div>
 
         {/* The matrix: scannable proof of the "whole label" claim. */}
+        <p className="mb-2 text-center text-[0.65rem] uppercase tracking-wider text-warmgrey md:hidden">
+          Swipe the table to compare →
+        </p>
         <Reveal delay={250}>
           <div className="admin-card overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[600px] text-sm">
               <thead>
                 <tr className="border-b border-ink/10 text-left">
                   <th className="py-3 pr-4 font-medium">What a label needs</th>

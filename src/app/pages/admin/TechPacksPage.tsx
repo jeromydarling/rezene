@@ -545,6 +545,7 @@ export function TechPackDetailPage() {
             <h2 className="mb-3 border-b border-ink/10 pb-1 text-sm font-semibold uppercase tracking-wider text-ink/70">
               Construction Notes (EN / FR)
             </h2>
+            <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -563,6 +564,7 @@ export function TechPackDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 
@@ -571,6 +573,7 @@ export function TechPackDetailPage() {
             <h2 className="mb-3 border-b border-ink/10 pb-1 text-sm font-semibold uppercase tracking-wider text-ink/70">
               Stitch Details
             </h2>
+            <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -593,6 +596,7 @@ export function TechPackDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 
@@ -601,6 +605,7 @@ export function TechPackDetailPage() {
             <h2 className="mb-3 border-b border-ink/10 pb-1 text-sm font-semibold uppercase tracking-wider text-ink/70">
               Labels & Packaging
             </h2>
+            <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -621,6 +626,7 @@ export function TechPackDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 

@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
+  Menu,
+  X,
   BookOpen,
   Boxes,
   Calendar,
@@ -114,6 +116,16 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Navigating always closes the drawer; a route change means the choice landed.
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
 
   const matches = useMemo(() => {
     if (!query.trim()) return [];
@@ -139,70 +151,108 @@ export function AdminLayout() {
     return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
   }
 
+  const sidebar = (
+    <>
+      <Link to="/admin" className="block border-b border-chalk/10 px-5 py-5">
+        <p className="font-display text-lg font-light">{brand.brandName}</p>
+        <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/50">
+          Brand Operating System
+        </p>
+      </Link>
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.title} className="mb-5">
+            <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/40">
+              {section.title}
+            </p>
+            <ul className="space-y-0.5">
+              {section.items.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    end={item.to === "/admin"}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 rounded px-2 py-2 text-[0.8rem] transition-colors lg:py-1.5 ${
+                        isActive
+                          ? "bg-chalk/15 text-chalk"
+                          : "text-chalk/65 hover:bg-chalk/8 hover:text-chalk"
+                      }`
+                    }
+                  >
+                    <item.icon size={15} strokeWidth={1.7} />
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+      <div className="border-t border-chalk/10 px-5 py-4">
+        <p className="truncate text-xs text-chalk/70">{user.email}</p>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-[0.65rem] uppercase tracking-wider text-chalk/40">
+            {user.roles.join(", ") || "no role"}
+          </p>
+          <button
+            type="button"
+            onClick={() => void logout().then(() => navigate("/admin/login"))}
+            className="text-[0.7rem] uppercase tracking-wider text-chalk/60 hover:text-chalk"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex min-h-screen bg-cream/60">
-      {/* Sidebar */}
+      {/* Sidebar (desktop, static) */}
       <aside className="fixed inset-y-0 hidden w-60 flex-col border-r border-ink/10 bg-navy text-chalk lg:flex">
-        <Link to="/admin" className="border-b border-chalk/10 px-5 py-5">
-          <p className="font-display text-lg font-light">{brand.brandName}</p>
-          <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/50">
-            Brand Operating System
-          </p>
-        </Link>
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.title} className="mb-5">
-              <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/40">
-                {section.title}
-              </p>
-              <ul className="space-y-0.5">
-                {section.items.map((item) => (
-                  <li key={item.to}>
-                    <NavLink
-                      to={item.to}
-                      end={item.to === "/admin"}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 rounded px-2 py-1.5 text-[0.8rem] transition-colors ${
-                          isActive
-                            ? "bg-chalk/15 text-chalk"
-                            : "text-chalk/65 hover:bg-chalk/8 hover:text-chalk"
-                        }`
-                      }
-                    >
-                      <item.icon size={15} strokeWidth={1.7} />
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-        <div className="border-t border-chalk/10 px-5 py-4">
-          <p className="truncate text-xs text-chalk/70">{user.email}</p>
-          <div className="mt-1 flex items-center justify-between">
-            <p className="text-[0.65rem] uppercase tracking-wider text-chalk/40">
-              {user.roles.join(", ") || "no role"}
-            </p>
+        {sidebar}
+      </aside>
+
+      {/* Sidebar (mobile, slide-over drawer) */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="absolute inset-0 bg-navy-deep/50"
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-[19rem] max-w-[85vw] flex-col bg-navy text-chalk shadow-2xl">
             <button
               type="button"
-              onClick={() => void logout().then(() => navigate("/admin/login"))}
-              className="text-[0.7rem] uppercase tracking-wider text-chalk/60 hover:text-chalk"
+              aria-label="Close menu"
+              className="absolute right-3 top-4 rounded p-2 text-chalk/70 hover:text-chalk"
+              onClick={() => setMenuOpen(false)}
             >
-              Sign out
+              <X size={18} />
             </button>
-          </div>
+            {sidebar}
+          </aside>
         </div>
-      </aside>
+      )}
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
-        <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-ink/10 bg-white/95 px-5 py-3 backdrop-blur">
-          <div className="text-xs uppercase tracking-wider text-warmgrey lg:hidden">
-            <Link to="/admin" className="font-semibold text-ink">
-              MA Admin
-            </Link>
-          </div>
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink/10 bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
+          <button
+            type="button"
+            aria-label="Open menu"
+            className="-ml-1 rounded p-1.5 text-ink/70 hover:bg-cream hover:text-ink lg:hidden"
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu size={20} strokeWidth={1.8} />
+          </button>
+          <Link
+            to="/admin"
+            className="max-w-[9rem] truncate text-xs font-semibold uppercase tracking-wider text-ink lg:hidden"
+          >
+            {brand.brandName}
+          </Link>
           <nav className="hidden text-xs text-warmgrey md:block">
             <Link to="/admin" className="hover:text-ink">
               Admin

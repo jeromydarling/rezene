@@ -519,6 +519,7 @@ function ZoneCard({
         </div>
       </div>
       {rates.length > 0 && (
+        <div className="overflow-x-auto">
         <table className="admin-table">
           <thead>
             <tr>
@@ -553,6 +554,7 @@ function ZoneCard({
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <SlideOver open={addingRate} title={`New rate — ${zone.name}`} onClose={() => setAddingRate(false)}>
         <RateForm
