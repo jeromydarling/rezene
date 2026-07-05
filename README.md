@@ -298,6 +298,8 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Marketing suite: AI campaign kits (IG/story/TikTok/Pinterest/X/FB, email, blog, press release, Google/Meta ads), posting calendar, graphics studio (SVG→PNG), subscriber email sends w/ unsubscribe, SEO content ideas | admin Marketing (Anthropic key or Workers AI Llama) | ✅ working |
 | Verto platform: marketing site + pricing + signup at `/`, shop registry with path routing (`/rezene`) and CNAME-ready domain mapping, legacy 301s | `services/shops.ts`, `verto/VertoApp.tsx` | ✅ working |
 | Multi-tenancy: per-shop SQLite Durable Object databases, tenant middleware, one-click provisioning of signups, suspend/reactivate, per-shop webhooks/media/SEO/unsubscribe | `do/shop-database.ts`, `services/tenant-db.ts`, `services/provision.ts` | ✅ working |
+| Instant self-serve onboarding: signup auto-provisions the shop (~10s, credentials shown once + emailed; falls back to pending on failure) | `routes/verto.ts` | ✅ working |
+| Cinematic Verto marketing site: scroll storytelling, Ken Burns hero + particle field, pinned manifesto, parallax scenes, AI typewriter demo, tilt pricing, magnetic CTAs, route transitions, reduced-motion safe, AI-generated lifestyle photography | `verto/cinema.tsx`, `verto/VertoApp.tsx`, `public/verto/` | ✅ working |
 | Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
 | Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |

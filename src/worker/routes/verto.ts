@@ -50,23 +50,37 @@ vertoRoutes.post(
       body.plan ?? null,
       body.note ?? null,
     );
-    await sendNotification(c.env, {
-      subject: `Verto signup: ${body.shopName} (/${body.slug})`,
-      text: [
-        `New shop reservation on Verto:`,
-        ``,
-        `  Shop:  ${body.shopName}`,
-        `  Slug:  /${body.slug}`,
-        `  Email: ${body.email}`,
-        body.plan ? `  Plan:  ${body.plan}` : null,
-        body.note ? `  Note:  ${body.note}` : null,
-        ``,
-        `Status is 'pending' in the shops table — provision when ready.`,
-      ]
-        .filter((line) => line !== null)
-        .join("\n"),
-    });
-    return c.json({ ok: true, slug: body.slug }, 201);
+
+    // Instant onboarding: provision on the spot. If anything goes wrong the
+    // reservation stays pending and the platform operator provisions it by
+    // hand from Admin → Verto Shops — the signup never hard-fails past this
+    // point because the slug is already reserved.
+    try {
+      const { provisionShop } = await import("../services/provision");
+      const result = await provisionShop(
+        c.env,
+        { id, slug: body.slug, name: body.shopName, status: "pending", custom_domain: null },
+        body.email,
+      );
+      return c.json(
+        {
+          ok: true,
+          provisioned: true,
+          slug: result.slug,
+          loginUrl: result.loginUrl,
+          adminEmail: result.adminEmail,
+          password: result.password,
+        },
+        201,
+      );
+    } catch (err) {
+      console.error(`[verto] auto-provision failed for /${body.slug}:`, err);
+      await sendNotification(c.env, {
+        subject: `Verto signup NEEDS PROVISIONING: ${body.shopName} (/${body.slug})`,
+        text: `Auto-provisioning failed for /${body.slug} (${body.email}): ${String(err).slice(0, 300)}\nProvision manually from Admin → Verto Shops.`,
+      });
+      return c.json({ ok: true, provisioned: false, slug: body.slug }, 201);
+    }
   },
 );
 
