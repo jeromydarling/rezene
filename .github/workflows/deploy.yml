@@ -8,7 +8,8 @@
 # Optional application secrets — any that are set as GitHub secrets are
 # synced to the Worker after deploy (skipped when absent):
 #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY,
-#   ANTHROPIC_API_KEY, SESSION_SECRET, ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD
+#   ANTHROPIC_API_KEY, SESSION_SECRET, ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD,
+#   RESEND_API_KEY (buyer-facing email — order confirmations)
 #
 # The D1 database, KV namespace, and R2 bucket referenced in wrangler.toml
 # already exist — this workflow only migrates and deploys.
@@ -62,9 +63,11 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           for name in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY \
-                      ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD; do
+                      ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD \
+                      RESEND_API_KEY; do
             value="${!name}"
             if [ -n "$value" ]; then
               printf '%s' "$value" | npx wrangler secret put "$name"

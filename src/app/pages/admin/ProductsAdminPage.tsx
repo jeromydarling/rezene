@@ -15,6 +15,7 @@ import type { AdminProduct } from "../../../shared/types";
 
 export function ProductsAdminPage() {
   const { data, loading, error, reload } = useFetch<AdminProduct[]>("/api/admin/products");
+  const [importOpen, setImportOpen] = useState(false);
 
   async function togglePublish(product: AdminProduct) {
     await api.patch(`/api/admin/products/${product.id}`, { isPublished: !product.isPublished });
@@ -27,6 +28,11 @@ export function ProductsAdminPage() {
         eyebrow="Catalog"
         title="Products"
         description="The storefront catalog — publication state, pricing, and stock at a glance."
+        actions={
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>
+            Import CSV
+          </button>
+        }
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
@@ -74,6 +80,115 @@ export function ProductsAdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      <SlideOver open={importOpen} title="Import products from CSV" onClose={() => setImportOpen(false)}>
+        <ProductImportForm
+          onDone={() => {
+            reload();
+          }}
+        />
+      </SlideOver>
+    </div>
+  );
+}
+
+interface ImportResult {
+  created: number;
+  skipped: { slug: string; reason: string }[];
+  errors: string[];
+}
+
+function ProductImportForm({ onDone }: { onDone: () => void }) {
+  const [mode, setMode] = useState<"shopify" | "simple">("shopify");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+
+  async function submit() {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("mode", mode);
+      const res = await api.upload<ImportResult>("/api/admin/import/products", form);
+      setResult(res);
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Import failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="label">Format</label>
+        <select
+          className="input"
+          value={mode}
+          onChange={(e) => setMode(e.target.value as "shopify" | "simple")}
+        >
+          <option value="shopify">Shopify product export</option>
+          <option value="simple">Simple template</option>
+        </select>
+        <p className="mt-1 text-xs text-warmgrey">
+          {mode === "shopify"
+            ? "The CSV Shopify produces under Products → Export. Variants, sizes, and colorways come across automatically."
+            : "Columns: name, slug, category, gender, price, sizes, colorway — sizes pipe-separated like S|M|L, price decimal like 185.00."}
+        </p>
+      </div>
+      <div>
+        <label className="label">CSV file</label>
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          className="input"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+      </div>
+      <p className="rounded bg-cream px-3 py-2 text-xs text-warmgrey">
+        Everything imports as an unpublished draft with zero inventory — nothing goes live until
+        you review and publish. Products whose slug already exists are skipped, so re-running an
+        import is safe.
+      </p>
+      {error && <p className="field-error">{error}</p>}
+      <button
+        type="button"
+        disabled={!file || busy}
+        className="btn btn-primary w-full"
+        onClick={() => void submit()}
+      >
+        {busy ? "Importing…" : "Import"}
+      </button>
+      {result && (
+        <div className="rounded-md border border-ink/10 bg-white p-4 text-sm">
+          <p className="font-medium">
+            {result.created} product{result.created === 1 ? "" : "s"} imported
+            {result.skipped.length > 0 && ` · ${result.skipped.length} skipped`}
+          </p>
+          {result.skipped.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-warmgrey">
+              {result.skipped.slice(0, 10).map((s) => (
+                <li key={s.slug}>
+                  /{s.slug} — {s.reason}
+                </li>
+              ))}
+              {result.skipped.length > 10 && <li>…and {result.skipped.length - 10} more</li>}
+            </ul>
+          )}
+          {result.errors.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-clay">
+              {result.errors.slice(0, 10).map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

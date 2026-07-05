@@ -166,9 +166,19 @@ logged no-op — nothing breaks.
 
 Known constraint: Email Service sends only **to verified destination
 addresses**, which makes it right for founder/ops notifications but not
-for arbitrary customer email. Customer-facing transactional email
-(order confirmations to buyers) remains a documented integration point
-for a transactional provider.
+for arbitrary customer email. Buyer-facing email goes through Resend
+(below).
+
+## Resend setup (buyer-facing email)
+
+Order confirmations to customers are sent through
+[Resend](https://resend.com) (`src/worker/services/resend.ts`). To
+activate: verify your sending domain in Resend, set the `RESEND_API_KEY`
+GitHub secret (synced to the Worker on the next deploy), and put the
+from-address in `RESEND_FROM` in `wrangler.toml [vars]`
+(e.g. `orders@yourdomain.com`). Until both are set, buyer email is a
+logged no-op — checkout and webhooks work regardless. Pre-order line
+items automatically get a "made to order" note in the confirmation.
 
 ## Anthropic setup
 
@@ -211,6 +221,15 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Analytics event foundation (11 event types) | D1 `analytics_events` | ✅ working |
 | Settings: brand identity as data, integration status | admin System | ✅ working |
 | Cron: daily late-task risk sweep | `wrangler.toml [triggers]` | ✅ working |
+| CMS: pages, journal, lookbooks with drafts + revision history | admin Content | ✅ working |
+| Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
+| Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
+| Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |
+| Spec-driven size charts on PDPs (graded from measurement specs) | product detail pages | ✅ working |
+| Shoppable lookbooks (images link to products) | admin Content → Lookbooks | ✅ working |
+| Cart + multi-item checkout + buyer confirmation email (Resend) | `/cart`, `src/app/lib/cart.tsx` | ✅ working |
+| Wholesale line sheets: tokenized links, wholesale pricing, buyer inquiries | admin Commerce → Line Sheets, `/linesheet/:token` | ✅ working |
+| Product CSV import (Shopify export or simple template) | admin Products → Import CSV | ✅ working |
 
 ### Formerly scaffolds — now wired
 
@@ -238,9 +257,9 @@ Nothing secret is ever exposed to the browser or stored in D1.
   the documented external option.
 - **Customer portal / accounts**: route exists
   (`/api/public/customer-portal`); customer-facing auth is a later phase.
-- **Customer-facing transactional email**: Email Service is restricted to
-  verified destinations — buyer-facing confirmations need a transactional
-  provider (Resend et al.).
+- **Customer-facing transactional email beyond order confirmations**:
+  confirmations ship via Resend; drop notifications and marketing email
+  are later phases.
 - **Queues**: producer/consumer config is commented in `wrangler.toml` —
   enable for webhook fan-out and AI batch jobs when the account has Queues.
 - **Multi-tenancy**: not built (per brief); all ids are opaque TEXT so a
@@ -252,7 +271,7 @@ Nothing secret is ever exposed to the browser or stored in D1.
 
 ## Data model
 
-Two migrations in [`migrations/`](./migrations):
+Four migrations in [`migrations/`](./migrations):
 
 - `0001_initial.sql` — ~65 tables across identity/auth, commerce,
   brand/content, product development, production, costing, tech packs,
@@ -263,6 +282,11 @@ Two migrations in [`migrations/`](./migrations):
   8-month season calendar, 2 tech packs, duty rules (EU 0% preferential,
   US yarn-forward, US MFN fallback 16.5–32%), cost sheet with EU/US
   landed-cost scenarios, 6 AI prompt presets, journal/lookbook/pages.
+- `0003_content_revisions.sql` — CMS revision history for pages, journal
+  posts, and lookbooks.
+- `0004_factory_portal_commerce.sql` — factory tech pack shares,
+  pre-order campaigns, wholesale line sheets + items, per-line-item
+  pre-order flags, shoppable lookbook image → product links.
 
 ## Known limitations
 
@@ -272,8 +296,9 @@ Two migrations in [`migrations/`](./migrations):
   sequence/KV counter before high-concurrency launch.
 - `useFetch` is a minimal data hook; adopt TanStack Query when caching and
   optimistic updates start to matter.
-- Checkout is single-item buy-now (matches the pre-order launch model);
-  a cart is additive work on the same order/line-item schema.
+- The cart is client-side (localStorage) with all validation server-side
+  at checkout; carts don't sync across devices until customer accounts
+  exist.
 - Markdown rendering supports headings/bold/lists/tables only (renders via
   React elements, no `innerHTML` — safe by construction).
 
@@ -283,7 +308,7 @@ Two migrations in [`migrations/`](./migrations):
 2. Stripe live keys + Stripe Tax + duties-in-pricing decision per region.
 3. Photography → replace `EditorialImage` placeholder slots (R2-hosted).
 4. Server-side PDF rendering for tech pack exports into R2.
-5. Outbound email (Resend) for order confirmations and drop notifications.
+5. Drop notifications and marketing email (Resend audience/broadcasts).
 6. Cloudflare Access in front of `/admin` for production.
 7. Cost-sheet edit forms and per-style margin what-if UI.
-8. SaaS phase: `workspace_id` migration, factory portal, Stripe Billing.
+8. SaaS phase: `workspace_id` migration, Stripe Billing.

@@ -6,6 +6,7 @@ import { publicRoutes } from "./routes/public";
 import { commerceRoutes } from "./routes/commerce";
 import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
 import { factoryRoutes } from "./routes/factory";
+import { lineSheetRoutes } from "./routes/linesheet";
 import { adminDashboardRoutes } from "./routes/admin-dashboard";
 import { adminStyleRoutes } from "./routes/admin-styles";
 import { adminProductRoutes } from "./routes/admin-products";
@@ -20,6 +21,8 @@ import { admin3dRoutes } from "./routes/admin-3d";
 import { adminFileRoutes } from "./routes/admin-files";
 import { adminSettingsRoutes } from "./routes/admin-settings";
 import { adminContentRoutes } from "./routes/admin-content";
+import { adminWholesaleRoutes } from "./routes/admin-wholesale";
+import { adminImportRoutes } from "./routes/admin-import";
 import type { AppContext, Env } from "./types/env";
 
 const app = new Hono<AppContext>();
@@ -69,6 +72,9 @@ app.route("/api/stripe", stripeWebhookRoutes);
 // Factory portal — token-scoped, unauthenticated by design.
 app.route("/api/factory", factoryRoutes);
 
+// Wholesale line sheets — token-scoped, unauthenticated by design.
+app.route("/api/linesheet", lineSheetRoutes);
+
 // Auth
 app.route("/api/auth", authRoutes);
 
@@ -90,6 +96,8 @@ admin.route("/3d", admin3dRoutes);
 admin.route("/files", adminFileRoutes);
 admin.route("/settings", adminSettingsRoutes);
 admin.route("/content", adminContentRoutes);
+admin.route("/wholesale", adminWholesaleRoutes);
+admin.route("/import", adminImportRoutes);
 app.route("/api/admin", admin);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

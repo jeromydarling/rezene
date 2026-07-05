@@ -15,12 +15,14 @@ import { ContactPage } from "./pages/public/ContactPage";
 import { CheckoutSuccessPage } from "./pages/public/CheckoutSuccessPage";
 import { CartPage } from "./pages/public/CartPage";
 import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
+import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
 import { ProductsAdminPage, CollectionsAdminPage } from "./pages/admin/ProductsAdminPage";
 import { InventoryPage } from "./pages/admin/InventoryPage";
 import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/CommercePages";
+import { LineSheetsPage } from "./pages/admin/WholesalePage";
 import { ProductionPage } from "./pages/admin/ProductionPage";
 import { SuppliersPage } from "./pages/admin/SuppliersPage";
 import { SamplesPage, PurchaseOrdersPage, MaterialsPage } from "./pages/admin/SamplesPage";
@@ -94,6 +96,9 @@ export function AppRouter() {
         {/* Factory portal — tokenized, outside the public site chrome */}
         <Route path="factory/:token" element={<FactoryPortalPage />} />
 
+        {/* Wholesale line sheet — tokenized, outside the public site chrome */}
+        <Route path="linesheet/:token" element={<LineSheetPage />} />
+
         {/* Auth */}
         <Route path="admin/login" element={<LoginPage />} />
 
@@ -108,6 +113,7 @@ export function AppRouter() {
           <Route path="orders" element={<OrdersPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="pre-orders" element={<PreOrdersPage />} />
+          <Route path="line-sheets" element={<LineSheetsPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="materials" element={<MaterialsPage />} />
