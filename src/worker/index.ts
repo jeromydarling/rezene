@@ -124,8 +124,15 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
   }
 
   // Static files (hashed bundles, favicons) pass straight to the asset layer.
+  // A missing file must be a real 404, not the SPA shell: a stale browser
+  // asking for a replaced bundle would get HTML-as-JavaScript and render
+  // nothing at all.
   if (/\.[a-z0-9]+$/i.test(url.pathname) && !url.pathname.endsWith(".html")) {
-    return c.env.ASSETS.fetch(c.req.raw) as unknown as Promise<Response>;
+    const asset = (await c.env.ASSETS.fetch(c.req.raw)) as unknown as Response;
+    if ((asset.headers.get("content-type") ?? "").includes("text/html")) {
+      return c.text("Not found", 404);
+    }
+    return asset;
   }
 
   const { shop, strippedPath, basePath } = await resolveShop(c.env, url);
@@ -155,7 +162,10 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
     : VERTO_META[url.pathname] ?? VERTO_META["/"];
   let html = injectMeta(await shell.text(), meta, `${canonicalBase}${basePath}${strippedPath === "/" && shop ? "" : shop ? strippedPath : url.pathname}`);
   html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
-  return c.html(html, 200, { "cache-control": "public, max-age=60" });
+  // The shell must never be stale: it pins the hashed bundle URL, and a
+  // cached copy that outlives a deploy points at assets that no longer
+  // exist — the whole app goes blank. no-cache = always revalidate.
+  return c.html(html, 200, { "cache-control": "no-cache" });
 }
 
 app.get("/sitemap.xml", async (c) =>
