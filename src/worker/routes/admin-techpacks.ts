@@ -8,7 +8,7 @@ import {
 import { requireAdminWrite } from "../middleware/auth";
 import { getBrandName } from "../services/brand";
 import { renderTechPackHtml } from "../services/techpack-html";
-import { newId } from "../utils/id";
+import { newId, randomToken, sha256Hex } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminTechPackDetail, AdminTechPackSummary } from "../../shared/types";
 
@@ -149,6 +149,60 @@ adminTechPackRoutes.get("/:id", async (c) => {
   );
   if (!detail) return c.json({ error: "Tech pack not found" }, 404);
   return c.json(detail);
+});
+
+// ---------- Factory shares ----------
+
+/** Create a tokenized factory link. The raw token is returned exactly once. */
+adminTechPackRoutes.post("/:id/shares", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const pack = await first(c.env.DB, `SELECT id FROM tech_packs WHERE id = ?`, id);
+  if (!pack) return c.json({ error: "Tech pack not found" }, 404);
+  const body = (await c.req.json().catch(() => ({}))) as {
+    label?: string;
+    supplierId?: string;
+    language?: string;
+  };
+  const token = randomToken(24);
+  const shareId = newId("tps");
+  await run(
+    c.env.DB,
+    `INSERT INTO tech_pack_shares (id, tech_pack_id, supplier_id, label, token_hash, language, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    shareId,
+    id,
+    body.supplierId?.slice(0, 80) || null,
+    body.label?.slice(0, 200) || null,
+    await sha256Hex(token),
+    body.language === "fr" ? "fr" : "en",
+    c.var.userId,
+  );
+  await writeAudit(c.env.DB, c.var.userId, "tech_pack.share", "tech_pack", id, { shareId });
+  return c.json({ id: shareId, url: `/factory/${token}` }, 201);
+});
+
+adminTechPackRoutes.get("/:id/shares", async (c) => {
+  const rows = await all(
+    c.env.DB,
+    `SELECT s.id, s.label, s.language, s.status, s.approved_at, s.approved_by_name,
+            s.approval_note, s.last_viewed_at, s.view_count, s.created_at,
+            sup.name AS supplier_name
+     FROM tech_pack_shares s LEFT JOIN suppliers sup ON sup.id = s.supplier_id
+     WHERE s.tech_pack_id = ? ORDER BY s.created_at DESC`,
+    c.req.param("id"),
+  );
+  return c.json(rows);
+});
+
+adminTechPackRoutes.post("/shares/:shareId/revoke", requireAdminWrite, async (c) => {
+  const result = await run(
+    c.env.DB,
+    `UPDATE tech_pack_shares SET status = 'revoked' WHERE id = ? AND status = 'active'`,
+    c.req.param("shareId"),
+  );
+  if (!result.meta.changes) return c.json({ error: "Share not found or already revoked" }, 404);
+  await writeAudit(c.env.DB, c.var.userId, "tech_pack.share_revoke", "tech_pack_share", c.req.param("shareId"));
+  return c.json({ ok: true });
 });
 
 // ---------- R2 export snapshots ----------

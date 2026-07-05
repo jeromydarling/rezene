@@ -4,6 +4,7 @@ import { useFetch } from "../../lib/useFetch";
 import { useBrand } from "../../lib/brand";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatDate, titleCase } from "../../lib/format";
+import { SectionContent } from "../../components/TechPackContent";
 import {
   EmptyState,
   ErrorNote,
@@ -177,6 +178,175 @@ interface TechPackExportRow {
   version: number;
   created_at: string;
   exported_by: string | null;
+}
+
+interface ShareRow {
+  id: string;
+  label: string | null;
+  language: string;
+  status: string;
+  approved_at: string | null;
+  approved_by_name: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
+  supplier_name: string | null;
+  created_at: string;
+}
+
+function FactorySharesPanel({ techPackId }: { techPackId: string }) {
+  const shares = useFetch<ShareRow[]>(`/api/admin/tech-packs/${techPackId}/shares`);
+  const suppliers = useFetch<{ id: string; name: string }[]>("/api/admin/suppliers");
+  const [form, setForm] = useState({ label: "", supplierId: "", language: "fr" });
+  const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function createShare() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ url: string }>(`/api/admin/tech-packs/${techPackId}/shares`, {
+        label: form.label || undefined,
+        supplierId: form.supplierId || undefined,
+        language: form.language,
+      });
+      setCreatedUrl(`${location.origin}${res.url}`);
+      shares.reload();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Share failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(shareId: string) {
+    if (!window.confirm("Revoke this factory link? It stops working immediately.")) return;
+    await api.post(`/api/admin/tech-packs/shares/${shareId}/revoke`);
+    shares.reload();
+  }
+
+  return (
+    <div className="no-print mx-auto mt-6 max-w-4xl">
+      <div className="admin-card p-5">
+        <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-warmgrey">
+          Factory shares
+        </h2>
+        <p className="mb-4 text-xs text-warmgrey">
+          A live, read-only link for the atelier — always the current version, with comments and
+          spec approval built in. No account needed on their side.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-1">
+            <label className="label">Label</label>
+            <input
+              className="input"
+              placeholder="Coupe Cousu — proto round"
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Supplier</label>
+            <select
+              className="input !w-48"
+              value={form.supplierId}
+              onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
+            >
+              <option value="">—</option>
+              {suppliers.data?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Language</label>
+            <select
+              className="input !w-24"
+              value={form.language}
+              onChange={(e) => setForm({ ...form, language: e.target.value })}
+            >
+              <option value="en">EN</option>
+              <option value="fr">FR</option>
+            </select>
+          </div>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void createShare()}>
+            {busy ? "Creating…" : "Create link"}
+          </button>
+        </div>
+        {error && <p className="field-error mt-2">{error}</p>}
+        {createdUrl && (
+          <div className="mt-3 flex items-center gap-2 rounded bg-cream p-3">
+            <code className="flex-1 truncate text-xs">{createdUrl}</code>
+            <button
+              type="button"
+              className="btn btn-secondary !px-3 !py-1 !text-[0.65rem]"
+              onClick={() => {
+                void navigator.clipboard.writeText(createdUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+            >
+              {copied ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+        )}
+
+        {shares.data && shares.data.length > 0 && (
+          <table className="admin-table mt-4">
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Supplier</th>
+                <th>Lang</th>
+                <th>Views</th>
+                <th>Last viewed</th>
+                <th>Approval</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {shares.data.map((share) => (
+                <tr key={share.id} className={share.status === "revoked" ? "opacity-40" : ""}>
+                  <td>{share.label ?? "—"}</td>
+                  <td>{share.supplier_name ?? "—"}</td>
+                  <td className="uppercase">{share.language}</td>
+                  <td>{share.view_count}</td>
+                  <td className="text-xs text-warmgrey">
+                    {share.last_viewed_at ? formatDate(share.last_viewed_at) : "never"}
+                  </td>
+                  <td>
+                    {share.approved_at ? (
+                      <span className="badge badge-success">
+                        ✓ {share.approved_by_name}
+                      </span>
+                    ) : (
+                      <span className="badge badge-neutral">pending</span>
+                    )}
+                  </td>
+                  <td>
+                    {share.status === "active" ? (
+                      <button
+                        type="button"
+                        className="text-xs text-red-700 hover:underline"
+                        onClick={() => void revoke(share.id)}
+                      >
+                        Revoke
+                      </button>
+                    ) : (
+                      <span className="text-xs text-warmgrey">revoked</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** Detail view doubles as the print-ready export (window.print → PDF). */
@@ -356,6 +526,8 @@ export function TechPackDetailPage() {
         </footer>
       </div>
 
+      {id && <FactorySharesPanel techPackId={id} />}
+
       {/* Export history */}
       {exports.data && exports.data.length > 0 && (
         <div className="no-print mx-auto mt-6 max-w-4xl">
@@ -397,74 +569,6 @@ export function TechPackDetailPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/** Render structured section JSON generically: rows, items, or key-value. */
-function SectionContent({ content }: { content: unknown }) {
-  if (!content || typeof content !== "object") return null;
-  const obj = content as Record<string, unknown>;
-
-  if (Array.isArray(obj.rows) && obj.rows.length > 0) {
-    const rows = obj.rows as Record<string, unknown>[];
-    const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
-    return (
-      <table className="admin-table">
-        <thead>
-          <tr>
-            {cols.map((col) => (
-              <th key={col}>{titleCase(col)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>
-              {cols.map((col) => (
-                <td key={col}>{String(row[col] ?? "—")}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-  if (Array.isArray(obj.items) && obj.items.length > 0) {
-    return (
-      <ul className="list-disc space-y-1 pl-5 text-sm text-ink/85">
-        {(obj.items as unknown[]).map((item, i) => (
-          <li key={i}>{String(item)}</li>
-        ))}
-      </ul>
-    );
-  }
-  const entries = Object.entries(obj).filter(
-    ([k, v]) => k !== "rows" && k !== "items" && v != null && typeof v !== "object",
-  );
-  const listEntries = Object.entries(obj).filter(([, v]) => Array.isArray(v));
-  return (
-    <div className="space-y-2">
-      {entries.length > 0 && (
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          {entries.map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-[0.68rem] font-semibold uppercase tracking-wider text-warmgrey">
-                {titleCase(k)}
-              </dt>
-              <dd className="text-ink/85">{String(v)}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {listEntries.map(([k, v]) => (
-        <div key={k} className="text-sm">
-          <p className="text-[0.68rem] font-semibold uppercase tracking-wider text-warmgrey">
-            {titleCase(k)}
-          </p>
-          <p className="text-ink/85">{(v as unknown[]).map(String).join(", ")}</p>
-        </div>
-      ))}
     </div>
   );
 }

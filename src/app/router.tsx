@@ -12,6 +12,7 @@ import { LookbookPage } from "./pages/public/LookbookPage";
 import { JournalPage, JournalPostPage } from "./pages/public/JournalPage";
 import { ContactPage } from "./pages/public/ContactPage";
 import { CheckoutSuccessPage } from "./pages/public/CheckoutSuccessPage";
+import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
@@ -85,6 +86,9 @@ export function AppRouter() {
           <Route path="p/:slug" element={<DynamicPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
+
+        {/* Factory portal — tokenized, outside the public site chrome */}
+        <Route path="factory/:token" element={<FactoryPortalPage />} />
 
         {/* Auth */}
         <Route path="admin/login" element={<LoginPage />} />

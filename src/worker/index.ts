@@ -5,6 +5,7 @@ import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 import { commerceRoutes } from "./routes/commerce";
 import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
+import { factoryRoutes } from "./routes/factory";
 import { adminDashboardRoutes } from "./routes/admin-dashboard";
 import { adminStyleRoutes } from "./routes/admin-styles";
 import { adminProductRoutes } from "./routes/admin-products";
@@ -64,6 +65,9 @@ app.route("/api/public", commerceRoutes);
 
 // Stripe webhooks — signature-verified, never session-gated.
 app.route("/api/stripe", stripeWebhookRoutes);
+
+// Factory portal — token-scoped, unauthenticated by design.
+app.route("/api/factory", factoryRoutes);
 
 // Auth
 app.route("/api/auth", authRoutes);
