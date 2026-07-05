@@ -65,6 +65,56 @@ app.get("/media/:fileId", async (c) => {
   });
 });
 
+// --- Edge SEO ------------------------------------------------------------
+// Document routes run worker-first (wrangler.toml): serve the SPA shell
+// with per-route <title>/meta/OG tags injected so crawlers and link
+// unfurlers see real content. Client-side routing takes over after load.
+import { buildSitemap, injectMeta, resolveRouteMeta } from "./services/seo";
+import type { Context } from "hono";
+
+async function serveDocument(c: Context<AppContext>): Promise<Response> {
+  const url = new URL(c.req.url);
+  const shell = await c.env.ASSETS.fetch(new Request(`${url.origin}/index.html`));
+  if (!shell.ok) return shell as unknown as Response;
+  const meta = await resolveRouteMeta(c.env, url.pathname);
+  const canonicalBase = (c.env.APP_URL || url.origin).replace(/\/$/, "");
+  const html = injectMeta(await shell.text(), meta, `${canonicalBase}${url.pathname}`);
+  return c.html(html, 200, { "cache-control": "public, max-age=60" });
+}
+
+const DOCUMENT_ROUTES = [
+  "/",
+  "/p/:slug",
+  "/journal",
+  "/journal/:slug",
+  "/products",
+  "/products/:slug",
+  "/collections",
+  "/collections/:slug",
+  "/story",
+  "/atelier",
+  "/lookbook",
+  "/contact",
+  "/cart",
+  "/size-guide",
+  "/shipping-returns",
+  "/stockists",
+  "/privacy",
+  "/terms",
+];
+for (const route of DOCUMENT_ROUTES) app.get(route, serveDocument);
+
+app.get("/sitemap.xml", async (c) =>
+  c.text(await buildSitemap(c.env), 200, {
+    "content-type": "application/xml",
+    "cache-control": "public, max-age=3600",
+  }),
+);
+app.get("/robots.txt", (c) => {
+  const base = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  return c.text(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`);
+});
+
 // Public API — no auth, rate-limited where it accepts writes.
 app.route("/api/public", publicRoutes);
 app.route("/api/public", commerceRoutes);
@@ -114,15 +164,37 @@ export default {
   fetch: app.fetch,
 
   /**
-   * Daily ops sweep (cron in wrangler.toml):
-   *  1. flag late production tasks,
-   *  2. sweep abandoned checkouts (pending > 24h) into analytics,
-   *  3. email the founder a digest via Cloudflare Email Service.
+   * Crons (wrangler.toml):
+   *  - hourly (:30): publish scheduled pages/journal posts that are due
+   *  - daily (06:00): ops sweep — late tasks, abandoned checkouts, digest
    */
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runDailyOpsSweep(env));
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (controller.cron === "30 * * * *") {
+      ctx.waitUntil(publishDueContent(env));
+    } else {
+      // Daily also runs the publisher — belt and braces if the hourly missed.
+      ctx.waitUntil(publishDueContent(env).then(() => runDailyOpsSweep(env)));
+    }
   },
 } satisfies ExportedHandler<Env>;
+
+/** Flip due scheduled drafts live (publish_at in the past). */
+async function publishDueContent(env: Env): Promise<void> {
+  const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+  await env.DB.prepare(
+    `UPDATE pages SET is_published = 1, publish_at = NULL, updated_at = datetime('now')
+     WHERE is_published = 0 AND publish_at IS NOT NULL AND publish_at <= ?`,
+  )
+    .bind(now)
+    .run();
+  await env.DB.prepare(
+    `UPDATE journal_posts SET is_published = 1, publish_at = NULL,
+       published_at = COALESCE(published_at, date('now'))
+     WHERE is_published = 0 AND publish_at IS NOT NULL AND publish_at <= ?`,
+  )
+    .bind(now)
+    .run();
+}
 
 async function runDailyOpsSweep(env: Env): Promise<void> {
   const { dailyDigestNotification, sendNotification } = await import("./services/email");

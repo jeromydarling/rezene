@@ -32,6 +32,7 @@ function mapFile(row: Record<string, unknown>): AdminFile {
     entityType: (row.entity_type as string) ?? null,
     entityId: (row.entity_id as string) ?? null,
     isPublic: Boolean(row.is_public),
+    altText: (row.alt_text as string) ?? null,
     createdAt: row.created_at as string,
   };
 }
@@ -39,6 +40,7 @@ function mapFile(row: Record<string, unknown>): AdminFile {
 adminFileRoutes.get("/", async (c) => {
   const entityType = c.req.query("entityType");
   const entityId = c.req.query("entityId");
+  const q = c.req.query("q");
   const params: unknown[] = [];
   const conditions: string[] = [];
   if (entityType) {
@@ -49,6 +51,13 @@ adminFileRoutes.get("/", async (c) => {
     conditions.push(`entity_id = ?`);
     params.push(entityId);
   }
+  if (c.req.query("publicImages") === "1") {
+    conditions.push(`is_public = 1 AND content_type LIKE 'image/%'`);
+  }
+  if (q) {
+    conditions.push(`(filename LIKE ? OR alt_text LIKE ?)`);
+    params.push(`%${q}%`, `%${q}%`);
+  }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = await all(
     c.env.DB,
@@ -56,6 +65,65 @@ adminFileRoutes.get("/", async (c) => {
     ...params,
   );
   return c.json(rows.map(mapFile));
+});
+
+/** Update file metadata (currently: alt text for the media library). */
+adminFileRoutes.patch("/:id", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { altText?: string | null };
+  if (body.altText === undefined) return c.json({ error: "Nothing to update" }, 400);
+  const result = await run(
+    c.env.DB,
+    `UPDATE files SET alt_text = ? WHERE id = ?`,
+    body.altText ? String(body.altText).slice(0, 300) : null,
+    c.req.param("id"),
+  );
+  if (!result.meta.changes) return c.json({ error: "File not found" }, 404);
+  return c.json({ ok: true });
+});
+
+/** Vision-generated alt text for an uploaded image. */
+adminFileRoutes.post("/:id/ai-alt", requireAdminWrite, async (c) => {
+  const row = await first<{ id: string; r2_key: string; content_type: string | null; size_bytes: number | null }>(
+    c.env.DB,
+    `SELECT id, r2_key, content_type, size_bytes FROM files WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!row) return c.json({ error: "File not found" }, 404);
+  if (!row.content_type?.startsWith("image/") || row.content_type === "image/svg+xml") {
+    return c.json({ error: "Alt text generation only works on raster images" }, 400);
+  }
+  if ((row.size_bytes ?? 0) > 4 * 1024 * 1024) {
+    return c.json({ error: "Image too large for alt text generation (4MB max)" }, 413);
+  }
+  const object = await c.env.FILES.get(row.r2_key);
+  if (!object) return c.json({ error: "Object missing from storage" }, 404);
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  try {
+    const { askClaude } = await import("../services/anthropic");
+    const result = await askClaude(c.env, {
+      system:
+        "You write alt text for e-commerce imagery. Respond with one plain sentence, " +
+        "under 125 characters, describing what is visually in the image. No quotes, no preamble.",
+      prompt: "Write alt text for this image.",
+      image: { base64: btoa(binary), mediaType: row.content_type },
+      maxTokens: 100,
+    });
+    const altText = result.text.trim().replace(/^"|"$/g, "").slice(0, 300);
+    if (!altText) return c.json({ error: "The model returned nothing — try again" }, 502);
+    await run(c.env.DB, `UPDATE files SET alt_text = ? WHERE id = ?`, altText, row.id);
+    return c.json({ altText });
+  } catch (err) {
+    const { AnthropicNotConfiguredError } = await import("../services/anthropic");
+    if (err instanceof AnthropicNotConfiguredError) {
+      return c.json({ error: "Alt text generation needs an Anthropic API key" }, 503);
+    }
+    throw err;
+  }
 });
 
 /**

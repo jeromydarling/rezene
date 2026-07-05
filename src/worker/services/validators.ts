@@ -326,6 +326,29 @@ const slugField = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, and hyphens only");
 
 const pageLayout = z.enum(["standard", "hero", "wide"]);
+const SECTION_TYPES = [
+  "home_hero",
+  "hero",
+  "prose",
+  "image_text",
+  "product_grid",
+  "collection_strip",
+  "gallery",
+  "quote",
+  "faq",
+  "cta_band",
+  "newsletter",
+] as const;
+/** Block sections: type is validated, per-type fields stay open (loose blocks). */
+const sectionsField = z
+  .array(z.object({ type: z.enum(SECTION_TYPES) }).passthrough())
+  .max(40)
+  .refine((arr) => JSON.stringify(arr).length <= 120_000, "Sections too large");
+const seoFields = {
+  metaTitle: z.string().max(120).nullable().optional(),
+  metaDescription: z.string().max(300).nullable().optional(),
+  publishAt: z.string().max(30).nullable().optional(),
+};
 export const pageCreateSchema = z.object({
   slug: slugField,
   title: z.string().min(1).max(200),
@@ -334,6 +357,8 @@ export const pageCreateSchema = z.object({
   heroImageUrl: z.string().max(500).nullable().optional(),
   heroEyebrow: z.string().max(120).nullable().optional(),
   subtitle: z.string().max(300).nullable().optional(),
+  sections: sectionsField.nullable().optional(),
+  ...seoFields,
   isPublished: z.boolean().optional(),
 });
 export const pageUpdateSchema = z.object({
@@ -343,7 +368,36 @@ export const pageUpdateSchema = z.object({
   heroImageUrl: z.string().max(500).nullable().optional(),
   heroEyebrow: z.string().max(120).nullable().optional(),
   subtitle: z.string().max(300).nullable().optional(),
+  sections: sectionsField.nullable().optional(),
+  ...seoFields,
   isPublished: z.boolean().optional(),
+});
+
+const navLinks = z
+  .array(z.object({ label: z.string().min(1).max(60), href: z.string().min(1).max(300) }))
+  .max(20);
+export const navMenusSchema = z.object({ header: navLinks, footer: navLinks });
+
+export const brandVoiceSchema = z.object({ voice: z.string().max(2000) });
+
+export const aiRewriteSchema = z.object({
+  text: z.string().min(1).max(20000),
+  instruction: z.string().min(1).max(300),
+});
+
+export const aiMetaSchema = z.object({
+  title: z.string().min(1).max(200),
+  body: z.string().max(30000),
+});
+
+export const siteStarterSchema = z.object({
+  whatYouMake: z.string().min(3).max(1000),
+  whereMade: z.string().max(500).optional(),
+  audience: z.string().max(500).optional(),
+  pricePosture: z.string().max(300).optional(),
+  differentiator: z.string().max(1000).optional(),
+  toneWords: z.string().max(300).optional(),
+  extras: z.string().max(1000).optional(),
 });
 
 export const homeHeroSchema = z.object({
@@ -374,6 +428,7 @@ export const journalCreateSchema = z.object({
   author: z.string().max(120).optional(),
   heroImageUrl: z.string().max(500).nullable().optional(),
   publishedAt: z.string().max(30).nullable().optional(),
+  ...seoFields,
   isPublished: z.boolean().optional(),
 });
 export const journalUpdateSchema = journalCreateSchema.partial().omit({ slug: true });

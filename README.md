@@ -256,7 +256,11 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Analytics event foundation (11 event types) | D1 `analytics_events` | ✅ working |
 | Settings: brand identity as data, integration status | admin System | ✅ working |
 | Cron: daily late-task risk sweep | `wrangler.toml [triggers]` | ✅ working |
-| CMS: pages (3 layouts, hero images), journal, lookbooks, editable homepage hero, AI content drafting, drafts + revision history + delete | admin Content | ✅ working (AI needs key) |
+| CMS: block-composed pages (11 section types), templates, 3 layouts, hero images, editable homepage (blocks) + hero + navigation, journal, lookbooks, drafts + revision history + delete | admin Content | ✅ working |
+| CMS ops: draft preview links, scheduled publishing (hourly cron), media library with alt text | admin Content | ✅ working |
+| Edge SEO: per-route meta/OG injection into the SPA shell, sitemap.xml, robots.txt, SEO fields | worker `services/seo.ts` | ✅ working |
+| AI content suite: interview drafting, selection rewrite, SEO meta, image alt text, brand voice, site-starter interview | admin Content (needs Anthropic key) | ✅ working |
+| Storefront translations: EN/FR toggle, on-demand Llama translation via Workers AI, cached in D1 | `services/translate.ts` | ✅ working |
 | Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
 | Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |

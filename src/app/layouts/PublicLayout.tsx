@@ -4,31 +4,54 @@ import { ShoppingBag } from "lucide-react";
 import { track } from "../lib/analytics";
 import { useBrand } from "../lib/brand";
 import { useCart } from "../lib/cart";
+import { useLang } from "../lib/lang";
 import { NewsletterForm } from "../components/LeadForm";
 
-const NAV = [
-  { to: "/products", label: "Shop" },
-  { to: "/collections", label: "Collections" },
-  { to: "/lookbook", label: "Lookbook" },
-  { to: "/story", label: "Story" },
-  { to: "/atelier", label: "Atelier" },
-  { to: "/journal", label: "Journal" },
+// Pre-fetch fallbacks — the live menus are data (Admin → Content → Pages).
+const DEFAULT_NAV = [
+  { href: "/products", label: "Shop" },
+  { href: "/collections", label: "Collections" },
+  { href: "/lookbook", label: "Lookbook" },
+  { href: "/story", label: "Story" },
+  { href: "/atelier", label: "Atelier" },
+  { href: "/journal", label: "Journal" },
 ];
 
-const FOOTER_LINKS = [
-  { to: "/size-guide", label: "Size Guide" },
-  { to: "/shipping-returns", label: "Shipping & Returns" },
-  { to: "/stockists", label: "Stockists" },
-  { to: "/contact", label: "Contact" },
-  { to: "/privacy", label: "Privacy" },
-  { to: "/terms", label: "Terms" },
+const DEFAULT_FOOTER = [
+  { href: "/size-guide", label: "Size Guide" },
+  { href: "/shipping-returns", label: "Shipping & Returns" },
+  { href: "/stockists", label: "Stockists" },
+  { href: "/contact", label: "Contact" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
 ];
+
+function LanguageSwitcher({ className = "" }: { className?: string }) {
+  const { lang, setLang, languages, defaultLang } = useLang();
+  if (languages.length < 2) return null;
+  return (
+    <select
+      aria-label="Language"
+      className={`bg-transparent text-[0.7rem] uppercase tracking-editorial text-ink/70 hover:text-ink ${className}`}
+      value={lang || defaultLang}
+      onChange={(e) => setLang(e.target.value)}
+    >
+      {languages.map((code) => (
+        <option key={code} value={code}>
+          {code.toUpperCase()}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const brand = useBrand();
   const cart = useCart();
+  const nav = brand.navigation?.header?.length ? brand.navigation.header : DEFAULT_NAV;
+  const footerLinks = brand.navigation?.footer?.length ? brand.navigation.footer : DEFAULT_FOOTER;
 
   useEffect(() => {
     setMenuOpen(false);
@@ -43,10 +66,10 @@ export function PublicLayout() {
             {brand.brandName}
           </Link>
           <nav className="hidden items-center gap-7 md:flex">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink
-                key={item.to}
-                to={item.to}
+                key={item.href}
+                to={item.href}
                 className={({ isActive }) =>
                   `text-[0.72rem] font-medium uppercase tracking-editorial transition-colors ${
                     isActive ? "text-terracotta" : "text-ink/70 hover:text-ink"
@@ -58,6 +81,7 @@ export function PublicLayout() {
             ))}
           </nav>
           <div className="flex items-center gap-4">
+            <LanguageSwitcher className="hidden md:block" />
             <Link to="/cart" className="relative text-ink/70 hover:text-ink" aria-label="Cart">
               <ShoppingBag size={19} strokeWidth={1.6} />
               {cart.count > 0 && (
@@ -80,13 +104,16 @@ export function PublicLayout() {
         {menuOpen && (
           <nav className="border-t border-ink/10 px-5 py-4 md:hidden">
             <ul className="space-y-3">
-              {[...NAV, ...FOOTER_LINKS].map((item) => (
-                <li key={item.to}>
-                  <Link to={item.to} className="text-sm uppercase tracking-editorial text-ink/80">
+              {[...nav, ...footerLinks].map((item) => (
+                <li key={item.href}>
+                  <Link to={item.href} className="text-sm uppercase tracking-editorial text-ink/80">
                     {item.label}
                   </Link>
                 </li>
               ))}
+              <li>
+                <LanguageSwitcher />
+              </li>
             </ul>
           </nav>
         )}
@@ -107,9 +134,9 @@ export function PublicLayout() {
           <div>
             <p className="eyebrow mb-4 !text-chalk/50">Concierge</p>
             <ul className="space-y-2">
-              {FOOTER_LINKS.map((item) => (
-                <li key={item.to}>
-                  <Link to={item.to} className="text-sm text-chalk/80 hover:text-chalk">
+              {footerLinks.map((item) => (
+                <li key={item.href}>
+                  <Link to={item.href} className="text-sm text-chalk/80 hover:text-chalk">
                     {item.label}
                   </Link>
                 </li>

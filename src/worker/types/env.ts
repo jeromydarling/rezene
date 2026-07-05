@@ -6,12 +6,22 @@
  * and are intentionally optional here: routes that need them must
  * check presence and fail with a clear 503 rather than crash.
  */
+/**
+ * Minimal Workers AI surface (kept local so we don't depend on a specific
+ * workers-types version). Used for content translation.
+ */
+export interface WorkersAi {
+  run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
+
 export interface Env {
   // Bindings
   DB: D1Database;
   FILES: R2Bucket;
   KV: KVNamespace;
   ASSETS: Fetcher;
+  /** Workers AI (optional: absent in very old local dev setups). */
+  AI?: WorkersAi;
   /** Cloudflare Email Service send binding (optional in local dev). */
   EMAIL?: SendEmail;
 

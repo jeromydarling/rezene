@@ -2,6 +2,9 @@ import { Hono, type Context } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
 import {
   aiDraftSchema,
+  aiMetaSchema,
+  aiRewriteSchema,
+  brandVoiceSchema,
   collectionUpdateSchema,
   homeHeroSchema,
   journalCreateSchema,
@@ -9,9 +12,11 @@ import {
   lookbookImageCreateSchema,
   lookbookImageUpdateSchema,
   lookbookUpdateSchema,
+  navMenusSchema,
   pageCreateSchema,
   pageUpdateSchema,
   parseBody,
+  siteStarterSchema,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { AnthropicNotConfiguredError, askClaude, parseModelJson } from "../services/anthropic";
@@ -113,6 +118,7 @@ adminContentRoutes.get("/pages", async (c) => {
   const rows = await all(
     c.env.DB,
     `SELECT id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle,
+            sections_json, publish_at, meta_title, meta_description,
             is_published, updated_at
      FROM pages ORDER BY slug`,
   );
@@ -126,8 +132,9 @@ adminContentRoutes.post("/pages", requireAdminWrite, async (c) => {
   const id = newId("pg");
   await run(
     c.env.DB,
-    `INSERT INTO pages (id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle, is_published)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO pages (id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle,
+                        sections_json, publish_at, meta_title, meta_description, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     body.slug,
     body.title,
@@ -136,6 +143,10 @@ adminContentRoutes.post("/pages", requireAdminWrite, async (c) => {
     body.heroImageUrl ?? null,
     body.heroEyebrow ?? null,
     body.subtitle ?? null,
+    body.sections ? JSON.stringify(body.sections) : null,
+    body.publishAt ?? null,
+    body.metaTitle ?? null,
+    body.metaDescription ?? null,
     body.isPublished === false ? 0 : 1,
   );
   await writeAudit(c.env.DB, c.var.userId, "page.create", "page", id, { slug: body.slug });
@@ -155,6 +166,9 @@ adminContentRoutes.patch("/pages/:id", requireAdminWrite, async (c) => {
     heroImageUrl: "hero_image_url",
     heroEyebrow: "hero_eyebrow",
     subtitle: "subtitle",
+    publishAt: "publish_at",
+    metaTitle: "meta_title",
+    metaDescription: "meta_description",
   };
   const sets: string[] = [`updated_at = datetime('now')`];
   const params: unknown[] = [];
@@ -167,6 +181,10 @@ adminContentRoutes.patch("/pages/:id", requireAdminWrite, async (c) => {
   if (body.bodyMd !== undefined) {
     sets.push(`body_md = ?`);
     params.push(body.bodyMd ?? "");
+  }
+  if (body.sections !== undefined) {
+    sets.push(`sections_json = ?`);
+    params.push(body.sections ? JSON.stringify(body.sections) : null);
   }
   if (body.isPublished !== undefined) {
     sets.push(`is_published = ?`);
@@ -194,6 +212,10 @@ const pageRevisions = revisionRoutes("page", [
   "hero_image_url",
   "hero_eyebrow",
   "subtitle",
+  "sections_json",
+  "publish_at",
+  "meta_title",
+  "meta_description",
   "is_published",
 ]);
 adminContentRoutes.get("/pages/:id/revisions", (c) => pageRevisions.list(c));
@@ -234,6 +256,99 @@ adminContentRoutes.put("/home-hero", requireAdminWrite, async (c) => {
 });
 
 // ============================================================
+// Draft preview token (share links for unpublished content)
+// ============================================================
+adminContentRoutes.get("/preview-token", async (c) => {
+  const row = await first<{ value: string }>(
+    c.env.DB,
+    `SELECT value FROM settings WHERE key = 'preview_token'`,
+  );
+  return c.json({ token: row?.value ?? null });
+});
+
+// ============================================================
+// Navigation (header/footer menus, settings-backed)
+// ============================================================
+adminContentRoutes.get("/navigation", async (c) => {
+  const row = await first<{ value: string }>(
+    c.env.DB,
+    `SELECT value FROM settings WHERE key = 'nav_menus'`,
+  );
+  try {
+    return c.json(row ? JSON.parse(row.value) : { header: [], footer: [] });
+  } catch {
+    return c.json({ header: [], footer: [] });
+  }
+});
+
+adminContentRoutes.put("/navigation", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, navMenusSchema);
+  await run(
+    c.env.DB,
+    `INSERT INTO settings (key, value, description)
+     VALUES ('nav_menus', ?, 'Header/footer navigation (JSON) — edited under Admin → Content → Pages')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+    JSON.stringify(body),
+  );
+  await writeAudit(c.env.DB, c.var.userId, "navigation.update", "settings", "nav_menus", {
+    headerCount: body.header.length,
+    footerCount: body.footer.length,
+  });
+  return c.json({ ok: true });
+});
+
+// ============================================================
+// Brand voice (consumed by every AI writing feature)
+// ============================================================
+async function loadBrandVoice(db: D1Database): Promise<string> {
+  const row = await first<{ value: string }>(
+    db,
+    `SELECT value FROM settings WHERE key = 'brand_voice'`,
+  );
+  return row?.value?.trim() ?? "";
+}
+
+adminContentRoutes.get("/brand-voice", async (c) => {
+  return c.json({ voice: await loadBrandVoice(c.env.DB) });
+});
+
+adminContentRoutes.put("/brand-voice", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, brandVoiceSchema);
+  await run(
+    c.env.DB,
+    `INSERT INTO settings (key, value, description)
+     VALUES ('brand_voice', ?, 'How the brand sounds — consumed by every AI writing feature')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+    body.voice,
+  );
+  await writeAudit(c.env.DB, c.var.userId, "brand_voice.update", "settings", "brand_voice");
+  return c.json({ ok: true });
+});
+
+/**
+ * Shared system prompt for every AI writing feature: brand identity plus
+ * the shop's configurable voice. A shop that hasn't written a voice yet
+ * gets a sane editorial default.
+ */
+async function writingSystem(env: Parameters<typeof getBrandName>[0]): Promise<string> {
+  const brandName = await getBrandName(env);
+  const tagline = await first<{ value: string }>(
+    env.DB,
+    `SELECT value FROM settings WHERE key = 'brand_tagline'`,
+  );
+  const voice = await loadBrandVoice(env.DB);
+  return (
+    `You are the in-house content editor for ${brandName}` +
+    (tagline?.value ? ` (“${tagline.value}”)` : "") +
+    `, an independent clothing brand. ` +
+    (voice
+      ? `The brand voice, defined by the owner — follow it closely:\n${voice}\n`
+      : `Write in a refined, editorial voice: concrete, warm, never salesy, no exclamation ` +
+        `marks, no clichés like "elevate" or "timeless". Write like a good magazine, not an ad. `)
+  );
+}
+
+// ============================================================
 // AI content drafting — a short interview becomes a ready draft
 // ============================================================
 const LENGTH_WORDS: Record<string, string> = {
@@ -244,12 +359,6 @@ const LENGTH_WORDS: Record<string, string> = {
 
 adminContentRoutes.post("/ai-draft", requireAdminWrite, async (c) => {
   const body = await parseBody(c, aiDraftSchema);
-  const brandName = await getBrandName(c.env);
-  const tagline = await first<{ value: string }>(
-    c.env.DB,
-    `SELECT value FROM settings WHERE key = 'brand_tagline'`,
-  );
-
   const kindLabel = body.kind === "journal" ? "journal (blog) post" : "site page";
   const prompt = [
     `Draft a ${kindLabel} for the brand's website.`,
@@ -277,11 +386,8 @@ adminContentRoutes.post("/ai-draft", requireAdminWrite, async (c) => {
   try {
     const result = await askClaude(c.env, {
       system:
-        `You are the in-house content editor for ${brandName}` +
-        (tagline?.value ? ` (“${tagline.value}”)` : "") +
-        `, an independent clothing brand with a refined, editorial voice: concrete, warm, never ` +
-        `salesy, no exclamation marks, no clichés like "elevate" or "timeless". Write like a good ` +
-        `magazine, not an ad. You always respond with exactly one JSON object and no surrounding prose.`,
+        (await writingSystem(c.env)) +
+        `You always respond with exactly one JSON object and no surrounding prose.`,
       prompt,
       maxTokens: 3000,
     });
@@ -313,12 +419,210 @@ adminContentRoutes.post("/ai-draft", requireAdminWrite, async (c) => {
 });
 
 // ============================================================
+// AI rewrite — selection-level editing inside the markdown editor
+// ============================================================
+adminContentRoutes.post("/ai-rewrite", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, aiRewriteSchema);
+  try {
+    const result = await askClaude(c.env, {
+      system:
+        (await writingSystem(c.env)) +
+        `You rewrite the text you are given. Preserve markdown formatting. ` +
+        `Output ONLY the rewritten text — no preamble, no explanation, no code fences.`,
+      prompt: `Instruction: ${body.instruction}\n\nText to rewrite:\n${body.text}`,
+      maxTokens: 4000,
+    });
+    const text = result.text.replace(/^```(?:markdown)?\n?|```$/g, "").trim();
+    if (!text) return c.json({ error: "The model returned nothing — try again" }, 502);
+    return c.json({ text });
+  } catch (err) {
+    if (err instanceof AnthropicNotConfiguredError) {
+      return c.json({ error: "AI editing needs an Anthropic API key" }, 503);
+    }
+    throw err;
+  }
+});
+
+// ============================================================
+// AI meta — SEO title/description from the content
+// ============================================================
+adminContentRoutes.post("/ai-meta", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, aiMetaSchema);
+  try {
+    const result = await askClaude(c.env, {
+      system:
+        (await writingSystem(c.env)) +
+        `You write search-optimized metadata. Respond with exactly one JSON object.`,
+      prompt:
+        `Write SEO metadata for this content.\n\nTitle: ${body.title}\n\nContent:\n${body.body.slice(0, 6000)}\n\n` +
+        `Return JSON: {"metaTitle": "≤60 chars, compelling, includes the natural topic keyword", ` +
+        `"metaDescription": "≤155 chars, specific and inviting, no clickbait"}`,
+      maxTokens: 400,
+    });
+    const parsed = parseModelJson(result.text) as { metaTitle?: string; metaDescription?: string };
+    if (!parsed.metaTitle && !parsed.metaDescription) {
+      return c.json({ error: "The model returned unusable metadata — try again" }, 502);
+    }
+    return c.json({
+      metaTitle: parsed.metaTitle ?? null,
+      metaDescription: parsed.metaDescription ?? null,
+    });
+  } catch (err) {
+    if (err instanceof AnthropicNotConfiguredError) {
+      return c.json({ error: "AI metadata needs an Anthropic API key" }, 503);
+    }
+    throw err;
+  }
+});
+
+// ============================================================
+// AI site starter — one interview roughs in the whole site as drafts
+// ============================================================
+adminContentRoutes.post("/ai-site-starter", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, siteStarterSchema);
+  const brandName = await getBrandName(c.env);
+
+  const prompt = [
+    `A new independent clothing brand called "${brandName}" is setting up its website. The owner answered:`,
+    ``,
+    `What they make: ${body.whatYouMake}`,
+    body.whereMade ? `Where it's made: ${body.whereMade}` : null,
+    body.audience ? `Who it's for: ${body.audience}` : null,
+    body.pricePosture ? `Price posture: ${body.pricePosture}` : null,
+    body.differentiator ? `What makes them different: ${body.differentiator}` : null,
+    body.toneWords ? `Tone words they chose: ${body.toneWords}` : null,
+    body.extras ? `Anything else: ${body.extras}` : null,
+    ``,
+    `Generate the starter content for their site. Respond with exactly one JSON object:`,
+    `{`,
+    `  "brandVoice": "3-5 sentences describing how this brand writes, plus 3-5 words/phrases it never uses",`,
+    `  "homeHero": {"eyebrow": "2-5 word kicker", "heading": "≤10 word hero heading", "subheading": "1-2 sentences", "primaryCtaLabel": "...", "primaryCtaHref": "/products", "secondaryCtaLabel": "...", "secondaryCtaHref": "/story"},`,
+    `  "pages": [`,
+    `    {"slug": "story", "title": "...", "heroEyebrow": "...", "subtitle": "...", "bodyMd": "the brand story, ~350 words of markdown with ## headings", "metaDescription": "≤155 chars"},`,
+    `    {"slug": "faq", "title": "...", "heroEyebrow": "...", "subtitle": "...", "bodyMd": "8-10 realistic Q&As as ## question / answer markdown", "metaDescription": "≤155 chars"},`,
+    `    {"slug": "press", "title": "...", "heroEyebrow": "...", "subtitle": "...", "bodyMd": "a press/about page for journalists: facts, founding, materials, contacts placeholder, ~250 words", "metaDescription": "≤155 chars"}`,
+    `  ],`,
+    `  "journalPost": {"slug": "kebab-slug", "title": "...", "excerpt": "1-2 sentences", "bodyMd": "a first journal post introducing the brand, ~400 words markdown"}`,
+    `}`,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+
+  let bundle: {
+    brandVoice?: string;
+    homeHero?: Record<string, unknown>;
+    pages?: { slug?: string; title?: string; heroEyebrow?: string; subtitle?: string; bodyMd?: string; metaDescription?: string }[];
+    journalPost?: { slug?: string; title?: string; excerpt?: string; bodyMd?: string };
+  };
+  try {
+    const result = await askClaude(c.env, {
+      system:
+        (await writingSystem(c.env)) +
+        `You respond with exactly one JSON object and no surrounding prose.`,
+      prompt,
+      maxTokens: 8000,
+    });
+    bundle = parseModelJson(result.text) as typeof bundle;
+  } catch (err) {
+    if (err instanceof AnthropicNotConfiguredError) {
+      return c.json({ error: "The site starter needs an Anthropic API key" }, 503);
+    }
+    throw err;
+  }
+
+  // Apply as drafts. Never touch a published page; never auto-apply the
+  // hero (it has no draft state) — it's returned for explicit apply.
+  const results: { item: string; status: "created" | "updated" | "skipped"; note?: string }[] = [];
+
+  if (typeof bundle.brandVoice === "string" && bundle.brandVoice.trim()) {
+    await run(
+      c.env.DB,
+      `INSERT INTO settings (key, value, description)
+       VALUES ('brand_voice', ?, 'How the brand sounds — consumed by every AI writing feature')
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+      bundle.brandVoice.trim(),
+    );
+    results.push({ item: "Brand voice", status: "updated" });
+  }
+
+  for (const page of bundle.pages ?? []) {
+    if (!page.slug || !page.title || !page.bodyMd) continue;
+    const slug = page.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const existing = await first<{ id: string; is_published: number }>(
+      c.env.DB,
+      `SELECT id, is_published FROM pages WHERE slug = ?`,
+      slug,
+    );
+    if (existing && existing.is_published) {
+      results.push({ item: `Page: ${slug}`, status: "skipped", note: "already published — left untouched" });
+      continue;
+    }
+    if (existing) {
+      await snapshotRevision(c.env.DB, "page", existing.id, c.var.userId);
+      await run(
+        c.env.DB,
+        `UPDATE pages SET title = ?, body_md = ?, hero_eyebrow = ?, subtitle = ?, meta_description = ?,
+           updated_at = datetime('now') WHERE id = ?`,
+        page.title,
+        page.bodyMd,
+        page.heroEyebrow ?? null,
+        page.subtitle ?? null,
+        page.metaDescription ?? null,
+        existing.id,
+      );
+      results.push({ item: `Page: ${slug}`, status: "updated", note: "existing draft refreshed" });
+    } else {
+      await run(
+        c.env.DB,
+        `INSERT INTO pages (id, slug, title, body_md, hero_eyebrow, subtitle, meta_description, is_published)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+        newId("pg"),
+        slug,
+        page.title,
+        page.bodyMd,
+        page.heroEyebrow ?? null,
+        page.subtitle ?? null,
+        page.metaDescription ?? null,
+      );
+      results.push({ item: `Page: ${slug}`, status: "created" });
+    }
+  }
+
+  const post = bundle.journalPost;
+  if (post?.slug && post.title && post.bodyMd) {
+    const slug = post.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const existing = await first(c.env.DB, `SELECT id FROM journal_posts WHERE slug = ?`, slug);
+    if (existing) {
+      results.push({ item: `Journal: ${slug}`, status: "skipped", note: "slug already exists" });
+    } else {
+      await run(
+        c.env.DB,
+        `INSERT INTO journal_posts (id, slug, title, excerpt, body_md, is_published)
+         VALUES (?, ?, ?, ?, ?, 0)`,
+        newId("jp"),
+        slug,
+        post.title,
+        post.excerpt ?? null,
+        post.bodyMd,
+      );
+      results.push({ item: `Journal: ${slug}`, status: "created" });
+    }
+  }
+
+  await writeAudit(c.env.DB, c.var.userId, "content.ai_site_starter", "settings", null, {
+    results: results.map((r) => `${r.item}:${r.status}`),
+  });
+  return c.json({ results, homeHero: bundle.homeHero ?? null });
+});
+
+// ============================================================
 // Journal
 // ============================================================
 adminContentRoutes.get("/journal", async (c) => {
   const rows = await all(
     c.env.DB,
-    `SELECT id, slug, title, excerpt, body_md, hero_image_url, author, published_at, is_published, created_at
+    `SELECT id, slug, title, excerpt, body_md, hero_image_url, author, published_at,
+            publish_at, meta_title, meta_description, is_published, created_at
      FROM journal_posts ORDER BY COALESCE(published_at, created_at) DESC`,
   );
   return c.json(rows);
@@ -363,6 +667,9 @@ adminContentRoutes.patch("/journal/:id", requireAdminWrite, async (c) => {
     heroImageUrl: "hero_image_url",
     author: "author",
     publishedAt: "published_at",
+    publishAt: "publish_at",
+    metaTitle: "meta_title",
+    metaDescription: "meta_description",
   };
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -398,6 +705,9 @@ const journalRevisions = revisionRoutes("journal_post", [
   "hero_image_url",
   "author",
   "published_at",
+  "publish_at",
+  "meta_title",
+  "meta_description",
   "is_published",
 ]);
 adminContentRoutes.get("/journal/:id/revisions", (c) => journalRevisions.list(c));

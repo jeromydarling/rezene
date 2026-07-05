@@ -1,5 +1,8 @@
+import { useLocation } from "react-router";
 import { useFetch } from "../../lib/useFetch";
+import { langParam, useLang } from "../../lib/lang";
 import { Markdown } from "../../components/Markdown";
+import { PageBlocks } from "../../components/PageBlocks";
 import type { PublicPage } from "../../../shared/types";
 
 /**
@@ -7,9 +10,20 @@ import type { PublicPage } from "../../../shared/types";
  *  - standard: narrow editorial prose (the classic)
  *  - hero: full-bleed image (or navy band) header with title overlay
  *  - wide: broad centered editorial with optional image under the title
+ * Pages composed of block sections render those instead of the body.
  */
 export function MarkdownPage({ slug, eyebrow }: { slug: string; eyebrow?: string }) {
-  const { data, loading, error } = useFetch<PublicPage>(`/api/public/pages/${slug}`);
+  const { lang, defaultLang } = useLang();
+  const preview = new URLSearchParams(useLocation().search).get("preview");
+  const params = [
+    langParam(lang, defaultLang),
+    preview ? `preview=${encodeURIComponent(preview)}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
+  const { data, loading, error } = useFetch<PublicPage>(
+    `/api/public/pages/${slug}${params ? `?${params}` : ""}`,
+  );
 
   if (loading) {
     return (
@@ -30,6 +44,14 @@ export function MarkdownPage({ slug, eyebrow }: { slug: string; eyebrow?: string
   }
 
   const kicker = data.heroEyebrow ?? eyebrow;
+  const hasSections = Boolean(data.sections && data.sections.length > 0);
+  const body = hasSections ? (
+    <PageBlocks sections={data.sections!} />
+  ) : (
+    <div className="mx-auto max-w-2xl px-5 py-16">
+      <Markdown text={data.bodyMd ?? ""} />
+    </div>
+  );
 
   if (data.layout === "hero") {
     return (
@@ -55,38 +77,52 @@ export function MarkdownPage({ slug, eyebrow }: { slug: string; eyebrow?: string
             )}
           </div>
         </header>
-        <div className="mx-auto max-w-2xl px-5 py-16">
-          <Markdown text={data.bodyMd ?? ""} />
-        </div>
+        {body}
       </article>
     );
   }
 
   if (data.layout === "wide") {
     return (
-      <article className="mx-auto max-w-4xl px-5 py-16">
-        <header className="mb-10 text-center">
+      <article className={hasSections ? "" : "mx-auto max-w-4xl px-5 py-16"}>
+        <header className={`text-center ${hasSections ? "mx-auto max-w-4xl px-5 pt-16 pb-4" : "mb-10"}`}>
           {kicker && <p className="eyebrow mb-3">{kicker}</p>}
           <h1 className="display-hero text-4xl md:text-5xl">{data.title}</h1>
           {data.subtitle && (
             <p className="prose-editorial mx-auto mt-4 max-w-2xl">{data.subtitle}</p>
           )}
         </header>
-        {data.heroImageUrl && (
+        {data.heroImageUrl && !hasSections && (
           <img
             src={data.heroImageUrl}
             alt=""
             className="mb-12 aspect-[21/9] w-full object-cover"
           />
         )}
-        <div className="mx-auto max-w-3xl">
-          <Markdown text={data.bodyMd ?? ""} />
-        </div>
+        {hasSections ? (
+          <PageBlocks sections={data.sections!} />
+        ) : (
+          <div className="mx-auto max-w-3xl">
+            <Markdown text={data.bodyMd ?? ""} />
+          </div>
+        )}
       </article>
     );
   }
 
   // standard
+  if (hasSections) {
+    return (
+      <article>
+        <header className="mx-auto max-w-2xl px-5 pt-16 pb-4">
+          {kicker && <p className="eyebrow mb-3">{kicker}</p>}
+          <h1 className="display-hero mb-3 text-4xl">{data.title}</h1>
+          {data.subtitle && <p className="prose-editorial text-warmgrey">{data.subtitle}</p>}
+        </header>
+        <PageBlocks sections={data.sections!} />
+      </article>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl px-5 py-16">
       <article>

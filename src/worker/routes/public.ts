@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { all, first, jsonArray, run } from "../services/db";
 import { leadNotification, sendNotification } from "../services/email";
+import { getSupportedLanguages, translateFields } from "../services/translate";
 import { analyticsEventSchema, leadSchema, parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import { newId } from "../utils/id";
@@ -24,23 +25,38 @@ export const publicRoutes = new Hono<AppContext>();
 publicRoutes.get("/settings", async (c) => {
   const rows = await all<{ key: string; value: string }>(
     c.env.DB,
-    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero')`,
+    `SELECT key, value FROM settings
+     WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero','nav_menus','supported_languages')`,
   );
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-  let homeHero: BrandSettings["homeHero"] = null;
-  try {
-    homeHero = map.home_hero ? (JSON.parse(map.home_hero) as BrandSettings["homeHero"]) : null;
-  } catch {
-    /* corrupt setting → client falls back to built-in defaults */
-  }
+  const parse = <T>(value: string | undefined): T | null => {
+    try {
+      return value ? (JSON.parse(value) as T) : null;
+    } catch {
+      return null; // corrupt setting → client falls back to built-in defaults
+    }
+  };
+  const languages = parse<string[]>(map.supported_languages);
   const settings: BrandSettings = {
     brandName: map.brand_name ?? c.env.BRAND_NAME,
     tagline: map.brand_tagline ?? "",
     currency: map.default_currency ?? "USD",
-    homeHero,
+    homeHero: parse<BrandSettings["homeHero"]>(map.home_hero),
+    navigation: parse<BrandSettings["navigation"]>(map.nav_menus),
+    languages: Array.isArray(languages) && languages.length > 0 ? languages : ["en"],
   };
   return c.json(settings);
 });
+
+/** True when the request carries the site's draft-preview token. */
+async function previewAllowed(db: D1Database, token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  const row = await first<{ value: string }>(
+    db,
+    `SELECT value FROM settings WHERE key = 'preview_token'`,
+  );
+  return Boolean(row?.value && row.value === token);
+}
 
 // ---------- Collections ----------
 publicRoutes.get("/collections", async (c) => {
@@ -213,19 +229,42 @@ publicRoutes.get("/journal", async (c) => {
 });
 
 publicRoutes.get("/journal/:slug", async (c) => {
+  const allowDraft = await previewAllowed(c.env.DB, c.req.query("preview"));
   const row = await first(
     c.env.DB,
-    `SELECT slug, title, excerpt, body_md, hero_image_url, author, published_at
-     FROM journal_posts WHERE slug = ? AND is_published = 1`,
+    `SELECT id, slug, title, excerpt, body_md, hero_image_url, author, published_at
+     FROM journal_posts WHERE slug = ? ${allowDraft ? "" : "AND is_published = 1"}`,
     c.req.param("slug"),
   );
   if (!row) return c.json({ error: "Post not found" }, 404);
-  return c.json(mapJournal(row, true));
+  const post = mapJournal(row, true) as PublicJournalPost & { lang?: string; translated?: boolean };
+
+  const lang = (c.req.query("lang") ?? "").toLowerCase().slice(0, 5);
+  if (lang) {
+    const languages = await getSupportedLanguages(c.env.DB);
+    if (lang !== languages[0] && languages.includes(lang)) {
+      const translated = await translateFields(c.env, "journal_post", row.id as string, lang, {
+        title: post.title,
+        excerpt: post.excerpt,
+        bodyMd: post.bodyMd,
+      });
+      if (translated) {
+        post.title = translated.title ?? post.title;
+        post.excerpt = translated.excerpt ?? post.excerpt;
+        post.bodyMd = translated.bodyMd ?? post.bodyMd;
+        post.lang = lang;
+        post.translated = true;
+      }
+    }
+  }
+  return c.json(post);
 });
 
 // ---------- Static pages ----------
 publicRoutes.get("/pages/:slug", async (c) => {
+  const allowDraft = await previewAllowed(c.env.DB, c.req.query("preview"));
   const row = await first<{
+    id: string;
     slug: string;
     title: string;
     body_md: string | null;
@@ -233,13 +272,23 @@ publicRoutes.get("/pages/:slug", async (c) => {
     hero_image_url: string | null;
     hero_eyebrow: string | null;
     subtitle: string | null;
+    sections_json: string | null;
   }>(
     c.env.DB,
-    `SELECT slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle
-     FROM pages WHERE slug = ? AND is_published = 1`,
+    `SELECT id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle, sections_json
+     FROM pages WHERE slug = ? ${allowDraft ? "" : "AND is_published = 1"}`,
     c.req.param("slug"),
   );
   if (!row) return c.json({ error: "Page not found" }, 404);
+
+  let sections: PublicPage["sections"] = null;
+  if (row.sections_json) {
+    try {
+      sections = JSON.parse(row.sections_json) as PublicPage["sections"];
+    } catch {
+      /* malformed sections → fall back to markdown body */
+    }
+  }
   const page: PublicPage = {
     slug: row.slug,
     title: row.title,
@@ -248,7 +297,31 @@ publicRoutes.get("/pages/:slug", async (c) => {
     heroImageUrl: row.hero_image_url,
     heroEyebrow: row.hero_eyebrow,
     subtitle: row.subtitle,
+    sections,
   };
+
+  // On-demand translation (markdown pages only; block sections stay in the
+  // default language — "decent translations without full localization").
+  const lang = (c.req.query("lang") ?? "").toLowerCase().slice(0, 5);
+  if (lang) {
+    const languages = await getSupportedLanguages(c.env.DB);
+    if (lang !== languages[0] && languages.includes(lang) && !sections) {
+      const translated = await translateFields(c.env, "page", row.id, lang, {
+        title: row.title,
+        subtitle: row.subtitle,
+        heroEyebrow: row.hero_eyebrow,
+        bodyMd: row.body_md,
+      });
+      if (translated) {
+        page.title = translated.title ?? page.title;
+        page.subtitle = translated.subtitle ?? page.subtitle;
+        page.heroEyebrow = translated.heroEyebrow ?? page.heroEyebrow;
+        page.bodyMd = translated.bodyMd ?? page.bodyMd;
+        page.lang = lang;
+        page.translated = true;
+      }
+    }
+  }
   return c.json(page);
 });
 

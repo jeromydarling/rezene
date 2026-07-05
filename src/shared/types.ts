@@ -93,6 +93,10 @@ export interface PublicPage {
   heroImageUrl?: string | null;
   heroEyebrow?: string | null;
   subtitle?: string | null;
+  sections?: PageSection[] | null;
+  /** Language this payload is in; 'translated' true when machine-translated. */
+  lang?: string;
+  translated?: boolean;
 }
 
 export interface AiContentDraft {
@@ -118,6 +122,40 @@ export interface PublicLookbook {
   }[];
 }
 
+// ---------- CMS blocks ----------
+export type SectionType =
+  | "home_hero"
+  | "hero"
+  | "prose"
+  | "image_text"
+  | "product_grid"
+  | "collection_strip"
+  | "gallery"
+  | "quote"
+  | "faq"
+  | "cta_band"
+  | "newsletter";
+
+/**
+ * A page section. Deliberately loose: each type reads the keys it knows
+ * (see SECTION_DEFS in the admin editor and PageBlocks renderer) so new
+ * block types never require a schema migration.
+ */
+export interface PageSection {
+  type: SectionType;
+  [key: string]: unknown;
+}
+
+export interface NavLinkItem {
+  label: string;
+  href: string;
+}
+
+export interface NavMenus {
+  header: NavLinkItem[];
+  footer: NavLinkItem[];
+}
+
 export interface HomeHero {
   eyebrow?: string | null;
   heading: string;
@@ -134,6 +172,9 @@ export interface BrandSettings {
   tagline: string;
   currency: string;
   homeHero?: HomeHero | null;
+  navigation?: NavMenus | null;
+  /** Storefront languages, first entry is the default. */
+  languages?: string[];
 }
 
 export type LeadKind =
@@ -497,6 +538,7 @@ export interface AdminFile {
   entityType: string | null;
   entityId: string | null;
   isPublic: boolean;
+  altText: string | null;
   createdAt: string;
 }
 

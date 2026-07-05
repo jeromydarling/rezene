@@ -2,6 +2,7 @@ import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
 import { CartProvider } from "./lib/cart";
 import { BrandProvider } from "./lib/brand";
+import { LangProvider } from "./lib/lang";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { HomePage } from "./pages/public/HomePage";
@@ -61,6 +62,7 @@ function NotFoundPage() {
 export function AppRouter() {
   return (
     <BrandProvider>
+      <LangProvider>
       <AuthProvider>
         <CartProvider>
         <Routes>
@@ -138,6 +140,7 @@ export function AppRouter() {
         </Routes>
         </CartProvider>
       </AuthProvider>
+      </LangProvider>
     </BrandProvider>
   );
 }

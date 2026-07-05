@@ -17,8 +17,17 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# API traffic and public R2 media must reach the Worker, never the asset layer.
-run_worker_first = ["/api/*", "/media/*"]
+# API traffic and public R2 media must reach the Worker, never the asset
+# layer. Document routes also go worker-first so per-page SEO meta tags can
+# be injected into index.html at the edge (src/worker/services/seo.ts).
+run_worker_first = [
+  "/api/*", "/media/*",
+  "/", "/p/*", "/journal", "/journal/*", "/products", "/products/*",
+  "/collections", "/collections/*",
+  "/story", "/atelier", "/lookbook", "/contact", "/cart",
+  "/size-guide", "/shipping-returns", "/stockists", "/privacy", "/terms",
+  "/sitemap.xml", "/robots.txt",
+]
 
 [observability]
 enabled = true
@@ -63,9 +72,15 @@ id = "79bcbb9c583f4ad0b90f715897bd8d2e"
 [[send_email]]
 name = "EMAIL"
 
-# Daily ops digest / low-stock + late-task sweep (see scheduled handler in src/worker/index.ts).
+# Workers AI: lightweight content translation (storefront language toggle).
+[ai]
+binding = "AI"
+
+# 06:00 daily — ops digest / low-stock + late-task sweep.
+# :30 hourly — publish scheduled pages & journal posts that are due.
+# (see scheduled handler in src/worker/index.ts)
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 6 * * *", "30 * * * *"]
 
 # --- Future bindings (uncomment when the account has them enabled) -----------
 # Async pipelines (webhook fan-out, AI batch jobs, export rendering):
