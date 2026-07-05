@@ -319,6 +319,10 @@ publicRoutes.get("/pages/:slug", async (c) => {
         page.bodyMd = translated.bodyMd ?? page.bodyMd;
         page.lang = lang;
         page.translated = true;
+      } else if (allowDraft) {
+        // Preview-token holders (admins) get the failure reason inline.
+        const { lastTranslateError } = await import("../services/translate");
+        (page as Record<string, unknown>).translationError = lastTranslateError;
       }
     }
   }
