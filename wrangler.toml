@@ -28,7 +28,7 @@ enabled = true
 [vars]
 # Deployed value. Local dev overrides this via .dev.vars (APP_ENV=development).
 APP_ENV = "production"
-APP_URL = "http://localhost:5173"
+APP_URL = "https://maison-atlantique.jer-f84.workers.dev"
 BRAND_NAME = "Maison Atlantique"
 BRAND_SLUG = "maison-atlantique"
 R2_PUBLIC_BASE_URL = ""
