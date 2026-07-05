@@ -194,6 +194,9 @@ export function TechPackDetailPage() {
           actions={
             <>
               <StatusBadge status={data.status} />
+              <Link to={`/admin/tech-packs/${data.id}/ai-assist`} className="btn btn-terracotta">
+                AI Assist
+              </Link>
               <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
                 Print / save PDF
               </button>

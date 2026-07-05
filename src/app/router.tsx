@@ -21,6 +21,7 @@ import { ProductionPage } from "./pages/admin/ProductionPage";
 import { SuppliersPage } from "./pages/admin/SuppliersPage";
 import { SamplesPage, PurchaseOrdersPage, MaterialsPage } from "./pages/admin/SamplesPage";
 import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
+import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
 import { AiConceptsPage, ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 
@@ -91,6 +92,7 @@ export function AppRouter() {
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
           <Route path="tech-packs" element={<TechPacksPage />} />
           <Route path="tech-packs/:id" element={<TechPackDetailPage />} />
+          <Route path="tech-packs/:id/ai-assist" element={<TechPackAiPage />} />
           <Route path="ai-concepts" element={<AiConceptsPage />} />
           <Route path="3d" element={<ThreeDPage />} />
           <Route path="files" element={<FilesPage />} />
