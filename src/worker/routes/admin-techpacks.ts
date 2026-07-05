@@ -6,6 +6,7 @@ import {
   techPackSectionUpdateSchema,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
+import { getBrandName } from "../services/brand";
 import { renderTechPackHtml } from "../services/techpack-html";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
@@ -139,7 +140,7 @@ adminTechPackRoutes.post("/:id/export", requireAdminWrite, async (c) => {
   const detail = await loadTechPackDetail(c.env.DB, id);
   if (!detail) return c.json({ error: "Tech pack not found" }, 404);
 
-  const html = renderTechPackHtml(detail, c.env.BRAND_NAME);
+  const html = renderTechPackHtml(detail, await getBrandName(c.env));
   const exportId = newId("tpe");
   const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
   const r2Key = `exports/tech-packs/${id}/${detail.code}-${stamp}.html`;

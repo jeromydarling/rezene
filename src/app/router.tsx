@@ -1,5 +1,6 @@
 import { Route, Routes, Link } from "react-router";
 import { AuthProvider } from "./lib/auth";
+import { BrandProvider } from "./lib/brand";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { HomePage } from "./pages/public/HomePage";
@@ -42,8 +43,9 @@ function NotFoundPage() {
 
 export function AppRouter() {
   return (
-    <AuthProvider>
-      <Routes>
+    <BrandProvider>
+      <AuthProvider>
+        <Routes>
         {/* Public site */}
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
@@ -101,7 +103,8 @@ export function AppRouter() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
-      </Routes>
-    </AuthProvider>
+        </Routes>
+      </AuthProvider>
+    </BrandProvider>
   );
 }

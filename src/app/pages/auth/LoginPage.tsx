@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../lib/auth";
+import { useBrand } from "../../lib/brand";
 import { ApiRequestError } from "../../lib/api";
 
 export function LoginPage() {
   const { user, loading, login } = useAuth();
+  const brand = useBrand();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -35,7 +37,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-navy px-5">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center text-chalk">
-          <p className="font-display text-2xl font-light">Maison Atlantique</p>
+          <p className="font-display text-2xl font-light">{brand.brandName}</p>
           <p className="mt-1 text-[0.65rem] uppercase tracking-editorial text-chalk/50">
             Brand Operating System
           </p>

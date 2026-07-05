@@ -24,6 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
+import { useBrand } from "../lib/brand";
 
 const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: typeof Shirt }[] }[] = [
   {
@@ -84,6 +85,7 @@ const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
 export function AdminLayout() {
   const { user, loading, logout } = useAuth();
+  const brand = useBrand();
   const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -117,7 +119,7 @@ export function AdminLayout() {
       {/* Sidebar */}
       <aside className="fixed inset-y-0 hidden w-60 flex-col border-r border-ink/10 bg-navy text-chalk lg:flex">
         <Link to="/admin" className="border-b border-chalk/10 px-5 py-5">
-          <p className="font-display text-lg font-light">Maison Atlantique</p>
+          <p className="font-display text-lg font-light">{brand.brandName}</p>
           <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/50">
             Brand Operating System
           </p>

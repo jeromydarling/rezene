@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { track } from "../lib/analytics";
+import { useBrand } from "../lib/brand";
 import { NewsletterForm } from "../components/LeadForm";
 
 const NAV = [
@@ -24,6 +25,7 @@ const FOOTER_LINKS = [
 export function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const brand = useBrand();
 
   useEffect(() => {
     setMenuOpen(false);
@@ -35,7 +37,7 @@ export function PublicLayout() {
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-chalk/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <Link to="/" className="font-display text-xl font-light tracking-wide">
-            Maison Atlantique
+            {brand.brandName}
           </Link>
           <nav className="hidden items-center gap-7 md:flex">
             {NAV.map((item) => (
@@ -84,10 +86,9 @@ export function PublicLayout() {
       <footer className="border-t border-ink/10 bg-navy text-chalk">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-3">
           <div className="space-y-3">
-            <p className="font-display text-lg font-light">Maison Atlantique</p>
+            <p className="font-display text-lg font-light">{brand.brandName}</p>
             <p className="text-sm leading-relaxed text-chalk/70">
-              Tailored resortwear, cut in Casablanca. Old-world craft, Atlantic
-              light, modern ease.
+              {brand.tagline} Old-world craft, Atlantic light, modern ease.
             </p>
           </div>
           <div>
@@ -111,7 +112,7 @@ export function PublicLayout() {
           </div>
         </div>
         <div className="border-t border-chalk/10 px-5 py-4 text-center text-xs text-chalk/50">
-          © {new Date().getFullYear()} Maison Atlantique · Produced in Casablanca, Morocco
+          © {new Date().getFullYear()} {brand.brandName} · Produced in Casablanca, Morocco
         </div>
       </footer>
     </div>

@@ -1,5 +1,6 @@
 import { EmailMessage } from "cloudflare:email";
 import { createMimeMessage } from "mimetext";
+import { getBrandName } from "./brand";
 import type { Env } from "../types/env";
 
 /**
@@ -30,7 +31,7 @@ export async function sendNotification(
   }
   try {
     const msg = createMimeMessage();
-    msg.setSender({ name: env.BRAND_NAME, addr: env.NOTIFY_EMAIL_FROM });
+    msg.setSender({ name: await getBrandName(env), addr: env.NOTIFY_EMAIL_FROM });
     msg.setRecipient(env.NOTIFY_EMAIL_TO);
     msg.setSubject(opts.subject);
     msg.addMessage({ contentType: "text/plain", data: opts.text });
