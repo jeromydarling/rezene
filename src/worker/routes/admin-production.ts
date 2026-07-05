@@ -283,6 +283,24 @@ adminProductionRoutes.patch("/samples/:id", requireAdminWrite, async (c) => {
   return c.json(mapSample(row!));
 });
 
+// ---------- Fabrics & materials ----------
+adminProductionRoutes.get("/materials", async (c) => {
+  const fabrics = await all(
+    c.env.DB,
+    `SELECT f.id, f.name, f.composition, f.weight_gsm, f.origin_country,
+            f.price_per_meter_cents, f.currency, f.lead_time_days, f.moq_meters, f.notes,
+            sup.name AS supplier_name
+     FROM fabrics f LEFT JOIN suppliers sup ON sup.id = f.supplier_id ORDER BY f.name`,
+  );
+  const trims = await all(
+    c.env.DB,
+    `SELECT t.id, t.name, t.spec, t.price_per_unit_cents, t.currency, t.notes,
+            sup.name AS supplier_name
+     FROM trims t LEFT JOIN suppliers sup ON sup.id = t.supplier_id ORDER BY t.name`,
+  );
+  return c.json({ fabrics, trims });
+});
+
 // ---------- Production orders ----------
 adminProductionRoutes.get("/orders", async (c) => {
   const rows = await all<Record<string, unknown>>(

@@ -115,6 +115,18 @@ adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
   return c.json(mapProduct(row!));
 });
 
+// ---------- Collections ----------
+adminProductRoutes.get("/collections/all", async (c) => {
+  const rows = await all(
+    c.env.DB,
+    `SELECT c.id, c.slug, c.name, c.season, c.is_published, c.sort_order,
+       (SELECT COUNT(*) FROM products p WHERE p.collection_id = c.id) AS product_count,
+       (SELECT COUNT(*) FROM styles s WHERE s.collection_id = c.id) AS style_count
+     FROM collections c ORDER BY c.sort_order`,
+  );
+  return c.json(rows);
+});
+
 // ---------- Inventory ----------
 adminProductRoutes.get("/inventory/all", async (c) => {
   const rows = await all<Record<string, unknown>>(
