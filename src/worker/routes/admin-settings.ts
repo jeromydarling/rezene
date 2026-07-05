@@ -48,32 +48,6 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
   return c.json({ ok: true });
 });
 
-// ---------- Analytics summary ----------
-adminSettingsRoutes.get("/analytics", async (c) => {
-  const days = Math.min(90, Math.max(1, parseInt(c.req.query("days") ?? "30", 10) || 30));
-  const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
-  const byEvent = await all(
-    c.env.DB,
-    `SELECT event, COUNT(*) AS count FROM analytics_events WHERE created_at >= ?
-     GROUP BY event ORDER BY count DESC`,
-    since,
-  );
-  const byDay = await all(
-    c.env.DB,
-    `SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count FROM analytics_events
-     WHERE created_at >= ? GROUP BY day ORDER BY day`,
-    since,
-  );
-  const topPaths = await all(
-    c.env.DB,
-    `SELECT path, COUNT(*) AS count FROM analytics_events
-     WHERE created_at >= ? AND event = 'page_view' AND path IS NOT NULL
-     GROUP BY path ORDER BY count DESC LIMIT 20`,
-    since,
-  );
-  return c.json({ days, byEvent, byDay, topPaths });
-});
-
 // ---------- Audit log ----------
 adminSettingsRoutes.get("/audit", requireAdminOnly, async (c) => {
   const rows = await all(

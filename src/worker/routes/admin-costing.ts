@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
-import { costSheetUpdateSchema, dutyRuleUpdateSchema, parseBody } from "../services/validators";
+import {
+  costSheetCreateSchema,
+  costSheetUpdateSchema,
+  dutyRuleUpdateSchema,
+  parseBody,
+  scenarioCreateSchema,
+} from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
+import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminCostSheet, AdminDutyRule, AdminLandedCostScenario } from "../../shared/types";
 
@@ -75,6 +82,96 @@ adminCostingRoutes.get("/cost-sheets", async (c) => {
     });
   }
   return c.json(sheets);
+});
+
+adminCostingRoutes.post("/cost-sheets", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, costSheetCreateSchema);
+  const style = await first<{ id: string; name: string }>(
+    c.env.DB,
+    `SELECT id, name FROM styles WHERE id = ?`,
+    body.styleId,
+  );
+  if (!style) return c.json({ error: "Style not found" }, 404);
+  const id = newId("cost");
+  await run(
+    c.env.DB,
+    `INSERT INTO cost_sheets (id, style_id, name, wholesale_price_cents) VALUES (?, ?, ?, ?)`,
+    id,
+    style.id,
+    body.name ?? `${style.name} costing`,
+    body.wholesalePriceCents ?? null,
+  );
+  await writeAudit(c.env.DB, c.var.userId, "cost_sheet.create", "cost_sheet", id, {
+    styleId: style.id,
+  });
+  return c.json({ id }, 201);
+});
+
+/**
+ * Destination scenarios: duty is charged on production cost + freight to
+ * that market, so the scenario carries its own freight/insurance and the
+ * sheet's freight/insurance/duty columns are excluded from the base.
+ */
+adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (c) => {
+  const sheetId = c.req.param("id");
+  const body = await parseBody(c, scenarioCreateSchema);
+  const sheet = await first<Record<string, unknown>>(
+    c.env.DB,
+    `SELECT * FROM cost_sheets WHERE id = ?`,
+    sheetId,
+  );
+  if (!sheet) return c.json({ error: "Cost sheet not found" }, 404);
+
+  const baseProductionCents =
+    ((sheet.fabric_cost_cents as number) ?? 0) +
+    ((sheet.trim_cost_cents as number) ?? 0) +
+    ((sheet.cut_sew_make_cents as number) ?? 0) +
+    ((sheet.sample_allocation_cents as number) ?? 0) +
+    ((sheet.packaging_cents as number) ?? 0) +
+    ((sheet.payment_processing_cents as number) ?? 0) +
+    ((sheet.returns_reserve_cents as number) ?? 0);
+  const rate = body.dutyRatePct / 100;
+  const freight = body.freightCents ?? 0;
+  const insurance = body.insuranceCents ?? 0;
+  const duty = Math.round((baseProductionCents + freight) * rate);
+  const landed = baseProductionCents + freight + insurance + duty;
+  const retail = body.retailPriceCents ?? null;
+  const margin = retail ? Math.round((1 - landed / retail) * 1000) / 10 : null;
+
+  const id = newId("lcs");
+  await run(
+    c.env.DB,
+    `INSERT INTO landed_cost_scenarios
+       (id, cost_sheet_id, name, destination_region, duty_rate_used, freight_cents,
+        insurance_cents, landed_cost_cents, retail_price_cents, gross_margin_pct, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    sheetId,
+    body.name,
+    body.destinationRegion,
+    rate,
+    freight,
+    insurance,
+    landed,
+    retail,
+    margin,
+    body.notes ?? null,
+  );
+  await writeAudit(c.env.DB, c.var.userId, "landed_scenario.create", "cost_sheet", sheetId, {
+    name: body.name,
+    region: body.destinationRegion,
+  });
+  return c.json({ id, landedCostCents: landed, grossMarginPct: margin }, 201);
+});
+
+adminCostingRoutes.delete("/scenarios/:id", requireAdminWrite, async (c) => {
+  const result = await run(
+    c.env.DB,
+    `DELETE FROM landed_cost_scenarios WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!result.meta.changes) return c.json({ error: "Scenario not found" }, 404);
+  return c.json({ ok: true });
 });
 
 adminCostingRoutes.patch("/cost-sheets/:id", requireAdminWrite, async (c) => {

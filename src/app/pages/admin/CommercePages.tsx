@@ -19,14 +19,14 @@ export function OrdersPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Orders"
-        description="Stripe-backed orders. Payment state mirrors Stripe via webhooks; fulfillment is managed here."
+        description="Every order in one place — payment status updates itself the moment a customer pays; you manage fulfillment here."
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
       {data && data.length === 0 && (
         <EmptyState
           title="No orders yet"
-          hint="Orders appear here when Stripe Checkout completes — configure Stripe keys and webhooks to go live."
+          hint="Orders appear here the moment a customer completes checkout. Connect your payment account in Settings to start selling."
         />
       )}
       {data && data.length > 0 && (
@@ -79,12 +79,15 @@ export function CustomersPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Customers"
-        description="Customer records mirror Stripe customers — only IDs and non-sensitive metadata are stored."
+        description="Everyone who has bought from you — order history and lifetime spend at a glance. Card details never touch this system; they stay with your payment provider."
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
       {data && data.length === 0 && (
-        <EmptyState title="No customers yet" hint="Created automatically from Stripe checkout." />
+        <EmptyState
+          title="No customers yet"
+          hint="Customers appear here automatically after their first order."
+        />
       )}
       {data && data.length > 0 && (
         <div className="admin-card overflow-x-auto">

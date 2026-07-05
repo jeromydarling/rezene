@@ -28,7 +28,7 @@ export function TechPacksPage() {
       <PageHeader
         eyebrow="Studio"
         title="Tech Packs"
-        description="Factory-ready specifications. Printable, versioned, and (soon) AI-assisted."
+        description="Factory-ready specifications — printable, versioned, shareable with your atelier as a live link, and AI-assisted from a photo or sketch."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
             New tech pack
@@ -509,7 +509,7 @@ export function TechPackDetailPage() {
                 disabled={exporting}
                 onClick={() => void exportSnapshot()}
               >
-                {exporting ? "Exporting…" : "Export snapshot → R2"}
+                {exporting ? "Archiving…" : "Archive snapshot"}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
                 Print / save PDF

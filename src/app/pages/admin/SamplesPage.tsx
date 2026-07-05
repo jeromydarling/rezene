@@ -1,14 +1,21 @@
+import { useState, type FormEvent } from "react";
 import { useFetch } from "../../lib/useFetch";
-import { api } from "../../lib/api";
+import { api, ApiRequestError } from "../../lib/api";
 import { formatDate, formatMoney, titleCase } from "../../lib/format";
 import {
   EmptyState,
   ErrorNote,
   LoadingTable,
   PageHeader,
+  SlideOver,
   StatusBadge,
 } from "../../components/admin/ui";
-import type { AdminProductionOrder, AdminSample } from "../../../shared/types";
+import type {
+  AdminProductionOrder,
+  AdminSample,
+  AdminStyle,
+  AdminSupplier,
+} from "../../../shared/types";
 
 const SAMPLE_STATUSES = [
   "requested",
@@ -23,6 +30,7 @@ const SAMPLE_STATUSES = [
 
 export function SamplesPage() {
   const { data, loading, error, reload } = useFetch<AdminSample[]>("/api/admin/production/samples");
+  const [createOpen, setCreateOpen] = useState(false);
 
   async function setStatus(sample: AdminSample, status: string) {
     await api.patch(`/api/admin/production/samples/${sample.id}`, { status });
@@ -35,6 +43,11 @@ export function SamplesPage() {
         eyebrow="Production"
         title="Samples"
         description="Proto → fit → SMS → PP → TOP. Every round tracked against its style and atelier."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+            Request sample
+          </button>
+        }
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
@@ -83,7 +96,129 @@ export function SamplesPage() {
           </table>
         </div>
       )}
+      <SlideOver open={createOpen} title="Request a sample" onClose={() => setCreateOpen(false)}>
+        <SampleCreateForm
+          existing={data ?? []}
+          onCreated={() => {
+            setCreateOpen(false);
+            reload();
+          }}
+        />
+      </SlideOver>
     </div>
+  );
+}
+
+const SAMPLE_KINDS = [
+  { value: "proto", label: "Proto — first shape" },
+  { value: "fit", label: "Fit — on-body corrections" },
+  { value: "sms", label: "SMS — salesman sample" },
+  { value: "pp", label: "PP — pre-production" },
+  { value: "top", label: "TOP — top of production" },
+];
+
+function SampleCreateForm({
+  existing,
+  onCreated,
+}: {
+  existing: AdminSample[];
+  onCreated: () => void;
+}) {
+  const { data: styles } = useFetch<AdminStyle[]>("/api/admin/styles");
+  const { data: suppliers } = useFetch<AdminSupplier[]>("/api/admin/suppliers");
+  const [form, setForm] = useState({ styleId: "", supplierId: "", kind: "proto", notes: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Next round number for this style+kind, so rounds count up automatically.
+  const nextRound =
+    existing.filter((s) => s.styleId === form.styleId && s.kind === form.kind).length + 1;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/admin/production/samples", {
+        styleId: form.styleId,
+        supplierId: form.supplierId || undefined,
+        kind: form.kind,
+        round: nextRound,
+        notes: form.notes || undefined,
+      });
+      onCreated();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Could not create the sample");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div>
+        <label className="label">Style *</label>
+        <select
+          required
+          className="input"
+          value={form.styleId}
+          onChange={(e) => setForm({ ...form, styleId: e.target.value })}
+        >
+          <option value="">Select…</option>
+          {styles?.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="label">Sample type</label>
+        <select
+          className="input"
+          value={form.kind}
+          onChange={(e) => setForm({ ...form, kind: e.target.value })}
+        >
+          {SAMPLE_KINDS.map((k) => (
+            <option key={k.value} value={k.value}>
+              {k.label}
+            </option>
+          ))}
+        </select>
+        {form.styleId && (
+          <p className="mt-1 text-xs text-warmgrey">This will be round #{nextRound}.</p>
+        )}
+      </div>
+      <div>
+        <label className="label">Atelier</label>
+        <select
+          className="input"
+          value={form.supplierId}
+          onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
+        >
+          <option value="">—</option>
+          {suppliers?.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="label">Notes for this round</label>
+        <textarea
+          rows={3}
+          className="input"
+          placeholder="What changed since the last round, what to check on arrival…"
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+        />
+      </div>
+      {error && <p className="field-error">{error}</p>}
+      <button type="submit" disabled={busy || !form.styleId} className="btn btn-primary w-full">
+        {busy ? "Requesting…" : "Request sample"}
+      </button>
+    </form>
   );
 }
 

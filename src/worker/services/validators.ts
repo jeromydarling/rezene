@@ -273,6 +273,22 @@ export const costSheetUpdateSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+export const costSheetCreateSchema = z.object({
+  styleId: z.string().min(1).max(80),
+  name: z.string().min(1).max(200).optional(),
+  wholesalePriceCents: cents.nullable().optional(),
+});
+
+export const scenarioCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  destinationRegion: z.string().min(1).max(40),
+  dutyRatePct: z.number().min(0).max(200),
+  freightCents: cents.optional(),
+  insuranceCents: cents.optional(),
+  retailPriceCents: cents.nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+});
+
 // ---------- Duty rules ----------
 export const dutyRuleUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),

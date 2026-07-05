@@ -522,7 +522,7 @@ export function FilesPage() {
       <PageHeader
         eyebrow="Studio"
         title="Files"
-        description="R2-backed storage for sketches, patterns, CLO files, renders, and factory documents — organized by entity."
+        description="Every working file — sketches, patterns, 3D files, renders, and factory documents — filed against the style, product, or order it belongs to."
         actions={
           <div className="flex items-center gap-2">
             <select

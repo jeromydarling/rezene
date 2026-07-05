@@ -78,7 +78,7 @@ export function TechPackAiPage() {
       <PageHeader
         eyebrow="AI Assist"
         title={pack.data.name}
-        description="Structured first drafts, reviewed by you before anything reaches a factory. Runs server-side via the Anthropic API."
+        description="AI drafts the tedious parts — bills of materials, construction notes, QC checklists — and you review every line before anything reaches a factory."
         actions={
           <Link to={`/admin/tech-packs/${id}`} className="btn btn-secondary">
             Back to tech pack

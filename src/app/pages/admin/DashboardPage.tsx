@@ -12,7 +12,7 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Overview"
         title="Dashboard"
-        description="The state of the maison — commerce, production, and what needs attention."
+        description="The state of your brand — sales, production, and what needs attention today."
       />
       {error && <ErrorNote message={error} />}
       {loading && (
