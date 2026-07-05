@@ -9,7 +9,7 @@
 # Actions (.github/workflows/deploy.yml); it applies D1 migrations and
 # deploys the Worker. See README "Deployment".
 
-name = "maison-atlantique"
+name = "rezene"
 main = "./src/worker/index.ts"
 compatibility_date = "2026-01-01"
 compatibility_flags = ["nodejs_compat"]
