@@ -6,6 +6,7 @@ import {
   techPackSectionUpdateSchema,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
+import { renderTechPackHtml } from "../services/techpack-html";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminTechPackDetail, AdminTechPackSummary } from "../../shared/types";
@@ -56,33 +57,33 @@ adminTechPackRoutes.get("/", async (c) => {
   return c.json(rows.map(mapSummary));
 });
 
-adminTechPackRoutes.get("/:id", async (c) => {
-  const row = await first<Record<string, unknown>>(
-    c.env.DB,
-    `${TP_SELECT} WHERE tp.id = ?`,
-    c.req.param("id"),
-  );
-  if (!row) return c.json({ error: "Tech pack not found" }, 404);
+/** Full detail loader — shared by the GET route and the R2 export. */
+export async function loadTechPackDetail(
+  db: D1Database,
+  id: string,
+): Promise<AdminTechPackDetail | null> {
+  const row = await first<Record<string, unknown>>(db, `${TP_SELECT} WHERE tp.id = ?`, id);
+  if (!row) return null;
 
   const sections = await all<Record<string, unknown>>(
-    c.env.DB,
+    db,
     `SELECT id, kind, title, content_json, sort_order FROM tech_pack_sections
      WHERE tech_pack_id = ? ORDER BY sort_order`,
     row.id,
   );
   const construction = await all<Record<string, unknown>>(
-    c.env.DB,
+    db,
     `SELECT id, area, note, note_fr FROM construction_notes WHERE tech_pack_id = ? ORDER BY sort_order`,
     row.id,
   );
   const stitches = await all<Record<string, unknown>>(
-    c.env.DB,
+    db,
     `SELECT id, operation, stitch_class, spi, thread, note FROM stitch_details
      WHERE tech_pack_id = ? ORDER BY sort_order`,
     row.id,
   );
   const labels = await all<Record<string, unknown>>(
-    c.env.DB,
+    db,
     `SELECT id, item, placement, material, note FROM labels_packaging
      WHERE tech_pack_id = ? ORDER BY sort_order`,
     row.id,
@@ -121,7 +122,73 @@ adminTechPackRoutes.get("/:id", async (c) => {
       note: (l.note as string) ?? null,
     })),
   };
+  return detail;
+}
+
+adminTechPackRoutes.get("/:id", async (c) => {
+  const detail = await loadTechPackDetail(c.env.DB, c.req.param("id"));
+  if (!detail) return c.json({ error: "Tech pack not found" }, 404);
   return c.json(detail);
+});
+
+// ---------- R2 export snapshots ----------
+
+/** Render the tech pack to standalone HTML and store it in R2. */
+adminTechPackRoutes.post("/:id/export", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const detail = await loadTechPackDetail(c.env.DB, id);
+  if (!detail) return c.json({ error: "Tech pack not found" }, 404);
+
+  const html = renderTechPackHtml(detail, c.env.BRAND_NAME);
+  const exportId = newId("tpe");
+  const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
+  const r2Key = `exports/tech-packs/${id}/${detail.code}-${stamp}.html`;
+
+  await c.env.FILES.put(r2Key, html, {
+    httpMetadata: { contentType: "text/html; charset=utf-8" },
+  });
+  await run(
+    c.env.DB,
+    `INSERT INTO tech_pack_exports (id, tech_pack_id, format, r2_key, version, exported_by)
+     VALUES (?, ?, 'html', ?, ?, ?)`,
+    exportId,
+    id,
+    r2Key,
+    detail.version,
+    c.var.userId,
+  );
+  await writeAudit(c.env.DB, c.var.userId, "tech_pack.export", "tech_pack", id, { r2Key });
+  return c.json({ id: exportId, r2Key, format: "html", version: detail.version }, 201);
+});
+
+adminTechPackRoutes.get("/:id/exports", async (c) => {
+  const rows = await all(
+    c.env.DB,
+    `SELECT e.id, e.format, e.r2_key, e.version, e.created_at, u.email AS exported_by
+     FROM tech_pack_exports e LEFT JOIN users u ON u.id = e.exported_by
+     WHERE e.tech_pack_id = ? ORDER BY e.created_at DESC`,
+    c.req.param("id"),
+  );
+  return c.json(rows);
+});
+
+/** Stream an export snapshot from R2 (session-gated like all admin routes). */
+adminTechPackRoutes.get("/exports/:exportId/download", async (c) => {
+  const row = await first<{ r2_key: string }>(
+    c.env.DB,
+    `SELECT r2_key FROM tech_pack_exports WHERE id = ?`,
+    c.req.param("exportId"),
+  );
+  if (!row?.r2_key) return c.json({ error: "Export not found" }, 404);
+  const object = await c.env.FILES.get(row.r2_key);
+  if (!object) return c.json({ error: "Snapshot missing from storage" }, 404);
+  return new Response(object.body as ReadableStream, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "content-disposition": `inline; filename="${row.r2_key.split("/").pop()}"`,
+      "cache-control": "private, max-age=300",
+    },
+  });
 });
 
 adminTechPackRoutes.post("/", requireAdminWrite, async (c) => {

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { all, first, run } from "../services/db";
+import { leadNotification, sendNotification } from "../services/email";
 import { analyticsEventSchema, leadSchema, parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import { newId } from "../utils/id";
@@ -226,6 +227,21 @@ publicRoutes.post(
       body.productId ?? null,
       body.sourcePath ?? null,
     );
+    // High-intent leads notify the founder immediately; list signups don't.
+    if (body.kind === "wholesale_inquiry" || body.kind === "contact") {
+      c.executionCtx.waitUntil(
+        sendNotification(
+          c.env,
+          leadNotification({
+            kind: body.kind,
+            email: body.email,
+            name: body.name,
+            company: body.company,
+            message: body.message,
+          }),
+        ),
+      );
+    }
     return c.json({ ok: true }, 201);
   },
 );

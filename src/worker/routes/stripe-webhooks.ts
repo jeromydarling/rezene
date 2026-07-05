@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type Stripe from "stripe";
-import { first, run } from "../services/db";
+import { all, first, run } from "../services/db";
 import { getStripe, webhookCryptoProvider } from "../services/stripe";
+import { orderPaidNotification, sendNotification } from "../services/email";
 import { newId } from "../utils/id";
-import type { AppContext } from "../types/env";
+import type { AppContext, Env } from "../types/env";
 
 /**
  * Stripe webhook receiver: signature-verified, idempotent (event ids are
@@ -56,9 +57,11 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutCompleted(c.env.DB, stripe, event.data.object);
+      case "checkout.session.completed": {
+        const orderId = await handleCheckoutCompleted(c.env.DB, stripe, event.data.object);
+        if (orderId) c.executionCtx.waitUntil(notifyOrderPaid(c.env, orderId));
         break;
+      }
       case "payment_intent.succeeded":
         await handlePaymentIntent(c.env.DB, event.data.object, "paid");
         break;
@@ -102,13 +105,48 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
   }
 });
 
+/** Founder notification for a settled order (Cloudflare Email Service). */
+async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
+  const order = await first<{
+    order_number: string;
+    email: string | null;
+    total_cents: number;
+    currency: string;
+    is_pre_order: number;
+    shipping_country: string | null;
+  }>(
+    env.DB,
+    `SELECT order_number, email, total_cents, currency, is_pre_order, shipping_country
+     FROM orders WHERE id = ?`,
+    orderId,
+  );
+  if (!order) return;
+  const items = await all<{ description: string; quantity: number }>(
+    env.DB,
+    `SELECT description, quantity FROM order_items WHERE order_id = ?`,
+    orderId,
+  );
+  await sendNotification(
+    env,
+    orderPaidNotification({
+      orderNumber: order.order_number,
+      email: order.email,
+      totalCents: order.total_cents,
+      currency: order.currency,
+      isPreOrder: Boolean(order.is_pre_order),
+      country: order.shipping_country,
+      items,
+    }),
+  );
+}
+
 async function handleCheckoutCompleted(
   db: D1Database,
   stripe: Stripe,
   session: Stripe.Checkout.Session,
-): Promise<void> {
+): Promise<string | null> {
   const orderId = session.metadata?.order_id ?? session.client_reference_id;
-  if (!orderId) return;
+  if (!orderId) return null;
 
   // Customer upsert from checkout details.
   const email = session.customer_details?.email ?? null;
@@ -257,6 +295,7 @@ async function handleCheckoutCompleted(
     newId("evt"),
     orderId,
   );
+  return orderId;
 }
 
 async function handlePaymentIntent(

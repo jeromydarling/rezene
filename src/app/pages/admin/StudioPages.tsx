@@ -22,7 +22,7 @@ import type {
 export function AiConceptsPage() {
   const prompts = useFetch<AdminAiPrompt[]>("/api/admin/ai/prompts");
   const concepts = useFetch<AdminAiConcept[]>("/api/admin/ai/concepts");
-  const [tab, setTab] = useState<"concepts" | "prompts">("concepts");
+  const [tab, setTab] = useState<"concepts" | "prompts" | "bridges">("concepts");
   const [createOpen, setCreateOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -40,7 +40,7 @@ export function AiConceptsPage() {
         actions={
           <>
             <div className="flex overflow-hidden rounded-md border border-ink/15">
-              {(["concepts", "prompts"] as const).map((t) => (
+              {(["concepts", "prompts", "bridges"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -148,6 +148,8 @@ export function AiConceptsPage() {
         </>
       )}
 
+      {tab === "bridges" && <BridgesTab />}
+
       <SlideOver open={createOpen} title="New concept" onClose={() => setCreateOpen(false)}>
         <ConceptCreateForm
           prompts={prompts.data ?? []}
@@ -157,6 +159,172 @@ export function AiConceptsPage() {
           }}
         />
       </SlideOver>
+    </div>
+  );
+}
+
+// ---------------- External tool bridges (Midjourney / Firefly / CLO…) ----------------
+
+interface ExternalExportRow {
+  id: string;
+  tool: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  title: string | null;
+  external_url: string | null;
+  metadata_json: string | null;
+  created_at: string;
+}
+
+const BRIDGE_TOOLS = ["midjourney", "firefly", "dalle", "clo3d", "browzwear", "style3d", "illustrator", "figma"];
+
+function BridgesTab() {
+  const { data, loading, error, reload } = useFetch<ExternalExportRow[]>(
+    "/api/admin/ai/external-exports",
+  );
+  const [form, setForm] = useState({ tool: "midjourney", title: "", externalUrl: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setFormError(null);
+    try {
+      await api.post("/api/admin/ai/external-exports", {
+        tool: form.tool,
+        title: form.title || undefined,
+        externalUrl: form.externalUrl || undefined,
+        metadata: form.notes ? { notes: form.notes } : undefined,
+      });
+      setForm({ tool: form.tool, title: "", externalUrl: "", notes: "" });
+      reload();
+    } catch (err) {
+      setFormError(err instanceof ApiRequestError ? err.message : "Failed to log export");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+      <form onSubmit={submit} className="admin-card h-fit space-y-3 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">
+          Log external output
+        </h2>
+        <div>
+          <label className="label">Tool</label>
+          <select
+            className="input"
+            value={form.tool}
+            onChange={(e) => setForm({ ...form, tool: e.target.value })}
+          >
+            {BRIDGE_TOOLS.map((t) => (
+              <option key={t} value={t}>
+                {titleCase(t)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Title</label>
+          <input
+            className="input"
+            placeholder="Tangier hero frame v3"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="label">Job / output URL</label>
+          <input
+            className="input"
+            placeholder="https://…"
+            value={form.externalUrl}
+            onChange={(e) => setForm({ ...form, externalUrl: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="label">Notes (seed, license, measurements…)</label>
+          <textarea
+            rows={3}
+            className="input"
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          />
+        </div>
+        {formError && <p className="field-error">{formError}</p>}
+        <button type="submit" disabled={busy} className="btn btn-primary w-full">
+          {busy ? "Logging…" : "Log output"}
+        </button>
+        <p className="text-xs text-warmgrey">
+          Image/file uploads go through Files (R2) — this logs the external
+          job metadata and links it into the concepting record.
+        </p>
+      </form>
+
+      <div>
+        {loading && <LoadingTable />}
+        {error && <ErrorNote message={error} />}
+        {data && data.length === 0 && (
+          <EmptyState
+            title="No external outputs logged"
+            hint="Run a preset prompt in Midjourney or Firefly, then log the job URL and metadata here."
+          />
+        )}
+        {data && data.length > 0 && (
+          <div className="admin-card overflow-x-auto">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Tool</th>
+                  <th>Title</th>
+                  <th>Link</th>
+                  <th>Notes</th>
+                  <th>Logged</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((row) => {
+                  let notes = "—";
+                  try {
+                    const meta = row.metadata_json ? JSON.parse(row.metadata_json) : null;
+                    if (meta && typeof meta === "object" && "notes" in meta) {
+                      notes = String((meta as { notes: unknown }).notes);
+                    }
+                  } catch {
+                    // ignore malformed metadata
+                  }
+                  return (
+                    <tr key={row.id}>
+                      <td>
+                        <span className="badge badge-navy">{titleCase(row.tool)}</span>
+                      </td>
+                      <td className="font-medium">{row.title ?? "—"}</td>
+                      <td>
+                        {row.external_url ? (
+                          <a
+                            href={row.external_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="link-quiet text-xs"
+                          >
+                            Open ↗
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="max-w-xs truncate text-xs text-warmgrey">{notes}</td>
+                      <td className="text-xs text-warmgrey">{formatDate(row.created_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -239,10 +407,21 @@ const SIM_STATUSES = ["not_started", "pattern_needed", "in_simulation", "fit_rev
 
 export function ThreeDPage() {
   const { data, loading, error, reload } = useFetch<AdminClo3dProject[]>("/api/admin/3d/projects");
+  const [taskCreated, setTaskCreated] = useState<string | null>(null);
 
   async function setStatus(project: AdminClo3dProject, status: string) {
     await api.patch(`/api/admin/3d/projects/${project.id}`, { status });
     reload();
+  }
+
+  async function logFitIssue(project: AdminClo3dProject) {
+    const issue = window.prompt(
+      `Describe the fit issue found in "${project.name}" — a sample-revision task will be created:`,
+    );
+    if (!issue?.trim()) return;
+    await api.post(`/api/admin/3d/projects/${project.id}/fit-issue-task`, { issue: issue.trim() });
+    setTaskCreated(project.id);
+    setTimeout(() => setTaskCreated(null), 2500);
   }
 
   return (
@@ -268,6 +447,7 @@ export function ThreeDPage() {
                 <th>Status</th>
                 <th>Notes</th>
                 <th>Updated</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -291,6 +471,15 @@ export function ThreeDPage() {
                   </td>
                   <td className="max-w-sm truncate text-xs text-warmgrey">{p.notes ?? "—"}</td>
                   <td className="text-xs text-warmgrey">{formatDate(p.updatedAt)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="link-quiet whitespace-nowrap text-xs"
+                      onClick={() => void logFitIssue(p)}
+                    >
+                      {taskCreated === p.id ? "Task created ✓" : "Log fit issue → task"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

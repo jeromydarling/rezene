@@ -4,11 +4,10 @@
 # API from src/worker. Local dev runs through @cloudflare/vite-plugin
 # (single `npm run dev` server, Worker executing in workerd).
 #
-# Before first deploy:
-#   1. wrangler d1 create maison-atlantique-db      -> paste database_id below
-#   2. wrangler kv namespace create KV              -> paste id below
-#   3. wrangler r2 bucket create maison-atlantique-files
-#   4. wrangler secret put STRIPE_SECRET_KEY (and the other secrets in .dev.vars.example)
+# The D1 database, KV namespace, and R2 bucket below are ALREADY CREATED in
+# the Cloudflare account — the ids are real. Deployment runs through GitHub
+# Actions (.github/workflows/deploy.yml); it applies D1 migrations and
+# deploys the Worker. See README "Deployment".
 
 name = "maison-atlantique"
 main = "./src/worker/index.ts"
@@ -32,11 +31,16 @@ APP_URL = "http://localhost:5173"
 BRAND_NAME = "Maison Atlantique"
 BRAND_SLUG = "maison-atlantique"
 R2_PUBLIC_BASE_URL = ""
+# Outbound notifications (Cloudflare Email Service). Sends no-op until both
+# are set: FROM must be on a domain onboarded to Email Service, TO must be a
+# verified destination address in the account.
+NOTIFY_EMAIL_FROM = ""
+NOTIFY_EMAIL_TO = ""
 
 [[d1_databases]]
 binding = "DB"
 database_name = "maison-atlantique-db"
-database_id = "00000000-0000-0000-0000-000000000000" # TODO: replace with output of `wrangler d1 create maison-atlantique-db`
+database_id = "efe744ff-e3dd-41a4-b61e-b93cd79e2139"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
@@ -45,7 +49,13 @@ bucket_name = "maison-atlantique-files"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "00000000000000000000000000000000" # TODO: replace with output of `wrangler kv namespace create KV`
+id = "79bcbb9c583f4ad0b90f715897bd8d2e"
+
+# Cloudflare Email Service: unrestricted binding — can send to any VERIFIED
+# destination address in the account, from any onboarded sender domain.
+# Local dev simulates sends (logged, not delivered).
+[[send_email]]
+name = "EMAIL"
 
 # Daily ops digest / low-stock + late-task sweep (see scheduled handler in src/worker/index.ts).
 [triggers]

@@ -1,20 +1,105 @@
 import { useState } from "react";
 import { useFetch } from "../../lib/useFetch";
-import { api } from "../../lib/api";
+import { api, ApiRequestError } from "../../lib/api";
 import { formatMoney } from "../../lib/format";
 import {
   EmptyState,
   ErrorNote,
   LoadingTable,
   PageHeader,
+  SlideOver,
   StatCard,
 } from "../../components/admin/ui";
 import type { AdminCostSheet, AdminDutyRule } from "../../../shared/types";
 
 // ---------------- Costing & Margins ----------------
 
+const COST_FIELDS: { key: string; label: string }[] = [
+  { key: "fabricCostCents", label: "Fabric" },
+  { key: "trimCostCents", label: "Trims" },
+  { key: "cutSewMakeCents", label: "Cut / sew / make" },
+  { key: "sampleAllocationCents", label: "Sample allocation" },
+  { key: "packagingCents", label: "Packaging" },
+  { key: "freightCents", label: "Freight" },
+  { key: "insuranceCents", label: "Insurance" },
+  { key: "dutyCents", label: "Duty" },
+  { key: "paymentProcessingCents", label: "Payment processing" },
+  { key: "returnsReserveCents", label: "Returns reserve" },
+  { key: "actualRetailCents", label: "Actual retail" },
+  { key: "targetRetailCents", label: "Target retail" },
+];
+
+function CostSheetEditForm({
+  sheet,
+  onSaved,
+}: {
+  sheet: AdminCostSheet;
+  onSaved: () => void;
+}) {
+  const initial: Record<string, string> = {};
+  for (const f of COST_FIELDS) {
+    const v = (sheet as unknown as Record<string, number | null>)[f.key];
+    initial[f.key] = v != null ? (v / 100).toFixed(2) : "";
+  }
+  const [values, setValues] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const payload: Record<string, number | null> = {};
+      for (const f of COST_FIELDS) {
+        const raw = values[f.key].trim();
+        payload[f.key] = raw === "" ? null : Math.round(parseFloat(raw) * 100);
+      }
+      // Cost components are required numbers server-side; nulls only for retail.
+      for (const f of COST_FIELDS.slice(0, 10)) {
+        if (payload[f.key] == null) payload[f.key] = 0;
+      }
+      await api.patch(`/api/admin/costing/cost-sheets/${sheet.id}`, payload);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-warmgrey">
+        All values in {sheet.currency}. Margins and scenario math recompute on save.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {COST_FIELDS.map((f) => (
+          <div key={f.key}>
+            <label className="label">{f.label}</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="input"
+              value={values[f.key]}
+              onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+      {error && <p className="field-error">{error}</p>}
+      <button type="button" disabled={busy} className="btn btn-primary w-full" onClick={() => void save()}>
+        {busy ? "Saving…" : "Save cost sheet"}
+      </button>
+    </div>
+  );
+}
+
 export function CostingPage() {
-  const { data, loading, error } = useFetch<AdminCostSheet[]>("/api/admin/costing/cost-sheets");
+  const { data, loading, error, reload } = useFetch<AdminCostSheet[]>(
+    "/api/admin/costing/cost-sheets",
+  );
+  const [editing, setEditing] = useState<AdminCostSheet | null>(null);
   return (
     <div>
       <PageHeader
@@ -34,6 +119,13 @@ export function CostingPage() {
               <div>
                 <h2 className="font-display text-xl font-light">{sheet.styleName}</h2>
                 <p className="text-xs text-warmgrey">{sheet.name}</p>
+                <button
+                  type="button"
+                  className="link-quiet mt-1 text-xs"
+                  onClick={() => setEditing(sheet)}
+                >
+                  Edit costs
+                </button>
               </div>
               <div className="flex gap-3">
                 <StatCard
@@ -142,6 +234,21 @@ export function CostingPage() {
           </div>
         ))}
       </div>
+      <SlideOver
+        open={Boolean(editing)}
+        title={editing ? `Edit costs — ${editing.styleName}` : ""}
+        onClose={() => setEditing(null)}
+      >
+        {editing && (
+          <CostSheetEditForm
+            sheet={editing}
+            onSaved={() => {
+              setEditing(null);
+              reload();
+            }}
+          />
+        )}
+      </SlideOver>
     </div>
   );
 }

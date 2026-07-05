@@ -72,15 +72,89 @@ app.notFound((c) => c.json({ error: "Not found" }, 404));
 export default {
   fetch: app.fetch,
 
-  // Daily ops sweep (cron in wrangler.toml): flags late production tasks so
-  // the dashboard and (future) notification channel pick them up.
-  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext) {
-    const today = new Date().toISOString().slice(0, 10);
-    await env.DB.prepare(
-      `UPDATE production_tasks SET risk_flag = 1
-       WHERE status NOT IN ('done','cancelled') AND due_date IS NOT NULL AND due_date < ?`,
-    )
-      .bind(today)
-      .run();
+  /**
+   * Daily ops sweep (cron in wrangler.toml):
+   *  1. flag late production tasks,
+   *  2. sweep abandoned checkouts (pending > 24h) into analytics,
+   *  3. email the founder a digest via Cloudflare Email Service.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runDailyOpsSweep(env));
   },
 } satisfies ExportedHandler<Env>;
+
+async function runDailyOpsSweep(env: Env): Promise<void> {
+  const { dailyDigestNotification, sendNotification } = await import("./services/email");
+  const today = new Date().toISOString().slice(0, 10);
+  const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+
+  // 1. Late tasks → risk flag.
+  await env.DB.prepare(
+    `UPDATE production_tasks SET risk_flag = 1
+     WHERE status NOT IN ('done','cancelled') AND due_date IS NOT NULL AND due_date < ?`,
+  )
+    .bind(today)
+    .run();
+
+  // 2. Abandoned checkouts: pending Stripe sessions older than 24h, not yet
+  //    swept. Recorded as analytics events (idempotent via the sweep flag in
+  //    shipping_address_json remaining untouched — we key off analytics).
+  const abandoned = await env.DB.prepare(
+    `SELECT o.id, o.order_number, o.total_cents, o.currency FROM orders o
+     WHERE o.payment_status = 'pending' AND o.stripe_checkout_session_id IS NOT NULL
+       AND o.created_at < ?
+       AND NOT EXISTS (
+         SELECT 1 FROM analytics_events e
+         WHERE e.event = 'checkout_abandoned' AND e.entity_id = o.id
+       )`,
+  )
+    .bind(dayAgo)
+    .all<{ id: string; order_number: string; total_cents: number; currency: string }>();
+  for (const order of abandoned.results) {
+    await env.DB.prepare(
+      `INSERT INTO analytics_events (id, event, entity_type, entity_id)
+       VALUES (?, 'checkout_abandoned', 'order', ?)`,
+    )
+      .bind(`evt_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`, order.id)
+      .run();
+  }
+
+  // 3. Digest.
+  const lateTasks = await env.DB.prepare(
+    `SELECT title, due_date FROM production_tasks
+     WHERE status NOT IN ('done','cancelled') AND due_date IS NOT NULL AND due_date < ?
+     ORDER BY due_date LIMIT 10`,
+  )
+    .bind(today)
+    .all<{ title: string; due_date: string | null }>();
+  const lowStock = await env.DB.prepare(
+    `SELECT p.name || ' ' || v.colorway_name || '/' || v.size AS name,
+            (i.on_hand - i.reserved) AS available
+     FROM inventory_items i
+     JOIN product_variants v ON v.id = i.variant_id
+     JOIN products p ON p.id = v.product_id
+     WHERE (i.on_hand - i.reserved) <= i.low_stock_threshold AND (i.on_hand + i.incoming) > 0
+     ORDER BY available LIMIT 10`,
+  ).all<{ name: string; available: number }>();
+  const pendingFactory = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM supplier_interactions WHERE needs_response = 1`,
+  ).first<{ n: number }>();
+  const openSamples = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM samples WHERE status NOT IN ('approved','rejected')`,
+  ).first<{ n: number }>();
+
+  await sendNotification(
+    env,
+    dailyDigestNotification({
+      lateTasks: lateTasks.results.map((t) => ({ title: t.title, dueDate: t.due_date })),
+      lowStock: lowStock.results,
+      pendingFactoryResponses: pendingFactory?.n ?? 0,
+      abandonedCheckouts: abandoned.results.map((o) => ({
+        orderNumber: o.order_number,
+        totalCents: o.total_cents,
+        currency: o.currency,
+      })),
+      openSamples: openSamples?.n ?? 0,
+    }),
+  );
+}

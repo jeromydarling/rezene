@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
-import { dutyRuleUpdateSchema, parseBody } from "../services/validators";
+import { costSheetUpdateSchema, dutyRuleUpdateSchema, parseBody } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import type { AppContext } from "../types/env";
 import type { AdminCostSheet, AdminDutyRule, AdminLandedCostScenario } from "../../shared/types";
@@ -75,6 +75,43 @@ adminCostingRoutes.get("/cost-sheets", async (c) => {
     });
   }
   return c.json(sheets);
+});
+
+adminCostingRoutes.patch("/cost-sheets/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, costSheetUpdateSchema);
+  const existing = await first(c.env.DB, `SELECT id FROM cost_sheets WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Cost sheet not found" }, 404);
+
+  const fieldMap: Record<string, string> = {
+    name: "name",
+    fabricCostCents: "fabric_cost_cents",
+    trimCostCents: "trim_cost_cents",
+    cutSewMakeCents: "cut_sew_make_cents",
+    sampleAllocationCents: "sample_allocation_cents",
+    packagingCents: "packaging_cents",
+    freightCents: "freight_cents",
+    insuranceCents: "insurance_cents",
+    dutyCents: "duty_cents",
+    paymentProcessingCents: "payment_processing_cents",
+    returnsReserveCents: "returns_reserve_cents",
+    targetRetailCents: "target_retail_cents",
+    actualRetailCents: "actual_retail_cents",
+    notes: "notes",
+  };
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [key, col] of Object.entries(fieldMap)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
+  }
+  if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await run(c.env.DB, `UPDATE cost_sheets SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.env.DB, c.var.userId, "cost_sheet.update", "cost_sheet", id, body);
+  return c.json({ ok: true });
 });
 
 adminCostingRoutes.get("/duty-rules", async (c) => {

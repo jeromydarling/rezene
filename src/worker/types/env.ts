@@ -12,6 +12,8 @@ export interface Env {
   FILES: R2Bucket;
   KV: KVNamespace;
   ASSETS: Fetcher;
+  /** Cloudflare Email Service send binding (optional in local dev). */
+  EMAIL?: SendEmail;
 
   // Plain vars (wrangler.toml [vars])
   APP_ENV: string;
@@ -19,6 +21,8 @@ export interface Env {
   BRAND_NAME: string;
   BRAND_SLUG: string;
   R2_PUBLIC_BASE_URL: string;
+  NOTIFY_EMAIL_FROM: string;
+  NOTIFY_EMAIL_TO: string;
 
   // Secrets
   STRIPE_SECRET_KEY?: string;

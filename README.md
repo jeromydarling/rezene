@@ -75,40 +75,42 @@ submitted credentials equal `ADMIN_EMAIL` / `ADMIN_INITIAL_PASSWORD` (from
 with the `admin` role. Sign in at `/admin/login`, then rotate the password.
 Roles: `admin` (everything), `ops` (read/write modules), `viewer` (read-only).
 
-## Cloudflare setup
+## Deployment — nothing to run locally
 
-```bash
-wrangler login
+The Cloudflare resources are **already provisioned** in the account and
+their real ids are committed in `wrangler.toml`:
 
-# 1. D1
-wrangler d1 create maison-atlantique-db
-#    → paste database_id into wrangler.toml
+| Resource | Name | Id |
+|----------|------|----|
+| D1 | `maison-atlantique-db` | `efe744ff-e3dd-41a4-b61e-b93cd79e2139` |
+| KV | `maison-atlantique-kv` | `79bcbb9c583f4ad0b90f715897bd8d2e` |
+| R2 | `maison-atlantique-files` | — |
 
-# 2. KV
-wrangler kv namespace create KV
-#    → paste id into wrangler.toml
+Both migrations are **already applied to the remote D1** (schema + seed
+data, verified against local), with wrangler migration bookkeeping in
+place — so the CI migration step is a safe no-op until a new migration
+lands.
 
-# 3. R2
-wrangler r2 bucket create maison-atlantique-files
+The Worker itself deploys through **GitHub Actions**
+(`.github/workflows/deploy.yml`, runs on push to `main` or manually via
+the Actions tab → Deploy → Run workflow). One-time repository setup, in
+GitHub → Settings → Secrets and variables → Actions:
 
-# 4. Migrations (remote)
-npm run db:migrate:remote
+1. `CLOUDFLARE_API_TOKEN` *(required)* — create at dash.cloudflare.com →
+   My Profile → API Tokens with permissions: Workers Scripts:Edit,
+   D1:Edit, Workers KV Storage:Edit, Workers R2 Storage:Edit.
+2. `CLOUDFLARE_ACCOUNT_ID` *(recommended)* — from the Cloudflare
+   dashboard sidebar.
+3. Optionally add any of `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+   `STRIPE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`,
+   `ADMIN_EMAIL`, `ADMIN_INITIAL_PASSWORD` — the workflow syncs whichever
+   exist to the Worker with `wrangler secret put` after each deploy.
 
-# 5. Secrets
-wrangler secret put STRIPE_SECRET_KEY
-wrangler secret put STRIPE_WEBHOOK_SECRET
-wrangler secret put STRIPE_PUBLISHABLE_KEY
-wrangler secret put ANTHROPIC_API_KEY
-wrangler secret put SESSION_SECRET
-wrangler secret put ADMIN_EMAIL
-wrangler secret put ADMIN_INITIAL_PASSWORD
+A separate CI workflow (`.github/workflows/ci.yml`) type-checks, builds,
+and validates migrations on every PR and non-main push.
 
-# 6. Deploy
-npm run deploy
-```
-
-Update `APP_URL` in `wrangler.toml` `[vars]` to the deployed URL (it is used
-for Stripe success/cancel redirects in production).
+After the first deploy, update `APP_URL` in `wrangler.toml` `[vars]` to
+the deployed URL (used for Stripe success/cancel redirects in production).
 
 For internal routes in production, additionally fronting `/admin` and
 `/api/admin` with **Cloudflare Access** is recommended; the app-level
@@ -139,6 +141,31 @@ stripe listen --forward-to localhost:5173/api/stripe/webhooks
 # copy the printed whsec_… into .dev.vars as STRIPE_WEBHOOK_SECRET
 stripe trigger checkout.session.completed
 ```
+
+## Outbound email — Cloudflare Email Service
+
+Operational email runs on Cloudflare Email Service via the `send_email`
+binding (`EMAIL` in `wrangler.toml`, service in
+`src/worker/services/email.ts`). Wired senders:
+
+- **Order notification** — fires on `checkout.session.completed`
+- **High-intent lead notification** — wholesale inquiries and contact
+  messages (list signups intentionally don't email)
+- **Daily ops digest** — the 06:00 UTC cron emails late tasks, low stock,
+  abandoned checkouts (pending > 24h, also swept into analytics),
+  pending factory follow-ups, and open samples
+
+To activate: enable Email Service on your domain in the Cloudflare
+dashboard, verify a destination address, then set `NOTIFY_EMAIL_FROM`
+(an address on the onboarded domain) and `NOTIFY_EMAIL_TO` (the verified
+destination) in `wrangler.toml [vars]`. Until then every send is a
+logged no-op — nothing breaks.
+
+Known constraint: Email Service sends only **to verified destination
+addresses**, which makes it right for founder/ops notifications but not
+for arbitrary customer email. Customer-facing transactional email
+(order confirmations to buyers) remains a documented integration point
+for a transactional provider.
 
 ## Anthropic setup
 
@@ -182,24 +209,39 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Settings: brand identity as data, integration status | admin System | ✅ working |
 | Cron: daily late-task risk sweep | `wrangler.toml [triggers]` | ✅ working |
 
-### Scaffolds / placeholders (documented, intentional)
+### Formerly scaffolds — now wired
 
-- **PDF export**: printable HTML via `window.print()` is the working path;
-  server-side HTML→PDF (e.g. Browserless/Gotenberg or a queue-driven
-  renderer) and R2 export snapshots are the documented next step
-  (`tech_pack_exports` table is ready).
+- **Tech pack R2 export snapshots**: server-side standalone HTML renderer
+  (`src/worker/services/techpack-html.ts`), "Export snapshot → R2" button,
+  export history with session-gated downloads (`tech_pack_exports`).
+- **Outbound email**: Cloudflare Email Service binding — order
+  notifications, lead notifications, daily ops digest (see the email
+  section above).
+- **Abandoned checkout sweep**: the daily cron flags Stripe sessions
+  pending > 24h as `checkout_abandoned` analytics events (idempotent) and
+  includes them in the digest email.
+- **Cost sheet editing UI**: full edit slide-over in Costing & Margins
+  backed by `PATCH /api/admin/costing/cost-sheets/:id`.
+- **External tool bridge UI**: "Bridges" tab in the AI Concept Lab — log
+  Midjourney/Firefly/CLO job URLs and metadata into
+  `external_tool_exports`.
+- **3D fit-issue → task**: one click on a 3D project files a sample-
+  revision production task.
+
+### Remaining placeholders (documented, intentional)
+
+- **Native PDF rendering**: the R2 HTML snapshot + print-to-PDF covers the
+  factory workflow; binary PDF generation (Browserless/Gotenberg) remains
+  the documented external option.
 - **Customer portal / accounts**: route exists
   (`/api/public/customer-portal`); customer-facing auth is a later phase.
+- **Customer-facing transactional email**: Email Service is restricted to
+  verified destinations — buyer-facing confirmations need a transactional
+  provider (Resend et al.).
 - **Queues**: producer/consumer config is commented in `wrangler.toml` —
   enable for webhook fan-out and AI batch jobs when the account has Queues.
-- **Abandoned checkout**: pending orders with `payment_status='pending'`
-  are the raw material; a cron sweep + email hook is the follow-up.
-- **Email sending** (Resend/Loops/Klaviyo): leads are captured in D1;
-  outbound email is a documented integration point.
 - **Multi-tenancy**: not built (per brief); all ids are opaque TEXT so a
   `workspace_id` column can be added by migration without identity rewrites.
-- **Cost sheet editing UI**: cost data renders in admin; edits go through
-  the API today, with a form UI as follow-up.
 - Supplier leads (Atelier Coupe Cousu, Sinti, HITEX) are seeded as
   **unverified research data** — the UI flags them until verified.
 - Duty rules are **editable estimates with disclaimers** — never presented

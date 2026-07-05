@@ -249,6 +249,25 @@ export const inventoryAdjustSchema = z.object({
   note: z.string().max(1000).optional(),
 });
 
+// ---------- Cost sheets ----------
+const cents = z.number().int().min(0).max(100_000_000);
+export const costSheetUpdateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  fabricCostCents: cents.optional(),
+  trimCostCents: cents.optional(),
+  cutSewMakeCents: cents.optional(),
+  sampleAllocationCents: cents.optional(),
+  packagingCents: cents.optional(),
+  freightCents: cents.optional(),
+  insuranceCents: cents.optional(),
+  dutyCents: cents.optional(),
+  paymentProcessingCents: cents.optional(),
+  returnsReserveCents: cents.optional(),
+  targetRetailCents: cents.nullable().optional(),
+  actualRetailCents: cents.nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
 // ---------- Duty rules ----------
 export const dutyRuleUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
