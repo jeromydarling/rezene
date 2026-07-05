@@ -17,9 +17,7 @@ name: Deploy
 
 on:
   push:
-    # The feature branch is listed so the workflow registers and deploys
-    # before the first merge — drop it once this branch lands on main.
-    branches: [main, claude/cloudflare-vite-react-scaffold-aluycl]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
