@@ -62,6 +62,7 @@ adminTechPackRoutes.get("/", async (c) => {
 export async function loadTechPackDetail(
   db: D1Database,
   id: string,
+  brandName?: string,
 ): Promise<AdminTechPackDetail | null> {
   const row = await first<Record<string, unknown>>(db, `${TP_SELECT} WHERE tp.id = ?`, id);
   if (!row) return null;
@@ -94,13 +95,27 @@ export async function loadTechPackDetail(
     ...mapSummary(row),
     summary: (row.summary as string) ?? null,
     coverImageUrl: (row.cover_image_url as string) ?? null,
-    sections: sections.map((s) => ({
-      id: s.id as string,
-      kind: s.kind as string,
-      title: s.title as string,
-      content: jsonObject(s.content_json),
-      sortOrder: s.sort_order as number,
-    })),
+    sections: sections.map((s) => {
+      let content = jsonObject(s.content_json);
+      // The cover's "brand" field always reflects the current brand setting —
+      // stored copies would go stale on rename.
+      if (
+        s.kind === "cover" &&
+        brandName &&
+        content &&
+        typeof content === "object" &&
+        "brand" in (content as Record<string, unknown>)
+      ) {
+        content = { ...(content as Record<string, unknown>), brand: brandName };
+      }
+      return {
+        id: s.id as string,
+        kind: s.kind as string,
+        title: s.title as string,
+        content,
+        sortOrder: s.sort_order as number,
+      };
+    }),
     constructionNotes: construction.map((n) => ({
       id: n.id as string,
       area: n.area as string,
@@ -127,7 +142,11 @@ export async function loadTechPackDetail(
 }
 
 adminTechPackRoutes.get("/:id", async (c) => {
-  const detail = await loadTechPackDetail(c.env.DB, c.req.param("id"));
+  const detail = await loadTechPackDetail(
+    c.env.DB,
+    c.req.param("id"),
+    await getBrandName(c.env),
+  );
   if (!detail) return c.json({ error: "Tech pack not found" }, 404);
   return c.json(detail);
 });
@@ -137,10 +156,11 @@ adminTechPackRoutes.get("/:id", async (c) => {
 /** Render the tech pack to standalone HTML and store it in R2. */
 adminTechPackRoutes.post("/:id/export", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
-  const detail = await loadTechPackDetail(c.env.DB, id);
+  const brandName = await getBrandName(c.env);
+  const detail = await loadTechPackDetail(c.env.DB, id, brandName);
   if (!detail) return c.json({ error: "Tech pack not found" }, 404);
 
-  const html = renderTechPackHtml(detail, await getBrandName(c.env));
+  const html = renderTechPackHtml(detail, brandName);
   const exportId = newId("tpe");
   const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
   const r2Key = `exports/tech-packs/${id}/${detail.code}-${stamp}.html`;
