@@ -3,12 +3,13 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import {
   createSession,
   destroySession,
+  hashPassword,
   maybeBootstrapAdmin,
   SESSION_COOKIE,
   verifyPassword,
 } from "../services/auth";
 import { first, run, writeAudit } from "../services/db";
-import { loginSchema, parseBody } from "../services/validators";
+import { changePasswordSchema, loginSchema, parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import type { AppContext } from "../types/env";
 
@@ -65,4 +66,34 @@ authRoutes.get("/me", (c) => {
     email: c.var.userEmail,
     roles: c.var.roles,
   });
+});
+
+/** Rotate the signed-in user's password; revokes every other session. */
+authRoutes.post("/change-password", async (c) => {
+  if (!c.var.userId) return c.json({ error: "Authentication required" }, 401);
+  const { currentPassword, newPassword } = await parseBody(c, changePasswordSchema);
+
+  const user = await first<{ password_hash: string | null }>(
+    c.env.DB,
+    `SELECT password_hash FROM users WHERE id = ?`,
+    c.var.userId,
+  );
+  if (!user?.password_hash || !(await verifyPassword(currentPassword, user.password_hash))) {
+    return c.json({ error: "Current password is incorrect" }, 401);
+  }
+  await run(
+    c.env.DB,
+    `UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
+    await hashPassword(newPassword),
+    c.var.userId,
+  );
+  // Kill every other session — a rotated password should orphan old logins.
+  await run(
+    c.env.DB,
+    `DELETE FROM sessions WHERE user_id = ? AND id != ?`,
+    c.var.userId,
+    c.var.sessionId,
+  );
+  await writeAudit(c.env.DB, c.var.userId, "auth.change_password", "user", c.var.userId);
+  return c.json({ ok: true });
 });

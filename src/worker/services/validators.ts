@@ -33,6 +33,11 @@ export const loginSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(8).max(200),
+  newPassword: z.string().min(8).max(200),
+});
+
 // ---------- Leads / public forms ----------
 export const leadSchema = z.object({
   kind: z.enum(["newsletter", "waitlist", "drop_notification", "wholesale_inquiry", "contact"]),

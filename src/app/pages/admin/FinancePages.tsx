@@ -499,6 +499,88 @@ interface SettingsResponse {
   secretStatus: { stripe: boolean; stripeWebhook: boolean; anthropic: boolean };
 }
 
+function ChangePasswordCard() {
+  const [form, setForm] = useState({ current: "", next: "", confirm: "" });
+  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (form.next !== form.confirm) {
+      setError("New passwords don't match");
+      return;
+    }
+    setState("busy");
+    setError(null);
+    try {
+      await api.post("/api/auth/change-password", {
+        currentPassword: form.current,
+        newPassword: form.next,
+      });
+      setState("done");
+      setForm({ current: "", next: "", confirm: "" });
+    } catch (err) {
+      setState("idle");
+      setError(err instanceof ApiRequestError ? err.message : "Password change failed");
+    }
+  }
+
+  return (
+    <div className="admin-card p-5">
+      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-warmgrey">
+        Account — change password
+      </h2>
+      <div className="space-y-3">
+        <div>
+          <label className="label">Current password</label>
+          <input
+            type="password"
+            autoComplete="current-password"
+            className="input"
+            value={form.current}
+            onChange={(e) => setForm({ ...form, current: e.target.value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">New password (min 8)</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="input"
+              value={form.next}
+              onChange={(e) => setForm({ ...form, next: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Confirm new password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="input"
+              value={form.confirm}
+              onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+            />
+          </div>
+        </div>
+        {error && <p className="field-error">{error}</p>}
+        {state === "done" && (
+          <p className="text-sm text-palm">
+            Password changed. All other sessions have been signed out.
+          </p>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={state === "busy" || !form.current || !form.next || !form.confirm}
+          onClick={() => void submit()}
+        >
+          {state === "busy" ? "Changing…" : "Change password"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { data, loading, error, reload } = useFetch<SettingsResponse>("/api/admin/settings");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -589,6 +671,7 @@ export function SettingsPage() {
               (or .dev.vars locally) — never stored in the database or exposed to the browser.
             </p>
           </div>
+          <ChangePasswordCard />
         </div>
       )}
     </div>
