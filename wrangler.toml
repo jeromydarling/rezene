@@ -33,7 +33,7 @@ enabled = true
 [vars]
 # Deployed value. Local dev overrides this via .dev.vars (APP_ENV=development).
 APP_ENV = "production"
-APP_URL = "https://rezene.jer-f84.workers.dev"
+APP_URL = "https://verto.style"
 BRAND_NAME = "Rezene"
 BRAND_SLUG = "rezene"
 R2_PUBLIC_BASE_URL = ""
