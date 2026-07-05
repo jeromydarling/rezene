@@ -32,14 +32,15 @@ APP_URL = "https://maison-atlantique.jer-f84.workers.dev"
 BRAND_NAME = "Maison Atlantique"
 BRAND_SLUG = "maison-atlantique"
 R2_PUBLIC_BASE_URL = ""
-# Outbound notifications (Cloudflare Email Service). Sends no-op until both
+# Founder notifications (Cloudflare Email Service). Sends no-op until both
 # are set: FROM must be on a domain onboarded to Email Service, TO must be a
-# verified destination address in the account.
+# verified destination address in the account (verified sends are free).
 NOTIFY_EMAIL_FROM = ""
 NOTIFY_EMAIL_TO = ""
-# Buyer transactional email (Resend). Sends no-op until RESEND_API_KEY
-# (secret) is set and this is a verified-domain address.
-RESEND_FROM = ""
+# Buyer transactional email (order confirmations) — same EMAIL binding.
+# Sending to arbitrary recipients requires the domain to be onboarded to
+# Email Sending; set this to an address on that domain to activate.
+BUYER_EMAIL_FROM = ""
 
 [[d1_databases]]
 binding = "DB"
@@ -55,9 +56,10 @@ bucket_name = "maison-atlantique-files"
 binding = "KV"
 id = "79bcbb9c583f4ad0b90f715897bd8d2e"
 
-# Cloudflare Email Service: unrestricted binding — can send to any VERIFIED
-# destination address in the account, from any onboarded sender domain.
-# Local dev simulates sends (logged, not delivered).
+# Cloudflare Email Service: unrestricted binding. Before a sending domain is
+# onboarded to Email Sending it reaches only verified destination addresses
+# (founder notifications); after onboarding it can send to any recipient
+# (buyer confirmations). Local dev simulates sends (logged, not delivered).
 [[send_email]]
 name = "EMAIL"
 

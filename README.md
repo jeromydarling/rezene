@@ -147,38 +147,35 @@ stripe trigger checkout.session.completed
 
 ## Outbound email — Cloudflare Email Service
 
-Operational email runs on Cloudflare Email Service via the `send_email`
-binding (`EMAIL` in `wrangler.toml`, service in
-`src/worker/services/email.ts`). Wired senders:
+All email — founder notifications and buyer confirmations — runs on
+Cloudflare Email Service via the single `send_email` binding (`EMAIL` in
+`wrangler.toml`). Wired senders:
 
-- **Order notification** — fires on `checkout.session.completed`
-- **High-intent lead notification** — wholesale inquiries and contact
-  messages (list signups intentionally don't email)
-- **Daily ops digest** — the 06:00 UTC cron emails late tasks, low stock,
-  abandoned checkouts (pending > 24h, also swept into analytics),
-  pending factory follow-ups, and open samples
+- **Order notification** (founder) — fires on `checkout.session.completed`
+  (`src/worker/services/email.ts`)
+- **High-intent lead notification** (founder) — wholesale inquiries, line
+  sheet inquiries, and contact messages (list signups intentionally
+  don't email)
+- **Daily ops digest** (founder) — the 06:00 UTC cron emails late tasks,
+  low stock, abandoned checkouts (pending > 24h, also swept into
+  analytics), pending factory follow-ups, and open samples
+- **Order confirmation** (buyer) — emailed to the customer after payment,
+  with pre-order line items flagged "made to order"
+  (`src/worker/services/buyer-email.ts`)
 
-To activate: enable Email Service on your domain in the Cloudflare
-dashboard, verify a destination address, then set `NOTIFY_EMAIL_FROM`
-(an address on the onboarded domain) and `NOTIFY_EMAIL_TO` (the verified
-destination) in `wrangler.toml [vars]`. Until then every send is a
-logged no-op — nothing breaks.
+Two activation tiers, matching how Email Service works:
 
-Known constraint: Email Service sends only **to verified destination
-addresses**, which makes it right for founder/ops notifications but not
-for arbitrary customer email. Buyer-facing email goes through Resend
-(below).
+1. **Founder notifications** — verify a destination address in the
+   Cloudflare dashboard (free on all plans), then set `NOTIFY_EMAIL_FROM`
+   and `NOTIFY_EMAIL_TO` in `wrangler.toml [vars]`.
+2. **Buyer email** — onboard your sending domain to **Email Sending**
+   (Compute → Email Service → Email Sending → Onboard Domain; requires
+   Workers Paid and Cloudflare DNS). Once onboarded, the account can send
+   to *any* recipient — set `BUYER_EMAIL_FROM` (e.g.
+   `orders@yourdomain.com`) to activate.
 
-## Resend setup (buyer-facing email)
-
-Order confirmations to customers are sent through
-[Resend](https://resend.com) (`src/worker/services/resend.ts`). To
-activate: verify your sending domain in Resend, set the `RESEND_API_KEY`
-GitHub secret (synced to the Worker on the next deploy), and put the
-from-address in `RESEND_FROM` in `wrangler.toml [vars]`
-(e.g. `orders@yourdomain.com`). Until both are set, buyer email is a
-logged no-op — checkout and webhooks work regardless. Pre-order line
-items automatically get a "made to order" note in the confirmation.
+Until the vars are set, every send is a logged no-op — checkout and
+webhooks work regardless. No third-party email provider is involved.
 
 ## Anthropic setup
 
@@ -227,7 +224,7 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |
 | Spec-driven size charts on PDPs (graded from measurement specs) | product detail pages | ✅ working |
 | Shoppable lookbooks (images link to products) | admin Content → Lookbooks | ✅ working |
-| Cart + multi-item checkout + buyer confirmation email (Resend) | `/cart`, `src/app/lib/cart.tsx` | ✅ working |
+| Cart + multi-item checkout + buyer confirmation email | `/cart`, `src/app/lib/cart.tsx` | ✅ working |
 | Wholesale line sheets: tokenized links, wholesale pricing, buyer inquiries | admin Commerce → Line Sheets, `/linesheet/:token` | ✅ working |
 | Product CSV import (Shopify export or simple template) | admin Products → Import CSV | ✅ working |
 
@@ -258,8 +255,8 @@ Nothing secret is ever exposed to the browser or stored in D1.
 - **Customer portal / accounts**: route exists
   (`/api/public/customer-portal`); customer-facing auth is a later phase.
 - **Customer-facing transactional email beyond order confirmations**:
-  confirmations ship via Resend; drop notifications and marketing email
-  are later phases.
+  confirmations ship via Email Service; drop notifications and marketing
+  email are later phases.
 - **Queues**: producer/consumer config is commented in `wrangler.toml` —
   enable for webhook fan-out and AI batch jobs when the account has Queues.
 - **Multi-tenancy**: not built (per brief); all ids are opaque TEXT so a
@@ -308,7 +305,7 @@ Four migrations in [`migrations/`](./migrations):
 2. Stripe live keys + Stripe Tax + duties-in-pricing decision per region.
 3. Photography → replace `EditorialImage` placeholder slots (R2-hosted).
 4. Server-side PDF rendering for tech pack exports into R2.
-5. Drop notifications and marketing email (Resend audience/broadcasts).
+5. Drop notifications to waitlists (Email Service, batched).
 6. Cloudflare Access in front of `/admin` for production.
 7. Cost-sheet edit forms and per-style margin what-if UI.
 8. SaaS phase: `workspace_id` migration, Stripe Billing.

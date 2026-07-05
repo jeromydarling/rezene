@@ -1,47 +1,39 @@
+import { EmailMessage } from "cloudflare:email";
+import { createMimeMessage } from "mimetext";
 import { getBrandName } from "./brand";
 import type { Env } from "../types/env";
 
 /**
- * Buyer-facing transactional email via Resend. Cloudflare Email Service
- * only delivers to verified destinations (fine for founder notifications),
- * so customer email goes through Resend. Guarded no-op until
- * RESEND_API_KEY (secret) and RESEND_FROM (var, verified-domain address)
- * are configured. Failures never break the webhook path.
+ * Buyer-facing transactional email via Cloudflare Email Service — the same
+ * EMAIL binding as founder notifications. Sending to arbitrary recipients
+ * requires a sending domain onboarded to Email Sending (until then the
+ * account can only reach its verified destination addresses), so buyer
+ * email is gated on its own var: set BUYER_EMAIL_FROM to an address on the
+ * onboarded domain once that's done. Until then every send is a logged
+ * no-op, and failures never break the webhook path.
  */
-export function resendConfigured(env: Env): boolean {
-  return Boolean(env.RESEND_API_KEY && env.RESEND_FROM);
+export function buyerEmailConfigured(env: Env): boolean {
+  return Boolean(env.EMAIL && env.BUYER_EMAIL_FROM);
 }
 
 export async function sendBuyerEmail(
   env: Env,
   opts: { to: string; subject: string; text: string },
 ): Promise<boolean> {
-  if (!resendConfigured(env)) {
-    console.log(`[resend] skipped (not configured): ${opts.subject}`);
+  if (!buyerEmailConfigured(env)) {
+    console.log(`[buyer-email] skipped (not configured): ${opts.subject}`);
     return false;
   }
   try {
-    const brand = await getBrandName(env);
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${env.RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: `${brand} <${env.RESEND_FROM}>`,
-        to: [opts.to],
-        subject: opts.subject,
-        text: opts.text,
-      }),
-    });
-    if (!res.ok) {
-      console.error(`[resend] send failed ${res.status}: ${(await res.text()).slice(0, 300)}`);
-      return false;
-    }
+    const msg = createMimeMessage();
+    msg.setSender({ name: await getBrandName(env), addr: env.BUYER_EMAIL_FROM });
+    msg.setRecipient(opts.to);
+    msg.setSubject(opts.subject);
+    msg.addMessage({ contentType: "text/plain", data: opts.text });
+    await env.EMAIL!.send(new EmailMessage(env.BUYER_EMAIL_FROM, opts.to, msg.asRaw()));
     return true;
   } catch (err) {
-    console.error(`[resend] send failed: ${String(err)}`);
+    console.error(`[buyer-email] send failed: ${String(err)}`);
     return false;
   }
 }

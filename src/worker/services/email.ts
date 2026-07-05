@@ -4,14 +4,11 @@ import { getBrandName } from "./brand";
 import type { Env } from "../types/env";
 
 /**
- * Outbound email via Cloudflare Email Service (send_email binding "EMAIL").
- *
- * Constraint worth knowing: Email Service sends FROM a domain onboarded to
- * Email Service and TO verified destination addresses in the account. That
- * makes it ideal for operational notifications to the founder/team (orders,
- * leads, daily digest) — which is exactly what this service does. Sending
- * arbitrary customer email (order confirmations to any address) needs a
- * transactional provider and stays a documented integration point.
+ * Founder/ops notifications via Cloudflare Email Service (send_email
+ * binding "EMAIL"): orders, leads, daily digest — always to the verified
+ * NOTIFY_EMAIL_TO destination, which works (and is free) even before a
+ * sending domain is onboarded. Buyer-facing email lives in
+ * buyer-email.ts on the same binding.
  *
  * Every send is guarded: missing binding or unset NOTIFY_* vars mean a
  * silent no-op (logged), never a thrown error into the request path.

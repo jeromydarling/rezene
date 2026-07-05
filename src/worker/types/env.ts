@@ -23,15 +23,18 @@ export interface Env {
   R2_PUBLIC_BASE_URL: string;
   NOTIFY_EMAIL_FROM: string;
   NOTIFY_EMAIL_TO: string;
-  /** Verified-domain sender for buyer email via Resend, e.g. orders@brand.com */
-  RESEND_FROM: string;
+  /**
+   * Sender for buyer email (order confirmations), e.g. orders@brand.com.
+   * Must be on a domain onboarded to Cloudflare Email Sending — only then
+   * can the EMAIL binding reach arbitrary recipients.
+   */
+  BUYER_EMAIL_FROM: string;
 
   // Secrets
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
   ANTHROPIC_API_KEY?: string;
-  RESEND_API_KEY?: string;
   SESSION_SECRET?: string;
   ADMIN_EMAIL?: string;
   ADMIN_INITIAL_PASSWORD?: string;

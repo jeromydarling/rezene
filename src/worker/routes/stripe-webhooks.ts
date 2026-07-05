@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { all, first, run } from "../services/db";
 import { getStripe, webhookCryptoProvider } from "../services/stripe";
 import { orderPaidNotification, sendNotification } from "../services/email";
-import { orderConfirmationEmail, sendBuyerEmail } from "../services/resend";
+import { orderConfirmationEmail, sendBuyerEmail } from "../services/buyer-email";
 import { getBrandName } from "../services/brand";
 import { newId } from "../utils/id";
 import type { AppContext, Env } from "../types/env";
@@ -108,8 +108,8 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
 });
 
 /**
- * Post-payment email fan-out: founder notification (Cloudflare Email
- * Service) and buyer confirmation (Resend). Each degrades independently.
+ * Post-payment email fan-out: founder notification and buyer confirmation,
+ * both via Cloudflare Email Service. Each degrades independently.
  */
 async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
   const order = await first<{
