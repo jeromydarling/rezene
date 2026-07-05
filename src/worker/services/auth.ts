@@ -145,9 +145,14 @@ export async function maybeBootstrapAdmin(
   email: string,
   password: string,
 ): Promise<boolean> {
-  if (!env.ADMIN_EMAIL || !env.ADMIN_INITIAL_PASSWORD) return false;
-  if (email.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()) return false;
-  if (password !== env.ADMIN_INITIAL_PASSWORD) return false;
+  // Secrets pasted into dashboards routinely pick up trailing whitespace or
+  // a newline — trim both sides of the comparison. Whitespace at the edges
+  // of a credential is never intentional.
+  const adminEmail = env.ADMIN_EMAIL?.trim();
+  const adminPassword = env.ADMIN_INITIAL_PASSWORD?.trim();
+  if (!adminEmail || !adminPassword) return false;
+  if (email.trim().toLowerCase() !== adminEmail.toLowerCase()) return false;
+  if (password.trim() !== adminPassword) return false;
 
   const existing = await first<{ n: number }>(env.DB, `SELECT count(*) AS n FROM users`);
   if (existing && existing.n > 0) return false;
@@ -157,9 +162,9 @@ export async function maybeBootstrapAdmin(
     env.DB,
     `INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)`,
     userId,
-    env.ADMIN_EMAIL.toLowerCase(),
+    adminEmail.toLowerCase(),
     "Founder",
-    await hashPassword(password),
+    await hashPassword(adminPassword),
   );
   await run(env.DB, `INSERT INTO user_roles (user_id, role_id) VALUES (?, 'admin')`, userId);
   return true;
