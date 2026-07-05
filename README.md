@@ -97,8 +97,11 @@ the Actions tab → Deploy → Run workflow). One-time repository setup, in
 GitHub → Settings → Secrets and variables → Actions:
 
 1. `CLOUDFLARE_API_TOKEN` *(required)* — create at dash.cloudflare.com →
-   My Profile → API Tokens with permissions: Workers Scripts:Edit,
-   D1:Edit, Workers KV Storage:Edit, Workers R2 Storage:Edit.
+   My Profile → API Tokens, starting from the "Edit Cloudflare Workers"
+   template. Required account-scoped permissions: Workers Scripts:Edit,
+   D1:Edit, Workers KV Storage:Edit, Workers R2 Storage:Edit, Account
+   Settings:Read. Restrict Account Resources to this account. If a deploy
+   ever fails on the email binding, add Email Routing Addresses:Read.
 2. `CLOUDFLARE_ACCOUNT_ID` *(recommended)* — from the Cloudflare
    dashboard sidebar.
 3. Optionally add any of `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
