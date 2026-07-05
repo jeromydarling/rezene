@@ -20,7 +20,26 @@ export interface PublicProductSummary {
   collectionSlug: string | null;
 }
 
+export interface PublicCampaign {
+  goalUnits: number;
+  orderedUnits: number;
+  maxUnits: number | null;
+  cutoffDate: string | null;
+  status: string;
+}
+
+export interface PublicSizeChart {
+  unit: string;
+  baseSize: string;
+  sizes: string[];
+  rows: { code: string; name: string; values: (number | null)[] }[];
+}
+
 export interface PublicProductDetail extends PublicProductSummary {
+  /** Live pre-order campaign, when one exists. */
+  campaign: PublicCampaign | null;
+  /** Size chart computed from the linked style's production spec. */
+  sizeChart: PublicSizeChart | null;
   description: string | null;
   editorialStory: string | null;
   fabricComposition: string | null;
@@ -75,7 +94,13 @@ export interface PublicLookbook {
   title: string;
   season: string | null;
   introCopy: string | null;
-  images: { url: string; caption: string | null }[];
+  images: {
+    url: string;
+    caption: string | null;
+    productSlug: string | null;
+    productName: string | null;
+    productPriceCents: number | null;
+  }[];
 }
 
 export interface BrandSettings {

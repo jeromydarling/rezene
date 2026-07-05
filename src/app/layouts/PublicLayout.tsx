@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
+import { ShoppingBag } from "lucide-react";
 import { track } from "../lib/analytics";
 import { useBrand } from "../lib/brand";
+import { useCart } from "../lib/cart";
 import { NewsletterForm } from "../components/LeadForm";
 
 const NAV = [
@@ -26,6 +28,7 @@ export function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const brand = useBrand();
+  const cart = useCart();
 
   useEffect(() => {
     setMenuOpen(false);
@@ -54,15 +57,25 @@ export function PublicLayout() {
               </NavLink>
             ))}
           </nav>
-          <button
-            type="button"
-            className="text-xs uppercase tracking-editorial md:hidden"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-expanded={menuOpen}
-            aria-label="Toggle menu"
-          >
-            {menuOpen ? "Close" : "Menu"}
-          </button>
+          <div className="flex items-center gap-4">
+            <Link to="/cart" className="relative text-ink/70 hover:text-ink" aria-label="Cart">
+              <ShoppingBag size={19} strokeWidth={1.6} />
+              {cart.count > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-terracotta px-1 text-[0.6rem] font-semibold text-chalk">
+                  {cart.count}
+                </span>
+              )}
+            </Link>
+            <button
+              type="button"
+              className="text-xs uppercase tracking-editorial md:hidden"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              aria-label="Toggle menu"
+            >
+              {menuOpen ? "Close" : "Menu"}
+            </button>
+          </div>
         </div>
         {menuOpen && (
           <nav className="border-t border-ink/10 px-5 py-4 md:hidden">

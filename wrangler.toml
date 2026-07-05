@@ -37,6 +37,9 @@ R2_PUBLIC_BASE_URL = ""
 # verified destination address in the account.
 NOTIFY_EMAIL_FROM = ""
 NOTIFY_EMAIL_TO = ""
+# Buyer transactional email (Resend). Sends no-op until RESEND_API_KEY
+# (secret) is set and this is a verified-domain address.
+RESEND_FROM = ""
 
 [[d1_databases]]
 binding = "DB"

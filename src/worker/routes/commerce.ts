@@ -9,19 +9,35 @@ import type { AppContext } from "../types/env";
 
 export const commerceRoutes = new Hono<AppContext>();
 
-const checkoutSchema = z.object({
+const checkoutItemSchema = z.object({
   variantId: z.string().min(1).max(80),
   quantity: z.number().int().min(1).max(10).default(1),
 });
+const checkoutSchema = z.union([
+  z.object({ items: z.array(checkoutItemSchema).min(1).max(20) }),
+  // Legacy single-item shape (PDP "Buy now").
+  checkoutItemSchema,
+]);
+
+interface ResolvedItem {
+  variantId: string;
+  productId: string;
+  slug: string;
+  description: string;
+  productName: string;
+  variantLabel: string;
+  quantity: number;
+  unitPriceCents: number;
+  currency: string;
+  isPreOrder: boolean;
+}
 
 /**
- * Create a Stripe Checkout Session for a single variant.
+ * Create a Stripe Checkout Session for one or more variants (cart).
  *
- * Uses inline price_data (no upfront product sync required); the
- * stripe_product_mappings table remains available for a future sync
- * strategy. A pending order + line items are written first, and the
- * order id rides along as metadata/client_reference_id so the webhook
- * can settle it.
+ * Guardrails per item: published + active, stock for in-stock items, and
+ * for pre-orders the campaign rules — cutoff date and hard unit cap — so
+ * a label can never oversell a production run.
  */
 commerceRoutes.post(
   "/checkout",
@@ -34,51 +50,123 @@ commerceRoutes.post(
         503,
       );
     }
-    const { variantId, quantity } = await parseBody(c, checkoutSchema);
+    const parsed = await parseBody(c, checkoutSchema);
+    const items = "items" in parsed ? parsed.items : [parsed];
 
-    const variant = await first<{
-      id: string;
-      colorway_name: string;
-      size: string;
-      price_cents: number | null;
-      currency: string;
-      is_active: number;
-      product_id: string;
-      product_name: string;
-      slug: string;
-      base_price_cents: number;
-      availability: string;
-      is_published: number;
-      on_hand: number | null;
-      reserved: number | null;
-    }>(
-      c.env.DB,
-      `SELECT v.id, v.colorway_name, v.size, v.price_cents, v.currency, v.is_active,
-              p.id AS product_id, p.name AS product_name, p.slug, p.base_price_cents,
-              p.availability, p.is_published, i.on_hand, i.reserved
-       FROM product_variants v
-       JOIN products p ON p.id = v.product_id
-       LEFT JOIN inventory_items i ON i.variant_id = v.id
-       WHERE v.id = ?`,
-      variantId,
-    );
-    if (!variant || !variant.is_active || !variant.is_published) {
-      return c.json({ error: "This piece is not available" }, 404);
-    }
-    if (variant.availability === "sold_out" || variant.availability === "archived") {
-      return c.json({ error: "This piece is sold out" }, 409);
-    }
-    const isPreOrder = variant.availability === "pre_order";
-    const available = Math.max(0, (variant.on_hand ?? 0) - (variant.reserved ?? 0));
-    if (!isPreOrder && available < quantity) {
-      return c.json({ error: "Not enough stock for that quantity" }, 409);
+    const resolved: ResolvedItem[] = [];
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (const item of items) {
+      const variant = await first<{
+        id: string;
+        colorway_name: string;
+        size: string;
+        price_cents: number | null;
+        currency: string;
+        is_active: number;
+        product_id: string;
+        product_name: string;
+        slug: string;
+        base_price_cents: number;
+        availability: string;
+        is_published: number;
+        on_hand: number | null;
+        reserved: number | null;
+      }>(
+        c.env.DB,
+        `SELECT v.id, v.colorway_name, v.size, v.price_cents, v.currency, v.is_active,
+                p.id AS product_id, p.name AS product_name, p.slug, p.base_price_cents,
+                p.availability, p.is_published, i.on_hand, i.reserved
+         FROM product_variants v
+         JOIN products p ON p.id = v.product_id
+         LEFT JOIN inventory_items i ON i.variant_id = v.id
+         WHERE v.id = ?`,
+        item.variantId,
+      );
+      if (!variant || !variant.is_active || !variant.is_published) {
+        return c.json({ error: "One of the pieces in your cart is no longer available" }, 404);
+      }
+      if (variant.availability === "sold_out" || variant.availability === "archived") {
+        return c.json({ error: `${variant.product_name} is sold out` }, 409);
+      }
+      const isPreOrder = variant.availability === "pre_order";
+      if (!isPreOrder) {
+        const available = Math.max(0, (variant.on_hand ?? 0) - (variant.reserved ?? 0));
+        if (available < item.quantity) {
+          return c.json({ error: `Not enough stock of ${variant.product_name}` }, 409);
+        }
+      } else {
+        // Pre-order campaign guardrails: cutoff + hard cap against oversell.
+        const campaign = await first<{
+          status: string;
+          cutoff_date: string | null;
+          max_units: number | null;
+        }>(
+          c.env.DB,
+          `SELECT status, cutoff_date, max_units FROM preorder_campaigns WHERE product_id = ?`,
+          variant.product_id,
+        );
+        if (campaign) {
+          if (!["live", "funded"].includes(campaign.status)) {
+            return c.json(
+              { error: `The pre-order window for ${variant.product_name} has closed` },
+              409,
+            );
+          }
+          if (campaign.cutoff_date && campaign.cutoff_date < today) {
+            return c.json(
+              { error: `The pre-order window for ${variant.product_name} closed on ${campaign.cutoff_date}` },
+              409,
+            );
+          }
+          if (campaign.max_units != null) {
+            const ordered = await first<{ n: number }>(
+              c.env.DB,
+              `SELECT COALESCE(SUM(oi.quantity), 0) AS n FROM order_items oi
+               JOIN orders o ON o.id = oi.order_id
+               WHERE oi.product_id = ? AND oi.is_pre_order = 1
+                 AND o.payment_status IN ('paid','partially_refunded')`,
+              variant.product_id,
+            );
+            const remaining = campaign.max_units - (ordered?.n ?? 0);
+            if (remaining < item.quantity) {
+              return c.json(
+                {
+                  error:
+                    remaining <= 0
+                      ? `${variant.product_name} pre-orders are fully allocated`
+                      : `Only ${remaining} unit(s) of ${variant.product_name} remain in this pre-order run`,
+                },
+                409,
+              );
+            }
+          }
+        }
+      }
+      resolved.push({
+        variantId: variant.id,
+        productId: variant.product_id,
+        slug: variant.slug,
+        description: `${variant.product_name} — ${variant.colorway_name} / ${variant.size}`,
+        productName: variant.product_name,
+        variantLabel: `${variant.colorway_name} / ${variant.size}`,
+        quantity: item.quantity,
+        unitPriceCents: variant.price_cents ?? variant.base_price_cents,
+        currency: variant.currency,
+        isPreOrder,
+      });
     }
 
-    const unitPrice = variant.price_cents ?? variant.base_price_cents;
+    const currency = resolved[0].currency;
+    if (resolved.some((r) => r.currency !== currency)) {
+      return c.json({ error: "Cart items must share a currency" }, 400);
+    }
+    const subtotal = resolved.reduce((sum, r) => sum + r.unitPriceCents * r.quantity, 0);
+    const anyPreOrder = resolved.some((r) => r.isPreOrder);
+
     const orderId = newId("ord");
     const seq = await first<{ n: number }>(c.env.DB, `SELECT COUNT(*) AS n FROM orders`);
     const orderNumber = `MA-${1000 + (seq?.n ?? 0) + 1}`;
-    const description = `${variant.product_name} — ${variant.colorway_name} / ${variant.size}`;
 
     await run(
       c.env.DB,
@@ -87,23 +175,28 @@ commerceRoutes.post(
        VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
       orderId,
       orderNumber,
-      variant.currency,
-      unitPrice * quantity,
-      unitPrice * quantity,
-      isPreOrder ? 1 : 0,
+      currency,
+      subtotal,
+      subtotal,
+      anyPreOrder ? 1 : 0,
     );
-    await run(
-      c.env.DB,
-      `INSERT INTO order_items (id, order_id, product_id, variant_id, description, quantity, unit_price_cents, currency)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      newId("oit"),
-      orderId,
-      variant.product_id,
-      variant.id,
-      description,
-      quantity,
-      unitPrice,
-      variant.currency,
+    await c.env.DB.batch(
+      resolved.map((r) =>
+        c.env.DB.prepare(
+          `INSERT INTO order_items (id, order_id, product_id, variant_id, description, quantity, unit_price_cents, currency, is_pre_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          newId("oit"),
+          orderId,
+          r.productId,
+          r.variantId,
+          r.description,
+          r.quantity,
+          r.unitPriceCents,
+          r.currency,
+          r.isPreOrder ? 1 : 0,
+        ),
+      ),
     );
 
     const origin = new URL(c.req.url).origin;
@@ -111,27 +204,25 @@ commerceRoutes.post(
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       client_reference_id: orderId,
-      metadata: { order_id: orderId, order_number: orderNumber, pre_order: String(isPreOrder) },
-      line_items: [
-        {
-          quantity,
-          price_data: {
-            currency: variant.currency.toLowerCase(),
-            unit_amount: unitPrice,
-            product_data: {
-              name: variant.product_name,
-              description: `${variant.colorway_name} / ${variant.size}${isPreOrder ? " · Pre-order" : ""}`,
-              metadata: { product_id: variant.product_id, variant_id: variant.id },
-            },
+      metadata: { order_id: orderId, order_number: orderNumber },
+      line_items: resolved.map((r) => ({
+        quantity: r.quantity,
+        price_data: {
+          currency: r.currency.toLowerCase(),
+          unit_amount: r.unitPriceCents,
+          product_data: {
+            name: r.productName,
+            description: `${r.variantLabel}${r.isPreOrder ? " · Pre-order" : ""}`,
+            metadata: { product_id: r.productId, variant_id: r.variantId },
           },
         },
-      ],
+      })),
       allow_promotion_codes: true,
       shipping_address_collection: { allowed_countries: SHIPPING_COUNTRIES },
       // Enable once Stripe Tax is activated on the account:
       // automatic_tax: { enabled: true },
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/products/${variant.slug}`,
+      cancel_url: resolved.length === 1 ? `${appUrl}/products/${resolved[0].slug}` : `${appUrl}/cart`,
     });
 
     await run(

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
-import { formatMoney } from "../../lib/format";
+import { useCart } from "../../lib/cart";
+import { formatDate, formatMoney } from "../../lib/format";
 import { track } from "../../lib/analytics";
 import { EditorialImage } from "../../components/ImagePlaceholder";
 import { ProductCard } from "../../components/ProductCard";
@@ -14,11 +15,14 @@ export function ProductDetailPage() {
   const { data: product, loading, error } = useFetch<PublicProductDetail>(
     slug ? `/api/public/products/${slug}` : null,
   );
+  const cart = useCart();
+  const navigate = useNavigate();
 
   const [colorway, setColorway] = useState<string>("");
   const [size, setSize] = useState<string>("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [added, setAdded] = useState(false);
 
   useEffect(() => {
     if (product) {
@@ -65,6 +69,31 @@ export function ProductDetailPage() {
   const isPreOrder = product.availability === "pre_order";
   const isSoldOut = product.availability === "sold_out";
   const canBuy = !isSoldOut && (selectedVariant ? selectedVariant.inStock : true);
+
+  function addToCart(goToCart: boolean) {
+    if (!selectedVariant || !product) {
+      setCheckoutError("Select a size first.");
+      return;
+    }
+    setCheckoutError(null);
+    cart.add({
+      variantId: selectedVariant.id,
+      productSlug: product.slug,
+      productName: product.name,
+      variantLabel: `${selectedVariant.colorwayName} / ${selectedVariant.size}`,
+      priceCents: selectedVariant.priceCents,
+      currency: selectedVariant.currency,
+      isPreOrder: product.availability === "pre_order",
+      imageUrl: product.imageUrl,
+    });
+    track("add_to_cart", { entityType: "product", entityId: product.id });
+    if (goToCart) {
+      navigate("/cart");
+    } else {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1800);
+    }
+  }
 
   async function startCheckout() {
     if (!selectedVariant) {
@@ -136,6 +165,37 @@ export function ProductDetailPage() {
             </p>
           )}
 
+          {/* Pre-order campaign progress — live numbers from the production run */}
+          {isPreOrder && product.campaign && (
+            <div className="mt-4 max-w-sm">
+              <div className="mb-1 flex items-baseline justify-between text-xs">
+                <span className="font-semibold uppercase tracking-wider text-bark">
+                  {product.campaign.status === "funded"
+                    ? "Production run confirmed ✓"
+                    : "Backing the production run"}
+                </span>
+                <span className="text-warmgrey">
+                  {product.campaign.orderedUnits} / {product.campaign.goalUnits} pieces
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-ink/10">
+                <div
+                  className={`h-2 rounded-full ${
+                    product.campaign.status === "funded" ? "bg-palm" : "bg-saffron"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, Math.round((product.campaign.orderedUnits / product.campaign.goalUnits) * 100))}%`,
+                  }}
+                />
+              </div>
+              {product.campaign.cutoffDate && (
+                <p className="mt-1 text-xs text-warmgrey">
+                  Pre-orders close {formatDate(product.campaign.cutoffDate)}
+                </p>
+              )}
+            </div>
+          )}
+
           <p className="prose-editorial mt-6">{product.description}</p>
 
           {/* Colorway */}
@@ -204,20 +264,63 @@ export function ProductDetailPage() {
                 <NewsletterForm kind="drop_notification" />
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={startCheckout}
-                disabled={!canBuy || checkoutBusy}
-                className="btn btn-primary w-full py-3.5"
-              >
-                {checkoutBusy ? "Preparing checkout…" : isPreOrder ? "Pre-order now" : "Buy now"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => addToCart(false)}
+                  disabled={!canBuy}
+                  className="btn btn-primary flex-1 py-3.5"
+                >
+                  {added ? "Added ✓" : isPreOrder ? "Add pre-order to cart" : "Add to cart"}
+                </button>
+                <button
+                  type="button"
+                  onClick={startCheckout}
+                  disabled={!canBuy || checkoutBusy}
+                  className="btn btn-secondary py-3.5"
+                >
+                  {checkoutBusy ? "…" : "Buy now"}
+                </button>
+              </div>
             )}
             {checkoutError && <p className="field-error text-center">{checkoutError}</p>}
             {product.shippingNote && (
               <p className="text-center text-xs text-warmgrey">{product.shippingNote}</p>
             )}
           </div>
+
+          {/* Size chart — computed from the production spec the factory sews to */}
+          {product.sizeChart && (
+            <div className="mt-10">
+              <p className="label">
+                Measurements ({product.sizeChart.unit}) — from the production spec
+              </p>
+              <div className="overflow-x-auto">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      {product.sizeChart.sizes.map((s) => (
+                        <th key={s} className={s === product.sizeChart!.baseSize ? "text-ink" : ""}>
+                          {s}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {product.sizeChart.rows.map((row) => (
+                      <tr key={row.code}>
+                        <td className="font-medium">{row.name}</td>
+                        {row.values.map((v, i) => (
+                          <td key={i}>{v ?? "—"}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Details */}
           <dl className="mt-10 divide-y divide-ink/10 border-y border-ink/10">

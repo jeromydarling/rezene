@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { all, first, run } from "../services/db";
+import { all, first, jsonArray, run } from "../services/db";
 import { leadNotification, sendNotification } from "../services/email";
 import { analyticsEventSchema, leadSchema, parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
@@ -7,12 +7,14 @@ import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type {
   BrandSettings,
+  PublicCampaign,
   PublicCollection,
   PublicJournalPost,
   PublicLookbook,
   PublicPage,
   PublicProductDetail,
   PublicProductSummary,
+  PublicSizeChart,
   PublicVariant,
 } from "../../shared/types";
 
@@ -126,6 +128,8 @@ publicRoutes.get("/products/:slug", async (c) => {
   );
 
   const detail: PublicProductDetail = {
+    campaign: await loadCampaign(c.env.DB, p.id as string),
+    sizeChart: p.style_id ? await loadSizeChart(c.env.DB, p.style_id as string) : null,
     ...mapProductSummary({
       ...p,
       image_url: images[0]?.url ?? null,
@@ -159,9 +163,19 @@ publicRoutes.get("/lookbooks", async (c) => {
   );
   const result: PublicLookbook[] = [];
   for (const b of books) {
-    const images = await all<{ image_url: string; caption: string | null }>(
+    const images = await all<{
+      image_url: string;
+      caption: string | null;
+      product_slug: string | null;
+      product_name: string | null;
+      product_price: number | null;
+    }>(
       c.env.DB,
-      `SELECT image_url, caption FROM lookbook_images WHERE lookbook_id = ? ORDER BY sort_order`,
+      `SELECT li.image_url, li.caption,
+              pr.slug AS product_slug, pr.name AS product_name, pr.base_price_cents AS product_price
+       FROM lookbook_images li
+       LEFT JOIN products pr ON pr.id = li.product_id AND pr.is_published = 1
+       WHERE li.lookbook_id = ? ORDER BY li.sort_order`,
       b.id,
     );
     result.push({
@@ -169,7 +183,13 @@ publicRoutes.get("/lookbooks", async (c) => {
       title: b.title as string,
       season: (b.season as string) ?? null,
       introCopy: (b.intro_copy as string) ?? null,
-      images: images.map((i) => ({ url: i.image_url, caption: i.caption })),
+      images: images.map((i) => ({
+        url: i.image_url,
+        caption: i.caption,
+        productSlug: i.product_slug,
+        productName: i.product_name,
+        productPriceCents: i.product_price,
+      })),
     });
   }
   return c.json(result);
@@ -270,6 +290,86 @@ publicRoutes.post(
     return c.json({ ok: true }, 201);
   },
 );
+
+// ---------- Campaign + size chart helpers ----------
+
+export async function loadCampaign(
+  db: D1Database,
+  productId: string,
+): Promise<PublicCampaign | null> {
+  const row = await first<{
+    goal_units: number;
+    max_units: number | null;
+    cutoff_date: string | null;
+    status: string;
+  }>(
+    db,
+    `SELECT goal_units, max_units, cutoff_date, status FROM preorder_campaigns
+     WHERE product_id = ? AND status IN ('live','funded')`,
+    productId,
+  );
+  if (!row) return null;
+  const ordered = await first<{ n: number }>(
+    db,
+    `SELECT COALESCE(SUM(oi.quantity), 0) AS n FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     WHERE oi.product_id = ? AND oi.is_pre_order = 1
+       AND o.payment_status IN ('paid','partially_refunded')`,
+    productId,
+  );
+  return {
+    goalUnits: row.goal_units,
+    orderedUnits: ordered?.n ?? 0,
+    maxUnits: row.max_units,
+    cutoffDate: row.cutoff_date,
+    status: row.status,
+  };
+}
+
+/**
+ * Size chart derived from the production spec: the same measurement points
+ * and grading rules the factory sews to power the PDP size table. One
+ * database, storefront to cutting table.
+ */
+async function loadSizeChart(db: D1Database, styleId: string): Promise<PublicSizeChart | null> {
+  const spec = await first<{ id: string; base_size: string; size_run: string; unit: string }>(
+    db,
+    `SELECT id, base_size, size_run, unit FROM size_specs WHERE style_id = ? LIMIT 1`,
+    styleId,
+  );
+  if (!spec) return null;
+  const sizes = jsonArray(spec.size_run);
+  const baseIdx = sizes.indexOf(spec.base_size);
+  if (sizes.length === 0 || baseIdx === -1) return null;
+
+  const points = await all<{
+    code: string;
+    name: string;
+    base_value: number | null;
+    step_value: number | null;
+  }>(
+    db,
+    `SELECT mp.code, mp.name, mp.base_value, gr.step_value
+     FROM measurement_points mp
+     LEFT JOIN grading_rules gr ON gr.measurement_point_id = mp.id
+     WHERE mp.size_spec_id = ? ORDER BY mp.sort_order`,
+    spec.id,
+  );
+  if (points.length === 0) return null;
+
+  const rows = points.map((point) => ({
+    code: point.code,
+    name: point.name,
+    values: sizes.map((_, i) => {
+      if (point.base_value == null) return null;
+      if (point.step_value != null) {
+        return Math.round((point.base_value + point.step_value * (i - baseIdx)) * 10) / 10;
+      }
+      return i === baseIdx ? point.base_value : null;
+    }),
+  }));
+  return { unit: spec.unit, baseSize: spec.base_size, sizes, rows };
+}
 
 // ---------- Mapping helpers ----------
 

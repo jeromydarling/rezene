@@ -56,6 +56,7 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
     title: "Commerce",
     items: [
       { to: "/admin/orders", label: "Orders", icon: Package },
+      { to: "/admin/pre-orders", label: "Pre-orders", icon: Sparkles },
       { to: "/admin/customers", label: "Customers", icon: Users },
     ],
   },

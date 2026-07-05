@@ -483,6 +483,8 @@ interface LookbookImageRow {
   image_url: string;
   caption: string | null;
   sort_order: number;
+  product_id: string | null;
+  product_name: string | null;
 }
 interface LookbookRow {
   id: string;
@@ -516,7 +518,13 @@ export function LookbooksEditorPage() {
   );
 }
 
+interface ProductOption {
+  id: string;
+  name: string;
+}
+
 function LookbookEditor({ book, onSaved }: { book: LookbookRow; onSaved: () => void }) {
+  const { data: products } = useFetch<ProductOption[]>("/api/admin/products");
   const [form, setForm] = useState({
     title: book.title,
     season: book.season ?? "",
@@ -640,6 +648,24 @@ function LookbookEditor({ book, onSaved }: { book: LookbookRow; onSaved: () => v
                   }
                 }}
               />
+              <select
+                className="input !py-1.5 text-xs"
+                value={image.product_id ?? ""}
+                onChange={(e) => {
+                  void api
+                    .patch(`/api/admin/content/lookbooks/images/${image.id}`, {
+                      productId: e.target.value || null,
+                    })
+                    .then(onSaved);
+                }}
+              >
+                <option value="">No shop link</option>
+                {products?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    Shop: {p.name}
+                  </option>
+                ))}
+              </select>
               <div className="flex items-center justify-between text-xs">
                 <div className="flex gap-2">
                   <button

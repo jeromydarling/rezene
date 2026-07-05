@@ -3,6 +3,8 @@ import type Stripe from "stripe";
 import { all, first, run } from "../services/db";
 import { getStripe, webhookCryptoProvider } from "../services/stripe";
 import { orderPaidNotification, sendNotification } from "../services/email";
+import { orderConfirmationEmail, sendBuyerEmail } from "../services/resend";
+import { getBrandName } from "../services/brand";
 import { newId } from "../utils/id";
 import type { AppContext, Env } from "../types/env";
 
@@ -105,7 +107,10 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
   }
 });
 
-/** Founder notification for a settled order (Cloudflare Email Service). */
+/**
+ * Post-payment email fan-out: founder notification (Cloudflare Email
+ * Service) and buyer confirmation (Resend). Each degrades independently.
+ */
 async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
   const order = await first<{
     order_number: string;
@@ -121,9 +126,9 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
     orderId,
   );
   if (!order) return;
-  const items = await all<{ description: string; quantity: number }>(
+  const items = await all<{ description: string; quantity: number; is_pre_order: number }>(
     env.DB,
-    `SELECT description, quantity FROM order_items WHERE order_id = ?`,
+    `SELECT description, quantity, is_pre_order FROM order_items WHERE order_id = ?`,
     orderId,
   );
   await sendNotification(
@@ -138,6 +143,22 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
       items,
     }),
   );
+  if (order.email) {
+    await sendBuyerEmail(env, {
+      to: order.email,
+      ...orderConfirmationEmail({
+        brandName: await getBrandName(env),
+        orderNumber: order.order_number,
+        totalCents: order.total_cents,
+        currency: order.currency,
+        items: items.map((i) => ({
+          description: i.description,
+          quantity: i.quantity,
+          isPreOrder: Boolean(i.is_pre_order),
+        })),
+      }),
+    });
+  }
 }
 
 async function handleCheckoutCompleted(
@@ -247,12 +268,19 @@ async function handleCheckoutCompleted(
     }
   }
 
-  // Inventory: decrement stock (or count against pre-order allocation).
+  // Inventory: per item — decrement stock, or count against pre-order
+  // allocation (mixed carts settle each line correctly).
   const items = await db
-    .prepare(`SELECT variant_id, quantity FROM order_items WHERE order_id = ?`)
+    .prepare(
+      `SELECT variant_id, product_id, quantity, is_pre_order FROM order_items WHERE order_id = ?`,
+    )
     .bind(orderId)
-    .all<{ variant_id: string | null; quantity: number }>();
-  const isPreOrder = session.metadata?.pre_order === "true";
+    .all<{
+      variant_id: string | null;
+      product_id: string | null;
+      quantity: number;
+      is_pre_order: number;
+    }>();
   for (const item of items.results) {
     if (!item.variant_id) continue;
     const inv = await first<{ id: string }>(
@@ -261,7 +289,7 @@ async function handleCheckoutCompleted(
       item.variant_id,
     );
     if (!inv) continue;
-    if (isPreOrder) {
+    if (item.is_pre_order) {
       await run(
         db,
         `UPDATE inventory_items SET pre_order_allocated = pre_order_allocated + ?, updated_at = datetime('now') WHERE id = ?`,
@@ -282,10 +310,55 @@ async function handleCheckoutCompleted(
        VALUES (?, ?, ?, ?, 'order', ?)`,
       newId("mov"),
       inv.id,
-      isPreOrder ? "preorder_allocate" : "sell",
+      item.is_pre_order ? "preorder_allocate" : "sell",
       -item.quantity,
       orderId,
     );
+  }
+
+  // Pre-order campaigns: mark funded the moment the goal is crossed.
+  const preOrderProducts = [
+    ...new Set(
+      items.results.filter((i) => i.is_pre_order && i.product_id).map((i) => i.product_id!),
+    ),
+  ];
+  for (const productId of preOrderProducts) {
+    const campaign = await first<{ id: string; goal_units: number; supplier_id: string | null }>(
+      db,
+      `SELECT id, goal_units, supplier_id FROM preorder_campaigns
+       WHERE product_id = ? AND status = 'live'`,
+      productId,
+    );
+    if (!campaign) continue;
+    const ordered = await first<{ n: number }>(
+      db,
+      `SELECT COALESCE(SUM(oi.quantity), 0) AS n FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE oi.product_id = ? AND oi.is_pre_order = 1
+         AND o.payment_status IN ('paid','partially_refunded')`,
+      productId,
+    );
+    if ((ordered?.n ?? 0) >= campaign.goal_units) {
+      await run(
+        db,
+        `UPDATE preorder_campaigns SET status = 'funded', updated_at = datetime('now') WHERE id = ?`,
+        campaign.id,
+      );
+      const product = await first<{ name: string }>(
+        db,
+        `SELECT name FROM products WHERE id = ?`,
+        productId,
+      );
+      await run(
+        db,
+        `INSERT INTO production_tasks (id, title, stage_id, status, supplier_id, notes)
+         VALUES (?, ?, 'stage_bulk_production', 'todo', ?, ?)`,
+        newId("task"),
+        `Pre-order funded: schedule production — ${product?.name ?? productId}`,
+        campaign.supplier_id,
+        `Campaign hit its goal of ${campaign.goal_units} units. Confirm the PO and production slot.`,
+      );
+    }
   }
 
   await run(

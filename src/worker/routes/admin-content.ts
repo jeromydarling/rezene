@@ -294,8 +294,11 @@ adminContentRoutes.get("/lookbooks", async (c) => {
   for (const book of books) {
     const images = await all(
       c.env.DB,
-      `SELECT id, image_url, caption, sort_order FROM lookbook_images
-       WHERE lookbook_id = ? ORDER BY sort_order`,
+      `SELECT li.id, li.image_url, li.caption, li.sort_order, li.product_id,
+              p.name AS product_name
+       FROM lookbook_images li
+       LEFT JOIN products p ON p.id = li.product_id
+       WHERE li.lookbook_id = ? ORDER BY li.sort_order`,
       book.id,
     );
     result.push({ ...book, images });
@@ -369,6 +372,10 @@ adminContentRoutes.patch("/lookbooks/images/:imageId", requireAdminWrite, async 
   if (body.sortOrder !== undefined) {
     sets.push(`sort_order = ?`);
     params.push(body.sortOrder);
+  }
+  if (body.productId !== undefined) {
+    sets.push(`product_id = ?`);
+    params.push(body.productId);
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   const result = await run(

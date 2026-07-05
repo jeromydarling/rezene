@@ -285,6 +285,23 @@ export const dutyRuleUpdateSchema = z.object({
 // ---------- Settings ----------
 export const settingsUpdateSchema = z.record(z.string().max(2000));
 
+// ---------- Pre-order campaigns ----------
+export const campaignCreateSchema = z.object({
+  productId: z.string().min(1).max(80),
+  goalUnits: z.number().int().min(1).max(1_000_000),
+  maxUnits: z.number().int().min(1).max(1_000_000).nullable().optional(),
+  cutoffDate: z.string().max(30).nullable().optional(),
+  supplierId: z.string().max(80).nullable().optional(),
+  note: z.string().max(1000).nullable().optional(),
+});
+export const campaignUpdateSchema = z.object({
+  goalUnits: z.number().int().min(1).max(1_000_000).optional(),
+  maxUnits: z.number().int().min(1).max(1_000_000).nullable().optional(),
+  cutoffDate: z.string().max(30).nullable().optional(),
+  status: z.enum(["draft", "live", "funded", "ended", "cancelled"]).optional(),
+  note: z.string().max(1000).nullable().optional(),
+});
+
 // ---------- CMS content ----------
 const slugField = z
   .string()
@@ -340,4 +357,5 @@ export const lookbookImageCreateSchema = z.object({
 export const lookbookImageUpdateSchema = z.object({
   caption: z.string().max(300).nullable().optional(),
   sortOrder: z.number().int().optional(),
+  productId: z.string().max(80).nullable().optional(),
 });

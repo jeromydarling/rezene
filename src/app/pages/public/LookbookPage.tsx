@@ -1,4 +1,6 @@
+import { Link } from "react-router";
 import { useFetch } from "../../lib/useFetch";
+import { formatMoney } from "../../lib/format";
 import { EditorialImage } from "../../components/ImagePlaceholder";
 import type { PublicLookbook } from "../../../shared/types";
 
@@ -31,11 +33,20 @@ export function LookbookPage() {
                   label={img.caption ?? book.title}
                   aspect={i % 3 === 0 ? "aspect-[3/2]" : "aspect-[4/5]"}
                 />
-                {img.caption && (
-                  <figcaption className="mt-2 text-xs italic text-warmgrey">
-                    {img.caption}
-                  </figcaption>
-                )}
+                <figcaption className="mt-2 flex items-baseline justify-between gap-4">
+                  {img.caption && (
+                    <span className="text-xs italic text-warmgrey">{img.caption}</span>
+                  )}
+                  {img.productSlug && (
+                    <Link
+                      to={`/products/${img.productSlug}`}
+                      className="link-quiet whitespace-nowrap text-xs"
+                    >
+                      Shop {img.productName}
+                      {img.productPriceCents ? ` · ${formatMoney(img.productPriceCents)}` : ""} →
+                    </Link>
+                  )}
+                </figcaption>
               </figure>
             ))}
           </div>

@@ -1,9 +1,94 @@
 import { Hono } from "hono";
-import { all, first } from "../services/db";
+import { all, first, run, writeAudit } from "../services/db";
+import { campaignCreateSchema, campaignUpdateSchema, parseBody } from "../services/validators";
+import { requireAdminWrite } from "../middleware/auth";
+import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminCustomer, AdminOrder } from "../../shared/types";
 
 export const adminCommerceRoutes = new Hono<AppContext>();
+
+// ---------- Pre-order campaigns ----------
+adminCommerceRoutes.get("/preorder-campaigns", async (c) => {
+  const rows = await all(
+    c.env.DB,
+    `SELECT pc.*, p.name AS product_name, p.slug AS product_slug, p.availability,
+            sup.name AS supplier_name, sup.moq_units AS supplier_moq,
+            (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
+               JOIN orders o ON o.id = oi.order_id
+               WHERE oi.product_id = pc.product_id AND oi.is_pre_order = 1
+                 AND o.payment_status IN ('paid','partially_refunded')) AS ordered_units
+     FROM preorder_campaigns pc
+     JOIN products p ON p.id = pc.product_id
+     LEFT JOIN suppliers sup ON sup.id = pc.supplier_id
+     ORDER BY pc.created_at DESC`,
+  );
+  return c.json(rows);
+});
+
+adminCommerceRoutes.post("/preorder-campaigns", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, campaignCreateSchema);
+  const product = await first<{ id: string; availability: string }>(
+    c.env.DB,
+    `SELECT id, availability FROM products WHERE id = ?`,
+    body.productId,
+  );
+  if (!product) return c.json({ error: "Product not found" }, 404);
+  const existing = await first(
+    c.env.DB,
+    `SELECT id FROM preorder_campaigns WHERE product_id = ?`,
+    body.productId,
+  );
+  if (existing) return c.json({ error: "This product already has a campaign" }, 409);
+  const id = newId("pc");
+  await run(
+    c.env.DB,
+    `INSERT INTO preorder_campaigns (id, product_id, goal_units, max_units, cutoff_date, supplier_id, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    body.productId,
+    body.goalUnits,
+    body.maxUnits ?? null,
+    body.cutoffDate ?? null,
+    body.supplierId ?? null,
+    body.note ?? null,
+  );
+  // A campaign implies the product sells as pre-order.
+  if (product.availability !== "pre_order") {
+    await run(
+      c.env.DB,
+      `UPDATE products SET availability = 'pre_order', updated_at = datetime('now') WHERE id = ?`,
+      body.productId,
+    );
+  }
+  await writeAudit(c.env.DB, c.var.userId, "preorder_campaign.create", "preorder_campaign", id, body);
+  return c.json({ id }, 201);
+});
+
+adminCommerceRoutes.patch("/preorder-campaigns/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, campaignUpdateSchema);
+  const existing = await first(c.env.DB, `SELECT id FROM preorder_campaigns WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Campaign not found" }, 404);
+  const fieldMap: Record<string, string> = {
+    goalUnits: "goal_units",
+    maxUnits: "max_units",
+    cutoffDate: "cutoff_date",
+    status: "status",
+    note: "note",
+  };
+  const sets: string[] = [`updated_at = datetime('now')`];
+  const params: unknown[] = [];
+  for (const [key, col] of Object.entries(fieldMap)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
+  }
+  await run(c.env.DB, `UPDATE preorder_campaigns SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.env.DB, c.var.userId, "preorder_campaign.update", "preorder_campaign", id, body);
+  return c.json({ ok: true });
+});
 
 // ---------- Orders ----------
 const ORDER_SELECT = `

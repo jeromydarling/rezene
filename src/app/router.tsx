@@ -1,5 +1,6 @@
 import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
+import { CartProvider } from "./lib/cart";
 import { BrandProvider } from "./lib/brand";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
@@ -12,13 +13,14 @@ import { LookbookPage } from "./pages/public/LookbookPage";
 import { JournalPage, JournalPostPage } from "./pages/public/JournalPage";
 import { ContactPage } from "./pages/public/ContactPage";
 import { CheckoutSuccessPage } from "./pages/public/CheckoutSuccessPage";
+import { CartPage } from "./pages/public/CartPage";
 import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
 import { ProductsAdminPage, CollectionsAdminPage } from "./pages/admin/ProductsAdminPage";
 import { InventoryPage } from "./pages/admin/InventoryPage";
-import { OrdersPage, CustomersPage } from "./pages/admin/CommercePages";
+import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/CommercePages";
 import { ProductionPage } from "./pages/admin/ProductionPage";
 import { SuppliersPage } from "./pages/admin/SuppliersPage";
 import { SamplesPage, PurchaseOrdersPage, MaterialsPage } from "./pages/admin/SamplesPage";
@@ -57,6 +59,7 @@ export function AppRouter() {
   return (
     <BrandProvider>
       <AuthProvider>
+        <CartProvider>
         <Routes>
         {/* Public site */}
         <Route element={<PublicLayout />}>
@@ -82,6 +85,7 @@ export function AppRouter() {
           <Route path="privacy" element={<MarkdownPage slug="privacy" eyebrow="Legal" />} />
           <Route path="terms" element={<MarkdownPage slug="terms" eyebrow="Legal" />} />
           <Route path="contact" element={<ContactPage />} />
+          <Route path="cart" element={<CartPage />} />
           <Route path="checkout/success" element={<CheckoutSuccessPage />} />
           <Route path="p/:slug" element={<DynamicPage />} />
           <Route path="*" element={<NotFoundPage />} />
@@ -103,6 +107,7 @@ export function AppRouter() {
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="customers" element={<CustomersPage />} />
+          <Route path="pre-orders" element={<PreOrdersPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="materials" element={<MaterialsPage />} />
@@ -123,6 +128,7 @@ export function AppRouter() {
           <Route path="content/lookbooks" element={<LookbooksEditorPage />} />
         </Route>
         </Routes>
+        </CartProvider>
       </AuthProvider>
     </BrandProvider>
   );
