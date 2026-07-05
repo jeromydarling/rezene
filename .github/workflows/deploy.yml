@@ -66,10 +66,22 @@ jobs:
           for name in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY \
                       ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD; do
             value="${!name}"
-            if [ -n "$value" ]; then
-              printf '%s' "$value" | npx wrangler secret put "$name"
-              echo "synced $name"
-            else
+            if [ -z "$value" ]; then
               echo "skipped $name (not set as a GitHub secret)"
+              continue
             fi
+            # Retry transient network failures — the deploy itself already
+            # succeeded by this point, so don't fail the run on a blip.
+            for attempt in 1 2 3; do
+              if printf '%s' "$value" | npx wrangler secret put "$name"; then
+                echo "synced $name"
+                break
+              elif [ "$attempt" = 3 ]; then
+                echo "failed to sync $name after 3 attempts" >&2
+                exit 1
+              else
+                echo "retrying $name (attempt $attempt failed)"
+                sleep $((attempt * 5))
+              fi
+            done
           done
