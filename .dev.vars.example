@@ -1,6 +1,9 @@
 # Local Worker secrets — copy to `.dev.vars` (gitignored) and fill in.
 # Production equivalents: `wrangler secret put <NAME>`.
 
+# Local dev mode (wrangler.toml ships APP_ENV=production for deploys).
+APP_ENV=development
+
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
