@@ -83,10 +83,25 @@ export interface PublicJournalPost {
   publishedAt: string | null;
 }
 
+export type PageLayout = "standard" | "hero" | "wide";
+
 export interface PublicPage {
   slug: string;
   title: string;
   bodyMd: string | null;
+  layout?: PageLayout;
+  heroImageUrl?: string | null;
+  heroEyebrow?: string | null;
+  subtitle?: string | null;
+}
+
+export interface AiContentDraft {
+  title: string;
+  slug: string | null;
+  excerpt: string | null;
+  subtitle: string | null;
+  heroEyebrow: string | null;
+  bodyMd: string;
 }
 
 export interface PublicLookbook {
@@ -103,10 +118,22 @@ export interface PublicLookbook {
   }[];
 }
 
+export interface HomeHero {
+  eyebrow?: string | null;
+  heading: string;
+  subheading?: string | null;
+  primaryCtaLabel?: string | null;
+  primaryCtaHref?: string | null;
+  secondaryCtaLabel?: string | null;
+  secondaryCtaHref?: string | null;
+  imageUrl?: string | null;
+}
+
 export interface BrandSettings {
   brandName: string;
   tagline: string;
   currency: string;
+  homeHero?: HomeHero | null;
 }
 
 export type LeadKind =

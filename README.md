@@ -256,7 +256,7 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Analytics event foundation (11 event types) | D1 `analytics_events` | ✅ working |
 | Settings: brand identity as data, integration status | admin System | ✅ working |
 | Cron: daily late-task risk sweep | `wrangler.toml [triggers]` | ✅ working |
-| CMS: pages, journal, lookbooks with drafts + revision history | admin Content | ✅ working |
+| CMS: pages (3 layouts, hero images), journal, lookbooks, editable homepage hero, AI content drafting, drafts + revision history + delete | admin Content | ✅ working (AI needs key) |
 | Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
 | Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |

@@ -26,6 +26,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           brandName: settings.brandName || DEFAULT_BRAND.brandName,
           tagline: settings.tagline || DEFAULT_BRAND.tagline,
           currency: settings.currency || DEFAULT_BRAND.currency,
+          homeHero: settings.homeHero ?? null,
         });
         if (settings.brandName) document.title = settings.brandName;
       })

@@ -325,16 +325,45 @@ const slugField = z
   .max(80)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, and hyphens only");
 
+const pageLayout = z.enum(["standard", "hero", "wide"]);
 export const pageCreateSchema = z.object({
   slug: slugField,
   title: z.string().min(1).max(200),
   bodyMd: z.string().max(60000).optional(),
+  layout: pageLayout.optional(),
+  heroImageUrl: z.string().max(500).nullable().optional(),
+  heroEyebrow: z.string().max(120).nullable().optional(),
+  subtitle: z.string().max(300).nullable().optional(),
   isPublished: z.boolean().optional(),
 });
 export const pageUpdateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   bodyMd: z.string().max(60000).nullable().optional(),
+  layout: pageLayout.optional(),
+  heroImageUrl: z.string().max(500).nullable().optional(),
+  heroEyebrow: z.string().max(120).nullable().optional(),
+  subtitle: z.string().max(300).nullable().optional(),
   isPublished: z.boolean().optional(),
+});
+
+export const homeHeroSchema = z.object({
+  eyebrow: z.string().max(120).nullable().optional(),
+  heading: z.string().min(1).max(200),
+  subheading: z.string().max(500).nullable().optional(),
+  primaryCtaLabel: z.string().max(60).nullable().optional(),
+  primaryCtaHref: z.string().max(300).nullable().optional(),
+  secondaryCtaLabel: z.string().max(60).nullable().optional(),
+  secondaryCtaHref: z.string().max(300).nullable().optional(),
+  imageUrl: z.string().max(500).nullable().optional(),
+});
+
+export const aiDraftSchema = z.object({
+  kind: z.enum(["page", "journal"]),
+  topic: z.string().min(3).max(2000),
+  audience: z.string().max(300).optional(),
+  tone: z.string().max(60).optional(),
+  keyPoints: z.string().max(2000).optional(),
+  length: z.enum(["short", "medium", "long"]).optional(),
 });
 
 export const journalCreateSchema = z.object({

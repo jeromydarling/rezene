@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { Markdown } from "../Markdown";
 import { ErrorNote } from "./ui";
-import type { AdminFile } from "../../../shared/types";
+import type { AdminFile, AiContentDraft } from "../../../shared/types";
 
 /** Markdown editor with a live preview toggle (same renderer as the site). */
 export function MarkdownEditor({
@@ -108,6 +108,161 @@ export function ImageUploadButton({
       </button>
       {error && <span className="text-xs text-red-700">{error}</span>}
     </span>
+  );
+}
+
+/**
+ * AI drafting interview: a handful of plain questions become a ready
+ * draft (title, slug, body, kicker…). The caller decides what to do with
+ * the accepted draft — prefill a create form or replace an editor's fields.
+ */
+export function AiDraftAssistant({
+  kind,
+  onAccept,
+}: {
+  kind: "page" | "journal";
+  onAccept: (draft: AiContentDraft) => void;
+}) {
+  const [form, setForm] = useState({
+    topic: "",
+    audience: "",
+    tone: "Editorial and understated",
+    keyPoints: "",
+    length: "medium",
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<AiContentDraft | null>(null);
+
+  async function generate(e?: FormEvent) {
+    e?.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.post<AiContentDraft>("/api/admin/content/ai-draft", {
+        kind,
+        topic: form.topic,
+        audience: form.audience || undefined,
+        tone: form.tone || undefined,
+        keyPoints: form.keyPoints || undefined,
+        length: form.length,
+      });
+      setDraft(result);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Drafting failed — try again");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (draft) {
+    return (
+      <div className="space-y-4">
+        <div className="admin-card max-h-96 overflow-y-auto p-4">
+          <p className="eyebrow mb-1">{draft.heroEyebrow ?? ""}</p>
+          <p className="font-display text-xl font-light">{draft.title}</p>
+          {(draft.subtitle ?? draft.excerpt) && (
+            <p className="mt-1 text-sm text-warmgrey">{draft.subtitle ?? draft.excerpt}</p>
+          )}
+          <div className="mt-4 border-t border-ink/10 pt-4">
+            <Markdown text={draft.bodyMd} />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="btn btn-secondary flex-1"
+            disabled={busy}
+            onClick={() => void generate()}
+          >
+            {busy ? "Redrafting…" : "Try again"}
+          </button>
+          <button type="button" className="btn btn-primary flex-1" onClick={() => onAccept(draft)}>
+            Use this draft
+          </button>
+        </div>
+        <p className="text-xs text-warmgrey">
+          The draft lands in the editor — nothing publishes until you save it yourself.
+        </p>
+        {error && <p className="field-error">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={generate} className="space-y-4">
+      <div>
+        <label className="label">What should this {kind === "journal" ? "post" : "page"} say? *</label>
+        <textarea
+          required
+          rows={3}
+          className="input"
+          placeholder={
+            kind === "journal"
+              ? "e.g. Behind the scenes of our first production run in Casablanca — what surprised us, the people involved…"
+              : "e.g. A press page introducing the brand to journalists: founding story, materials, where we produce…"
+          }
+          value={form.topic}
+          onChange={(e) => setForm({ ...form, topic: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="label">Who is it for?</label>
+        <input
+          className="input"
+          placeholder="e.g. First-time visitors deciding whether to trust us"
+          value={form.audience}
+          onChange={(e) => setForm({ ...form, audience: e.target.value })}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Tone</label>
+          <select
+            className="input"
+            value={form.tone}
+            onChange={(e) => setForm({ ...form, tone: e.target.value })}
+          >
+            {[
+              "Editorial and understated",
+              "Warm and personal",
+              "Direct and practical",
+              "Playful",
+            ].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Length</label>
+          <select
+            className="input"
+            value={form.length}
+            onChange={(e) => setForm({ ...form, length: e.target.value })}
+          >
+            <option value="short">Short (~150 words)</option>
+            <option value="medium">Medium (~350 words)</option>
+            <option value="long">Long (~700 words)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="label">Anything that must be mentioned?</label>
+        <textarea
+          rows={2}
+          className="input"
+          placeholder="Names, dates, facts, links — one per line"
+          value={form.keyPoints}
+          onChange={(e) => setForm({ ...form, keyPoints: e.target.value })}
+        />
+      </div>
+      {error && <p className="field-error">{error}</p>}
+      <button type="submit" disabled={busy} className="btn btn-primary w-full">
+        {busy ? "Writing…" : "Generate draft"}
+      </button>
+    </form>
   );
 }
 

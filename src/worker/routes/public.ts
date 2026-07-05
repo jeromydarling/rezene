@@ -24,13 +24,20 @@ export const publicRoutes = new Hono<AppContext>();
 publicRoutes.get("/settings", async (c) => {
   const rows = await all<{ key: string; value: string }>(
     c.env.DB,
-    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline','default_currency')`,
+    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero')`,
   );
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  let homeHero: BrandSettings["homeHero"] = null;
+  try {
+    homeHero = map.home_hero ? (JSON.parse(map.home_hero) as BrandSettings["homeHero"]) : null;
+  } catch {
+    /* corrupt setting → client falls back to built-in defaults */
+  }
   const settings: BrandSettings = {
     brandName: map.brand_name ?? c.env.BRAND_NAME,
     tagline: map.brand_tagline ?? "",
     currency: map.default_currency ?? "USD",
+    homeHero,
   };
   return c.json(settings);
 });
@@ -218,13 +225,30 @@ publicRoutes.get("/journal/:slug", async (c) => {
 
 // ---------- Static pages ----------
 publicRoutes.get("/pages/:slug", async (c) => {
-  const row = await first<{ slug: string; title: string; body_md: string | null }>(
+  const row = await first<{
+    slug: string;
+    title: string;
+    body_md: string | null;
+    layout: string | null;
+    hero_image_url: string | null;
+    hero_eyebrow: string | null;
+    subtitle: string | null;
+  }>(
     c.env.DB,
-    `SELECT slug, title, body_md FROM pages WHERE slug = ? AND is_published = 1`,
+    `SELECT slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle
+     FROM pages WHERE slug = ? AND is_published = 1`,
     c.req.param("slug"),
   );
   if (!row) return c.json({ error: "Page not found" }, 404);
-  const page: PublicPage = { slug: row.slug, title: row.title, bodyMd: row.body_md };
+  const page: PublicPage = {
+    slug: row.slug,
+    title: row.title,
+    bodyMd: row.body_md,
+    layout: (row.layout as PublicPage["layout"]) ?? "standard",
+    heroImageUrl: row.hero_image_url,
+    heroEyebrow: row.hero_eyebrow,
+    subtitle: row.subtitle,
+  };
   return c.json(page);
 });
 

@@ -1,7 +1,9 @@
 import { Hono, type Context } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
 import {
+  aiDraftSchema,
   collectionUpdateSchema,
+  homeHeroSchema,
   journalCreateSchema,
   journalUpdateSchema,
   lookbookImageCreateSchema,
@@ -12,6 +14,8 @@ import {
   parseBody,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
+import { AnthropicNotConfiguredError, askClaude, parseModelJson } from "../services/anthropic";
+import { getBrandName } from "../services/brand";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 
@@ -108,7 +112,9 @@ function revisionRoutes(entityType: RevisionEntity, restorableColumns: string[])
 adminContentRoutes.get("/pages", async (c) => {
   const rows = await all(
     c.env.DB,
-    `SELECT id, slug, title, body_md, is_published, updated_at FROM pages ORDER BY slug`,
+    `SELECT id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle,
+            is_published, updated_at
+     FROM pages ORDER BY slug`,
   );
   return c.json(rows);
 });
@@ -120,11 +126,16 @@ adminContentRoutes.post("/pages", requireAdminWrite, async (c) => {
   const id = newId("pg");
   await run(
     c.env.DB,
-    `INSERT INTO pages (id, slug, title, body_md, is_published) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO pages (id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     body.slug,
     body.title,
     body.bodyMd ?? "",
+    body.layout ?? "standard",
+    body.heroImageUrl ?? null,
+    body.heroEyebrow ?? null,
+    body.subtitle ?? null,
     body.isPublished === false ? 0 : 1,
   );
   await writeAudit(c.env.DB, c.var.userId, "page.create", "page", id, { slug: body.slug });
@@ -138,11 +149,20 @@ adminContentRoutes.patch("/pages/:id", requireAdminWrite, async (c) => {
   if (!existing) return c.json({ error: "Page not found" }, 404);
 
   await snapshotRevision(c.env.DB, "page", id, c.var.userId);
+  const fieldMap: Record<string, string> = {
+    title: "title",
+    layout: "layout",
+    heroImageUrl: "hero_image_url",
+    heroEyebrow: "hero_eyebrow",
+    subtitle: "subtitle",
+  };
   const sets: string[] = [`updated_at = datetime('now')`];
   const params: unknown[] = [];
-  if (body.title !== undefined) {
-    sets.push(`title = ?`);
-    params.push(body.title);
+  for (const [key, col] of Object.entries(fieldMap)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
   }
   if (body.bodyMd !== undefined) {
     sets.push(`body_md = ?`);
@@ -157,11 +177,140 @@ adminContentRoutes.patch("/pages/:id", requireAdminWrite, async (c) => {
   return c.json({ ok: true });
 });
 
-const pageRevisions = revisionRoutes("page", ["title", "body_md", "is_published"]);
+adminContentRoutes.delete("/pages/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  // Final snapshot lands in content_revisions before the row disappears.
+  await snapshotRevision(c.env.DB, "page", id, c.var.userId);
+  const result = await run(c.env.DB, `DELETE FROM pages WHERE id = ?`, id);
+  if (!result.meta.changes) return c.json({ error: "Page not found" }, 404);
+  await writeAudit(c.env.DB, c.var.userId, "page.delete", "page", id);
+  return c.json({ ok: true });
+});
+
+const pageRevisions = revisionRoutes("page", [
+  "title",
+  "body_md",
+  "layout",
+  "hero_image_url",
+  "hero_eyebrow",
+  "subtitle",
+  "is_published",
+]);
 adminContentRoutes.get("/pages/:id/revisions", (c) => pageRevisions.list(c));
 adminContentRoutes.post("/pages/:id/revisions/:revId/restore", requireAdminWrite, (c) =>
   pageRevisions.restore(c),
 );
+
+// ============================================================
+// Homepage hero (settings-backed, no revision history — it's one row)
+// ============================================================
+adminContentRoutes.get("/home-hero", async (c) => {
+  const row = await first<{ value: string }>(
+    c.env.DB,
+    `SELECT value FROM settings WHERE key = 'home_hero'`,
+  );
+  let hero: Record<string, unknown> = {};
+  try {
+    hero = row ? (JSON.parse(row.value) as Record<string, unknown>) : {};
+  } catch {
+    /* fall through to empty */
+  }
+  return c.json(hero);
+});
+
+adminContentRoutes.put("/home-hero", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, homeHeroSchema);
+  await run(
+    c.env.DB,
+    `INSERT INTO settings (key, value, description)
+     VALUES ('home_hero', ?, 'Homepage hero content (JSON) — edited under Admin → Content → Pages')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+    JSON.stringify(body),
+  );
+  await writeAudit(c.env.DB, c.var.userId, "home_hero.update", "settings", "home_hero", {
+    heading: body.heading,
+  });
+  return c.json({ ok: true });
+});
+
+// ============================================================
+// AI content drafting — a short interview becomes a ready draft
+// ============================================================
+const LENGTH_WORDS: Record<string, string> = {
+  short: "roughly 150 words",
+  medium: "roughly 350 words",
+  long: "roughly 700 words",
+};
+
+adminContentRoutes.post("/ai-draft", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, aiDraftSchema);
+  const brandName = await getBrandName(c.env);
+  const tagline = await first<{ value: string }>(
+    c.env.DB,
+    `SELECT value FROM settings WHERE key = 'brand_tagline'`,
+  );
+
+  const kindLabel = body.kind === "journal" ? "journal (blog) post" : "site page";
+  const prompt = [
+    `Draft a ${kindLabel} for the brand's website.`,
+    ``,
+    `What it should cover: ${body.topic}`,
+    body.audience ? `Who it's for: ${body.audience}` : null,
+    body.tone ? `Tone: ${body.tone}` : null,
+    body.keyPoints ? `Points that must be included:\n${body.keyPoints}` : null,
+    `Target length: ${LENGTH_WORDS[body.length ?? "medium"]}.`,
+    ``,
+    `Respond with a single JSON object, nothing else:`,
+    `{`,
+    `  "title": "page title (plain text, no markdown)",`,
+    `  "slug": "url-slug-suggestion-in-kebab-case",`,
+    body.kind === "journal"
+      ? `  "excerpt": "1–2 sentence summary for the journal index",`
+      : `  "subtitle": "one-sentence subtitle shown under the title",`,
+    `  "heroEyebrow": "a 2–4 word kicker line",`,
+    `  "bodyMd": "the full body in markdown — use ## section headings; do NOT repeat the title as a heading"`,
+    `}`,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+
+  try {
+    const result = await askClaude(c.env, {
+      system:
+        `You are the in-house content editor for ${brandName}` +
+        (tagline?.value ? ` (“${tagline.value}”)` : "") +
+        `, an independent clothing brand with a refined, editorial voice: concrete, warm, never ` +
+        `salesy, no exclamation marks, no clichés like "elevate" or "timeless". Write like a good ` +
+        `magazine, not an ad. You always respond with exactly one JSON object and no surrounding prose.`,
+      prompt,
+      maxTokens: 3000,
+    });
+    const draft = parseModelJson(result.text) as Record<string, unknown>;
+    if (typeof draft.title !== "string" || typeof draft.bodyMd !== "string") {
+      return c.json({ error: "The model returned an unusable draft — try again" }, 502);
+    }
+    await writeAudit(c.env.DB, c.var.userId, "content.ai_draft", body.kind, null, {
+      topic: body.topic.slice(0, 200),
+      tokensOut: result.tokensOut,
+    });
+    return c.json({
+      title: draft.title,
+      slug: typeof draft.slug === "string" ? draft.slug : null,
+      excerpt: typeof draft.excerpt === "string" ? draft.excerpt : null,
+      subtitle: typeof draft.subtitle === "string" ? draft.subtitle : null,
+      heroEyebrow: typeof draft.heroEyebrow === "string" ? draft.heroEyebrow : null,
+      bodyMd: draft.bodyMd,
+    });
+  } catch (err) {
+    if (err instanceof AnthropicNotConfiguredError) {
+      return c.json(
+        { error: "AI drafting needs an Anthropic API key — add ANTHROPIC_API_KEY in Settings" },
+        503,
+      );
+    }
+    throw err;
+  }
+});
 
 // ============================================================
 // Journal
@@ -230,6 +379,15 @@ adminContentRoutes.patch("/journal/:id", requireAdminWrite, async (c) => {
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   await run(c.env.DB, `UPDATE journal_posts SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
   await writeAudit(c.env.DB, c.var.userId, "journal.update", "journal_post", id);
+  return c.json({ ok: true });
+});
+
+adminContentRoutes.delete("/journal/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  await snapshotRevision(c.env.DB, "journal_post", id, c.var.userId);
+  const result = await run(c.env.DB, `DELETE FROM journal_posts WHERE id = ?`, id);
+  if (!result.meta.changes) return c.json({ error: "Post not found" }, 404);
+  await writeAudit(c.env.DB, c.var.userId, "journal.delete", "journal_post", id);
   return c.json({ ok: true });
 });
 

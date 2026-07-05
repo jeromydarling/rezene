@@ -1,37 +1,82 @@
 import { Link } from "react-router";
 import { useFetch } from "../../lib/useFetch";
+import { useBrand } from "../../lib/brand";
 import { ProductCard } from "../../components/ProductCard";
 import { EditorialImage } from "../../components/ImagePlaceholder";
 import { NewsletterForm } from "../../components/LeadForm";
-import type { PublicCollection, PublicProductSummary } from "../../../shared/types";
+import type { HomeHero, PublicCollection, PublicProductSummary } from "../../../shared/types";
+
+/** Pre-fetch fallback only — the live hero is data (Admin → Content → Pages). */
+const DEFAULT_HERO: HomeHero = {
+  eyebrow: "Casablanca · Atlantic Riviera · SS27",
+  heading: "Dressed for the last hour of light.",
+  subheading:
+    "High-waisted linen tailoring and draped resortwear, cut in the ateliers of Casablanca. Old-world proportions, modern ease, honest cloth.",
+  primaryCtaLabel: "Shop the collection",
+  primaryCtaHref: "/products",
+  secondaryCtaLabel: "Our story",
+  secondaryCtaHref: "/story",
+  imageUrl: null,
+};
+
+function HeroCta({ label, href, primary }: { label?: string | null; href?: string | null; primary: boolean }) {
+  if (!label || !href) return null;
+  const cls = primary ? "btn btn-primary" : "btn btn-secondary";
+  return href.startsWith("/") ? (
+    <Link to={href} className={cls}>
+      {label}
+    </Link>
+  ) : (
+    <a href={href} className={cls}>
+      {label}
+    </a>
+  );
+}
 
 export function HomePage() {
+  const brand = useBrand();
   const { data: products } = useFetch<PublicProductSummary[]>("/api/public/products");
   const { data: collections } = useFetch<PublicCollection[]>("/api/public/collections");
   const featured = products?.slice(0, 4) ?? [];
   const collection = collections?.[0];
+  const hero = brand.homeHero ?? DEFAULT_HERO;
+  const withImage = Boolean(hero.imageUrl);
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-b from-cream to-chalk">
-        <div className="mx-auto max-w-6xl px-5 py-24 text-center md:py-36">
-          <p className="eyebrow mb-6">Casablanca · Atlantic Riviera · SS27</p>
-          <h1 className="display-hero mx-auto max-w-3xl text-5xl md:text-7xl">
-            Dressed for the last hour of light.
+      {/* Hero — content and image are CMS data */}
+      <section
+        className={withImage ? "relative bg-navy" : "bg-gradient-to-b from-cream to-chalk"}
+      >
+        {withImage && (
+          <>
+            <img
+              src={hero.imageUrl!}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-ink/45" />
+          </>
+        )}
+        <div className="relative mx-auto max-w-6xl px-5 py-24 text-center md:py-36">
+          {hero.eyebrow && (
+            <p className={`eyebrow mb-6 ${withImage ? "!text-chalk/70" : ""}`}>{hero.eyebrow}</p>
+          )}
+          <h1
+            className={`display-hero mx-auto max-w-3xl text-5xl md:text-7xl ${withImage ? "!text-chalk" : ""}`}
+          >
+            {hero.heading}
           </h1>
-          <p className="prose-editorial mx-auto mt-6 max-w-xl text-base">
-            High-waisted linen tailoring and draped resortwear, cut in the
-            ateliers of Casablanca. Old-world proportions, modern ease, honest
-            cloth.
-          </p>
+          {hero.subheading && (
+            <p
+              className={`prose-editorial mx-auto mt-6 max-w-xl text-base ${withImage ? "!text-chalk/85" : ""}`}
+            >
+              {hero.subheading}
+            </p>
+          )}
           <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link to="/products" className="btn btn-primary">
-              Shop the collection
-            </Link>
-            <Link to="/story" className="btn btn-secondary">
-              Our story
-            </Link>
+            <HeroCta label={hero.primaryCtaLabel} href={hero.primaryCtaHref} primary />
+            <HeroCta label={hero.secondaryCtaLabel} href={hero.secondaryCtaHref} primary={false} />
           </div>
         </div>
       </section>
