@@ -284,3 +284,60 @@ export const dutyRuleUpdateSchema = z.object({
 
 // ---------- Settings ----------
 export const settingsUpdateSchema = z.record(z.string().max(2000));
+
+// ---------- CMS content ----------
+const slugField = z
+  .string()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, and hyphens only");
+
+export const pageCreateSchema = z.object({
+  slug: slugField,
+  title: z.string().min(1).max(200),
+  bodyMd: z.string().max(60000).optional(),
+  isPublished: z.boolean().optional(),
+});
+export const pageUpdateSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  bodyMd: z.string().max(60000).nullable().optional(),
+  isPublished: z.boolean().optional(),
+});
+
+export const journalCreateSchema = z.object({
+  slug: slugField,
+  title: z.string().min(1).max(200),
+  excerpt: z.string().max(500).optional(),
+  bodyMd: z.string().max(60000).optional(),
+  author: z.string().max(120).optional(),
+  heroImageUrl: z.string().max(500).nullable().optional(),
+  publishedAt: z.string().max(30).nullable().optional(),
+  isPublished: z.boolean().optional(),
+});
+export const journalUpdateSchema = journalCreateSchema.partial().omit({ slug: true });
+
+export const collectionUpdateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  season: z.string().max(20).nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  editorialCopy: z.string().max(8000).nullable().optional(),
+  heroImageUrl: z.string().max(500).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+  isPublished: z.boolean().optional(),
+});
+
+export const lookbookUpdateSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  season: z.string().max(20).nullable().optional(),
+  introCopy: z.string().max(4000).nullable().optional(),
+  isPublished: z.boolean().optional(),
+});
+
+export const lookbookImageCreateSchema = z.object({
+  imageUrl: z.string().min(1).max(500),
+  caption: z.string().max(300).optional(),
+});
+export const lookbookImageUpdateSchema = z.object({
+  caption: z.string().max(300).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});

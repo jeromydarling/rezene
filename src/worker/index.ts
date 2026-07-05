@@ -18,6 +18,7 @@ import { adminAiRoutes } from "./routes/admin-ai";
 import { admin3dRoutes } from "./routes/admin-3d";
 import { adminFileRoutes } from "./routes/admin-files";
 import { adminSettingsRoutes } from "./routes/admin-settings";
+import { adminContentRoutes } from "./routes/admin-content";
 import type { AppContext, Env } from "./types/env";
 
 const app = new Hono<AppContext>();
@@ -37,6 +38,25 @@ app.onError((err, c) => {
 app.get("/api/health", (c) =>
   c.json({ ok: true, brand: c.env.BRAND_NAME, env: c.env.APP_ENV }),
 );
+
+// Public media: streams R2 objects flagged is_public (storefront imagery
+// uploaded through the CMS). File ids are unique per upload → immutable cache.
+app.get("/media/:fileId", async (c) => {
+  const row = await c.env.DB.prepare(
+    `SELECT r2_key, content_type FROM files WHERE id = ? AND is_public = 1`,
+  )
+    .bind(c.req.param("fileId"))
+    .first<{ r2_key: string; content_type: string | null }>();
+  if (!row) return c.json({ error: "Not found" }, 404);
+  const object = await c.env.FILES.get(row.r2_key);
+  if (!object) return c.json({ error: "Not found" }, 404);
+  return new Response(object.body as ReadableStream, {
+    headers: {
+      "content-type": row.content_type ?? "application/octet-stream",
+      "cache-control": "public, max-age=31536000, immutable",
+    },
+  });
+});
 
 // Public API — no auth, rate-limited where it accepts writes.
 app.route("/api/public", publicRoutes);
@@ -65,6 +85,7 @@ admin.route("/ai", adminAiRoutes);
 admin.route("/3d", admin3dRoutes);
 admin.route("/files", adminFileRoutes);
 admin.route("/settings", adminSettingsRoutes);
+admin.route("/content", adminContentRoutes);
 app.route("/api/admin", admin);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

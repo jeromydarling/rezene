@@ -127,6 +127,11 @@ adminProductRoutes.get("/collections/all", async (c) => {
   return c.json(rows);
 });
 
+adminProductRoutes.get("/collections/detail", async (c) => {
+  const rows = await all(c.env.DB, `SELECT * FROM collections ORDER BY sort_order`);
+  return c.json(rows);
+});
+
 // ---------- Inventory ----------
 adminProductRoutes.get("/inventory/all", async (c) => {
   const rows = await all<Record<string, unknown>>(

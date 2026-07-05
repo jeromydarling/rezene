@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
+  BookOpen,
   Boxes,
   Calendar,
   CircleDollarSign,
@@ -10,9 +11,11 @@ import {
   FileBox,
   FileText,
   FlaskConical,
+  Images,
   Landmark,
   LayoutDashboard,
   Layers,
+  Newspaper,
   Package,
   Rotate3d,
   Scissors,
@@ -39,6 +42,14 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
       { to: "/admin/skus", label: "SKUs", icon: Tags },
       { to: "/admin/collections", label: "Collections", icon: Layers },
       { to: "/admin/inventory", label: "Inventory", icon: Boxes },
+    ],
+  },
+  {
+    title: "Content",
+    items: [
+      { to: "/admin/content/pages", label: "Pages", icon: BookOpen },
+      { to: "/admin/content/journal", label: "Journal", icon: Newspaper },
+      { to: "/admin/content/lookbooks", label: "Lookbooks", icon: Images },
     ],
   },
   {

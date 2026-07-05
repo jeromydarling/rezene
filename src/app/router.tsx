@@ -1,4 +1,4 @@
-import { Route, Routes, Link } from "react-router";
+import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
 import { BrandProvider } from "./lib/brand";
 import { PublicLayout } from "./layouts/PublicLayout";
@@ -25,6 +25,17 @@ import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
 import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
 import { AiConceptsPage, ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
+import {
+  PagesEditorPage,
+  JournalEditorPage,
+  LookbooksEditorPage,
+} from "./pages/admin/ContentPages";
+
+/** CMS-created pages published at /p/:slug. */
+function DynamicPage() {
+  const { slug } = useParams();
+  return <MarkdownPage slug={slug ?? ""} />;
+}
 
 function NotFoundPage() {
   return (
@@ -71,6 +82,7 @@ export function AppRouter() {
           <Route path="terms" element={<MarkdownPage slug="terms" eyebrow="Legal" />} />
           <Route path="contact" element={<ContactPage />} />
           <Route path="checkout/success" element={<CheckoutSuccessPage />} />
+          <Route path="p/:slug" element={<DynamicPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
@@ -102,6 +114,9 @@ export function AppRouter() {
           <Route path="duties" element={<DutiesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="content/pages" element={<PagesEditorPage />} />
+          <Route path="content/journal" element={<JournalEditorPage />} />
+          <Route path="content/lookbooks" element={<LookbooksEditorPage />} />
         </Route>
         </Routes>
       </AuthProvider>

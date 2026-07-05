@@ -17,8 +17,8 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# All /api traffic must reach the Worker, never the asset layer.
-run_worker_first = ["/api/*"]
+# API traffic and public R2 media must reach the Worker, never the asset layer.
+run_worker_first = ["/api/*", "/media/*"]
 
 [observability]
 enabled = true

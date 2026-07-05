@@ -77,6 +77,10 @@ adminFileRoutes.post("/upload", requireAdminWrite, async (c) => {
       : "general";
   const entityIdRaw = form.get("entityId");
   const entityId = typeof entityIdRaw === "string" && entityIdRaw ? entityIdRaw.slice(0, 80) : null;
+  const isPublicRaw = form.get("isPublic");
+  // Public files are served (cached, unauthenticated) at /media/:id — for
+  // storefront imagery. Everything else stays session-gated.
+  const isPublic = isPublicRaw === "1" || isPublicRaw === "true";
 
   const id = newId("file");
   const safeName = file.name.replaceAll(/[^\w.\-]/g, "_").slice(0, 120) || "upload.bin";
@@ -87,8 +91,8 @@ adminFileRoutes.post("/upload", requireAdminWrite, async (c) => {
   });
   await run(
     c.env.DB,
-    `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     r2Key,
     file.name.slice(0, 200),
@@ -96,6 +100,7 @@ adminFileRoutes.post("/upload", requireAdminWrite, async (c) => {
     file.size,
     entityType,
     entityId,
+    isPublic ? 1 : 0,
     c.var.userId,
   );
   await writeAudit(c.env.DB, c.var.userId, "file.upload", "file", id, {
