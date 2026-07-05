@@ -28,9 +28,9 @@ enabled = true
 [vars]
 # Deployed value. Local dev overrides this via .dev.vars (APP_ENV=development).
 APP_ENV = "production"
-APP_URL = "https://maison-atlantique.jer-f84.workers.dev"
-BRAND_NAME = "Maison Atlantique"
-BRAND_SLUG = "maison-atlantique"
+APP_URL = "https://rezene.jer-f84.workers.dev"
+BRAND_NAME = "Rezene"
+BRAND_SLUG = "rezene"
 R2_PUBLIC_BASE_URL = ""
 # Founder notifications (Cloudflare Email Service). Sends no-op until both
 # are set: FROM must be on a domain onboarded to Email Service, TO must be a
