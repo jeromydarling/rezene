@@ -5,6 +5,7 @@ import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 import { commerceRoutes } from "./routes/commerce";
 import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
+import { shippingWebhookRoutes } from "./routes/shipping-webhooks";
 import { factoryRoutes } from "./routes/factory";
 import { lineSheetRoutes } from "./routes/linesheet";
 import { adminDashboardRoutes } from "./routes/admin-dashboard";
@@ -20,6 +21,7 @@ import { adminAiRoutes } from "./routes/admin-ai";
 import { admin3dRoutes } from "./routes/admin-3d";
 import { adminFileRoutes } from "./routes/admin-files";
 import { adminSettingsRoutes } from "./routes/admin-settings";
+import { adminShippingRoutes } from "./routes/admin-shipping";
 import { adminAnalyticsRoutes } from "./routes/admin-analytics";
 import { adminContentRoutes } from "./routes/admin-content";
 import { adminWholesaleRoutes } from "./routes/admin-wholesale";
@@ -70,6 +72,9 @@ app.route("/api/public", commerceRoutes);
 // Stripe webhooks — signature-verified, never session-gated.
 app.route("/api/stripe", stripeWebhookRoutes);
 
+// Carrier tracking webhooks — secret-token path, never session-gated.
+app.route("/api/shipping", shippingWebhookRoutes);
+
 // Factory portal — token-scoped, unauthenticated by design.
 app.route("/api/factory", factoryRoutes);
 
@@ -96,6 +101,7 @@ admin.route("/ai", adminAiRoutes);
 admin.route("/3d", admin3dRoutes);
 admin.route("/files", adminFileRoutes);
 admin.route("/settings", adminSettingsRoutes);
+admin.route("/shipping", adminShippingRoutes);
 admin.route("/analytics", adminAnalyticsRoutes);
 admin.route("/content", adminContentRoutes);
 admin.route("/wholesale", adminWholesaleRoutes);

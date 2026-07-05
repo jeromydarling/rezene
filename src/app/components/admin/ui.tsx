@@ -98,6 +98,13 @@ const STATUS_TONES: Record<string, string> = {
   unfulfilled: "badge-neutral",
   processing: "badge-navy",
   delivered: "badge-success",
+  // shipments
+  created: "badge-neutral",
+  label_purchased: "badge-navy",
+  in_transit: "badge-saffron",
+  out_for_delivery: "badge-olive",
+  exception: "badge-danger",
+  returned: "badge-terracotta",
   // availability
   available: "badge-success",
   pre_order: "badge-saffron",

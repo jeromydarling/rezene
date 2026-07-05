@@ -213,6 +213,18 @@ async function handleCheckoutCompleted(
     (session as { shipping_details?: { address?: unknown; name?: string } }).shipping_details ??
     session.customer_details;
 
+  // Chosen shipping option (when checkout offered live rates).
+  const shippingCents = session.shipping_cost?.amount_total ?? null;
+  let shippingMethod: string | null = null;
+  if (typeof session.shipping_cost?.shipping_rate === "string") {
+    try {
+      const rate = await stripe.shippingRates.retrieve(session.shipping_cost.shipping_rate);
+      shippingMethod = rate.display_name ?? null;
+    } catch {
+      // Display name is cosmetic; the amount is already captured.
+    }
+  }
+
   await run(
     db,
     `UPDATE orders SET
@@ -222,6 +234,8 @@ async function handleCheckoutCompleted(
        email = COALESCE(?, email),
        subtotal_cents = COALESCE(?, subtotal_cents),
        tax_cents = COALESCE(?, tax_cents),
+       shipping_cents = COALESCE(?, shipping_cents),
+       shipping_method = COALESCE(?, shipping_method),
        total_cents = COALESCE(?, total_cents),
        shipping_country = COALESCE(?, shipping_country),
        shipping_address_json = COALESCE(?, shipping_address_json),
@@ -233,6 +247,8 @@ async function handleCheckoutCompleted(
     email?.toLowerCase() ?? null,
     session.amount_subtotal,
     session.total_details?.amount_tax ?? null,
+    shippingCents,
+    shippingMethod,
     session.amount_total,
     session.customer_details?.address?.country ?? null,
     shipping ? JSON.stringify(shipping) : null,

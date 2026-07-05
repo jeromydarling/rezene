@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import type Stripe from "stripe";
 import { first, run } from "../services/db";
 import { getStripe, SHIPPING_COUNTRIES } from "../services/stripe";
+import { buildRateRequest, quoteEnabledProviders, type RateQuote } from "../services/shipping";
 import { parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import { newId } from "../utils/id";
@@ -9,14 +11,22 @@ import type { AppContext } from "../types/env";
 
 export const commerceRoutes = new Hono<AppContext>();
 
+const countrySchema = z
+  .string()
+  .length(2)
+  .transform((s) => s.toUpperCase())
+  .optional();
 const checkoutItemSchema = z.object({
   variantId: z.string().min(1).max(80),
   quantity: z.number().int().min(1).max(10).default(1),
 });
 const checkoutSchema = z.union([
-  z.object({ items: z.array(checkoutItemSchema).min(1).max(20) }),
+  z.object({
+    items: z.array(checkoutItemSchema).min(1).max(20),
+    shippingCountry: countrySchema,
+  }),
   // Legacy single-item shape (PDP "Buy now").
-  checkoutItemSchema,
+  checkoutItemSchema.extend({ shippingCountry: countrySchema }),
 ]);
 
 interface ResolvedItem {
@@ -199,6 +209,34 @@ commerceRoutes.post(
       ),
     );
 
+    // Live shipping options when the buyer told us their country on the cart
+    // page. Quoting is best-effort: any provider failure (or no country) just
+    // means Stripe collects the address without shipping charges, exactly as
+    // before the shipping layer existed.
+    let shippingOptions: Stripe.Checkout.SessionCreateParams.ShippingOption[] = [];
+    if (parsed.shippingCountry) {
+      try {
+        const req = await buildRateRequest(c.env.DB, {
+          to: { country: parsed.shippingCountry },
+          items: resolved.map((r) => ({
+            description: r.description,
+            quantity: r.quantity,
+            valueCents: r.unitPriceCents,
+            currency: r.currency,
+          })),
+          currency,
+          subtotalCents: subtotal,
+        });
+        const { quotes } = await quoteEnabledProviders(c.env.DB, req, {
+          checkoutOnly: true,
+          timeoutMs: 8_000,
+        });
+        shippingOptions = quotesToStripeOptions(quotes, currency);
+      } catch (err) {
+        console.error("[checkout] shipping quote failed:", err);
+      }
+    }
+
     const origin = new URL(c.req.url).origin;
     const appUrl = c.env.APP_ENV === "development" ? origin : (c.env.APP_URL || origin);
     const session = await stripe.checkout.sessions.create({
@@ -219,6 +257,7 @@ commerceRoutes.post(
       })),
       allow_promotion_codes: true,
       shipping_address_collection: { allowed_countries: SHIPPING_COUNTRIES },
+      ...(shippingOptions.length > 0 ? { shipping_options: shippingOptions } : {}),
       // Enable once Stripe Tax is activated on the account:
       // automatic_tax: { enabled: true },
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -233,6 +272,104 @@ commerceRoutes.post(
     );
     if (!session.url) return c.json({ error: "Stripe did not return a checkout URL" }, 502);
     return c.json({ url: session.url, orderId, orderNumber });
+  },
+);
+
+/**
+ * Stripe accepts at most 5 shipping options per session; quotes arrive
+ * cheapest-first, and only quotes in the cart currency are usable (Stripe
+ * requires the fixed amount to match the session currency).
+ */
+function quotesToStripeOptions(
+  quotes: RateQuote[],
+  currency: string,
+): Stripe.Checkout.SessionCreateParams.ShippingOption[] {
+  return quotes
+    .filter((q) => q.currency.toUpperCase() === currency.toUpperCase())
+    .slice(0, 5)
+    .map((q) => ({
+      shipping_rate_data: {
+        display_name: `${q.carrier} — ${q.service}`.slice(0, 100),
+        type: "fixed_amount" as const,
+        fixed_amount: { amount: q.amountCents, currency: q.currency.toLowerCase() },
+        ...(q.minDays != null || q.maxDays != null
+          ? {
+              delivery_estimate: {
+                ...(q.minDays != null
+                  ? { minimum: { unit: "business_day" as const, value: Math.max(1, q.minDays) } }
+                  : {}),
+                ...(q.maxDays != null
+                  ? { maximum: { unit: "business_day" as const, value: Math.max(1, q.maxDays) } }
+                  : {}),
+              },
+            }
+          : {}),
+        metadata: { provider: q.provider, rate_id: q.rateId ?? "" },
+      },
+    }));
+}
+
+/**
+ * Cart-page shipping estimate: quote checkout-enabled providers for a
+ * destination country before the buyer commits to Stripe. Rate-limited —
+ * live carrier quotes are metered API calls.
+ */
+commerceRoutes.post(
+  "/shipping/quote",
+  rateLimit({ key: "shipping_quote", limit: 30, windowSeconds: 3600 }),
+  async (c) => {
+    const body = await parseBody(
+      c,
+      z.object({
+        country: z.string().length(2).transform((s) => s.toUpperCase()),
+        items: z.array(checkoutItemSchema).min(1).max(20),
+      }),
+    );
+    const lines: { description: string; quantity: number; valueCents: number; currency: string }[] =
+      [];
+    for (const item of body.items) {
+      const variant = await first<{
+        price_cents: number | null;
+        base_price_cents: number;
+        currency: string;
+        name: string;
+      }>(
+        c.env.DB,
+        `SELECT v.price_cents, p.base_price_cents, v.currency, p.name
+         FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = ?`,
+        item.variantId,
+      );
+      if (!variant) continue;
+      lines.push({
+        description: variant.name,
+        quantity: item.quantity,
+        valueCents: variant.price_cents ?? variant.base_price_cents,
+        currency: variant.currency,
+      });
+    }
+    if (lines.length === 0) return c.json({ quotes: [] });
+    const subtotal = lines.reduce((sum, l) => sum + l.valueCents * l.quantity, 0);
+    const req = await buildRateRequest(c.env.DB, {
+      to: { country: body.country },
+      items: lines,
+      currency: lines[0].currency,
+      subtotalCents: subtotal,
+    });
+    const { quotes } = await quoteEnabledProviders(c.env.DB, req, {
+      checkoutOnly: true,
+      timeoutMs: 8_000,
+    });
+    // Buyer-facing: strip provider internals, keep display fields.
+    return c.json({
+      quotes: quotes.slice(0, 6).map((q) => ({
+        carrier: q.carrier,
+        service: q.service,
+        amountCents: q.amountCents,
+        currency: q.currency,
+        minDays: q.minDays ?? null,
+        maxDays: q.maxDays ?? null,
+      })),
+    });
   },
 );
 

@@ -145,6 +145,44 @@ stripe listen --forward-to localhost:5173/api/stripe/webhooks
 stripe trigger checkout.session.completed
 ```
 
+## Shipping providers
+
+Shops choose their own carrier stack under **Admin → Shipping**. The
+`manual` provider (flat rates per destination zone) is enabled by default
+so checkout always has something to quote; connect any of DHL Express
+(MyDHL API), Shippo, EasyPost, ShipEngine, Sendcloud, or Easyship by
+pasting that provider's API credentials — keys are stored in D1
+(`shipping_provider_configs`) and never returned to the browser.
+
+Per provider you can toggle:
+
+- **Enabled** — available for fulfillment (quoting + label purchase on
+  the order panel under Admin → Orders).
+- **Quote live rates to buyers at checkout** — rates for the buyer's
+  country are passed to Stripe Checkout as `shipping_options` (max 5,
+  cheapest first, matching the cart currency).
+
+**Test connection** runs a live rate request against the provider and
+surfaces the provider's own error message if credentials are wrong.
+
+**Tracking webhooks:** each connected provider gets a secret webhook URL
+(shown in its configure panel) — paste it into the provider's dashboard.
+Inbound events append to `shipment_events`, advance the shipment status
+(never backwards), and roll the order's fulfillment status up to
+`shipped`/`delivered` once every parcel on the order has arrived.
+EasyPost events are additionally HMAC-verified when a webhook secret is
+configured.
+
+Labels bought from providers that return raw PDF bytes (DHL, Sendcloud)
+are stored in R2 under `shipping-labels/` and served via an
+admin-authenticated route; URL-hosted labels (Shippo, EasyPost,
+ShipEngine, Easyship) link out directly.
+
+The ship-from address, default parcel size, and per-item weight used for
+quoting live in `settings` (`shipping_origin`, `shipping_default_parcel`,
+`shipping_per_item_weight_kg`) and are editable at the top of the
+Shipping page.
+
 ## Outbound email — Cloudflare Email Service
 
 All email — founder notifications and buyer confirmations — runs on
@@ -227,6 +265,7 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Cart + multi-item checkout + buyer confirmation email | `/cart`, `src/app/lib/cart.tsx` | ✅ working |
 | Wholesale line sheets: tokenized links, wholesale pricing, buyer inquiries | admin Commerce → Line Sheets, `/linesheet/:token` | ✅ working |
 | Product CSV import (Shopify export or simple template) | admin Products → Import CSV | ✅ working |
+| Multi-provider shipping: manual rates, DHL Express, Shippo, EasyPost, ShipEngine, Sendcloud, Easyship — checkout rates, labels, tracking webhooks | admin Commerce → Shipping | ✅ working (carriers need keys) |
 
 ### Formerly scaffolds — now wired
 

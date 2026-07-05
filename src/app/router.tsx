@@ -30,6 +30,7 @@ import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
 import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
 import { AiConceptsPage, ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
+import { ShippingPage } from "./pages/admin/ShippingPage";
 import {
   PagesEditorPage,
   JournalEditorPage,
@@ -114,6 +115,7 @@ export function AppRouter() {
           <Route path="customers" element={<CustomersPage />} />
           <Route path="pre-orders" element={<PreOrdersPage />} />
           <Route path="line-sheets" element={<LineSheetsPage />} />
+          <Route path="shipping" element={<ShippingPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="materials" element={<MaterialsPage />} />

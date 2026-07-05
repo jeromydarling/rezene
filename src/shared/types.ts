@@ -489,6 +489,101 @@ export interface DashboardSummary {
   upcomingMilestones: { title: string; startsOn: string; kind: string }[];
 }
 
+// ---------- Shipping ----------
+export interface ShippingProviderSummary {
+  provider: string;
+  name: string;
+  blurb: string;
+  bestFor: string;
+  capabilities: string[];
+  credentialFields: { key: string; label: string; secret: boolean; placeholder?: string }[];
+  configFields: { key: string; label: string; kind: "text" | "boolean"; hint?: string }[];
+  docsUrl: string | null;
+  supportsWebhooks: boolean;
+  isEnabled: boolean;
+  useAtCheckout: boolean;
+  credentialsSet: Record<string, boolean>;
+  config: Record<string, unknown>;
+  lastVerifiedAt: string | null;
+  lastVerifyError: string | null;
+  webhookPath: string | null;
+}
+
+export interface ShippingSettings {
+  providers: ShippingProviderSummary[];
+  origin: {
+    name?: string;
+    company?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country: string;
+    phone?: string;
+    email?: string;
+  };
+  parcel: { lengthCm: number; widthCm: number; heightCm: number; weightKg: number };
+  perItemWeightKg: number;
+}
+
+export interface ShippingZoneRow {
+  id: string;
+  name: string;
+  countries_json: string;
+  sort_order: number;
+  is_active: number;
+}
+
+export interface ShippingRateRow {
+  id: string;
+  zone_id: string;
+  name: string;
+  amount_cents: number;
+  currency: string;
+  free_over_cents: number | null;
+  min_transit_days: number | null;
+  max_transit_days: number | null;
+  sort_order: number;
+  is_active: number;
+}
+
+export interface ShippingQuote {
+  provider?: string;
+  rateId?: string;
+  externalShipmentId?: string;
+  carrier: string;
+  service: string;
+  amountCents: number;
+  currency: string;
+  minDays?: number | null;
+  maxDays?: number | null;
+}
+
+export interface OrderShipmentRow {
+  id: string;
+  provider: string;
+  carrier: string | null;
+  service: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  label_url: string | null;
+  cost_cents: number | null;
+  currency: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShipmentEventRow {
+  shipment_id: string;
+  status: string | null;
+  description: string | null;
+  location: string | null;
+  occurred_at: string | null;
+  created_at: string;
+}
+
 // ---------- API envelope ----------
 export interface ApiError {
   error: string;

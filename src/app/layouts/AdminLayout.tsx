@@ -25,6 +25,7 @@ import {
   ShoppingBag,
   Sparkles,
   Tags,
+  Truck,
   Users,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
@@ -58,6 +59,7 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
     items: [
       { to: "/admin/orders", label: "Orders", icon: Package },
       { to: "/admin/pre-orders", label: "Pre-orders", icon: Sparkles },
+      { to: "/admin/shipping", label: "Shipping", icon: Truck },
       { to: "/admin/line-sheets", label: "Line Sheets", icon: FileSpreadsheet },
       { to: "/admin/customers", label: "Customers", icon: Users },
     ],
