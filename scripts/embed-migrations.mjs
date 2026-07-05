@@ -18,7 +18,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = join(root, "migrations");
 // 0002 = Rezene demo content; 0009 = the platform shop registry, which
 // lives only in the primary D1 — shop databases must not carry a copy.
-const EXCLUDE = new Set(["0002_seed_demo_data.sql", "0009_verto_shops.sql"]);
+const EXCLUDE = new Set([
+  "0002_seed_demo_data.sql",
+  "0009_verto_shops.sql",
+  "0010_platform_crm.sql", // Verto HQ CRM — platform-only, like the registry
+]);
 
 const files = readdirSync(dir)
   .filter((f) => f.endsWith(".sql") && !EXCLUDE.has(f))

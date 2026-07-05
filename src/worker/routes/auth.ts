@@ -137,6 +137,17 @@ authRoutes.post(
       text: `${name ? `${name} <${email}>` : email} opened the demo admin gate.`,
     }).catch(() => {});
 
+    // CRM: demo visitors are warm leads — contact + timeline + edge geo.
+    const { ingestEvent, geoFromRequest } = await import("../services/crm");
+    await ingestEvent(c.env, {
+      email,
+      name: name ?? null,
+      source: "demo",
+      kind: "demo_visit",
+      subject: "Toured the demo admin",
+      geo: geoFromRequest(c.req.raw),
+    });
+
     const { token, expiresAt } = await createSession(c.var.db, viewer.id, {
       ip: c.req.header("cf-connecting-ip"),
       userAgent: c.req.header("user-agent"),

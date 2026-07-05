@@ -153,5 +153,18 @@ export async function provisionShop(env: Env, shop: Shop, ownerEmail: string): P
     text: `Shop /${shop.slug} is active. Owner: ${ownerEmail}.`,
   });
 
+  // CRM timeline: the shop went live.
+  const { ingestEvent } = await import("./crm");
+  await ingestEvent(env, {
+    email: ownerEmail,
+    company: shop.name,
+    shopId: shop.id,
+    source: "signup",
+    status: "trial",
+    kind: "provision",
+    subject: `Shop provisioned: ${shop.name} (/${shop.slug})`,
+    metadata: { slug: shop.slug },
+  });
+
   return { slug: shop.slug, adminEmail: ownerEmail.toLowerCase(), password, loginUrl };
 }

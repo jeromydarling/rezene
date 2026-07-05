@@ -28,6 +28,7 @@ import { adminWholesaleRoutes } from "./routes/admin-wholesale";
 import { adminMarketingRoutes } from "./routes/admin-marketing";
 import { adminImportRoutes } from "./routes/admin-import";
 import { adminPlatformRoutes } from "./routes/admin-platform";
+import { adminCrmRoutes } from "./routes/admin-crm";
 import { tenantMiddleware } from "./middleware/tenant";
 import { getShopDb } from "./services/tenant-db";
 import type { AppContext, Env } from "./types/env";
@@ -227,6 +228,7 @@ admin.route("/content", adminContentRoutes);
 admin.route("/wholesale", adminWholesaleRoutes);
 admin.route("/marketing", adminMarketingRoutes);
 admin.route("/platform", adminPlatformRoutes);
+admin.route("/crm", adminCrmRoutes);
 admin.route("/import", adminImportRoutes);
 app.route("/api/admin", admin);
 
@@ -249,7 +251,15 @@ export default {
       ctx.waitUntil(publishDueContent(env));
     } else {
       // Daily also runs the publisher — belt and braces if the hourly missed.
-      ctx.waitUntil(publishDueContent(env).then(() => runDailyOpsSweep(env)));
+      ctx.waitUntil(
+        publishDueContent(env)
+          .then(() => runDailyOpsSweep(env))
+          .then(async () => {
+            // CRM: silence becomes follow-up tasks (platform D1 only).
+            const { crmFollowupSweep } = await import("./services/crm");
+            await crmFollowupSweep(env).catch((err) => console.error("[crm] sweep failed:", err));
+          }),
+      );
     }
   },
 } satisfies ExportedHandler<Env>;

@@ -34,6 +34,7 @@ import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/ad
 import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
 import { PlatformPage } from "./pages/admin/PlatformPage";
+import { CrmAtlasPage, CrmPage } from "./pages/admin/CrmPage";
 import {
   PagesEditorPage,
   JournalEditorPage,
@@ -137,6 +138,8 @@ export function AppRouter() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="platform" element={<PlatformPage />} />
+          <Route path="crm" element={<CrmPage />} />
+          <Route path="crm/atlas" element={<CrmAtlasPage />} />
           <Route path="content/pages" element={<PagesEditorPage />} />
           <Route path="content/journal" element={<JournalEditorPage />} />
           <Route path="content/lookbooks" element={<LookbooksEditorPage />} />

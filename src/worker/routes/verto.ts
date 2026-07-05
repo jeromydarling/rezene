@@ -51,6 +51,20 @@ vertoRoutes.post(
       body.note ?? null,
     );
 
+    // CRM: the relationship starts here — contact + timeline + edge geo.
+    const { ingestEvent, geoFromRequest } = await import("../services/crm");
+    await ingestEvent(c.env, {
+      email: body.email,
+      company: body.shopName,
+      shopId: id,
+      source: "signup",
+      status: "trial",
+      kind: "signup",
+      subject: `Signed up: ${body.shopName} (/${body.slug})`,
+      metadata: { slug: body.slug, plan: body.plan ?? null, note: body.note ?? null },
+      geo: geoFromRequest(c.req.raw),
+    });
+
     // Instant onboarding: provision on the spot. If anything goes wrong the
     // reservation stays pending and the platform operator provisions it by
     // hand from Admin → Verto Shops — the signup never hard-fails past this

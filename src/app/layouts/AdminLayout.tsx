@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
+  HeartHandshake,
+  Map,
   Menu,
   X,
   BookOpen,
@@ -34,9 +36,13 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
-import { isDemoShop } from "../lib/shop";
+import { isDemoShop, isPrimaryShop } from "../lib/shop";
 
-const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: typeof Shirt }[] }[] = [
+const NAV_SECTIONS: {
+  title: string;
+  platformOnly?: boolean;
+  items: { to: string; label: string; icon: typeof Shirt }[];
+}[] = [
   {
     title: "Overview",
     items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
@@ -102,12 +108,22 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
   },
   {
     title: "System",
+    items: [{ to: "/admin/settings", label: "Settings", icon: Settings }],
+  },
+  {
+    title: "Verto HQ",
+    platformOnly: true,
     items: [
-      { to: "/admin/settings", label: "Settings", icon: Settings },
+      { to: "/admin/crm", label: "Customers", icon: HeartHandshake },
+      { to: "/admin/crm/atlas", label: "Atlas", icon: Map },
       { to: "/admin/platform", label: "Verto Shops", icon: Store },
     ],
   },
 ];
+
+function visibleSections() {
+  return NAV_SECTIONS.filter((s) => !s.platformOnly || isPrimaryShop());
+}
 
 const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
@@ -131,7 +147,10 @@ export function AdminLayout() {
   const matches = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return ALL_ITEMS.filter((i) => i.label.toLowerCase().includes(q)).slice(0, 6);
+    return visibleSections()
+      .flatMap((s) => s.items)
+      .filter((i) => i.label.toLowerCase().includes(q))
+      .slice(0, 6);
   }, [query]);
 
   const breadcrumb = useMemo(() => {
@@ -161,7 +180,7 @@ export function AdminLayout() {
         </p>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {NAV_SECTIONS.map((section) => (
+        {visibleSections().map((section) => (
           <div key={section.title} className="mb-5">
             <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/40">
               {section.title}
