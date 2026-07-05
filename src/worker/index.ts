@@ -25,6 +25,7 @@ import { adminShippingRoutes } from "./routes/admin-shipping";
 import { adminAnalyticsRoutes } from "./routes/admin-analytics";
 import { adminContentRoutes } from "./routes/admin-content";
 import { adminWholesaleRoutes } from "./routes/admin-wholesale";
+import { adminMarketingRoutes } from "./routes/admin-marketing";
 import { adminImportRoutes } from "./routes/admin-import";
 import type { AppContext, Env } from "./types/env";
 
@@ -155,6 +156,7 @@ admin.route("/shipping", adminShippingRoutes);
 admin.route("/analytics", adminAnalyticsRoutes);
 admin.route("/content", adminContentRoutes);
 admin.route("/wholesale", adminWholesaleRoutes);
+admin.route("/marketing", adminMarketingRoutes);
 admin.route("/import", adminImportRoutes);
 app.route("/api/admin", admin);
 

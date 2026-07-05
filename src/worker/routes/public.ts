@@ -48,6 +48,22 @@ publicRoutes.get("/settings", async (c) => {
   return c.json(settings);
 });
 
+// ---------- Marketing email unsubscribe (link in every campaign email) ----------
+publicRoutes.get("/unsubscribe", async (c) => {
+  const email = (c.req.query("email") ?? "").toLowerCase().slice(0, 200);
+  const token = c.req.query("token") ?? "";
+  if (!email || !token) return c.text("Invalid unsubscribe link.", 400);
+  const { sha256Hex } = await import("../utils/id");
+  const expected = (await sha256Hex(`${email}${c.env.SESSION_SECRET ?? ""}`)).slice(0, 32);
+  if (token !== expected) return c.text("Invalid unsubscribe link.", 400);
+  await run(
+    c.env.DB,
+    `UPDATE leads SET unsubscribed_at = datetime('now') WHERE lower(email) = ? AND unsubscribed_at IS NULL`,
+    email,
+  );
+  return c.text("You're unsubscribed. You won't hear from us again unless you sign back up.");
+});
+
 /** True when the request carries the site's draft-preview token. */
 async function previewAllowed(db: D1Database, token: string | undefined): Promise<boolean> {
   if (!token) return false;

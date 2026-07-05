@@ -15,6 +15,7 @@ import {
   Images,
   Landmark,
   LayoutDashboard,
+  Megaphone,
   Layers,
   Newspaper,
   Package,
@@ -53,6 +54,10 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
       { to: "/admin/content/journal", label: "Journal", icon: Newspaper },
       { to: "/admin/content/lookbooks", label: "Lookbooks", icon: Images },
     ],
+  },
+  {
+    title: "Marketing",
+    items: [{ to: "/admin/marketing", label: "Campaigns", icon: Megaphone }],
   },
   {
     title: "Commerce",
