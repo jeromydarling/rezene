@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
@@ -19,6 +19,11 @@ interface Generation {
   output_kind: string;
   prompt_text?: string | null;
 }
+interface Reference {
+  id: string;
+  label: string | null;
+  url: string;
+}
 interface ConceptDetail {
   id: string;
   title: string;
@@ -27,6 +32,20 @@ interface ConceptDetail {
   styleName: string | null;
   status: string;
   generations: Generation[];
+  references: Reference[];
+}
+
+/** Downscale an image file to <=512px (FLUX.2 reference limit) as JPEG. */
+async function resizeToRef(file: File, max = 512): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, w, h);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.9));
 }
 interface ConceptRow {
   id: string;
@@ -157,9 +176,34 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
   const [promptDirty, setPromptDirty] = useState(false);
   const [useHouseStyle, setUseHouseStyle] = useState(true);
   const [lockSeed, setLockSeed] = useState<number | null>(null);
-  const [busy, setBusy] = useState<"gen" | "enhance" | null>(null);
+  const [busy, setBusy] = useState<"gen" | "enhance" | "ref" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [ship, setShip] = useState<Generation | null>(null);
+  const [useGen, setUseGen] = useState<Generation | null>(null);
+  const refInput = useRef<HTMLInputElement>(null);
+
+  const uploadReference = useCallback(
+    async (file: File) => {
+      setBusy("ref");
+      setErr(null);
+      try {
+        const blob = await resizeToRef(file);
+        const form = new FormData();
+        form.set("file", new File([blob], "reference.jpg", { type: "image/jpeg" }));
+        form.set("entityType", "concept");
+        form.set("entityId", conceptId);
+        form.set("isPublic", "1");
+        const up = await api.upload<{ id: string }>("/api/admin/files/upload", form);
+        await api.post(`/api/admin/ai/concepts/${conceptId}/references`, { fileId: up.id });
+        await reload();
+      } catch (e) {
+        setErr(e instanceof ApiRequestError ? e.message : "Couldn't add reference");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [conceptId, reload],
+  );
 
   // Assemble a prompt from the builder unless the user has hand-edited it.
   const assembled = [garment && `a ${garment}`, fabric && `in ${fabric}`, palette, details, presentation && `presented ${presentation}`]
@@ -253,6 +297,45 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
           />
         </Labeled>
 
+        {/* Reference images (FLUX.2 conditioning) */}
+        <div className="rounded-md border border-ink/10 bg-navy/[0.02] p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-warmgrey">Reference images {data.references.length > 0 ? `(${data.references.length}/4)` : ""}</span>
+            <input ref={refInput} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && void uploadReference(e.target.files[0])} />
+            <button
+              type="button"
+              className="text-xs text-navy hover:underline disabled:opacity-50"
+              disabled={busy === "ref" || data.references.length >= 4}
+              onClick={() => refInput.current?.click()}
+            >
+              {busy === "ref" ? "Adding…" : "+ Add reference"}
+            </button>
+          </div>
+          {data.references.length === 0 ? (
+            <p className="text-[11px] text-warmgrey">
+              Add a fabric swatch, a model, or a silhouette and Flux will match its look for a consistent line.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {data.references.map((r) => (
+                <div key={r.id} className="group relative">
+                  <img src={r.url} alt="" className="h-14 w-14 rounded object-cover" />
+                  <button
+                    type="button"
+                    className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-ink text-[10px] text-white opacity-0 group-hover:opacity-100"
+                    onClick={async () => {
+                      await api.delete(`/api/admin/ai/concepts/${conceptId}/references/${r.id}`);
+                      await reload();
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" className="btn btn-secondary !py-1.5 text-xs" disabled={busy === "enhance"} onClick={() => void enhance()}>
             {busy === "enhance" ? "Thinking…" : "✦ Enhance prompt"}
@@ -273,6 +356,9 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
             {busy === "gen" ? "Designing…" : "Generate 4 looks"}
           </button>
         </div>
+        {data.references.length > 0 && (
+          <p className="text-[11px] text-navy">✦ Matching {data.references.length} reference{data.references.length > 1 ? "s" : ""} for a consistent look (FLUX.2).</p>
+        )}
         {err && <p className="field-error">{err}</p>}
         {busy === "gen" && <p className="text-xs text-warmgrey">Flux is rendering four looks — this takes a few seconds.</p>}
       </div>
@@ -300,6 +386,9 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
                     >
                       {g.is_favorite ? "★" : "☆"}
                     </button>
+                    <button type="button" title="Use on your site" className="text-xs text-white" onClick={() => setUseGen(g)}>
+                      ⇡ use
+                    </button>
                     <button type="button" title="Ship to sampling" className="text-xs text-white" onClick={() => setShip(g)}>
                       ⇢ sample
                     </button>
@@ -320,6 +409,19 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
           </div>
         </div>
       )}
+
+      <SlideOver open={Boolean(useGen)} title="Use on your site" onClose={() => setUseGen(null)}>
+        {useGen && (
+          <UseImageForm
+            conceptId={conceptId}
+            generation={useGen}
+            onDone={(where) => {
+              setUseGen(null);
+              toast.success(`Added to ${where}`, "The image is live on your site.");
+            }}
+          />
+        )}
+      </SlideOver>
 
       <SlideOver open={Boolean(ship)} title="Ship to sampling" onClose={() => setShip(null)}>
         {ship && (
@@ -407,6 +509,88 @@ function ShipForm({
       {error && <ErrorNote message={error} />}
       <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={() => void submit()}>
         {busy ? "Sending…" : "Create style + request sample"}
+      </button>
+    </div>
+  );
+}
+
+function UseImageForm({
+  conceptId,
+  generation,
+  onDone,
+}: {
+  conceptId: string;
+  generation: Generation;
+  onDone: (where: string) => void;
+}) {
+  const { data: products } = useFetch<{ id: string; name: string }[]>("/api/admin/products");
+  const { data: lookbooks } = useFetch<{ id: string; title: string }[]>("/api/admin/content/lookbooks");
+  const [target, setTarget] = useState<"product" | "lookbook">("product");
+  const [productId, setProductId] = useState("");
+  const [lookbookId, setLookbookId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/api/admin/ai/concepts/${conceptId}/generations/${generation.id}/use`, {
+        target,
+        productId: target === "product" ? productId : null,
+        lookbookId: target === "lookbook" ? lookbookId : null,
+      });
+      onDone(target === "product" ? "the product" : "the lookbook");
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "Couldn't add the image");
+      setBusy(false);
+    }
+  }
+
+  const ready = target === "product" ? Boolean(productId) : Boolean(lookbookId);
+  return (
+    <div className="space-y-4">
+      {generation.url && <img src={generation.url} alt="" className="aspect-[3/4] w-40 rounded-md object-cover" />}
+      <div className="flex gap-2">
+        {(["product", "lookbook"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTarget(t)}
+            className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize transition ${
+              target === t ? "border-navy bg-navy/5" : "border-ink/15 hover:border-ink/40"
+            }`}
+          >
+            {t === "product" ? "Product photo" : "Lookbook"}
+          </button>
+        ))}
+      </div>
+      {target === "product" ? (
+        <Labeled label="Add to product">
+          <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)}>
+            <option value="">Choose a product…</option>
+            {(products ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </Labeled>
+      ) : (
+        <Labeled label="Add to lookbook">
+          <select className="input" value={lookbookId} onChange={(e) => setLookbookId(e.target.value)}>
+            <option value="">Choose a lookbook…</option>
+            {(lookbooks ?? []).map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.title}
+              </option>
+            ))}
+          </select>
+        </Labeled>
+      )}
+      {error && <ErrorNote message={error} />}
+      <button type="button" className="btn btn-primary w-full" disabled={busy || !ready} onClick={() => void submit()}>
+        {busy ? "Adding…" : "Add image"}
       </button>
     </div>
   );

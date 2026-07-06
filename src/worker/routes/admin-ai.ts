@@ -115,6 +115,11 @@ adminAiRoutes.get("/concepts/:id", async (c) => {
      FROM ai_generations WHERE concept_id = ? ORDER BY is_favorite DESC, created_at DESC`,
     row.id,
   );
+  const references = await all<Record<string, unknown>>(
+    c.var.db,
+    `SELECT id, file_id, label FROM concept_references WHERE concept_id = ? ORDER BY created_at`,
+    row.id,
+  );
   return c.json({
     ...mapConcept(row),
     generations: generations.map((g) => ({
@@ -122,6 +127,7 @@ adminAiRoutes.get("/concepts/:id", async (c) => {
       is_favorite: Boolean(g.is_favorite),
       url: g.file_id ? `/media/${g.file_id}` : g.external_url,
     })),
+    references: references.map((r) => ({ id: r.id, label: r.label, url: `/media/${r.file_id}` })),
   });
 });
 
@@ -230,6 +236,75 @@ adminAiRoutes.post("/prompt-suggest", requireAdminWrite, async (c) => {
   }
 });
 
+// Attach a reference image (already uploaded via /files/upload, resized <512).
+adminAiRoutes.post("/concepts/:id/references", requireAdminWrite, async (c) => {
+  const { referenceAttachSchema } = await import("../services/validators");
+  const id = c.req.param("id");
+  const body = await parseBody(c, referenceAttachSchema);
+  if (!(await first(c.var.db, `SELECT id FROM ai_concepts WHERE id = ?`, id))) {
+    return c.json({ error: "Concept not found" }, 404);
+  }
+  const count = await first<{ n: number }>(c.var.db, `SELECT COUNT(*) AS n FROM concept_references WHERE concept_id = ?`, id);
+  if ((count?.n ?? 0) >= 4) return c.json({ error: "Up to 4 reference images." }, 409);
+  const refId = newId("ref");
+  await run(c.var.db, `INSERT INTO concept_references (id, concept_id, file_id, label) VALUES (?, ?, ?, ?)`, refId, id, body.fileId, body.label ?? null);
+  return c.json({ id: refId, url: `/media/${body.fileId}` }, 201);
+});
+
+adminAiRoutes.delete("/concepts/:id/references/:refId", requireAdminWrite, async (c) => {
+  const ref = await first<{ file_id: string | null }>(
+    c.var.db,
+    `SELECT file_id FROM concept_references WHERE id = ? AND concept_id = ?`,
+    c.req.param("refId"),
+    c.req.param("id"),
+  );
+  await run(c.var.db, `DELETE FROM concept_references WHERE id = ? AND concept_id = ?`, c.req.param("refId"), c.req.param("id"));
+  if (ref?.file_id) {
+    const f = await first<{ r2_key: string }>(c.var.db, `SELECT r2_key FROM files WHERE id = ?`, ref.file_id);
+    if (f) await c.env.FILES.delete(f.r2_key).catch(() => {});
+    await run(c.var.db, `DELETE FROM files WHERE id = ?`, ref.file_id);
+  }
+  return c.json({ ok: true });
+});
+
+// Use a generated look directly on the site — as a product image or in a lookbook.
+adminAiRoutes.post("/concepts/:id/generations/:genId/use", requireAdminWrite, async (c) => {
+  const { useImageSchema } = await import("../services/validators");
+  const body = await parseBody(c, useImageSchema);
+  const gen = await first<{ file_id: string | null }>(
+    c.var.db,
+    `SELECT file_id FROM ai_generations WHERE id = ? AND concept_id = ?`,
+    c.req.param("genId"),
+    c.req.param("id"),
+  );
+  if (!gen?.file_id) return c.json({ error: "Image not found" }, 404);
+  const url = `/media/${gen.file_id}`;
+  if (body.target === "product") {
+    if (!body.productId) return c.json({ error: "Pick a product." }, 400);
+    const next = await first<{ n: number }>(c.var.db, `SELECT COALESCE(MAX(sort_order),-1)+1 AS n FROM product_images WHERE product_id = ?`, body.productId);
+    await run(
+      c.var.db,
+      `INSERT INTO product_images (id, product_id, url, sort_order) VALUES (?, ?, ?, ?)`,
+      newId("img"),
+      body.productId,
+      url,
+      next?.n ?? 0,
+    );
+    return c.json({ ok: true, url });
+  }
+  if (!body.lookbookId) return c.json({ error: "Pick a lookbook." }, 400);
+  const next = await first<{ n: number }>(c.var.db, `SELECT COALESCE(MAX(sort_order),-1)+1 AS n FROM lookbook_images WHERE lookbook_id = ?`, body.lookbookId);
+  await run(
+    c.var.db,
+    `INSERT INTO lookbook_images (id, lookbook_id, image_url, sort_order) VALUES (?, ?, ?, ?)`,
+    newId("lbi"),
+    body.lookbookId,
+    url,
+    next?.n ?? 0,
+  );
+  return c.json({ ok: true, url });
+});
+
 // Generate images with Flux → R2 → ai_generations.
 adminAiRoutes.post("/concepts/:id/generate", requireAdminWrite, async (c) => {
   const { fluxGenerateSchema } = await import("../services/validators");
@@ -245,13 +320,27 @@ adminAiRoutes.post("/concepts/:id/generate", requireAdminWrite, async (c) => {
     prompt = `${prompt}. ${style}`;
   }
 
-  const { generateFluxImage, randomSeed, FluxUnavailableError } = await import("../services/flux");
+  // Load reference images (if any) — FLUX.2 conditions on them for consistency.
+  const refRows = await all<{ file_id: string }>(c.var.db, `SELECT file_id FROM concept_references WHERE concept_id = ?`, id);
+  const references: Uint8Array[] = [];
+  for (const r of refRows) {
+    const f = await first<{ r2_key: string }>(c.var.db, `SELECT r2_key FROM files WHERE id = ?`, r.file_id);
+    if (f) {
+      const obj = await c.env.FILES.get(f.r2_key);
+      if (obj) references.push(new Uint8Array(await obj.arrayBuffer()));
+    }
+  }
+  const useRefs = references.length > 0;
+
+  const { generateFluxImage, generateFluxWithReferences, randomSeed, FluxUnavailableError } = await import("../services/flux");
   const created: unknown[] = [];
   try {
     for (let i = 0; i < body.count; i++) {
       // Lock the seed when given (consistency); otherwise vary per image.
       const seed = body.seed != null ? body.seed + i : randomSeed();
-      const { bytes, seed: usedSeed, model } = await generateFluxImage(c.env, { prompt, seed });
+      const { bytes, seed: usedSeed, model } = useRefs
+        ? await generateFluxWithReferences(c.env, { prompt, references, seed })
+        : await generateFluxImage(c.env, { prompt, seed });
       const fileId = newId("file");
       const key = `uploads/concept/${id}/${fileId}.jpg`;
       await c.env.FILES.put(key, bytes, { httpMetadata: { contentType: "image/jpeg" } });

@@ -207,6 +207,17 @@ export const promptSuggestSchema = z.object({
 
 export const houseStyleSchema = z.object({ value: z.string().max(1200) });
 
+export const referenceAttachSchema = z.object({
+  fileId: z.string().min(1).max(60),
+  label: z.string().max(80).nullable().optional(),
+});
+
+export const useImageSchema = z.object({
+  target: z.enum(["product", "lookbook"]),
+  productId: z.string().max(60).nullable().optional(),
+  lookbookId: z.string().max(60).nullable().optional(),
+});
+
 export const conceptShipSchema = z.object({
   generationId: z.string().max(60).optional(),
   supplierId: z.string().max(60).nullable().optional(),
