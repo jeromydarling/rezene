@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { all, first, writeAudit, run } from "../services/db";
 import { parseBody } from "../services/validators";
-import { requireAdminOnly } from "../middleware/auth";
+import { requireAdminOnly, requireSuperAdmin } from "../middleware/auth";
 import { provisionShop } from "../services/provision";
 import { PRIMARY_SHOP_ID, RESERVED_SLUGS, type Shop } from "../services/shops";
 import type { AppContext } from "../types/env";
@@ -15,9 +15,9 @@ import type { AppContext } from "../types/env";
  */
 export const adminPlatformRoutes = new Hono<AppContext>();
 
-adminPlatformRoutes.use("*", async (c, next) => {
+adminPlatformRoutes.use("*", requireAdminOnly, requireSuperAdmin, async (c, next) => {
   if (c.var.shopId !== PRIMARY_SHOP_ID) {
-    return c.json({ error: "Platform operations are limited to the platform operator" }, 403);
+    return c.json({ error: "Not found" }, 404);
   }
   await next();
 });

@@ -190,6 +190,8 @@ export interface SessionUser {
   email: string;
   name: string | null;
   roles: string[];
+  /** Verto HQ (platform CRM + shop registry) access. */
+  superAdmin?: boolean;
 }
 
 // ---------- Admin: product development ----------

@@ -4,6 +4,7 @@ import { useAuth } from "../../lib/auth";
 import { useBrand } from "../../lib/brand";
 import { api, ApiRequestError } from "../../lib/api";
 import { isDemoShop } from "../../lib/shop";
+import { PasswordInput } from "../../components/PasswordInput";
 
 export function LoginPage() {
   const { user, loading, login, refresh } = useAuth();
@@ -16,7 +17,23 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   // On the demo shop the gate is the default; credentials are one tap away.
   const [showCredentials, setShowCredentials] = useState(false);
+  const [mode, setMode] = useState<"signin" | "forgot">("signin");
+  const [sent, setSent] = useState(false);
   const demo = isDemoShop();
+
+  async function submitForgot(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/auth/forgot", { email });
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Something went wrong — try again");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!loading && user) {
     const from = (location.state as { from?: string } | null)?.from ?? "/admin";
@@ -108,44 +125,99 @@ export function LoginPage() {
             Brand Operating System
           </p>
         </div>
-        <form onSubmit={submit} className="admin-card space-y-4 p-6">
-          <div>
-            <label className="label" htmlFor="login-email">
-              Email
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              required
-              autoComplete="username"
-              className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="login-password">
-              Password
-            </label>
-            <input
-              id="login-password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && <p className="field-error">{error}</p>}
-          <button type="submit" disabled={busy} className="btn btn-primary w-full">
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-          <p className="text-center text-xs text-warmgrey">
-            First run? Sign in with ADMIN_EMAIL / ADMIN_INITIAL_PASSWORD to
-            bootstrap the founder account.
-          </p>
-        </form>
+        {mode === "forgot" ? (
+          <form onSubmit={submitForgot} className="admin-card space-y-4 p-6">
+            {sent ? (
+              <div className="space-y-3 text-center">
+                <p className="font-display text-lg font-light">Check your email</p>
+                <p className="text-sm text-warmgrey">
+                  If <span className="font-medium">{email}</span> has an account, a password-reset
+                  link is on its way. It’s valid for two hours.
+                </p>
+                <button
+                  type="button"
+                  className="link-quiet"
+                  onClick={() => {
+                    setMode("signin");
+                    setSent(false);
+                  }}
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="label" htmlFor="forgot-email">
+                    Email
+                  </label>
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    required
+                    autoComplete="username"
+                    className="input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-warmgrey">We’ll email you a link to set a new password.</p>
+                </div>
+                {error && <p className="field-error">{error}</p>}
+                <button type="submit" disabled={busy} className="btn btn-primary w-full">
+                  {busy ? "Sending…" : "Send reset link"}
+                </button>
+                <button type="button" className="link-quiet mx-auto block" onClick={() => setMode("signin")}>
+                  Back to sign in
+                </button>
+              </>
+            )}
+          </form>
+        ) : (
+          <form onSubmit={submit} className="admin-card space-y-4 p-6">
+            <div>
+              <label className="label" htmlFor="login-email">
+                Email
+              </label>
+              <input
+                id="login-email"
+                type="email"
+                required
+                autoComplete="username"
+                className="input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="label" htmlFor="login-password">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  className="text-xs text-warmgrey hover:text-ink hover:underline"
+                  onClick={() => {
+                    setMode("forgot");
+                    setError(null);
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <PasswordInput
+                id="login-password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={setPassword}
+              />
+            </div>
+            {error && <p className="field-error">{error}</p>}
+            <button type="submit" disabled={busy} className="btn btn-primary w-full">
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

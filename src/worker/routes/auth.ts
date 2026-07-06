@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import {
+  consumeResetToken,
+  createResetToken,
   createSession,
   destroySession,
   hashPassword,
@@ -9,8 +11,16 @@ import {
   verifyPassword,
 } from "../services/auth";
 import { first, run, writeAudit } from "../services/db";
-import { changePasswordSchema, demoAccessSchema, loginSchema, parseBody } from "../services/validators";
+import {
+  changePasswordSchema,
+  demoAccessSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  parseBody,
+  resetPasswordSchema,
+} from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
+import type { Context } from "hono";
 import type { AppContext } from "../types/env";
 
 export const authRoutes = new Hono<AppContext>();
@@ -59,12 +69,77 @@ authRoutes.post("/logout", async (c) => {
   return c.json({ ok: true });
 });
 
-authRoutes.get("/me", (c) => {
+/** Build the shop-scoped admin URL for reset/invite links. */
+function adminUrl(c: Context<AppContext>, path: string): string {
+  const origin = new URL(c.req.url).origin;
+  const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : "";
+  const base = (c.env.APP_ENV === "development" ? origin : c.env.APP_URL || origin) + shopBase;
+  return `${base}${path}`;
+}
+
+/**
+ * Forgot password: always answers 200 so it never reveals which emails exist.
+ * When the address maps to an active account, a single-use reset link is
+ * emailed. Delivery needs BUYER_EMAIL_FROM configured; without it the request
+ * still succeeds silently (self-service recovery just can't complete).
+ */
+authRoutes.post(
+  "/forgot",
+  rateLimit({ key: "forgot", limit: 5, windowSeconds: 900 }),
+  async (c) => {
+    const { email } = await parseBody(c, forgotPasswordSchema);
+    const user = await first<{ id: string; name: string | null }>(
+      c.var.db,
+      `SELECT id, name FROM users WHERE email = ? AND is_active = 1`,
+      email.toLowerCase(),
+    );
+    if (user) {
+      const token = await createResetToken(c.var.db, user.id, "reset");
+      const link = adminUrl(c, `/admin/reset?token=${encodeURIComponent(token)}`);
+      const { sendBuyerEmail } = await import("../services/buyer-email");
+      const { getBrandName } = await import("../services/brand");
+      const brand = await getBrandName(c.env);
+      await sendBuyerEmail(c.env, {
+        to: email.toLowerCase(),
+        fromName: brand,
+        subject: `Reset your ${brand} password`,
+        text: `Someone asked to reset the password for your ${brand} admin account.\n\nSet a new password (link valid for 2 hours):\n${link}\n\nIf this wasn't you, ignore this email — your password won't change.`,
+      }).catch(() => {});
+      await writeAudit(c.var.db, user.id, "auth.forgot_password", "user", user.id);
+    }
+    return c.json({ ok: true });
+  },
+);
+
+/** Complete a reset (or invite) by burning the token and setting a password. */
+authRoutes.post(
+  "/reset",
+  rateLimit({ key: "reset", limit: 10, windowSeconds: 900 }),
+  async (c) => {
+    const { token, password } = await parseBody(c, resetPasswordSchema);
+    const result = await consumeResetToken(c.var.db, token);
+    if (!result) return c.json({ error: "This link is invalid or has expired. Request a new one." }, 400);
+    await run(
+      c.var.db,
+      `UPDATE users SET password_hash = ?, is_active = 1, updated_at = datetime('now') WHERE id = ?`,
+      await hashPassword(password),
+      result.userId,
+    );
+    // A password change orphans every existing session for that user.
+    await run(c.var.db, `DELETE FROM sessions WHERE user_id = ?`, result.userId);
+    await writeAudit(c.var.db, result.userId, "auth.reset_password", "user", result.userId);
+    return c.json({ ok: true });
+  },
+);
+
+authRoutes.get("/me", async (c) => {
   if (!c.var.userId) return c.json({ error: "Not authenticated" }, 401);
+  const { isSuperAdmin } = await import("../services/auth");
   return c.json({
     id: c.var.userId,
     email: c.var.userEmail,
     roles: c.var.roles,
+    superAdmin: isSuperAdmin(c.env, c.var.userEmail, c.var.roles),
   });
 });
 

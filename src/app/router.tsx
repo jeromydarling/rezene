@@ -18,6 +18,8 @@ import { CartPage } from "./pages/public/CartPage";
 import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
 import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
+import { TeamPage } from "./pages/admin/TeamPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
 import { ProductsAdminPage, CollectionsAdminPage } from "./pages/admin/ProductsAdminPage";
@@ -109,6 +111,7 @@ export function AppRouter() {
 
         {/* Auth */}
         <Route path="admin/login" element={<LoginPage />} />
+        <Route path="admin/reset" element={<ResetPasswordPage />} />
 
         {/* Admin OS */}
         <Route path="admin" element={<AdminLayout />}>
@@ -140,6 +143,7 @@ export function AppRouter() {
           <Route path="duties" element={<DutiesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="team" element={<TeamPage />} />
           <Route path="platform" element={<PlatformPage />} />
           <Route path="crm" element={<CrmPage />} />
           <Route path="crm/atlas" element={<CrmAtlasPage />} />

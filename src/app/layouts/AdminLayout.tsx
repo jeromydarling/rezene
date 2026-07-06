@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Clapperboard,
+  UsersRound,
   Layers,
   Newspaper,
   Package,
@@ -38,11 +39,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
-import { isDemoShop, isPrimaryShop } from "../lib/shop";
+import { isDemoShop } from "../lib/shop";
 
 const NAV_SECTIONS: {
   title: string;
-  platformOnly?: boolean;
+  superAdminOnly?: boolean;
   items: { to: string; label: string; icon: typeof Shirt }[];
 }[] = [
   {
@@ -114,11 +115,14 @@ const NAV_SECTIONS: {
   },
   {
     title: "System",
-    items: [{ to: "/admin/settings", label: "Settings", icon: Settings }],
+    items: [
+      { to: "/admin/settings", label: "Settings", icon: Settings },
+      { to: "/admin/team", label: "Team", icon: UsersRound },
+    ],
   },
   {
     title: "Verto HQ",
-    platformOnly: true,
+    superAdminOnly: true,
     items: [
       { to: "/admin/crm", label: "Customers", icon: HeartHandshake },
       { to: "/admin/crm/atlas", label: "Atlas", icon: Map },
@@ -127,8 +131,10 @@ const NAV_SECTIONS: {
   },
 ];
 
-function visibleSections() {
-  return NAV_SECTIONS.filter((s) => !s.platformOnly || isPrimaryShop());
+function visibleSections(superAdmin: boolean) {
+  // Verto HQ is platform-operator only. Rezene shares the platform DB, so this
+  // must key off the SuperAdmin identity — never merely "is the primary shop".
+  return NAV_SECTIONS.filter((s) => !s.superAdminOnly || superAdmin);
 }
 
 const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
@@ -150,14 +156,15 @@ export function AdminLayout() {
     };
   }, [menuOpen]);
 
+  const superAdmin = Boolean(user?.superAdmin);
   const matches = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return visibleSections()
+    return visibleSections(superAdmin)
       .flatMap((s) => s.items)
       .filter((i) => i.label.toLowerCase().includes(q))
       .slice(0, 6);
-  }, [query]);
+  }, [query, superAdmin]);
 
   const breadcrumb = useMemo(() => {
     const current = ALL_ITEMS.filter((i) => i.to !== "/admin").find((i) =>
@@ -186,7 +193,7 @@ export function AdminLayout() {
         </p>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {visibleSections().map((section) => (
+        {visibleSections(superAdmin).map((section) => (
           <div key={section.title} className="mb-5">
             <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/60">
               {section.title}

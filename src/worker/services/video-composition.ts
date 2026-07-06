@@ -66,7 +66,12 @@ export function buildCompositionHtml(spec: VideoSpec): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 :root{--navy:${esc(navy)};--terra:${esc(terra)};--chalk:${esc(chalk)}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:1920px;height:1080px;overflow:hidden;background:#000}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+/* The stage is authored at a fixed 1920x1080 so the render is deterministic;
+   #fit scales it to the viewport. At a 1920x1080 viewport (the render) the
+   scale is exactly 1, so captured frames are unchanged. */
+#fit{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#scaler{width:1920px;height:1080px;transform-origin:center center}
 #stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#000;font-family:'Helvetica Neue',Arial,sans-serif}
 .scene{position:absolute;inset:0;overflow:hidden}
 .fill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -75,6 +80,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#000}
 .grain{position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>")}
 .vig{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 320px rgba(0,0,0,.5)}
 </style></head><body>
+<div id="fit"><div id="scaler">
 <div id="stage">
   <div class="scene" id="s1"><img class="fill" id="s1img"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(20,29,49,.9),rgba(20,29,49,.15) 60%)"></div>
     <div id="s1t" style="position:absolute;left:120px;bottom:200px;max-width:1300px;color:var(--chalk)"><div class="eyebrow" id="s1eye" style="color:var(--terra);margin-bottom:20px"></div><div class="serif" id="s1line" style="font-size:104px;line-height:1.04"></div></div></div>
@@ -84,7 +90,10 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#000}
   <div class="scene" id="s5"><img class="fill" id="s5img"><div style="position:absolute;inset:0;background:rgba(20,29,49,.6)"></div><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--chalk)"><div class="serif" id="s5brand" style="font-size:160px"></div><div class="eyebrow" id="s5cta" style="font-size:32px;margin-top:24px"></div><div id="s5url" style="font-size:30px;color:rgba(250,247,240,.75);margin-top:16px;letter-spacing:.1em"></div></div></div>
   <div class="grain"></div><div class="vig"></div>
 </div>
+</div></div>
 <script>
+// Fit the fixed 1920x1080 stage to the viewport (no-op when they match, i.e. the render).
+(function(){const sc=document.getElementById('scaler');function fit(){const s=Math.min(innerWidth/1920,innerHeight/1080);sc.style.transform='scale('+s+')';}fit();addEventListener('resize',fit);})();
 const SPEC=${specJson};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));const lerp=(a,b,t)=>a+(b-a)*t;
 const eOut=t=>1-Math.pow(1-clamp(t,0,1),3);const eInOut=t=>{t=clamp(t,0,1);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};

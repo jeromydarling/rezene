@@ -54,6 +54,9 @@ export interface Env {
   SESSION_SECRET?: string;
   ADMIN_EMAIL?: string;
   ADMIN_INITIAL_PASSWORD?: string;
+  /** Comma-separated emails granted Verto HQ (SuperAdmin) access. The
+   *  bootstrap ADMIN_EMAIL is always included. */
+  SUPERADMIN_EMAILS?: string;
   /** Shared secret the render worker (GitHub Action) presents on callbacks. */
   RENDER_CALLBACK_SECRET?: string;
   /** GitHub token (repo scope) used to trigger the render workflow. */

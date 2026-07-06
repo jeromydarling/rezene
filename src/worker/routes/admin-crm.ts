@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { all, first, run, writeAudit } from "../services/db";
 import { parseBody } from "../services/validators";
-import { requireAdminOnly } from "../middleware/auth";
+import { requireAdminOnly, requireSuperAdmin } from "../middleware/auth";
 import { PRIMARY_SHOP_ID } from "../services/shops";
 import {
   crmFollowupSweep,
@@ -20,9 +20,10 @@ import type { AppContext } from "../types/env";
  */
 export const adminCrmRoutes = new Hono<AppContext>();
 
-adminCrmRoutes.use("*", requireAdminOnly, async (c, next) => {
+// SuperAdmin-only, and HQ data lives in the primary D1.
+adminCrmRoutes.use("*", requireAdminOnly, requireSuperAdmin, async (c, next) => {
   if (c.var.shopId !== PRIMARY_SHOP_ID) {
-    return c.json({ error: "Platform operations are limited to the platform operator" }, 403);
+    return c.json({ error: "Not found" }, 404);
   }
   await next();
 });

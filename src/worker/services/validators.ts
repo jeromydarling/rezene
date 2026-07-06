@@ -43,6 +43,29 @@ export const demoAccessSchema = z.object({
   name: z.string().max(120).optional(),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email().max(200),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(10).max(200),
+  password: z.string().min(8).max(200),
+});
+
+const TEAM_ROLES = ["admin", "ops", "viewer"] as const;
+
+export const inviteUserSchema = z.object({
+  email: z.string().email().max(200),
+  name: z.string().max(120).optional(),
+  role: z.enum(TEAM_ROLES).default("ops"),
+});
+
+export const updateUserSchema = z.object({
+  name: z.string().max(120).optional(),
+  role: z.enum(TEAM_ROLES).optional(),
+  isActive: z.boolean().optional(),
+});
+
 // ---------- Leads / public forms ----------
 export const leadSchema = z.object({
   kind: z.enum(["newsletter", "waitlist", "drop_notification", "wholesale_inquiry", "contact"]),
