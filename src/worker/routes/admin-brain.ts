@@ -3,6 +3,7 @@ import { first, run, writeAudit } from "../services/db";
 import { requireAdminWrite } from "../middleware/auth";
 import { reserveResearchQuota, quotaExceededBody } from "../services/ai-quota";
 import { PLAYBOOK, PLAYBOOK_FIELDS } from "../../shared/playbook";
+import { FABRIC_LIBRARY } from "../../shared/fabrics";
 import type { AppContext } from "../types/env";
 
 /**
@@ -200,6 +201,43 @@ function parseAssist(text: string): { answers: unknown; explanation: string | nu
   }
   return { answers: {}, explanation: null };
 }
+
+/**
+ * Fabric drill-down: a founder describes what they want in human terms ("soft
+ * and cozy for a hoodie") and we map it to real fabrics from the library. No
+ * web research needed — this is matching, so it runs on the general LLM.
+ */
+adminBrainRoutes.post("/suggest-fabrics", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { description?: string };
+  if (!body.description?.trim()) return c.json({ error: "Describe the feel you want." }, 400);
+  const { aiComplete } = await import("../services/ai");
+  const manifest = FABRIC_LIBRARY.map((f) => `${f.id}: ${f.name} — ${f.feel} (good for ${f.goodFor})`).join("\n");
+  try {
+    const out = await aiComplete(c.env, {
+      system: `You help a first-time fashion founder choose fabrics in plain language. From the LIBRARY below, pick the 2–5 that best match what they describe. Respond with ONLY JSON: {"picks":["fabric-id",...],"note":"one warm, jargon-free sentence explaining the choice"}. Only use ids that appear in the library.\nLIBRARY:\n${manifest}`,
+      prompt: `They want: ${body.description}`,
+      maxTokens: 500,
+    });
+    const { parseModelJson } = await import("../services/anthropic");
+    let picks: string[] = [];
+    let note: string | null = null;
+    try {
+      const p = parseModelJson(out.text) as { picks?: unknown; note?: unknown };
+      if (Array.isArray(p.picks)) picks = p.picks.map(String);
+      if (typeof p.note === "string") note = p.note;
+    } catch {
+      /* leave empty */
+    }
+    const valid = new Set(FABRIC_LIBRARY.map((f) => f.id));
+    const resolved = picks
+      .filter((id) => valid.has(id))
+      .map((id) => FABRIC_LIBRARY.find((f) => f.id === id)!)
+      .map((f) => ({ id: f.id, name: f.name, composition: f.composition, gsm: f.gsm }));
+    return c.json({ picks: resolved, note });
+  } catch (err) {
+    return c.json({ error: `Couldn't suggest fabrics: ${String(err).slice(0, 160)}` }, 502);
+  }
+});
 
 /** Parse a pasted / PDF-extracted launch plan into the Playbook fields. */
 adminBrainRoutes.post("/parse", requireAdminWrite, async (c) => {

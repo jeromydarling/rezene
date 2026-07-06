@@ -6,6 +6,7 @@ import { extractPdfText } from "../../lib/pdfText";
 import { ErrorNote, LoadingTable, PageHeader } from "../../components/admin/ui";
 import { KbMarkdown } from "../../kb/KbMarkdown";
 import { PLAYBOOK, type PbField } from "../../../shared/playbook";
+import { searchFabrics, type FabricRef } from "../../../shared/fabrics";
 
 interface BrainState {
   mode: "established" | "new" | null;
@@ -283,19 +284,41 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
                       />
                     ))}
                   </div>
-                  {section.checklist && (
-                    <div className="mt-3 space-y-1.5 border-t border-ink/8 pt-3">
-                      {section.checklist.map((item) => {
-                        const key = `${section.id}:${item}`;
-                        return (
-                          <label key={key} className="flex items-start gap-2 text-xs">
-                            <input type="checkbox" checked={Boolean(checklist[key])} onChange={(e) => toggleCheck(key, e.target.checked)} className="mt-0.5" />
-                            <span className={checklist[key] ? "text-warmgrey line-through" : ""}>{item}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {section.checklist && (() => {
+                    const total = section.checklist.length;
+                    const done = section.checklist.filter((it) => checklist[`${section.id}:${it.label}`]).length;
+                    return (
+                      <div className="mt-3 border-t border-ink/8 pt-3">
+                        <div className="mb-2">
+                          <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-warmgrey">
+                            <span>Launch readiness</span>
+                            <span>{done}/{total}{done === total && total > 0 ? " — ready 🎉" : ""}</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-ink/8">
+                            <div className="h-1.5 rounded-full bg-palm transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          {section.checklist.map((item) => {
+                            const key = `${section.id}:${item.label}`;
+                            const on = Boolean(checklist[key]);
+                            return (
+                              <div key={key} className="flex items-start gap-2 text-xs">
+                                <input type="checkbox" checked={on} onChange={(e) => toggleCheck(key, e.target.checked)} className="mt-0.5" />
+                                <span className={`flex-1 ${on ? "text-warmgrey line-through" : ""}`}>{item.label}</span>
+                                {item.route && !on && (
+                                  <Link to={item.route} className="shrink-0 text-navy hover:underline">→ set up</Link>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="mt-2 text-[11px] text-warmgrey">
+                          Tick items as you finish them — this tracks how close you are to launching, and the links jump you straight to where each one gets done.
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -327,6 +350,9 @@ function FieldInput({
   );
   if (field.type === "images") {
     return <ImagesField label={label} value={value} onCommit={onCommit} />;
+  }
+  if (field.type === "fabrics") {
+    return <FabricPickerField label={label} value={value} onCommit={onCommit} />;
   }
   if (field.type === "select") {
     return (
@@ -381,6 +407,120 @@ function FieldInput({
         onBlur={(e) => { onChange(e.target.value); onCommit(e.target.value); }}
       />
     </label>
+  );
+}
+
+function FabricPickerField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: ReactNode;
+  value: unknown;
+  onCommit: (v: unknown) => void;
+}) {
+  const toast = useToast();
+  const selected: string[] = Array.isArray(value) ? (value as string[]) : [];
+  const [query, setQuery] = useState("");
+  const [describe, setDescribe] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [browse, setBrowse] = useState(false);
+
+  const asLine = (f: FabricRef) => `${f.name} (${f.composition}, ${f.gsm})`;
+  function add(line: string) {
+    if (!selected.includes(line)) onCommit([...selected, line]);
+  }
+  function remove(line: string) {
+    onCommit(selected.filter((s) => s !== line));
+  }
+
+  async function suggest() {
+    if (!describe.trim()) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await api.post<{ picks: FabricRef[]; note: string | null }>(
+        "/api/admin/brain/suggest-fabrics",
+        { description: describe },
+      );
+      const lines = (res.picks ?? []).map((f) => `${f.name} (${f.composition}, ${f.gsm})`);
+      const merged = [...selected];
+      for (const l of lines) if (!merged.includes(l)) merged.push(l);
+      onCommit(merged);
+      setNote(res.note ?? null);
+      if (lines.length === 0) toast.info("No clear match", "Try describing the feel a little differently, or browse the library.");
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Couldn't suggest fabrics");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const results = query.trim() ? searchFabrics(query) : browse ? searchFabrics("") : [];
+
+  return (
+    <div className="block">
+      {label}
+      {selected.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {selected.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-full bg-navy/[0.06] px-2 py-0.5 text-xs text-ink/80">
+              {s}
+              <button type="button" onClick={() => remove(s)} className="text-warmgrey hover:text-terracotta" aria-label="Remove">✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Human-terms drill-down */}
+      <div className="mb-2 rounded-lg border border-navy/15 bg-navy/[0.03] p-2.5">
+        <p className="mb-1 text-[11px] font-medium text-warmgrey">🧵 Not sure? Describe the feel you want</p>
+        <div className="flex gap-2">
+          <input
+            className="input !py-1.5 text-xs"
+            placeholder="e.g. soft and cozy for a hoodie; breezy summer shirt"
+            value={describe}
+            onChange={(e) => setDescribe(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void suggest()}
+          />
+          <button type="button" className="btn btn-secondary shrink-0 !py-1.5 text-xs" disabled={busy} onClick={() => void suggest()}>
+            {busy ? "…" : "Suggest"}
+          </button>
+        </div>
+        {note && <p className="mt-1.5 text-xs text-ink/75">💬 {note}</p>}
+      </div>
+
+      {/* Library search / browse */}
+      <div className="flex gap-2">
+        <input className="input !py-1.5 text-xs" placeholder="Search the fabric library…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <button type="button" className="link-quiet shrink-0 text-xs" onClick={() => setBrowse((b) => !b)}>
+          {browse || query ? "Hide" : "Browse all"}
+        </button>
+      </div>
+      {results.length > 0 && (
+        <div className="mt-2 grid max-h-56 gap-1.5 overflow-y-auto sm:grid-cols-2">
+          {results.map((f) => {
+            const line = asLine(f);
+            const on = selected.includes(line);
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => (on ? remove(line) : add(line))}
+                className={`rounded-md border p-2 text-left text-xs transition ${on ? "border-navy bg-navy/[0.05]" : "border-ink/10 hover:border-navy/40"}`}
+              >
+                <span className="flex items-center justify-between font-medium">
+                  {f.name} <span>{on ? "✓" : "+"}</span>
+                </span>
+                <span className="block text-warmgrey">{f.feel}</span>
+                <span className="block text-[11px] text-warmgrey/80">{f.composition} · {f.gsm} · good for {f.goodFor}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

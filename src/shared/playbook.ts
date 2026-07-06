@@ -6,7 +6,7 @@
  * Brand Brain.
  */
 
-export type PbFieldType = "text" | "textarea" | "list" | "select" | "images";
+export type PbFieldType = "text" | "textarea" | "list" | "select" | "images" | "fabrics";
 
 export interface PbField {
   id: string;
@@ -25,8 +25,12 @@ export interface PbSection {
   /** Short guidance (plain text) shown under the section title. */
   intro?: string;
   fields: PbField[];
-  /** Optional pre-launch checklist items for this section. */
-  checklist?: string[];
+  /**
+   * Optional readiness checklist. Each item can deep-link to the module where
+   * you actually do it, so ticking it is tied to a real action — the launch
+   * section rolls these into a "launch-ready" progress bar.
+   */
+  checklist?: { label: string; route?: string }[];
 }
 
 export interface PbPart {
@@ -78,12 +82,12 @@ export const PLAYBOOK: PbPart[] = [
           { id: "brand.type", label: "Typography direction", type: "text", placeholder: "e.g. elegant French serif + clean grotesk" },
         ],
         checklist: [
-          "Domain available",
-          "Instagram handle available",
-          "TikTok handle available",
-          "USPTO trademark search clear",
-          "EUIPO trademark search clear (if selling to EU)",
-          "No negative translations in target markets",
+          { label: "Domain available" },
+          { label: "Instagram handle available" },
+          { label: "TikTok handle available" },
+          { label: "USPTO trademark search clear" },
+          { label: "EUIPO trademark search clear (if selling to EU)" },
+          { label: "No negative translations in target markets" },
         ],
       },
     ],
@@ -134,7 +138,7 @@ export const PLAYBOOK: PbPart[] = [
         id: "fabric",
         title: "Fabric & sampling",
         fields: [
-          { id: "prod.fabrics", label: "Key fabrics", type: "list", seeds: "materials", placeholder: "100% linen 190gsm; 78/22 viscose-nylon…" },
+          { id: "prod.fabrics", label: "Key fabrics", type: "fabrics", seeds: "materials", help: "Pick from the library, or describe the feel you want and we'll suggest." },
           { id: "prod.sampleRounds", label: "Planned sample rounds", type: "select", options: ["2", "3", "4"], seeds: "production", placeholder: "Expect 2–3" },
         ],
       },
@@ -195,15 +199,15 @@ export const PLAYBOOK: PbPart[] = [
           { id: "launch.campaign", label: "Launch campaign angle", type: "textarea", seeds: "marketing" },
         ],
         checklist: [
-          "Business entity formed",
-          "Trademark filed in primary markets",
-          "All launch SKUs sampled and approved",
-          "Checkout tested end-to-end",
-          "Shipping rates configured",
-          "Returns policy + size guide published",
-          "Product photography complete",
-          "Launch email sequence drafted",
-          "Email list at goal",
+          { label: "Business entity formed" },
+          { label: "Trademark filed in primary markets" },
+          { label: "All launch SKUs sampled and approved", route: "/admin/samples" },
+          { label: "Checkout tested end-to-end", route: "/admin/orders" },
+          { label: "Shipping rates configured", route: "/admin/shipping" },
+          { label: "Returns policy + size guide published", route: "/admin/content/pages" },
+          { label: "Product photography complete", route: "/admin/products" },
+          { label: "Launch email sequence drafted", route: "/admin/marketing" },
+          { label: "Email list at goal", route: "/admin/marketing" },
         ],
       },
     ],
