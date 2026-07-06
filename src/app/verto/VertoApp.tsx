@@ -209,6 +209,15 @@ function VertoLayout({ children }: { children: ReactNode }) {
           <div>
             <p className="font-display text-lg font-light">Verto</p>
             <p className="text-xs text-chalk/60">The operating system for independent clothing labels.</p>
+            <a
+              href="https://thecros.app"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs text-chalk/55 transition hover:text-chalk"
+            >
+              Part of the <span className="font-medium text-chalk/80">CROS</span> family of apps
+              <span aria-hidden>↗</span>
+            </a>
           </div>
           <div className="flex gap-6 text-xs text-chalk/70">
             <Link to="/why" className="hover:text-chalk">
@@ -223,13 +232,20 @@ function VertoLayout({ children }: { children: ReactNode }) {
             <a href={DEMO_SHOP_BASE} className="hover:text-chalk">
               See a live shop
             </a>
+            <a href="https://thecros.app" target="_blank" rel="noreferrer" className="hover:text-chalk">
+              CROS
+            </a>
             <Link to="/signup" className="hover:text-chalk">
               Sign up
             </Link>
           </div>
         </div>
         <div className="border-t border-chalk/10 px-5 py-4 text-center text-xs text-chalk/65">
-          © {new Date().getFullYear()} Verto
+          © {new Date().getFullYear()} Verto — a{" "}
+          <a href="https://thecros.app" target="_blank" rel="noreferrer" className="underline decoration-chalk/30 underline-offset-2 hover:text-chalk">
+            CROS
+          </a>{" "}
+          app
         </div>
       </footer>
     </div>

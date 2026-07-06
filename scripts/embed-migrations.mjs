@@ -25,6 +25,7 @@ const EXCLUDE = new Set([
   "0011_crm_health_inbox.sql", // CRM phase 2 — platform-only
   "0016_feedback.sql", // Support tickets land in the platform DB, not per-shop
   "0020_kb_overrides.sql", // KB overlay is platform-wide, not per-shop
+  "0021_superadmin_role.sql", // Platform-owner role — only the platform DB has HQ
 ]);
 
 const files = readdirSync(dir)
