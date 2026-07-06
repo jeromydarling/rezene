@@ -104,7 +104,7 @@ const NAV_SECTIONS: {
     title: "Studio",
     items: [
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
-      { to: "/admin/ai-concepts", label: "AI Concept Lab", icon: Sparkles },
+      { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
     ],

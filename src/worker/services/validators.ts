@@ -192,6 +192,29 @@ export const variantUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// ---------- Design Studio (Flux) ----------
+export const fluxGenerateSchema = z.object({
+  prompt: z.string().min(3).max(2000),
+  seed: z.number().int().nonnegative().nullable().optional(),
+  count: z.number().int().min(1).max(4).default(4),
+  useHouseStyle: z.boolean().default(true),
+});
+
+export const promptSuggestSchema = z.object({
+  brief: z.string().min(1).max(1000),
+  fields: z.record(z.string(), z.string()).optional(),
+});
+
+export const houseStyleSchema = z.object({ value: z.string().max(1200) });
+
+export const conceptShipSchema = z.object({
+  generationId: z.string().max(60).optional(),
+  supplierId: z.string().max(60).nullable().optional(),
+  styleId: z.string().max(60).nullable().optional(),
+  kind: z.enum(["proto", "fit", "sms", "pp", "top"]).default("proto"),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
 export const feedbackCreateSchema = z.object({
   kind: z.enum(["bug", "feature", "question"]).default("bug"),
   title: z.string().min(3).max(200),
