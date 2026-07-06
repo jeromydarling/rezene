@@ -321,3 +321,241 @@ adminImportRoutes.post("/products", requireAdminWrite, async (c) => {
   });
   return c.json(result, 201);
 });
+
+// ============================================================
+// AI-assisted import studio: map any spreadsheet, preview, then apply.
+// ============================================================
+
+/** Canonical product fields the studio can populate from arbitrary columns. */
+const IMPORT_FIELDS = [
+  { key: "name", label: "Product name", required: true },
+  { key: "price", label: "Price" },
+  { key: "compareAtPrice", label: "Compare-at price" },
+  { key: "description", label: "Description" },
+  { key: "category", label: "Category" },
+  { key: "gender", label: "Audience (mens/womens/unisex)" },
+  { key: "collection", label: "Collection" },
+  { key: "colorway", label: "Colour" },
+  { key: "size", label: "Size" },
+  { key: "sku", label: "SKU code" },
+  { key: "stock", label: "Stock on hand" },
+  { key: "image", label: "Image URL" },
+  { key: "currency", label: "Currency" },
+] as const;
+type ImportField = (typeof IMPORT_FIELDS)[number]["key"];
+
+const HEURISTICS: Record<ImportField, RegExp> = {
+  name: /(^name$|title|product ?name|^product$|^handle$|style ?name|item ?name|^item$)/i,
+  price: /(^price$|retail|msrp|amount|unit ?price|base ?price)/i,
+  compareAtPrice: /(compare|was|rrp|original|list ?price)/i,
+  description: /(desc|description|details|body|about)/i,
+  category: /(category|type|garment|product ?type|dept)/i,
+  gender: /(gender|audience|sex|dept|department)/i,
+  collection: /(collection|season|line|capsule|group)/i,
+  colorway: /(colou?r|colorway|shade|finish)/i,
+  size: /(size|dimension)/i,
+  sku: /(sku|code|barcode|upc|ean|variant ?id)/i,
+  stock: /(stock|qty|quantity|inventory|on ?hand|units)/i,
+  image: /(image|photo|img|picture|url|src)/i,
+  currency: /(currency|curr|ccy)/i,
+};
+
+function heuristicMap(headers: string[]): Record<ImportField, number | null> {
+  const map = Object.fromEntries(IMPORT_FIELDS.map((f) => [f.key, null])) as Record<ImportField, number | null>;
+  for (const f of IMPORT_FIELDS) {
+    const idx = headers.findIndex((h) => HEURISTICS[f.key].test(h.trim()));
+    if (idx >= 0) map[f.key] = idx;
+  }
+  return map;
+}
+
+// Step 1 — analyze: parse the sheet and propose a column mapping (AI, with a
+// deterministic heuristic fallback). Returns headers, samples, and the rows so
+// the client can confirm and apply without re-uploading.
+adminImportRoutes.post("/analyze", requireAdminWrite, async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const file = form?.get("file");
+  if (!(file instanceof File)) return c.json({ error: "Upload a CSV file." }, 400);
+  const grid = parseCsv(await file.text());
+  if (grid.length < 2) return c.json({ error: "That file has no data rows." }, 400);
+  const headers = grid[0].map((h) => h.trim());
+  const rows = grid.slice(1, 2001); // cap
+  const truncated = grid.length - 1 > 2000;
+
+  let mapping = heuristicMap(headers);
+  let mappedBy: "ai" | "heuristic" = "heuristic";
+  try {
+    const { aiComplete } = await import("../services/ai");
+    const { parseModelJson } = await import("../services/anthropic");
+    const sample = [headers, ...rows.slice(0, 3)].map((r) => r.join(" | ")).join("\n");
+    const res = await aiComplete(c.env, {
+      system:
+        "You map spreadsheet columns to a fashion catalog schema. Given the header row and a few sample rows, return ONLY compact JSON mapping each of these fields to the best 0-based column index, or null if absent: " +
+        IMPORT_FIELDS.map((f) => f.key).join(", ") +
+        '. Example: {"name":0,"price":2,"size":null}. Consider the sample values, not just header names.',
+      prompt: `Columns and samples:\n${sample}`,
+      maxTokens: 300,
+    });
+    const ai = parseModelJson(res.text) as Record<string, unknown>;
+    const aiMap = { ...mapping };
+    let any = false;
+    for (const f of IMPORT_FIELDS) {
+      const v = ai[f.key];
+      if (typeof v === "number" && v >= 0 && v < headers.length) {
+        aiMap[f.key] = v;
+        any = true;
+      } else if (v === null) {
+        aiMap[f.key] = null;
+      }
+    }
+    if (any) {
+      mapping = aiMap;
+      mappedBy = "ai";
+    }
+  } catch {
+    // heuristic mapping already in place
+  }
+
+  return c.json({ headers, rows, rowCount: rows.length, truncated, mapping, mappedBy, fields: IMPORT_FIELDS });
+});
+
+// Step 2 — apply: create products (grouped by name) + variants + images,
+// resolving/creating collections as needed.
+adminImportRoutes.post("/apply", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => null)) as {
+    headers?: string[];
+    rows?: string[][];
+    mapping?: Record<string, number | null>;
+  } | null;
+  if (!body?.rows || !body.mapping) return c.json({ error: "Missing rows or mapping." }, 400);
+  const m = body.mapping;
+  if (m.name == null) return c.json({ error: "Map a Product name column first." }, 400);
+  const cell = (row: string[], field: ImportField): string => {
+    const idx = m[field];
+    return idx == null ? "" : (row[idx] ?? "").trim();
+  };
+
+  const collectionCache = new Map<string, string | null>();
+  async function resolveCollection(name: string): Promise<string | null> {
+    const key = name.toLowerCase();
+    if (collectionCache.has(key)) return collectionCache.get(key)!;
+    const existing = await first<{ id: string }>(c.var.db, `SELECT id FROM collections WHERE lower(name) = ?`, key);
+    let id = existing?.id ?? null;
+    if (!id) {
+      id = newId("col");
+      const next = await first<{ n: number }>(c.var.db, `SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM collections`);
+      await run(
+        c.var.db,
+        `INSERT INTO collections (id, slug, name, sort_order, is_published) VALUES (?, ?, ?, ?, 0)`,
+        id,
+        `${slugify(name)}-${(next?.n ?? 1)}`,
+        name,
+        next?.n ?? 1,
+      );
+    }
+    collectionCache.set(key, id);
+    return id;
+  }
+
+  const result = { productsCreated: 0, variantsCreated: 0, skipped: [] as string[] };
+  // Group rows by product name (order-preserving).
+  const groups = new Map<string, string[][]>();
+  for (const row of body.rows) {
+    const name = cell(row, "name");
+    if (!name) continue;
+    (groups.get(name) ?? groups.set(name, []).get(name)!).push(row);
+  }
+
+  const sortStart = await first<{ n: number }>(c.var.db, `SELECT COALESCE(MAX(sort_order),0) AS n FROM products`);
+  let sort = sortStart?.n ?? 0;
+
+  for (const [name, rows] of groups) {
+    const head = rows[0];
+    const priceCents = parsePriceCents(cell(head, "price")) ?? 0;
+    const genderRaw = cell(head, "gender").toLowerCase();
+    const gender = GENDERS.has(genderRaw) ? genderRaw : "unisex";
+    const collectionName = cell(head, "collection");
+    const collectionId = collectionName ? await resolveCollection(collectionName) : null;
+    const currency = (cell(head, "currency") || "USD").toUpperCase().slice(0, 3);
+    const productId = newId("prod");
+    let slug = slugify(name);
+    if (await first(c.var.db, `SELECT id FROM products WHERE slug = ?`, slug)) slug = `${slug}-${sort + 1}`;
+    try {
+      await run(
+        c.var.db,
+        `INSERT INTO products (id, slug, name, description, gender, category, collection_id, base_price_cents, compare_at_price_cents, currency, availability, is_published, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?)`,
+        productId,
+        slug,
+        name,
+        cell(head, "description") || null,
+        gender,
+        cell(head, "category") || "apparel",
+        collectionId,
+        priceCents,
+        parsePriceCents(cell(head, "compareAtPrice")),
+        currency,
+        ++sort,
+      );
+    } catch {
+      result.skipped.push(name);
+      continue;
+    }
+    result.productsCreated++;
+
+    // Images (dedupe across rows).
+    const seenImg = new Set<string>();
+    let imgSort = 0;
+    for (const row of rows) {
+      const url = cell(row, "image");
+      if (url && !seenImg.has(url)) {
+        seenImg.add(url);
+        await run(
+          c.var.db,
+          `INSERT INTO product_images (id, product_id, url, sort_order) VALUES (?, ?, ?, ?)`,
+          newId("img"),
+          productId,
+          url,
+          imgSort++,
+        );
+      }
+    }
+
+    // Variants (dedupe colour+size).
+    const seenVar = new Set<string>();
+    for (const row of rows) {
+      const colorway = cell(row, "colorway") || "Default";
+      const size = cell(row, "size") || "OS";
+      const vkey = `${colorway}|${size}`;
+      if (seenVar.has(vkey)) continue;
+      seenVar.add(vkey);
+      const variantId = newId("var");
+      const vprice = parsePriceCents(cell(row, "price"));
+      await run(
+        c.var.db,
+        `INSERT INTO product_variants (id, product_id, colorway_name, size, sku_code, price_cents, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        variantId,
+        productId,
+        colorway,
+        size,
+        cell(row, "sku") || null,
+        vprice != null && vprice !== priceCents ? vprice : null,
+      );
+      const stock = parseInt(cell(row, "stock").replace(/[^0-9]/g, ""), 10);
+      await run(
+        c.var.db,
+        `INSERT INTO inventory_items (id, variant_id, on_hand) VALUES (?, ?, ?)`,
+        newId("inv"),
+        variantId,
+        Number.isFinite(stock) ? Math.min(stock, 1_000_000) : 0,
+      );
+      result.variantsCreated++;
+    }
+  }
+
+  await writeAudit(c.var.db, c.var.userId, "products.import_studio", "product", "csv", {
+    productsCreated: result.productsCreated,
+    variantsCreated: result.variantsCreated,
+  });
+  return c.json(result, 201);
+});

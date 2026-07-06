@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatMoney, titleCase } from "../../lib/format";
@@ -15,6 +16,22 @@ import type { AdminSku, AdminStyle } from "../../../shared/types";
 export function StylesPage() {
   const { data, loading, error, reload } = useFetch<AdminStyle[]>("/api/admin/styles");
   const [createOpen, setCreateOpen] = useState(false);
+  const [tpBusy, setTpBusy] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  async function createTechPack(style: AdminStyle) {
+    setTpBusy(style.id);
+    try {
+      const res = await api.post<{ id: string }>("/api/admin/tech-packs", {
+        styleId: style.id,
+        name: `${style.name} — tech pack`,
+        source: "style",
+      });
+      navigate(`/admin/tech-packs/${res.id}`);
+    } catch {
+      setTpBusy(null);
+    }
+  }
 
   return (
     <div>
@@ -72,7 +89,21 @@ export function StylesPage() {
                     {s.targetRetailCents ? formatMoney(s.targetRetailCents, s.currency) : "—"}
                   </td>
                   <td>{s.skuCount}</td>
-                  <td>{s.hasTechPack ? "✓" : <span className="text-terracotta-deep">missing</span>}</td>
+                  <td>
+                    {s.hasTechPack ? (
+                      "✓"
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={tpBusy === s.id}
+                        onClick={() => void createTechPack(s)}
+                        className="text-xs text-terracotta-deep hover:underline"
+                        title="Create a tech pack from this style"
+                      >
+                        {tpBusy === s.id ? "Creating…" : "+ Create"}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -209,18 +240,39 @@ function StyleCreateForm({ onCreated }: { onCreated: () => void }) {
 }
 
 export function SkusPage() {
-  const { data, loading, error } = useFetch<AdminSku[]>("/api/admin/styles/skus/all");
+  const { data, loading, error, reload } = useFetch<AdminSku[]>("/api/admin/styles/skus/all");
+  const [addOpen, setAddOpen] = useState(false);
+
+  async function remove(k: AdminSku) {
+    if (!confirm(`Delete SKU ${k.skuCode}?`)) return;
+    await api.delete(`/api/admin/styles/skus/${k.id}`);
+    reload();
+  }
+
   return (
     <div>
       <PageHeader
         eyebrow="Catalog"
         title="SKUs"
-        description="The sellable unit master — style × colorway × size."
+        description="The design-pipeline unit master — style × colorway × size. (Sellable colours & sizes live on each product.)"
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
+            Add SKU
+          </button>
+        }
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
       {data && data.length === 0 && (
-        <EmptyState title="No SKUs yet" hint="SKUs are created from a style's detail view." />
+        <EmptyState
+          title="No SKUs yet"
+          hint="Add a SKU against a style, or create sellable colours & sizes directly on a product."
+          action={
+            <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
+              Add SKU
+            </button>
+          }
+        />
       )}
       {data && data.length > 0 && (
         <div className="admin-card overflow-x-auto">
@@ -232,6 +284,7 @@ export function SkusPage() {
                 <th>Colorway</th>
                 <th>Size</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -244,12 +297,99 @@ export function SkusPage() {
                   <td>
                     <StatusBadge status={k.status} />
                   </td>
+                  <td>
+                    <button type="button" className="text-xs text-warmgrey hover:text-red-700 hover:underline" onClick={() => void remove(k)}>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <SlideOver open={addOpen} title="Add SKU" onClose={() => setAddOpen(false)}>
+        <SkuCreateForm
+          onCreated={() => {
+            setAddOpen(false);
+            reload();
+          }}
+        />
+      </SlideOver>
+    </div>
+  );
+}
+
+function SkuCreateForm({ onCreated }: { onCreated: () => void }) {
+  const { data: styles } = useFetch<AdminStyle[]>("/api/admin/styles");
+  const [styleId, setStyleId] = useState("");
+  const [colorwayId, setColorwayId] = useState("");
+  const [size, setSize] = useState("");
+  const [skuCode, setSkuCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { data: detail } = useFetch<{ colorways?: { id: string; name: string }[] }>(
+    styleId ? `/api/admin/styles/${styleId}` : null,
+  );
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/admin/styles/skus", {
+        styleId,
+        colorwayId: colorwayId || null,
+        size,
+        skuCode,
+      });
+      onCreated();
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "Couldn't create SKU");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Style</span>
+        <select className="input" value={styleId} onChange={(e) => { setStyleId(e.target.value); setColorwayId(""); }}>
+          <option value="">Choose a style…</option>
+          {(styles ?? []).map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.styleCode})
+            </option>
+          ))}
+        </select>
+      </label>
+      {detail?.colorways && detail.colorways.length > 0 && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Colorway (optional)</span>
+          <select className="input" value={colorwayId} onChange={(e) => setColorwayId(e.target.value)}>
+            <option value="">— none —</option>
+            {detail.colorways.map((cw) => (
+              <option key={cw.id} value={cw.id}>
+                {cw.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Size</span>
+          <input className="input" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M / 32 / OS" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">SKU code</span>
+          <input className="input font-mono" value={skuCode} onChange={(e) => setSkuCode(e.target.value)} placeholder="MA-M-TRS-001-M" />
+        </label>
+      </div>
+      {error && <ErrorNote message={error} />}
+      <button type="button" className="btn btn-primary w-full" disabled={busy || !styleId || !size || !skuCode} onClick={() => void submit()}>
+        {busy ? "Creating…" : "Create SKU"}
+      </button>
     </div>
   );
 }

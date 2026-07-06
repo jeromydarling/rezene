@@ -193,6 +193,16 @@ adminStyleRoutes.post("/skus", requireAdminWrite, async (c) => {
   return c.json({ id }, 201);
 });
 
+adminStyleRoutes.delete("/skus/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  if (!(await first(c.var.db, `SELECT id FROM skus WHERE id = ?`, id))) {
+    return c.json({ error: "SKU not found" }, 404);
+  }
+  await run(c.var.db, `DELETE FROM skus WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "sku.delete", "sku", id);
+  return c.json({ ok: true });
+});
+
 function mapColorway(row: Record<string, unknown>): AdminColorway {
   return {
     id: row.id as string,

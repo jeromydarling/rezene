@@ -24,6 +24,7 @@ import {
   UsersRound,
   ChevronRight,
   LifeBuoy,
+  Upload,
   Layers,
   Newspaper,
   Package,
@@ -60,6 +61,7 @@ const NAV_SECTIONS: {
       { to: "/admin/skus", label: "SKUs", icon: Tags },
       { to: "/admin/collections", label: "Collections", icon: Layers },
       { to: "/admin/inventory", label: "Inventory", icon: Boxes },
+      { to: "/admin/import", label: "Import studio", icon: Upload },
     ],
   },
   {
