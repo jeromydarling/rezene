@@ -14,7 +14,13 @@ const FLUX_MODELS = [
 // match their style/subject. Newest/cheapest first.
 const FLUX_REF_MODELS = ["@cf/black-forest-labs/flux-2-klein-9b", "@cf/black-forest-labs/flux-2-dev"] as const;
 
-/** Generate an image conditioned on up to 4 reference images (each < 512px). */
+/**
+ * Generate an image conditioned on up to 4 reference images (each < 512px).
+ * FLUX.2 on Workers AI takes multipart form data (even the prompt), so we
+ * build a FormData, serialize it through a Response to get the boundary, and
+ * hand the binding { multipart: { body, contentType } }. `steps` is fixed on
+ * the distilled model, so we don't send it.
+ */
 export async function generateFluxWithReferences(
   env: Env,
   opts: { prompt: string; references: Uint8Array[]; seed?: number },
@@ -22,21 +28,24 @@ export async function generateFluxWithReferences(
   if (!env.AI) throw new FluxUnavailableError("no AI binding");
   const seed = opts.seed ?? randomSeed();
   const refs = opts.references.slice(0, 4);
-  const inputs: Record<string, unknown> = {
-    prompt: opts.prompt.slice(0, 2000),
-    seed,
-    width: 1024,
-    height: 1024,
-    steps: 6,
-  };
-  refs.forEach((r, i) => {
-    // Workers AI binds binary image inputs as a byte-value array.
-    inputs[`input_image_${i}`] = [...r];
-  });
   let lastErr = "";
   for (const model of FLUX_REF_MODELS) {
     try {
-      const res = (await env.AI.run(model, inputs)) as { image?: string } | Uint8Array | ReadableStream;
+      const form = new FormData();
+      form.append("prompt", opts.prompt.slice(0, 2000));
+      form.append("width", "1024");
+      form.append("height", "1024");
+      form.append("seed", String(seed));
+      refs.forEach((r, i) => {
+        // Copy into a fresh ArrayBuffer so Blob gets a clean, non-shared view.
+        const copy = new Uint8Array(r.byteLength);
+        copy.set(r);
+        form.append(`input_image_${i}`, new Blob([copy], { type: "image/jpeg" }), `ref${i}.jpg`);
+      });
+      const serialized = new Response(form);
+      const res = (await env.AI.run(model, {
+        multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") },
+      })) as { image?: string } | Uint8Array | ReadableStream;
       const bytes = await toBytes(res);
       if (bytes && bytes.length > 0) return { bytes, seed, model };
       lastErr = "empty image";
