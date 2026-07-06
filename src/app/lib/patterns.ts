@@ -54,16 +54,58 @@ export function patternLabel(garmentId: string): string | null {
   return DESIGN_MAP[garmentId]?.label ?? null;
 }
 
+/** Optional made-to-measure inputs (centimetres). Blank fields fall back to the
+ *  size-graded standard set. */
+export interface BodyMeasurements {
+  chestCm?: number;
+  waistCm?: number;
+  hipsCm?: number;
+  heightCm?: number;
+}
+
+// Measurements that scale with height (lengths) rather than girth.
+const LENGTH_MEASURES = new Set([
+  "ankle", "crotchDepth", "hpsToBust", "hpsToWaistBack", "hpsToWaistFront", "inseam",
+  "knee", "shoulderToElbow", "shoulderToWrist", "waistToArmpit", "waistToFloor",
+  "waistToHips", "waistToKnee", "waistToSeat", "waistToUnderbust", "waistToUpperLeg", "heel",
+]);
+const BASE_CHEST_CM = 108;
+const BASE_HEIGHT_CM = 170;
+
+function measurementsFor(size: SizeStep, m?: BodyMeasurements): Record<string, number> {
+  const sizeScale = SIZE_SCALE[size];
+  const girthScale = m?.chestCm ? m.chestCm / BASE_CHEST_CM : sizeScale;
+  const lengthScale = m?.heightCm ? m.heightCm / BASE_HEIGHT_CM : sizeScale;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(BASE_MEASUREMENTS)) {
+    out[k] = Math.round(v * (LENGTH_MEASURES.has(k) ? lengthScale : girthScale));
+  }
+  // Hard overrides for the girths the user gave (cm → mm).
+  if (m?.chestCm) out.chest = Math.round(m.chestCm * 10);
+  if (m?.waistCm) {
+    out.waist = Math.round(m.waistCm * 10);
+    out.waistBack = Math.round(m.waistCm * 10 * 0.5);
+  }
+  if (m?.hipsCm) {
+    out.hips = Math.round(m.hipsCm * 10);
+    out.seat = Math.round(m.hipsCm * 10);
+  }
+  return out;
+}
+
 /** Draft a real pattern and return its SVG (or null if unsupported / on error). */
-export function draftPatternSvg(garmentId: string, size: SizeStep): { svg: string; label: string } | null {
+export function draftPatternSvg(
+  garmentId: string,
+  size: SizeStep,
+  measurements?: BodyMeasurements,
+): { svg: string; label: string } | null {
   const entry = DESIGN_MAP[garmentId];
   if (!entry) return null;
   try {
-    const scale = SIZE_SCALE[size];
-    const measurements = Object.fromEntries(
-      Object.entries(BASE_MEASUREMENTS).map(([k, v]) => [k, Math.round(v * scale)]),
-    );
-    const svg = new entry.design({ measurements, paperless: true }).use(pluginTheme).draft().render();
+    const svg = new entry.design({ measurements: measurementsFor(size, measurements), paperless: true })
+      .use(pluginTheme)
+      .draft()
+      .render();
     return { svg, label: entry.label };
   } catch {
     return null;

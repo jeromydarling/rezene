@@ -13,7 +13,7 @@ import {
 } from "../../../shared/garments";
 import { FABRIC_LIBRARY, type FabricRef } from "../../../shared/fabrics";
 import { buildGarment, buildMannequin, disposeGroup, fabricAppearance } from "../../lib/garmentGeometry";
-import { draftPatternSvg, patternLabel } from "../../lib/patterns";
+import { draftPatternSvg, patternLabel, type BodyMeasurements } from "../../lib/patterns";
 import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
@@ -115,11 +115,45 @@ export function FittingStudioPage() {
   const [spin, setSpin] = useState(true);
   const [showBody, setShowBody] = useState(true);
   const [view, setView] = useState<"3d" | "pattern">("3d");
+  const [measurements, setMeasurements] = useState<BodyMeasurements>({});
+  const [designPrompt, setDesignPrompt] = useState("");
+  const [designing, setDesigning] = useState(false);
 
   const pattern = useMemo(
-    () => (view === "pattern" ? draftPatternSvg(garmentId, fit.size) : null),
-    [view, garmentId, fit.size],
+    () => (view === "pattern" ? draftPatternSvg(garmentId, fit.size, measurements) : null),
+    [view, garmentId, fit.size, measurements],
   );
+
+  async function describeGarment() {
+    if (!designPrompt.trim()) return;
+    setDesigning(true);
+    try {
+      const res = await api.post<{
+        garmentId: string;
+        fit: FitConfig;
+        fabricId: string;
+        color?: string;
+        rationale?: string;
+      }>("/api/admin/fitting/design", { prompt: designPrompt });
+      setGarmentId(res.garmentId);
+      // Defer fabric/colour/fit so the garment-change effect doesn't clobber them.
+      setTimeout(() => {
+        if (res.fabricId) setFabricId(res.fabricId);
+        if (res.color) setColor(res.color);
+        setFit({ ...DEFAULT_FIT, ...res.fit });
+      }, 0);
+      toast.success("Design drafted", res.rationale || undefined);
+    } catch {
+      toast.error("Couldn't interpret that", "Try describing the garment a bit differently.");
+    } finally {
+      setDesigning(false);
+    }
+  }
+
+  function setMeasure(key: keyof BodyMeasurements, value: string) {
+    const n = Number(value);
+    setMeasurements((m) => ({ ...m, [key]: value === "" || !Number.isFinite(n) ? undefined : n }));
+  }
 
   function downloadPattern() {
     if (!pattern) return;
@@ -272,6 +306,31 @@ export function FittingStudioPage() {
 
         {/* Controls */}
         <div className="space-y-5">
+          {/* Describe it — the LLM design loop */}
+          <div className="space-y-2 rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
+            <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              ✨ Describe your garment
+            </label>
+            <textarea
+              className="input min-h-[64px] w-full"
+              placeholder="e.g. an oversized cropped hoodie in heavy black fleece"
+              value={designPrompt}
+              onChange={(e) => setDesignPrompt(e.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn-primary w-full"
+              onClick={describeGarment}
+              disabled={designing || !designPrompt.trim()}
+            >
+              {designing ? "Drafting…" : "Draft it"}
+            </button>
+            <p className="text-[11px] leading-snug text-warmgrey">
+              The LLM maps your words to a garment, fit, and fabric — updating both the 3D preview and the real
+              pattern. You can fine-tune everything below.
+            </p>
+          </div>
+
           {/* Garment */}
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
@@ -341,6 +400,33 @@ export function FittingStudioPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Measurements (made-to-measure — feeds the real pattern) */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Measurements <span className="normal-case text-warmgrey/70">· cm, optional</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["chestCm", "Chest"],
+                ["waistCm", "Waist"],
+                ["hipsCm", "Hips"],
+                ["heightCm", "Height"],
+              ] as const).map(([key, label]) => (
+                <input
+                  key={key}
+                  type="number"
+                  className="input w-full"
+                  placeholder={label}
+                  value={measurements[key] ?? ""}
+                  onChange={(e) => setMeasure(key, e.target.value)}
+                />
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-warmgrey">
+              Leave blank to grade from the standard size. Drives the Pattern view.
+            </p>
           </div>
 
           {/* Fit / ease */}
@@ -482,8 +568,10 @@ export function FittingStudioPage() {
       <p className="mt-6 max-w-3xl text-xs text-warmgrey">
         <strong>Two views, both real work:</strong> the <strong>3D preview</strong> is a stylized proportion and
         fabric study — great for exploring silhouette, ease, and fabric feel early (not a physics-accurate drape).
-        The <strong>Pattern</strong> view drafts a genuine, manufacturable 2D sewing pattern for the size you pick
-        (powered by FreeSewing) that you can download as SVG and hand to a factory or drop into a tech pack. For
+        The <strong>Pattern</strong> view drafts a genuine, manufacturable 2D sewing pattern for your size or
+        measurements (powered by FreeSewing) that you can download as SVG and hand to a factory or drop into a
+        tech pack. <strong>Describe your garment</strong> and the LLM sets the garment, fit, and fabric for both
+        views — you refine from there. For
         full physics draping and made-to-measure fit, bring a CLO&nbsp;3D / Browzwear / Style3D file into the 3D
         Simulation bridge.
       </p>
