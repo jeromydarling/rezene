@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
 import { ToastProvider } from "./lib/toast";
@@ -41,6 +42,10 @@ import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
 import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
 import { ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { DesignStudioPage } from "./pages/admin/DesignStudioPage";
+// Lazy-loaded: pulls in three.js / react-three-fiber, kept out of the main bundle.
+const FittingStudioPage = lazy(() =>
+  import("./pages/admin/FittingStudioPage").then((m) => ({ default: m.FittingStudioPage })),
+);
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
@@ -153,6 +158,14 @@ export function AppRouter() {
           <Route path="tech-packs/:id/ai-assist" element={<TechPackAiPage />} />
           <Route path="ai-concepts" element={<DesignStudioPage />} />
           <Route path="3d" element={<ThreeDPage />} />
+          <Route
+            path="fitting"
+            element={
+              <Suspense fallback={<div className="p-8 text-sm text-warmgrey">Loading the 3D Fitting Room…</div>}>
+                <FittingStudioPage />
+              </Suspense>
+            }
+          />
           <Route path="files" element={<FilesPage />} />
           <Route path="costing" element={<CostingPage />} />
           <Route path="duties" element={<DutiesPage />} />

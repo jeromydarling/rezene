@@ -1,0 +1,533 @@
+import { useEffect, useMemo, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, ContactShadows, Center } from "@react-three/drei";
+import * as THREE from "three";
+import {
+  GARMENT_LIBRARY,
+  SIZE_STEPS,
+  SIZE_SCALE,
+  FIT_PRESETS,
+  DEFAULT_FIT,
+  type BaseGarment,
+  type FitConfig,
+  type SizeStep,
+} from "../../../shared/garments";
+import { FABRIC_LIBRARY, type FabricRef } from "../../../shared/fabrics";
+import { PageHeader, EmptyState } from "../../components/admin/ui";
+import { useFetch } from "../../lib/useFetch";
+import { api } from "../../lib/api";
+import { useToast } from "../../lib/toast";
+import type { AdminStyle } from "../../../shared/types";
+
+// ---------------------------------------------------------------------------
+// Geometry: a stylized parametric silhouette (surface of revolution + tubes).
+// NOT a physics drape — a fast, asset-free preview of proportion, fit and
+// fabric. The real GarmentCode + Warp simulation is a later phase.
+// ---------------------------------------------------------------------------
+
+const K = 0.01; // cm-ish → world units
+
+type Cyl = {
+  args: [number, number, number, number];
+  position: [number, number, number];
+  rotation: [number, number, number];
+};
+
+interface Parts {
+  profile: THREE.Vector2[] | null;
+  cylinders: Cyl[];
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+function computeParts(g: BaseGarment, fit: FitConfig, weight: FabricRef["weight"]): Parts {
+  const s = SIZE_SCALE[fit.size];
+  // Heavier cloth holds structure (more flare); light/drapey cloth clings.
+  const flare = weight === "light" ? 0.9 : weight === "heavy" ? 1.12 : 1.0;
+  const chest = g.silhouette.chest * fit.ease * s;
+  const hem = g.silhouette.hem * Math.pow(fit.ease, 0.5) * s * flare;
+  const shoulder = (g.silhouette.shoulder || chest * 0.9) * fit.ease * s;
+  const len = g.silhouette.length * fit.length * s;
+  const sleeveLen = g.silhouette.sleeve * fit.sleeve * s;
+
+  const V = (r: number, y: number) => new THREE.Vector2(Math.max(r, 0.001) * K, y * K);
+  const cylinders: Cyl[] = [];
+  let profile: THREE.Vector2[] | null = null;
+
+  if (g.type === "pants") {
+    const waist = chest;
+    const inseam = g.silhouette.inseam * fit.length * s;
+    profile = [V(waist * 0.98, len), V(waist, len * 0.5), V(waist * 1.03, 0)];
+    const legTop = waist * 0.62;
+    const legBot = hem * 0.5;
+    const legX = waist * 0.5 * K;
+    for (const sign of [-1, 1]) {
+      cylinders.push({
+        args: [legTop * K, legBot * K, inseam * K, 24],
+        position: [sign * legX, -(inseam * 0.5) * K, 0],
+        rotation: [0, 0, sign * 0.03],
+      });
+    }
+  } else if (g.type === "skirt") {
+    profile = [V(chest, len), V(chest * 1.03, len * 0.72), V(lerp(chest, hem, 0.5), len * 0.36), V(hem, 0)];
+  } else {
+    // tops & dresses
+    const neck = chest * 0.42;
+    const waist = chest * 0.95;
+    profile = [
+      V(neck, len),
+      V(shoulder, len * 0.965),
+      V(chest, len * 0.8),
+      V(waist, len * 0.55),
+      V(lerp(waist, hem, 0.5), len * 0.3),
+      V(hem, 0),
+    ];
+    if (sleeveLen > 1 && g.silhouette.shoulder > 0) {
+      const topY = len * 0.95;
+      for (const sign of [-1, 1]) {
+        cylinders.push({
+          args: [chest * 0.34 * K, chest * 0.24 * K, sleeveLen * K, 20],
+          position: [sign * shoulder * 0.9 * K, (topY - sleeveLen * 0.42) * K, 0],
+          rotation: [0, 0, sign * (Math.PI / 2 - 0.55)],
+        });
+      }
+    }
+  }
+  return { profile, cylinders };
+}
+
+// Plain-language fabric → surface appearance. Colour is a sensible default the
+// user can override; roughness reads silk vs. fleece vs. denim.
+function fabricAppearance(f: FabricRef | undefined): { color: string; roughness: number } {
+  if (!f) return { color: "#b8b2a6", roughness: 0.7 };
+  const byId: Record<string, { color: string; roughness: number }> = {
+    "silk-charmeuse": { color: "#d9ccbe", roughness: 0.22 },
+    sateen: { color: "#cdbfd6", roughness: 0.35 },
+    "viscose-crepe": { color: "#c2b8a8", roughness: 0.5 },
+    linen: { color: "#c8bda2", roughness: 0.9 },
+    "cotton-linen": { color: "#cabfa6", roughness: 0.85 },
+    poplin: { color: "#e6e3dc", roughness: 0.6 },
+    denim: { color: "#3b5b7a", roughness: 0.85 },
+    "wool-suiting": { color: "#3a3a42", roughness: 0.7 },
+    "wool-cashmere": { color: "#6b6258", roughness: 0.75 },
+    "brushed-fleece": { color: "#6b7280", roughness: 0.95 },
+    "french-terry": { color: "#8b8578", roughness: 0.9 },
+    "cotton-jersey": { color: "#b9b3a6", roughness: 0.8 },
+    "organic-cotton-jersey": { color: "#b3ac9a", roughness: 0.8 },
+    "modal-jersey": { color: "#a9a29a", roughness: 0.55 },
+    twill: { color: "#7a6f57", roughness: 0.8 },
+    ponte: { color: "#4a4650", roughness: 0.7 },
+    "rib-knit": { color: "#9a9488", roughness: 0.8 },
+    "waffle-knit": { color: "#a59a86", roughness: 0.85 },
+  };
+  if (byId[f.id]) return byId[f.id];
+  const r = f.weight === "light" ? 0.5 : f.weight === "heavy" ? 0.9 : 0.7;
+  return { color: "#b8b2a6", roughness: r };
+}
+
+function GarmentModel({
+  garment,
+  fit,
+  fabric,
+  color,
+}: {
+  garment: BaseGarment;
+  fit: FitConfig;
+  fabric: FabricRef | undefined;
+  color: string;
+}) {
+  const parts = useMemo(
+    () => computeParts(garment, fit, fabric?.weight ?? "medium"),
+    [garment, fit, fabric?.weight],
+  );
+  const appearance = fabricAppearance(fabric);
+  const material = (
+    <meshStandardMaterial color={color} roughness={appearance.roughness} metalness={0} side={THREE.DoubleSide} />
+  );
+  return (
+    <Center>
+      <group>
+        {parts.profile && (
+          <mesh>
+            <latheGeometry args={[parts.profile, 72]} />
+            {material}
+          </mesh>
+        )}
+        {parts.cylinders.map((c, i) => (
+          <mesh key={i} position={c.position} rotation={c.rotation}>
+            <cylinderGeometry args={c.args} />
+            {material}
+          </mesh>
+        ))}
+      </group>
+    </Center>
+  );
+}
+
+function Viewer({
+  garment,
+  fit,
+  fabric,
+  color,
+  spin,
+}: {
+  garment: BaseGarment;
+  fit: FitConfig;
+  fabric: FabricRef | undefined;
+  color: string;
+  spin: boolean;
+}) {
+  return (
+    <Canvas camera={{ position: [0, 0.15, 3], fov: 40 }} dpr={[1, 2]}>
+      <color attach="background" args={["#f4f2ee"]} />
+      <ambientLight intensity={0.65} />
+      <hemisphereLight args={["#ffffff", "#b8b0a4", 0.5]} />
+      <directionalLight position={[4, 6, 5]} intensity={1.2} />
+      <directionalLight position={[-5, 2, -3]} intensity={0.35} />
+      <GarmentModel garment={garment} fit={fit} fabric={fabric} color={color} />
+      <ContactShadows position={[0, -1.05, 0]} opacity={0.35} scale={5} blur={2.4} far={3} />
+      <OrbitControls
+        enablePan={false}
+        minDistance={1.6}
+        maxDistance={5}
+        autoRotate={spin}
+        autoRotateSpeed={1.6}
+        target={[0, 0, 0]}
+      />
+    </Canvas>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+interface SavedLook {
+  id: string;
+  name: string;
+  garmentId: string;
+  fabricId: string;
+  color: string | null;
+  fit: Partial<FitConfig>;
+  styleId: string | null;
+  styleName: string | null;
+  updatedAt: string;
+}
+
+export function FittingStudioPage() {
+  const toast = useToast();
+  const [garmentId, setGarmentId] = useState(GARMENT_LIBRARY[0].id);
+  const garment = useMemo(() => GARMENT_LIBRARY.find((g) => g.id === garmentId)!, [garmentId]);
+  const [fabricId, setFabricId] = useState(garment.defaultFabric);
+  const fabric = useMemo(() => FABRIC_LIBRARY.find((f) => f.id === fabricId), [fabricId]);
+  const [color, setColor] = useState(fabricAppearance(fabric).color);
+  const [fit, setFit] = useState<FitConfig>(DEFAULT_FIT);
+  const [spin, setSpin] = useState(true);
+  const [styleId, setStyleId] = useState("");
+  const [lookName, setLookName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const styles = useFetch<AdminStyle[]>("/api/admin/styles");
+  const looks = useFetch<SavedLook[]>("/api/admin/fitting/looks");
+
+  const hasSleeve = garment.silhouette.sleeve > 0;
+
+  // When the garment changes, reset fabric + colour to its default.
+  useEffect(() => {
+    const f = FABRIC_LIBRARY.find((x) => x.id === garment.defaultFabric);
+    setFabricId(garment.defaultFabric);
+    setColor(fabricAppearance(f).color);
+    setFit((prev) => ({ ...prev, sleeve: 1.0 }));
+  }, [garment]);
+
+  function applyFabric(id: string) {
+    setFabricId(id);
+    setColor(fabricAppearance(FABRIC_LIBRARY.find((f) => f.id === id)).color);
+  }
+
+  function loadLook(l: SavedLook) {
+    setGarmentId(l.garmentId);
+    // Defer fabric/colour so the garment-change effect doesn't clobber them.
+    setTimeout(() => {
+      setFabricId(l.fabricId);
+      if (l.color) setColor(l.color);
+      setFit({ ...DEFAULT_FIT, ...l.fit });
+      setStyleId(l.styleId ?? "");
+    }, 0);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api.post("/api/admin/fitting/looks", {
+        name: lookName.trim() || `${garment.name} — ${fit.size}`,
+        garmentId,
+        fabricId,
+        color,
+        fit,
+        styleId: styleId || null,
+      });
+      setLookName("");
+      toast.success("Look saved");
+      looks.reload();
+    } catch {
+      toast.error("Couldn't save the look");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeLook(id: string) {
+    try {
+      await api.delete(`/api/admin/fitting/looks/${id}`);
+      looks.reload();
+    } catch {
+      toast.error("Couldn't delete");
+    }
+  }
+
+  const garmentFabrics = FABRIC_LIBRARY.filter((f) => garment.fabrics.includes(f.id));
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Design & Development"
+        title="3D Fitting Room"
+        description="Preview a base garment in 3D, dial in the fit, and drape it in a fabric. A fast, stylized proportion study — the physics-accurate drape lands in a later release."
+        actions={
+          <button type="button" className="btn btn-secondary" onClick={() => setSpin((s) => !s)}>
+            {spin ? "Stop spin" : "Auto-spin"}
+          </button>
+        }
+      />
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        {/* Viewer */}
+        <div className="overflow-hidden rounded-lg border border-ink/10 bg-[#f4f2ee]">
+          <div className="h-[540px] w-full">
+            <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} />
+          </div>
+          <div className="flex items-center justify-between border-t border-ink/10 bg-white/60 px-4 py-2 text-xs text-warmgrey">
+            <span>
+              {garment.name} · {fabric?.name ?? "—"} · size {fit.size}
+            </span>
+            <span>Drag to orbit · scroll to zoom</span>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="space-y-5">
+          {/* Garment */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Garment
+            </label>
+            <select
+              className="input w-full"
+              value={garmentId}
+              onChange={(e) => setGarmentId(e.target.value)}
+            >
+              {GARMENT_LIBRARY.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} · {g.category}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-warmgrey">{garment.blurb}</p>
+          </div>
+
+          {/* Fabric */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Fabric
+            </label>
+            <select className="input w-full" value={fabricId} onChange={(e) => applyFabric(e.target.value)}>
+              {garmentFabrics.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            {fabric && <p className="mt-1 text-xs text-warmgrey">{fabric.feel}</p>}
+          </div>
+
+          {/* Colour */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Colour
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border border-ink/15 bg-white p-0.5"
+              />
+              <span className="text-xs uppercase text-warmgrey">{color}</span>
+            </div>
+          </div>
+
+          {/* Size */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Size
+            </label>
+            <div className="flex overflow-hidden rounded-md border border-ink/15">
+              {SIZE_STEPS.map((sz) => (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => setFit((f) => ({ ...f, size: sz as SizeStep }))}
+                  className={`flex-1 px-2 py-1.5 text-xs ${
+                    fit.size === sz ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                  }`}
+                >
+                  {sz}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fit / ease */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Fit
+            </label>
+            <div className="flex overflow-hidden rounded-md border border-ink/15">
+              {FIT_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setFit((f) => ({ ...f, ease: p.ease }))}
+                  className={`flex-1 px-2 py-1.5 text-xs ${
+                    Math.abs(fit.ease - p.ease) < 0.01
+                      ? "bg-navy text-chalk"
+                      : "bg-white text-ink/60 hover:text-ink"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="range"
+              min={0.7}
+              max={1.5}
+              step={0.01}
+              value={fit.ease}
+              onChange={(e) => setFit((f) => ({ ...f, ease: Number(e.target.value) }))}
+              className="mt-2 w-full"
+            />
+          </div>
+
+          {/* Length */}
+          <div>
+            <div className="mb-1 flex justify-between text-xs uppercase tracking-wider text-warmgrey">
+              <span>Length</span>
+              <span>{Math.round(fit.length * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0.8}
+              max={1.2}
+              step={0.01}
+              value={fit.length}
+              onChange={(e) => setFit((f) => ({ ...f, length: Number(e.target.value) }))}
+              className="w-full"
+            />
+          </div>
+
+          {/* Sleeve */}
+          {hasSleeve && (
+            <div>
+              <div className="mb-1 flex justify-between text-xs uppercase tracking-wider text-warmgrey">
+                <span>Sleeve</span>
+                <span>{Math.round(fit.sleeve * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1.3}
+                step={0.01}
+                value={fit.sleeve}
+                onChange={(e) => setFit((f) => ({ ...f, sleeve: Number(e.target.value) }))}
+                className="w-full"
+              />
+            </div>
+          )}
+
+          {/* Save */}
+          <div className="space-y-2 rounded-lg border border-ink/10 bg-white p-3">
+            <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              Save this look
+            </label>
+            <input
+              className="input w-full"
+              placeholder={`${garment.name} — ${fit.size}`}
+              value={lookName}
+              onChange={(e) => setLookName(e.target.value)}
+            />
+            <select className="input w-full" value={styleId} onChange={(e) => setStyleId(e.target.value)}>
+              <option value="">Link to a style (optional)…</option>
+              {(styles.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn btn-primary w-full" onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save look"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Saved looks */}
+      <div className="mt-8">
+        <h2 className="mb-3 font-display text-lg font-light">Saved looks</h2>
+        {(looks.data ?? []).length === 0 ? (
+          <EmptyState title="No saved looks yet" hint="Dial in a garment and save it to build a proportion library." />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(looks.data ?? []).map((l) => {
+              const g = GARMENT_LIBRARY.find((x) => x.id === l.garmentId);
+              const f = FABRIC_LIBRARY.find((x) => x.id === l.fabricId);
+              return (
+                <div key={l.id} className="rounded-lg border border-ink/10 bg-white p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="mt-0.5 inline-block h-4 w-4 shrink-0 rounded-full border border-ink/15"
+                        style={{ background: l.color ?? "#ccc" }}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{l.name}</p>
+                        <p className="text-xs text-warmgrey">
+                          {g?.name ?? l.garmentId} · {f?.name ?? l.fabricId}
+                          {l.styleName ? ` · ${l.styleName}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" className="btn btn-secondary flex-1 text-xs" onClick={() => loadLook(l)}>
+                      Load
+                    </button>
+                    <button type="button" className="btn btn-danger text-xs" onClick={() => removeLook(l.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="mt-6 max-w-3xl text-xs text-warmgrey">
+        <strong>How to read this:</strong> the Fitting Room is a stylized proportion and fabric study, not a
+        physics-accurate garment simulation. It's great for exploring silhouette, ease, and fabric feel early.
+        For true made-to-measure draping and fit, bring a CLO&nbsp;3D / Browzwear / Style3D file into the 3D
+        Simulation bridge — native pattern-based simulation is on the roadmap.
+      </p>
+    </div>
+  );
+}
