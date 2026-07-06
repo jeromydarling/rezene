@@ -68,9 +68,12 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
+          GITHUB_DISPATCH_TOKEN: ${{ secrets.GITHUB_DISPATCH_TOKEN }}
         run: |
           for name in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY \
-                      ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD; do
+                      ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD \
+                      RENDER_CALLBACK_SECRET GITHUB_DISPATCH_TOKEN; do
             value="${!name}"
             if [ -z "$value" ]; then
               echo "skipped $name (not set as a GitHub secret)"
