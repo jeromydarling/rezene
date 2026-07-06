@@ -38,6 +38,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  /** Fetch a non-JSON body (e.g. preview HTML) with the tenant header attached. */
+  getText: async (path: string): Promise<string> => {
+    const res = await fetch(path, { headers: shopHeaders(), credentials: "same-origin" });
+    if (!res.ok) throw new ApiRequestError(res.status, `Request failed (${res.status})`);
+    return res.text();
+  },
   post: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "POST", body: data === undefined ? undefined : JSON.stringify(data) }),
   patch: <T>(path: string, data: unknown) =>

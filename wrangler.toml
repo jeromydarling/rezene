@@ -47,6 +47,12 @@ NOTIFY_EMAIL_TO = ""
 # Sending to arbitrary recipients requires the domain to be onboarded to
 # Email Sending; set this to an address on that domain to activate.
 BUYER_EMAIL_FROM = ""
+# Promo-video render backend. RENDER_REPO's GitHub Actions do the heavy
+# Playwright→ffmpeg render off-Worker; set the matching secrets with
+# `wrangler secret put RENDER_CALLBACK_SECRET` and `... GITHUB_DISPATCH_TOKEN`.
+# Renders stay disabled (free preview still works) until both are set.
+RENDER_REPO = "jeromydarling/rezene"
+VIDEO_EXPORT_PRICE_CENTS = "1900"
 
 [[d1_databases]]
 binding = "DB"

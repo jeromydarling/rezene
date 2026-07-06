@@ -41,6 +41,10 @@ export interface Env {
    * can the EMAIL binding reach arbitrary recipients.
    */
   BUYER_EMAIL_FROM: string;
+  /** GitHub repo (owner/name) whose Actions render promo videos. */
+  RENDER_REPO?: string;
+  /** Per-video export price in minor units, as a string var. Default 1900. */
+  VIDEO_EXPORT_PRICE_CENTS?: string;
 
   // Secrets
   STRIPE_SECRET_KEY?: string;
@@ -50,6 +54,10 @@ export interface Env {
   SESSION_SECRET?: string;
   ADMIN_EMAIL?: string;
   ADMIN_INITIAL_PASSWORD?: string;
+  /** Shared secret the render worker (GitHub Action) presents on callbacks. */
+  RENDER_CALLBACK_SECRET?: string;
+  /** GitHub token (repo scope) used to trigger the render workflow. */
+  GITHUB_DISPATCH_TOKEN?: string;
 }
 
 /** Hono context variables set by middleware. */

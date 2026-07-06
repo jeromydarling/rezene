@@ -6,6 +6,7 @@ import { publicRoutes } from "./routes/public";
 import { commerceRoutes } from "./routes/commerce";
 import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
 import { shippingWebhookRoutes } from "./routes/shipping-webhooks";
+import { renderCallbackRoutes } from "./routes/render-callbacks";
 import { factoryRoutes } from "./routes/factory";
 import { lineSheetRoutes } from "./routes/linesheet";
 import { adminDashboardRoutes } from "./routes/admin-dashboard";
@@ -268,6 +269,9 @@ app.route("/api/stripe", stripeWebhookRoutes);
 
 // Carrier tracking webhooks — secret-token path, never session-gated.
 app.route("/api/shipping", shippingWebhookRoutes);
+
+// Promo-video render callbacks — RENDER_CALLBACK_SECRET-gated, from GitHub Actions.
+app.route("/api/render", renderCallbackRoutes);
 
 // Factory portal — token-scoped, unauthenticated by design.
 app.route("/api/factory", factoryRoutes);

@@ -1,0 +1,42 @@
+name: Render promo video
+
+# Triggered by the Worker via repository_dispatch when a shop pays for a render.
+# The heavy Playwright→ffmpeg work runs here (free CI minutes), then posts the
+# finished MP4s back to the Worker, which captures payment on delivery.
+on:
+  repository_dispatch:
+    types: [render_video]
+
+concurrency:
+  # One render per job; a re-submit supersedes an in-flight run.
+  group: render-${{ github.event.client_payload.jobId }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (for scripts/render-promo.mjs)
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright + Chromium
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install playwright@1.48.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+
+      - name: Render
+        env:
+          JOB_SHOP_ID: ${{ github.event.client_payload.shopId }}
+          JOB_ID: ${{ github.event.client_payload.jobId }}
+          CALLBACK_BASE: ${{ github.event.client_payload.callbackBase }}
+          FORMATS: ${{ toJSON(github.event.client_payload.formats) }}
+          RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: node scripts/render-promo.mjs

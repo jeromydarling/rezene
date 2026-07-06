@@ -20,6 +20,7 @@ import {
   Landmark,
   LayoutDashboard,
   Megaphone,
+  Clapperboard,
   Layers,
   Newspaper,
   Package,
@@ -69,7 +70,10 @@ const NAV_SECTIONS: {
   },
   {
     title: "Marketing",
-    items: [{ to: "/admin/marketing", label: "Campaigns", icon: Megaphone }],
+    items: [
+      { to: "/admin/marketing", label: "Campaigns", icon: Megaphone },
+      { to: "/admin/marketing/video", label: "Promo Video", icon: Clapperboard },
+    ],
   },
   {
     title: "Commerce",

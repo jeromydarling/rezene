@@ -8,6 +8,7 @@ import { parseModelJson } from "../services/anthropic";
 import { getBrandName } from "../services/brand";
 import { buyerEmailConfigured, sendBuyerEmail } from "../services/buyer-email";
 import { newId, sha256Hex } from "../utils/id";
+import type { Context } from "hono";
 import type { AppContext, Env } from "../types/env";
 
 /**
@@ -645,4 +646,253 @@ adminMarketingRoutes.get("/sends", async (c) => {
      ORDER BY ms.sent_at DESC LIMIT 50`,
   );
   return c.json(rows);
+});
+
+// ---------- Promo-video studio ----------
+// Free in-app preview → paid render. The preview and the render share one
+// composition (services/video-composition.ts), so the customer approves the
+// exact frames they pay for. Render + charge-on-delivery land in a later
+// endpoint; these cover compose + edit + live preview.
+
+async function buildVideoSpec(c: Context<AppContext>, sceneOverride?: Partial<import("../services/video-composition").VideoScene>, titleOut?: { v: string }) {
+  const { defaultSpecFromShop } = await import("../services/video-composition");
+  const settings = await all<{ key: string; value: string }>(
+    c.var.db,
+    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline')`,
+  );
+  const s = Object.fromEntries(settings.map((r) => [r.key, r.value]));
+  const brandName = s.brand_name || c.env.BRAND_NAME || "Your label";
+  const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const base = c.var.shopSlug ? `/${c.var.shopSlug}` : "";
+  const rows = await all<{ name: string; base_price_cents: number; currency: string; slug: string; url: string | null }>(
+    c.var.db,
+    `SELECT p.name, p.base_price_cents, p.currency, p.slug,
+            (SELECT url FROM product_images i WHERE i.product_id = p.id ORDER BY sort_order LIMIT 1) AS url
+     FROM products p WHERE p.is_published = 1 AND p.availability != 'archived'
+     ORDER BY p.sort_order LIMIT 6`,
+  );
+  const money = (cents: number, cur: string) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(cents / 100);
+  const products = rows
+    .filter((r) => r.url)
+    .map((r) => ({ img: r.url as string, name: r.name, price: money(r.base_price_cents, r.currency) }));
+  const hero = products[0]?.img ?? `${appUrl}/verto/hero.jpg`;
+  const editorial = products[products.length - 1]?.img ?? hero;
+  const spec = defaultSpecFromShop({
+    brandName,
+    tagline: s.brand_tagline || "New season.",
+    url: `${appUrl}${base}`.replace(/^https?:\/\//, ""),
+    products: products.slice(0, 5),
+    heroImg: hero,
+    editorialImg: editorial,
+  });
+  if (sceneOverride) spec.scenes = { ...spec.scenes, ...sceneOverride };
+  if (titleOut) titleOut.v = brandName;
+  return spec;
+}
+
+adminMarketingRoutes.get("/video", async (c) => {
+  const rows = await all(
+    c.var.db,
+    `SELECT id, title, status, progress, progress_label, formats, poster_file_id, price_cents, paid_at, created_at
+     FROM video_jobs ORDER BY created_at DESC LIMIT 100`,
+  );
+  return c.json(rows);
+});
+
+adminMarketingRoutes.post("/video", requireAdminWrite, async (c) => {
+  const t = { v: "" };
+  const spec = await buildVideoSpec(c, undefined, t);
+  const id = newId("vid");
+  await run(
+    c.var.db,
+    `INSERT INTO video_jobs (id, title, template, spec_json, status, created_by)
+     VALUES (?, ?, 'brand_promo', ?, 'draft', ?)`,
+    id,
+    `${t.v} — promo`,
+    JSON.stringify(spec),
+    c.var.userId,
+  );
+  return c.json({ id }, 201);
+});
+
+// Studio config: price + whether renders are switched on for this store.
+adminMarketingRoutes.get("/video/config", async (c) => {
+  const { renderConfigured, videoExportPriceCents } = await import("../services/video-render");
+  return c.json({
+    priceCents: videoExportPriceCents(c.env),
+    currency: "USD",
+    renderEnabled: renderConfigured(c.env),
+    stripeEnabled: Boolean(c.env.STRIPE_SECRET_KEY),
+    formats: ["16:9", "9:16", "1:1"],
+  });
+});
+
+adminMarketingRoutes.get("/video/:id", async (c) => {
+  const row = await first(c.var.db, `SELECT * FROM video_jobs WHERE id = ?`, c.req.param("id"));
+  if (!row) return c.json({ error: "Not found" }, 404);
+  return c.json(row);
+});
+
+const videoSceneSchema = z.object({
+  title: z.string().max(120).optional(),
+  scenes: z
+    .object({
+      opener: z.string().max(160).optional(),
+      collection: z.string().max(80).optional(),
+      story: z.string().max(200).optional(),
+      cta: z.string().max(80).optional(),
+    })
+    .optional(),
+});
+
+adminMarketingRoutes.patch("/video/:id", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, videoSceneSchema);
+  const row = await first<{ spec_json: string }>(c.var.db, `SELECT spec_json FROM video_jobs WHERE id = ?`, c.req.param("id"));
+  if (!row) return c.json({ error: "Not found" }, 404);
+  const spec = JSON.parse(row.spec_json) as import("../services/video-composition").VideoSpec;
+  if (body.scenes) spec.scenes = { ...spec.scenes, ...body.scenes };
+  await run(
+    c.var.db,
+    `UPDATE video_jobs SET spec_json = ?, ${body.title ? "title = ?, " : ""} updated_at = datetime('now') WHERE id = ?`,
+    ...(body.title ? [JSON.stringify(spec), body.title, c.req.param("id")] : [JSON.stringify(spec), c.req.param("id")]),
+  );
+  return c.json({ ok: true });
+});
+
+// Live preview HTML for the studio iframe (same composition the render
+// captures — this IS the guardrail). Loaded via api.get (carries the shop
+// header) and injected as srcdoc, so DB-backed /media/:id images are rewritten
+// to the shop-addressed path that resolves without a header. Static demo
+// images under /media/placeholder/* are already header-independent.
+adminMarketingRoutes.get("/video/:id/preview", async (c) => {
+  const row = await first<{ spec_json: string }>(c.var.db, `SELECT spec_json FROM video_jobs WHERE id = ?`, c.req.param("id"));
+  if (!row) return c.text("Not found", 404);
+  const { buildCompositionHtml } = await import("../services/video-composition");
+  let html = buildCompositionHtml(JSON.parse(row.spec_json));
+  if (c.var.shopSlug) {
+    html = html.replace(/\/media\/(?!placeholder\/)/g, `/${c.var.shopSlug}/media/`);
+  }
+  return c.html(html);
+});
+
+// AI: draft the scene copy in the shop's brand voice.
+adminMarketingRoutes.post("/video/:id/draft", requireAdminWrite, async (c) => {
+  const row = await first<{ spec_json: string }>(c.var.db, `SELECT spec_json FROM video_jobs WHERE id = ?`, c.req.param("id"));
+  if (!row) return c.json({ error: "Not found" }, 404);
+  const spec = JSON.parse(row.spec_json) as import("../services/video-composition").VideoSpec;
+  const voice = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = 'brand_voice'`);
+  try {
+    const { aiComplete } = await import("../services/ai");
+    const res = await aiComplete(c.env, {
+      system:
+        "You write copy for a short fashion-brand promo video. Return ONLY compact JSON: {\"opener\":\"\",\"collection\":\"\",\"story\":\"\",\"cta\":\"\"}. opener ≤ 6 words (a hook over the hero), collection ≤ 4 words (a season/collection name), story ≤ 12 words (one evocative brand line), cta ≤ 4 words. No quotes-within, no emojis, match the brand voice.",
+      prompt: `Brand: ${spec.brandName}. Voice: ${voice?.value || "warm, understated, editorial"}. Pieces: ${spec.products.map((p) => p.name).join(", ") || "seasonal styles"}.`,
+      maxTokens: 220,
+    });
+    const { parseModelJson } = await import("../services/anthropic");
+    const draft = parseModelJson(res.text) as Record<string, string>;
+    spec.scenes = {
+      opener: draft.opener || spec.scenes.opener,
+      collection: draft.collection || spec.scenes.collection,
+      story: draft.story || spec.scenes.story,
+      cta: draft.cta || spec.scenes.cta,
+    };
+    await run(c.var.db, `UPDATE video_jobs SET spec_json = ?, updated_at = datetime('now') WHERE id = ?`, JSON.stringify(spec), c.req.param("id"));
+    return c.json({ scenes: spec.scenes });
+  } catch {
+    return c.json({ error: "AI drafting unavailable — edit the lines by hand" }, 503);
+  }
+});
+
+// Submit for render. The free preview above is the approval step — this is the
+// only place money enters, and only ever captured once the MP4 lands (see
+// render-callbacks finalize). Guardrail: what they previewed == what renders.
+const submitSchema = z.object({
+  formats: z.array(z.enum(["16:9", "9:16", "1:1"])).min(1).max(3).optional(),
+});
+adminMarketingRoutes.post("/video/:id/submit", requireAdminWrite, async (c) => {
+  const { renderConfigured, videoExportPriceCents, dispatchRender } = await import("../services/video-render");
+  const jobId = c.req.param("id");
+  const body = await parseBody(c, submitSchema);
+  const formats = body.formats ?? ["16:9"];
+  const row = await first<{ status: string; title: string; currency: string; paid_at: string | null }>(
+    c.var.db,
+    `SELECT status, title, currency, paid_at FROM video_jobs WHERE id = ?`,
+    jobId,
+  );
+  if (!row) return c.json({ error: "Not found" }, 404);
+  if (!["draft", "failed", "cancelled"].includes(row.status)) {
+    return c.json({ error: `Already ${row.status}` }, 409);
+  }
+  if (!renderConfigured(c.env)) {
+    return c.json(
+      { error: "Video rendering isn't switched on for this store yet — the live preview is fully available.", code: "render_unconfigured" },
+      503,
+    );
+  }
+  const price = videoExportPriceCents(c.env);
+  await run(
+    c.var.db,
+    `UPDATE video_jobs SET formats = ?, price_cents = ?, error = NULL, updated_at = datetime('now') WHERE id = ?`,
+    JSON.stringify(formats),
+    price,
+    jobId,
+  );
+
+  const { getStripe } = await import("../services/stripe");
+  const stripe = getStripe(c.env);
+  // Paid path: authorize now (manual capture), dispatch only after Stripe
+  // confirms the hold via webhook, capture only on delivery.
+  if (stripe && price > 0 && !row.paid_at) {
+    const origin = new URL(c.req.url).origin;
+    const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : "";
+    const appUrl = (c.env.APP_ENV === "development" ? origin : (c.env.APP_URL || origin)) + shopBase;
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_intent_data: { capture_method: "manual" },
+      metadata: { kind: "video_render", job_id: jobId, shop_id: c.var.shopId, formats: JSON.stringify(formats) },
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: (row.currency || "USD").toLowerCase(),
+            unit_amount: price,
+            product_data: {
+              name: `Promo video — ${row.title}`,
+              description: `Rendered export (${formats.join(", ")}). You're only charged once the finished video is delivered.`,
+            },
+          },
+        },
+      ],
+      success_url: `${appUrl}/admin/marketing/video?paid=${jobId}`,
+      cancel_url: `${appUrl}/admin/marketing/video?cancelled=${jobId}`,
+    });
+    await run(c.var.db, `UPDATE video_jobs SET updated_at = datetime('now') WHERE id = ?`, jobId);
+    return c.json({ checkoutUrl: session.url });
+  }
+
+  // Free path (no Stripe configured, zero price, or already paid): queue now.
+  await run(
+    c.var.db,
+    `UPDATE video_jobs SET status = 'queued', progress = 0, progress_label = 'Queued', updated_at = datetime('now') WHERE id = ?`,
+    jobId,
+  );
+  const dispatched = await dispatchRender(c.env, { shopId: c.var.shopId, jobId, formats });
+  if (!dispatched.ok) {
+    await run(c.var.db, `UPDATE video_jobs SET status = 'failed', error = ? WHERE id = ?`, dispatched.error ?? "dispatch failed", jobId);
+    return c.json({ error: "Couldn't reach the render service. Try again shortly." }, 502);
+  }
+  return c.json({ queued: true });
+});
+
+// Cancel a draft/failed job (or hide a finished one).
+adminMarketingRoutes.delete("/video/:id", requireAdminWrite, async (c) => {
+  const row = await first<{ status: string }>(c.var.db, `SELECT status FROM video_jobs WHERE id = ?`, c.req.param("id"));
+  if (!row) return c.json({ error: "Not found" }, 404);
+  if (["queued", "rendering"].includes(row.status)) {
+    return c.json({ error: "Can't cancel while it's rendering." }, 409);
+  }
+  await run(c.var.db, `DELETE FROM video_jobs WHERE id = ?`, c.req.param("id"));
+  return c.json({ ok: true });
 });

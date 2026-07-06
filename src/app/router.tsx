@@ -33,6 +33,7 @@ import { AiConceptsPage, ThreeDPage, FilesPage } from "./pages/admin/StudioPages
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
+import { VideoStudioPage } from "./pages/admin/VideoStudioPage";
 import { PlatformPage } from "./pages/admin/PlatformPage";
 import { CrmAtlasPage, CrmPage } from "./pages/admin/CrmPage";
 import { SearchCheckupPage } from "./pages/admin/SearchCheckupPage";
@@ -123,6 +124,7 @@ export function AppRouter() {
           <Route path="line-sheets" element={<LineSheetsPage />} />
           <Route path="shipping" element={<ShippingPage />} />
           <Route path="marketing" element={<MarketingPage />} />
+          <Route path="marketing/video" element={<VideoStudioPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="materials" element={<MaterialsPage />} />

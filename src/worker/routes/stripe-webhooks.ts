@@ -60,7 +60,12 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const orderId = await handleCheckoutCompleted(c.env.DB, stripe, event.data.object);
+        const session = event.data.object;
+        if (session.metadata?.kind === "video_render") {
+          await handleVideoRenderAuthorized(c.env, session);
+          break;
+        }
+        const orderId = await handleCheckoutCompleted(c.env.DB, stripe, session);
         if (orderId) c.executionCtx.waitUntil(notifyOrderPaid(c.env, orderId));
         break;
       }
@@ -158,6 +163,41 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
         })),
       }),
     });
+  }
+}
+
+/**
+ * Promo-video render checkout completed → the card is now authorized (manual
+ * capture holds the funds). Record the intent, queue the job, and dispatch the
+ * GitHub Actions render. The hold is only captured when the finished MP4 lands
+ * (see render-callbacks finalize), so an uncompleted render costs nothing.
+ */
+async function handleVideoRenderAuthorized(env: Env, session: Stripe.Checkout.Session): Promise<void> {
+  const jobId = session.metadata?.job_id;
+  const shopId = session.metadata?.shop_id;
+  if (!jobId || !shopId) return;
+  const { getShopDb } = await import("../services/tenant-db");
+  const { PRIMARY_SHOP_ID } = await import("../services/shops");
+  const { dispatchRender } = await import("../services/video-render");
+  const db = getShopDb(env, shopId, PRIMARY_SHOP_ID);
+  const pi = typeof session.payment_intent === "string" ? session.payment_intent : null;
+  const formats = (() => {
+    try {
+      return JSON.parse(session.metadata?.formats || "[\"16:9\"]") as ("16:9" | "9:16" | "1:1")[];
+    } catch {
+      return ["16:9"] as ("16:9" | "9:16" | "1:1")[];
+    }
+  })();
+  await run(
+    db,
+    `UPDATE video_jobs SET status = 'queued', progress = 0, progress_label = 'Queued',
+       stripe_payment_intent_id = ?, updated_at = datetime('now') WHERE id = ?`,
+    pi,
+    jobId,
+  );
+  const dispatched = await dispatchRender(env, { shopId, jobId, formats });
+  if (!dispatched.ok) {
+    await run(db, `UPDATE video_jobs SET status = 'failed', error = ? WHERE id = ?`, dispatched.error ?? "dispatch failed", jobId);
   }
 }
 

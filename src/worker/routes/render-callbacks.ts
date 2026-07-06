@@ -1,0 +1,248 @@
+/**
+ * Render backend callbacks — the surface GitHub Actions talks to.
+ *
+ * These are NOT session-gated: the render runs in CI, not a browser. Every
+ * call is authenticated by the shared RENDER_CALLBACK_SECRET, and the shop is
+ * addressed explicitly in the path so the Action can write back to the right
+ * per-shop database.
+ *
+ * Flow:
+ *   GET  /:shopId/:jobId              → job spec + music prompt + formats
+ *   GET  /:shopId/:jobId/composition  → the exact HTML the Action captures
+ *   POST /:shopId/:jobId/progress     → scene-by-scene progress for the UI
+ *   POST /:shopId/:jobId/complete     → one finished MP4 (multipart, per format)
+ *   POST /:shopId/:jobId/finalize     → render done → capture payment / notify
+ */
+import { Hono } from "hono";
+import { first, run } from "../services/db";
+import { getShopDb } from "../services/tenant-db";
+import { PRIMARY_SHOP_ID } from "../services/shops";
+import { renderSecretOk } from "../services/video-render";
+import { buildCompositionHtml, type VideoSpec } from "../services/video-composition";
+import { getStripe } from "../services/stripe";
+import { sendBuyerEmail } from "../services/buyer-email";
+import { newId } from "../utils/id";
+import type { Env } from "../types/env";
+import type { D1Database } from "@cloudflare/workers-types";
+
+export const renderCallbackRoutes = new Hono<{ Bindings: Env }>();
+
+interface JobRow {
+  id: string;
+  title: string;
+  spec_json: string;
+  status: string;
+  formats: string;
+  outputs: string | null;
+  price_cents: number;
+  currency: string;
+  stripe_payment_intent_id: string | null;
+  paid_at: string | null;
+  created_by: string | null;
+}
+
+function db(env: Env, shopId: string): D1Database {
+  return getShopDb(env, shopId, PRIMARY_SHOP_ID) as unknown as D1Database;
+}
+
+function secretOk(c: { req: { header: (k: string) => string | undefined; query: (k: string) => string | undefined }; env: Env }): boolean {
+  return renderSecretOk(c.env, c.req.header("x-render-secret") || c.req.query("secret"));
+}
+
+/** Absolute-ise /media and /verto asset paths so CI's browser can fetch them. */
+function absolutise(spec: VideoSpec, appUrl: string): VideoSpec {
+  const fix = (u: string) => (u && u.startsWith("/") ? `${appUrl}${u}` : u);
+  return {
+    ...spec,
+    heroImg: fix(spec.heroImg),
+    editorialImg: fix(spec.editorialImg),
+    products: (spec.products ?? []).map((p) => ({ ...p, img: fix(p.img) })),
+  };
+}
+
+function musicPromptFor(spec: VideoSpec): string {
+  return `Elegant, cinematic fashion-runway underscore for a ${spec.durationSec ?? 30}-second brand promo. Understated, modern, confident; soft percussion building to a warm resolve. Instrumental, no vocals. Brand mood: refined, editorial, ${spec.brandName}.`;
+}
+
+// ---- Job metadata (spec, formats, music prompt) --------------------------
+renderCallbackRoutes.get("/:shopId/:jobId", async (c) => {
+  if (!secretOk(c)) return c.json({ error: "unauthorized" }, 401);
+  const row = await first<JobRow>(db(c.env, c.req.param("shopId")), `SELECT * FROM video_jobs WHERE id = ?`, c.req.param("jobId"));
+  if (!row) return c.json({ error: "not found" }, 404);
+  const appUrl = (c.env.APP_URL || "https://verto.style").replace(/\/$/, "");
+  const spec = absolutise(JSON.parse(row.spec_json) as VideoSpec, appUrl);
+  return c.json({
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    durationSec: spec.durationSec ?? 30,
+    formats: JSON.parse(row.formats || "[\"16:9\"]") as string[],
+    musicPrompt: musicPromptFor(spec),
+    spec,
+  });
+});
+
+// ---- Composition HTML (what the Action captures) -------------------------
+renderCallbackRoutes.get("/:shopId/:jobId/composition", async (c) => {
+  if (!secretOk(c)) return c.text("unauthorized", 401);
+  const row = await first<JobRow>(db(c.env, c.req.param("shopId")), `SELECT spec_json FROM video_jobs WHERE id = ?`, c.req.param("jobId"));
+  if (!row) return c.text("not found", 404);
+  const appUrl = (c.env.APP_URL || "https://verto.style").replace(/\/$/, "");
+  const spec = absolutise(JSON.parse(row.spec_json) as VideoSpec, appUrl);
+  return c.html(buildCompositionHtml(spec));
+});
+
+// ---- Progress ------------------------------------------------------------
+renderCallbackRoutes.post("/:shopId/:jobId/progress", async (c) => {
+  if (!secretOk(c)) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { progress?: number; label?: string; status?: string };
+  const shopDb = db(c.env, c.req.param("shopId"));
+  const progress = Math.max(0, Math.min(100, Math.round(Number(body.progress) || 0)));
+  const status = body.status === "rendering" ? "rendering" : undefined;
+  await run(
+    shopDb,
+    `UPDATE video_jobs SET progress = ?, progress_label = ?, ${status ? "status = ?, " : ""}
+       render_started_at = COALESCE(render_started_at, datetime('now')), updated_at = datetime('now')
+     WHERE id = ?`,
+    ...(status
+      ? [progress, body.label ?? null, status, c.req.param("jobId")]
+      : [progress, body.label ?? null, c.req.param("jobId")]),
+  );
+  return c.json({ ok: true });
+});
+
+// ---- One finished MP4 (per requested format) -----------------------------
+renderCallbackRoutes.post("/:shopId/:jobId/complete", async (c) => {
+  // multipart: fields secret, format; files video (required), poster (optional)
+  const form = await c.req.parseBody();
+  if (!renderSecretOk(c.env, (form.secret as string) || c.req.header("x-render-secret"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const shopId = c.req.param("shopId");
+  const jobId = c.req.param("jobId");
+  const shopDb = db(c.env, shopId);
+  const row = await first<JobRow>(shopDb, `SELECT id, outputs FROM video_jobs WHERE id = ?`, jobId);
+  if (!row) return c.json({ error: "not found" }, 404);
+
+  const format = String(form.format || "16:9");
+  const video = form.video as unknown as File | undefined;
+  if (!video || typeof video.arrayBuffer !== "function") return c.json({ error: "missing video" }, 400);
+
+  const key = `${shopId}/video/${jobId}/${format.replace(":", "x")}.mp4`;
+  await c.env.FILES.put(key, await video.arrayBuffer(), { httpMetadata: { contentType: "video/mp4" } });
+  const fileId = newId("file");
+  await run(
+    shopDb,
+    `INSERT INTO files (id, r2_key, filename, content_type, entity_type, entity_id, is_public, uploaded_by)
+     VALUES (?, ?, ?, 'video/mp4', 'general', ?, 1, NULL)`,
+    fileId,
+    key,
+    `${jobId}-${format.replace(":", "x")}.mp4`,
+    jobId,
+  );
+
+  let posterFileId: string | null = null;
+  const poster = form.poster as unknown as File | undefined;
+  if (poster && typeof poster.arrayBuffer === "function") {
+    const pkey = `${shopId}/video/${jobId}/poster.jpg`;
+    await c.env.FILES.put(pkey, await poster.arrayBuffer(), { httpMetadata: { contentType: "image/jpeg" } });
+    posterFileId = newId("file");
+    await run(
+      shopDb,
+      `INSERT INTO files (id, r2_key, filename, content_type, entity_type, entity_id, is_public, uploaded_by)
+       VALUES (?, ?, ?, 'image/jpeg', 'general', ?, 1, NULL)`,
+      posterFileId,
+      pkey,
+      `${jobId}-poster.jpg`,
+      jobId,
+    );
+  }
+
+  const outputs = (row.outputs ? JSON.parse(row.outputs) : {}) as Record<string, { fileId: string; url: string }>;
+  // Served through the tenant-resolving /media route (studio requests carry the shop header).
+  outputs[format] = { fileId, url: `/media/${fileId}` };
+  await run(
+    shopDb,
+    `UPDATE video_jobs SET outputs = ?, ${posterFileId ? "poster_file_id = COALESCE(poster_file_id, ?), " : ""} updated_at = datetime('now') WHERE id = ?`,
+    ...(posterFileId ? [JSON.stringify(outputs), posterFileId, jobId] : [JSON.stringify(outputs), jobId]),
+  );
+  return c.json({ ok: true, fileId });
+});
+
+// ---- Finalize: render succeeded or failed → settle payment + notify ------
+renderCallbackRoutes.post("/:shopId/:jobId/finalize", async (c) => {
+  if (!secretOk(c)) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  const shopId = c.req.param("shopId");
+  const jobId = c.req.param("jobId");
+  const shopDb = db(c.env, shopId);
+  const row = await first<JobRow>(shopDb, `SELECT * FROM video_jobs WHERE id = ?`, jobId);
+  if (!row) return c.json({ error: "not found" }, 404);
+
+  const stripe = getStripe(c.env);
+  if (body.ok) {
+    // Capture the authorization now that the MP4 exists. Charge-on-delivery:
+    // a failed render (below) never reaches this branch, so we never bill it.
+    let paidAt: string | null = row.paid_at;
+    if (stripe && row.stripe_payment_intent_id && !row.paid_at && row.price_cents > 0) {
+      try {
+        const pi = await stripe.paymentIntents.capture(row.stripe_payment_intent_id);
+        if (pi.status === "succeeded") paidAt = new Date().toISOString();
+      } catch (err) {
+        console.error(`[render] capture failed for ${jobId}: ${String(err)}`);
+      }
+    }
+    await run(
+      shopDb,
+      `UPDATE video_jobs SET status = 'ready', progress = 100, progress_label = 'Ready', error = NULL,
+         paid_at = ?, rendered_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      paidAt,
+      jobId,
+    );
+    await notifyOwner(c.env, shopDb, row, true);
+  } else {
+    // Release the hold so the customer is never charged for a render they can't use.
+    if (stripe && row.stripe_payment_intent_id && !row.paid_at) {
+      try {
+        await stripe.paymentIntents.cancel(row.stripe_payment_intent_id);
+      } catch (err) {
+        console.error(`[render] PI cancel failed for ${jobId}: ${String(err)}`);
+      }
+    }
+    await run(
+      shopDb,
+      `UPDATE video_jobs SET status = 'failed', progress_label = 'Render failed', error = ?, updated_at = datetime('now') WHERE id = ?`,
+      (body.error || "render failed").slice(0, 500),
+      jobId,
+    );
+    await notifyOwner(c.env, shopDb, row, false);
+  }
+  return c.json({ ok: true });
+});
+
+async function notifyOwner(env: Env, shopDb: D1Database, row: JobRow, ok: boolean): Promise<void> {
+  if (!row.created_by) return;
+  const user = await first<{ email: string; name: string | null }>(
+    shopDb,
+    `SELECT email, name FROM users WHERE id = ?`,
+    row.created_by,
+  );
+  if (!user?.email) return;
+  const brand = await first<{ value: string }>(shopDb, `SELECT value FROM settings WHERE key = 'brand_name'`);
+  const name = brand?.value || "your shop";
+  if (ok) {
+    await sendBuyerEmail(env, {
+      to: user.email,
+      fromName: name,
+      subject: `Your ${name} promo video is ready`,
+      text: `Good news — "${row.title}" finished rendering and is ready to download from your Marketing Suite → Promo Video.\n\nYou were only charged now that the finished video exists.`,
+    });
+  } else {
+    await sendBuyerEmail(env, {
+      to: user.email,
+      fromName: name,
+      subject: `Your ${name} promo render needs another pass`,
+      text: `"${row.title}" didn't finish rendering, so you were not charged. Open the Marketing Suite → Promo Video to retry — your composition is saved exactly as you left it.`,
+    });
+  }
+}
