@@ -1,12 +1,48 @@
 import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
-import { inventoryAdjustSchema, parseBody, productUpdateSchema } from "../services/validators";
+import {
+  collectionCreateSchema,
+  imageReorderSchema,
+  inventoryAdjustSchema,
+  parseBody,
+  productCreateSchema,
+  productImageSchema,
+  productUpdateSchema,
+  variantCreateSchema,
+  variantUpdateSchema,
+} from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminInventoryRow, AdminProduct } from "../../shared/types";
 
 export const adminProductRoutes = new Hono<AppContext>();
+
+/** URL-safe slug from a name; caller ensures uniqueness. */
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/[\s_]+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80) || "item";
+}
+
+async function uniqueSlug(db: AppContext["Variables"]["db"], table: string, base: string, ignoreId?: string): Promise<string> {
+  let slug = base;
+  for (let n = 2; n < 200; n++) {
+    const clash = await first<{ id: string }>(
+      db,
+      `SELECT id FROM ${table} WHERE slug = ?${ignoreId ? " AND id != ?" : ""}`,
+      ...(ignoreId ? [slug, ignoreId] : [slug]),
+    );
+    if (!clash) return slug;
+    slug = `${base}-${n}`;
+  }
+  return `${base}-${Date.now()}`;
+}
 
 const PRODUCT_SELECT = `
   SELECT p.*,
@@ -39,6 +75,30 @@ adminProductRoutes.get("/", async (c) => {
   return c.json(rows.map(mapProduct));
 });
 
+adminProductRoutes.post("/", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, productCreateSchema);
+  const id = newId("prod");
+  const slug = await uniqueSlug(c.var.db, "products", body.slug || slugify(body.name));
+  const next = await first<{ n: number }>(c.var.db, `SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM products`);
+  await run(
+    c.var.db,
+    `INSERT INTO products (id, slug, name, gender, category, collection_id, base_price_cents, currency, description, availability, is_published, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?)`,
+    id,
+    slug,
+    body.name,
+    body.gender,
+    body.category,
+    body.collectionId || null,
+    body.basePriceCents,
+    body.currency,
+    body.description ?? null,
+    next?.n ?? 1,
+  );
+  await writeAudit(c.var.db, c.var.userId, "product.create", "product", id, { name: body.name });
+  return c.json({ id, slug }, 201);
+});
+
 adminProductRoutes.get("/:id", async (c) => {
   const row = await first<Record<string, unknown>>(
     c.var.db,
@@ -48,7 +108,7 @@ adminProductRoutes.get("/:id", async (c) => {
   if (!row) return c.json({ error: "Product not found" }, 404);
   const variants = await all<Record<string, unknown>>(
     c.var.db,
-    `SELECT v.*, i.on_hand, i.reserved, i.incoming FROM product_variants v
+    `SELECT v.*, i.id AS inventory_item_id, i.on_hand, i.reserved, i.incoming FROM product_variants v
      LEFT JOIN inventory_items i ON i.variant_id = v.id
      WHERE v.product_id = ? ORDER BY v.colorway_name, v.size`,
     row.id,
@@ -91,8 +151,16 @@ adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
     subtitle: "subtitle",
     description: "description",
     editorialStory: "editorial_story",
+    gender: "gender",
+    category: "category",
+    collectionId: "collection_id",
     basePriceCents: "base_price_cents",
+    compareAtPriceCents: "compare_at_price_cents",
+    currency: "currency",
     availability: "availability",
+    fabricComposition: "fabric_composition",
+    careSummary: "care_summary",
+    originStatement: "origin_statement",
     preOrderNote: "pre_order_note",
     shippingNote: "shipping_note",
     fitNotes: "fit_notes",
@@ -102,6 +170,10 @@ adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
       sets.push(`${col} = ?`);
       params.push((body as Record<string, unknown>)[key] ?? null);
     }
+  }
+  if ("slug" in body && body.slug) {
+    sets.push(`slug = ?`);
+    params.push(await uniqueSlug(c.var.db, "products", body.slug, id));
   }
   if ("isPublished" in body) {
     sets.push(`is_published = ?`);
@@ -115,7 +187,172 @@ adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
   return c.json(mapProduct(row!));
 });
 
+adminProductRoutes.delete("/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first(c.var.db, `SELECT id FROM products WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Product not found" }, 404);
+  // Variants + images cascade; inventory_items cascade off variants.
+  await run(c.var.db, `DELETE FROM products WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "product.delete", "product", id);
+  return c.json({ ok: true });
+});
+
+// ---------- Product images ----------
+adminProductRoutes.post("/:id/images", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, productImageSchema);
+  if (!(await first(c.var.db, `SELECT id FROM products WHERE id = ?`, id))) {
+    return c.json({ error: "Product not found" }, 404);
+  }
+  const next = await first<{ n: number }>(
+    c.var.db,
+    `SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM product_images WHERE product_id = ?`,
+    id,
+  );
+  const imageId = newId("img");
+  await run(
+    c.var.db,
+    `INSERT INTO product_images (id, product_id, url, alt_text, colorway_name, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    imageId,
+    id,
+    body.url,
+    body.altText ?? null,
+    body.colorwayName ?? null,
+    next?.n ?? 0,
+  );
+  return c.json({ id: imageId }, 201);
+});
+
+adminProductRoutes.delete("/:id/images/:imageId", requireAdminWrite, async (c) => {
+  await run(
+    c.var.db,
+    `DELETE FROM product_images WHERE id = ? AND product_id = ?`,
+    c.req.param("imageId"),
+    c.req.param("id"),
+  );
+  return c.json({ ok: true });
+});
+
+adminProductRoutes.post("/:id/images/reorder", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const { order } = await parseBody(c, imageReorderSchema);
+  await c.var.db.batch(
+    order.map((imageId, i) =>
+      c.var.db
+        .prepare(`UPDATE product_images SET sort_order = ? WHERE id = ? AND product_id = ?`)
+        .bind(i, imageId, id),
+    ),
+  );
+  return c.json({ ok: true });
+});
+
+// ---------- Variants (sellable SKUs) + their inventory row ----------
+adminProductRoutes.post("/:id/variants", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, variantCreateSchema);
+  if (!(await first(c.var.db, `SELECT id FROM products WHERE id = ?`, id))) {
+    return c.json({ error: "Product not found" }, 404);
+  }
+  const dupe = await first(
+    c.var.db,
+    `SELECT id FROM product_variants WHERE product_id = ? AND colorway_name = ? AND size = ?`,
+    id,
+    body.colorwayName,
+    body.size,
+  );
+  if (dupe) return c.json({ error: "That colour + size already exists." }, 409);
+
+  const variantId = newId("var");
+  const invId = newId("inv");
+  await c.var.db.batch([
+    c.var.db
+      .prepare(
+        `INSERT INTO product_variants (id, product_id, colorway_name, size, sku_code, price_cents, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      )
+      .bind(variantId, id, body.colorwayName, body.size, body.skuCode ?? null, body.priceCents ?? null),
+    c.var.db
+      .prepare(`INSERT INTO inventory_items (id, variant_id, on_hand) VALUES (?, ?, ?)`)
+      .bind(invId, variantId, body.onHand ?? 0),
+  ]);
+  await writeAudit(c.var.db, c.var.userId, "variant.create", "product", id, { variantId });
+  return c.json({ id: variantId }, 201);
+});
+
+adminProductRoutes.patch("/:id/variants/:variantId", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, variantUpdateSchema);
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  const map: Record<string, string> = {
+    colorwayName: "colorway_name",
+    size: "size",
+    skuCode: "sku_code",
+    priceCents: "price_cents",
+  };
+  for (const [key, col] of Object.entries(map)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
+  }
+  if ("isActive" in body) {
+    sets.push(`is_active = ?`);
+    params.push(body.isActive ? 1 : 0);
+  }
+  if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
+  await run(
+    c.var.db,
+    `UPDATE product_variants SET ${sets.join(", ")} WHERE id = ? AND product_id = ?`,
+    ...params,
+    c.req.param("variantId"),
+    c.req.param("id"),
+  );
+  return c.json({ ok: true });
+});
+
+adminProductRoutes.delete("/:id/variants/:variantId", requireAdminWrite, async (c) => {
+  await run(
+    c.var.db,
+    `DELETE FROM product_variants WHERE id = ? AND product_id = ?`,
+    c.req.param("variantId"),
+    c.req.param("id"),
+  );
+  return c.json({ ok: true });
+});
+
 // ---------- Collections ----------
+adminProductRoutes.post("/collections", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, collectionCreateSchema);
+  const id = newId("col");
+  const slug = await uniqueSlug(c.var.db, "collections", body.slug || slugify(body.name));
+  const next = await first<{ n: number }>(c.var.db, `SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM collections`);
+  await run(
+    c.var.db,
+    `INSERT INTO collections (id, slug, name, season, description, sort_order, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, 0)`,
+    id,
+    slug,
+    body.name,
+    body.season ?? null,
+    body.description ?? null,
+    next?.n ?? 1,
+  );
+  await writeAudit(c.var.db, c.var.userId, "collection.create", "collection", id, { name: body.name });
+  return c.json({ id, slug }, 201);
+});
+
+adminProductRoutes.delete("/collections/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  if (!(await first(c.var.db, `SELECT id FROM collections WHERE id = ?`, id))) {
+    return c.json({ error: "Collection not found" }, 404);
+  }
+  // Products/styles reference collection_id with ON DELETE SET NULL.
+  await run(c.var.db, `DELETE FROM collections WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "collection.delete", "collection", id);
+  return c.json({ ok: true });
+});
+
 adminProductRoutes.get("/collections/all", async (c) => {
   const rows = await all(
     c.var.db,

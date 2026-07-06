@@ -23,6 +23,7 @@ import { TeamPage } from "./pages/admin/TeamPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
 import { ProductsAdminPage, CollectionsAdminPage } from "./pages/admin/ProductsAdminPage";
+import { ProductEditorPage } from "./pages/admin/ProductEditorPage";
 import { InventoryPage } from "./pages/admin/InventoryPage";
 import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/CommercePages";
 import { LineSheetsPage } from "./pages/admin/WholesalePage";
@@ -117,6 +118,8 @@ export function AppRouter() {
         <Route path="admin" element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="products" element={<ProductsAdminPage />} />
+          <Route path="products/new" element={<ProductEditorPage />} />
+          <Route path="products/:id" element={<ProductEditorPage />} />
           <Route path="styles" element={<StylesPage />} />
           <Route path="skus" element={<SkusPage />} />
           <Route path="collections" element={<CollectionsAdminPage />} />

@@ -132,17 +132,71 @@ export const colorwayCreateSchema = z.object({
 });
 
 // ---------- Products ----------
+const GENDERS = ["mens", "womens", "unisex"] as const;
+const AVAILABILITIES = ["draft", "available", "pre_order", "sold_out", "archived"] as const;
+
 export const productUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
+  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/, "lowercase letters, numbers and hyphens only").optional(),
   subtitle: z.string().max(300).nullable().optional(),
   description: z.string().max(8000).nullable().optional(),
   editorialStory: z.string().max(8000).nullable().optional(),
+  gender: z.enum(GENDERS).optional(),
+  category: z.string().min(1).max(60).optional(),
+  collectionId: z.string().max(60).nullable().optional(),
   basePriceCents: z.number().int().nonnegative().optional(),
-  availability: z.enum(["draft", "available", "pre_order", "sold_out", "archived"]).optional(),
+  compareAtPriceCents: z.number().int().nonnegative().nullable().optional(),
+  currency: z.string().length(3).optional(),
+  availability: z.enum(AVAILABILITIES).optional(),
   isPublished: z.boolean().optional(),
+  fabricComposition: z.string().max(1000).nullable().optional(),
+  careSummary: z.string().max(1000).nullable().optional(),
+  originStatement: z.string().max(500).nullable().optional(),
   preOrderNote: z.string().max(1000).nullable().optional(),
   shippingNote: z.string().max(1000).nullable().optional(),
   fitNotes: z.string().max(2000).nullable().optional(),
+});
+
+export const productCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),
+  gender: z.enum(GENDERS).default("unisex"),
+  category: z.string().min(1).max(60).default("apparel"),
+  collectionId: z.string().max(60).nullable().optional(),
+  basePriceCents: z.number().int().nonnegative().default(0),
+  currency: z.string().length(3).default("USD"),
+  description: z.string().max(8000).nullable().optional(),
+});
+
+export const productImageSchema = z.object({
+  url: z.string().min(1).max(1000),
+  altText: z.string().max(300).nullable().optional(),
+  colorwayName: z.string().max(80).nullable().optional(),
+});
+
+export const imageReorderSchema = z.object({ order: z.array(z.string()).max(60) });
+
+export const variantCreateSchema = z.object({
+  colorwayName: z.string().min(1).max(80),
+  size: z.string().min(1).max(40),
+  skuCode: z.string().max(80).nullable().optional(),
+  priceCents: z.number().int().nonnegative().nullable().optional(),
+  onHand: z.number().int().nonnegative().max(1_000_000).optional(),
+});
+
+export const variantUpdateSchema = z.object({
+  colorwayName: z.string().min(1).max(80).optional(),
+  size: z.string().min(1).max(40).optional(),
+  skuCode: z.string().max(80).nullable().optional(),
+  priceCents: z.number().int().nonnegative().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const collectionCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),
+  season: z.string().max(40).nullable().optional(),
+  description: z.string().max(4000).nullable().optional(),
 });
 
 // ---------- Suppliers ----------
