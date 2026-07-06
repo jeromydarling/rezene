@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { first, run, writeAudit } from "../services/db";
-import { parseBody, sourcingAddSchema, sourcingSearchSchema } from "../services/validators";
+import {
+  parseBody,
+  sourcingAddSchema,
+  sourcingEnrichSchema,
+  sourcingSearchSchema,
+} from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
@@ -137,6 +142,49 @@ adminSourcingRoutes.post("/search", requireAdminWrite, async (c) => {
     }));
 
   return c.json({ leads, citations });
+});
+
+// On-demand contact enrichment for ONE maker. The bulk search keeps its answer
+// concise (and often omits phone/address for small ateliers); this does a
+// focused second lookup for a single maker's official contact details.
+adminSourcingRoutes.post("/enrich", requireAdminWrite, async (c) => {
+  const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
+  if (!perplexityConfigured(c.env)) {
+    return c.json({ error: "Maker sourcing isn't switched on yet.", code: "sourcing_unconfigured" }, 503);
+  }
+  const body = await parseBody(c, sourcingEnrichSchema);
+  const who = [body.name, body.city, body.country].filter(Boolean).join(", ");
+  try {
+    const research = await perplexityResearch(c.env, {
+      system:
+        "You are a sourcing researcher. Find the OFFICIAL CONTACT DETAILS for the ONE specific clothing maker named below, using its own website, Google Business listing, and reputable directories. Respond with ONLY a JSON object and nothing else, plain text values (no markdown, no citation markers): {\"address\":\"full street address or null\",\"phone\":\"phone in international format or null\",\"whatsapp\":\"WhatsApp number or null\",\"email\":\"contact email or null\"}. NEVER invent a value — use null for anything you cannot verify for THIS exact business.",
+      prompt: `Maker: ${who}${body.website ? `\nWebsite: ${body.website}` : ""}\nFind their street address, phone number, WhatsApp, and email.`,
+      maxTokens: 700,
+    });
+    const { parseModelJson } = await import("../services/anthropic");
+    let out: Record<string, unknown> = {};
+    try {
+      const p = parseModelJson(research.text);
+      if (p && typeof p === "object") out = p as Record<string, unknown>;
+    } catch {
+      /* leave empty */
+    }
+    const clean = (v: unknown, max: number): string | null => {
+      if (typeof v !== "string") return null;
+      const t = v.trim();
+      if (!t || t.toLowerCase() === "null" || t.toLowerCase() === "n/a") return null;
+      return t.slice(0, max);
+    };
+    return c.json({
+      address: clean(out.address, 400),
+      phone: clean(out.phone, 40),
+      whatsapp: clean(out.whatsapp, 40),
+      email: clean(out.email, 200),
+      citations: research.citations,
+    });
+  } catch (err) {
+    return c.json({ error: `Couldn't fetch contact details: ${String(err).slice(0, 160)}` }, 502);
+  }
 });
 
 adminSourcingRoutes.post("/add", requireAdminWrite, async (c) => {

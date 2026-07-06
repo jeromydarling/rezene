@@ -34,6 +34,46 @@ export function SourcingPage() {
   const [leads, setLeads] = useState<MakerLead[] | null>(null);
   const [citations, setCitations] = useState<string[]>([]);
   const [added, setAdded] = useState<Record<string, boolean>>({});
+  const [enriching, setEnriching] = useState<Record<string, boolean>>({});
+
+  async function enrich(lead: MakerLead) {
+    setEnriching((e) => ({ ...e, [lead.name]: true }));
+    try {
+      const res = await api.post<{
+        address: string | null;
+        phone: string | null;
+        whatsapp: string | null;
+        email: string | null;
+      }>("/api/admin/sourcing/enrich", {
+        name: lead.name,
+        city: lead.city,
+        country: lead.country,
+        website: lead.website,
+      });
+      setLeads((prev) =>
+        prev
+          ? prev.map((l) =>
+              l.name === lead.name
+                ? {
+                    ...l,
+                    address: res.address ?? l.address,
+                    phone: res.phone ?? l.phone,
+                    whatsapp: res.whatsapp ?? l.whatsapp,
+                    email: res.email ?? l.email,
+                  }
+                : l,
+            )
+          : prev,
+      );
+      const found = [res.address, res.phone, res.whatsapp, res.email].filter(Boolean).length;
+      if (found) toast.success(`Updated ${lead.name}`, "Pulled fresh contact details from public sources.");
+      else toast.info(`No verified details for ${lead.name}`, "Couldn't confirm contact info — try their website directly.");
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Couldn't fetch contact details");
+    } finally {
+      setEnriching((e) => ({ ...e, [lead.name]: false }));
+    }
+  }
 
   async function search() {
     setBusy(true);
@@ -118,14 +158,25 @@ export function SourcingPage() {
                     {lead.leadTimeDays ? ` · ${lead.leadTimeDays}d lead` : ""}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary !py-1.5 text-xs"
-                  disabled={added[lead.name]}
-                  onClick={() => void add(lead)}
-                >
-                  {added[lead.name] ? "Added ✓" : "+ Add to factories"}
-                </button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-ink/15 px-3 py-1.5 text-xs text-ink/70 transition hover:bg-cream disabled:opacity-50"
+                    disabled={enriching[lead.name]}
+                    onClick={() => void enrich(lead)}
+                    title="Do a focused web lookup for this maker's address, phone, WhatsApp & email"
+                  >
+                    {enriching[lead.name] ? "Digging…" : "🔍 Find contact details"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary !py-1.5 text-xs"
+                    disabled={added[lead.name]}
+                    onClick={() => void add(lead)}
+                  >
+                    {added[lead.name] ? "Added ✓" : "+ Add to factories"}
+                  </button>
+                </div>
               </div>
               {lead.whyFit && <p className="mt-2 text-sm text-ink/80">{lead.whyFit}</p>}
               {lead.specialties.length > 0 && (

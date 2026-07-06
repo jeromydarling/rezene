@@ -236,6 +236,13 @@ export const sourcingSearchSchema = z.object({
   notes: z.string().max(600).optional(),
 });
 
+export const sourcingEnrichSchema = z.object({
+  name: z.string().min(1).max(200),
+  city: z.string().max(120).nullable().optional(),
+  country: z.string().max(80).nullable().optional(),
+  website: z.string().max(300).nullable().optional(),
+});
+
 export const sourcingAddSchema = z.object({
   name: z.string().min(1).max(200),
   city: z.string().max(120).nullable().optional(),
