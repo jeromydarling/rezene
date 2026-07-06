@@ -141,6 +141,7 @@ export function CostingPage() {
       <PageHeader
         eyebrow="Finance"
         title="Costing & Margins"
+        help="costing"
         description="What every style really costs to land, market by market — and the margin left at your price. Duty figures are estimates, not customs advice."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -685,6 +686,7 @@ export function DutiesPage() {
       <PageHeader
         eyebrow="Finance"
         title="Duties & Landed Cost"
+        help="duties"
         description="An editable rules engine, not a customs authority. Every figure is an estimate requiring trade/legal review."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setRuleFormOpen(true)}>
@@ -1116,6 +1118,7 @@ export function AnalyticsPage() {
       <PageHeader
         eyebrow="Insights"
         title="Analytics"
+        help="analytics"
         description="How the shop is doing — sales, traffic, what's selling, and where your buyers come from."
         actions={
           <div className="flex gap-1">
@@ -1594,6 +1597,7 @@ export function SettingsPage() {
       <PageHeader
         eyebrow="System"
         title="Settings"
+        help="settings"
         description="Your brand's name, tagline, and identity — change them here and they update everywhere, from the storefront to your tech packs."
       />
       {error && <ErrorNote message={error} />}

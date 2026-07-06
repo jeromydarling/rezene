@@ -86,6 +86,7 @@ export function DesignStudioPage() {
       <PageHeader
         eyebrow="Studio"
         title="Design Studio"
+        help="design-studio"
         description="Design your next line with LLM — build a prompt, generate looks with Flux, then ship a favorite to your factory for a sample."
         actions={
           <>

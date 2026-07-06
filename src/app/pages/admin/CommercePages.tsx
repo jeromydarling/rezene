@@ -28,6 +28,7 @@ export function OrdersPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Orders"
+        help="orders"
         description="Every order in one place — payment status updates itself the moment a customer pays; open an order to quote carriers, buy a label, or record tracking."
       />
       {error && <ErrorNote message={error} />}
@@ -437,6 +438,7 @@ export function CustomersPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Customers"
+        help="orders"
         description="Everyone who has bought from you — order history and lifetime spend at a glance. Card details never touch this system; they stay with your payment provider."
       />
       {error && <ErrorNote message={error} />}
@@ -512,6 +514,7 @@ export function PreOrdersPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Pre-orders"
+        help="pre-orders"
         description="Campaigns that fund production runs — goals tied to factory MOQs, cutoffs tied to the calendar, and hard caps so a run can never oversell."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>

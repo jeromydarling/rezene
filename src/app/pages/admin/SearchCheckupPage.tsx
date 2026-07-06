@@ -82,6 +82,7 @@ export function SearchCheckupPage() {
       <PageHeader
         eyebrow="Content"
         title="Search Checkup"
+        help="seo"
         description="How your shop looks to Google and LLM assistants. The plumbing — sitemaps, per-page tags, product rich results — is automatic; these are the parts only you can supply."
       />
       {error && <ErrorNote message={error} />}

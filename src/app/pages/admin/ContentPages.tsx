@@ -185,6 +185,7 @@ export function PagesEditorPage() {
       <PageHeader
         eyebrow="Content"
         title="Pages"
+        help="cms"
         description="Every page of the public site — including the homepage hero. Pick a layout, set a hero image, or let LLM draft the first version. Every save keeps a restorable revision."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -1214,6 +1215,7 @@ export function JournalEditorPage() {
       <PageHeader
         eyebrow="Content"
         title="Journal"
+        help="cms"
         description="Editorial posts for the public journal. Drafts stay hidden until published."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -1561,6 +1563,7 @@ export function LookbooksEditorPage() {
       <PageHeader
         eyebrow="Content"
         title="Lookbooks"
+        help="cms"
         description="Campaign imagery for the public lookbook — upload, caption, reorder."
       />
       {error && <ErrorNote message={error} />}

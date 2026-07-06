@@ -90,6 +90,7 @@ export function ImportStudioPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Import studio"
+        help="import"
         description="Bring products in from any spreadsheet — the LLM figures out your columns, you confirm, and it imports."
       />
 

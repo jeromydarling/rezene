@@ -29,6 +29,7 @@ export function ProductsAdminPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Products"
+        help="products"
         description="The storefront catalog — publication state, pricing, and stock at a glance."
         actions={
           <>
@@ -267,6 +268,7 @@ export function CollectionsAdminPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Collections"
+        help="collections"
         description="Seasonal groupings across the storefront and the design pipeline. Copy and hero imagery are editable here."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>

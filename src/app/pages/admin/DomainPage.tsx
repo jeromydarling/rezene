@@ -114,6 +114,7 @@ export function DomainPage() {
       <PageHeader
         eyebrow="Settings"
         title="Connect your domain"
+        help="domain"
         description="Point your own web address (like yourlabel.com) at your Verto store. It takes about five minutes."
       />
 

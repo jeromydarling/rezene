@@ -26,6 +26,7 @@ export function ShippingPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Shipping"
+        help="shipping"
         description="Connect the carriers you already use — or run on the built-in rate table. Enabled providers quote live rates at checkout; connected carriers also buy labels and push tracking updates back to your orders."
       />
       {error && <ErrorNote message={error} />}

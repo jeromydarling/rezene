@@ -99,6 +99,7 @@ export function VideoStudioPage() {
     <div>
       <PageHeader
         title="Promo Video"
+        help="promo-video"
         eyebrow="Marketing Suite"
         description="Compose a cinematic promo from your own products, preview the finished film in real time, and export only when you love it."
         actions={

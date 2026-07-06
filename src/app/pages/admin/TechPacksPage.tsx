@@ -29,6 +29,7 @@ export function TechPacksPage() {
       <PageHeader
         eyebrow="Studio"
         title="Tech Packs"
+        help="tech-packs"
         description="Factory-ready specifications — printable, versioned, shareable with your atelier as a live link, and LLM-assisted from a photo or sketch."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>

@@ -69,6 +69,7 @@ export function MarketingPage() {
       <PageHeader
         eyebrow="Marketing"
         title="Campaigns"
+        help="campaigns"
         description="Describe a campaign once — LLM writes the whole kit in your brand voice: social posts, email, blog draft, press release, ad copy. Edit, schedule, send. Uses your Anthropic key when set, otherwise built-in Llama."
         actions={
           <>

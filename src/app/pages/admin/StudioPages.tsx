@@ -439,6 +439,7 @@ export function ThreeDPage() {
       <PageHeader
         eyebrow="Studio"
         title="3D Simulation Bridge"
+        help="three-d"
         description="CLO 3D / Browzwear / Style3D project tracking — files, renders, measurements, and fit status. Simulation happens in the external tool; the record lives here."
       />
       {error && <ErrorNote message={error} />}

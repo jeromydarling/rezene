@@ -35,6 +35,7 @@ export function SuppliersPage() {
       <PageHeader
         eyebrow="Production"
         title="Factories & Suppliers"
+        help="suppliers"
         description="Your maker network. Leads marked 'unverified' are LLM-researched — confirm details before committing production."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
