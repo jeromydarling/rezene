@@ -38,9 +38,9 @@ adminSourcingRoutes.get("/export-intel", async (c) => {
   try {
     const research = await perplexityResearch(c.env, {
       system:
-        "You are a fashion trade & logistics analyst. For shipping FINISHED APPAREL from the given origin to the given destination, give current, practical export intelligence. Respond with ONLY JSON: {\"agreement\":\"the trade agreement / tariff program that applies (or 'None')\",\"duties\":\"duty/tariff summary with concrete rates\",\"documents\":[\"required export & import documents\"],\"gotchas\":[\"non-obvious pitfalls — rules of origin (e.g. yarn-forward), quotas, certifications, de minimis thresholds, labeling\"],\"freight\":\"ballpark freight cost and transit time by air and by sea\",\"leadTime\":\"typical end-to-end logistics lead time\",\"asOf\":\"the time period this reflects\"}. Be concrete with numbers.",
+        "You are a fashion trade & logistics analyst. For shipping FINISHED APPAREL from the given origin to the given destination, give current, practical export intelligence. Respond with ONLY a single JSON object and nothing before or after it. Use plain text in every value — NO markdown, NO ** bold **, NO citation markers like [1]. Keep each string field to 1-2 tight sentences. Shape: {\"agreement\":\"the trade agreement / tariff program that applies (or 'None')\",\"duties\":\"duty/tariff summary with concrete rates\",\"documents\":[\"required export & import documents\"],\"gotchas\":[\"non-obvious pitfalls — rules of origin (e.g. yarn-forward), quotas, certifications, de minimis thresholds, labeling\"],\"freight\":\"ballpark freight cost and transit time by air and by sea\",\"leadTime\":\"typical end-to-end logistics lead time\",\"asOf\":\"the time period this reflects\"}. Be concrete with numbers but concise so the JSON is complete.",
       prompt: `Finished apparel export lane: ${origin} → ${destination}.`,
-      maxTokens: 1300,
+      maxTokens: 2600,
     });
     const { parseModelJson } = await import("../services/anthropic");
     let sections: Record<string, unknown> = {};
