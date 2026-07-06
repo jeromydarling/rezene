@@ -60,7 +60,7 @@ async function periodTotals(db: D1Database, from: string, to: string): Promise<P
 }
 
 adminAnalyticsRoutes.get("/", async (c) => {
-  const db = c.env.DB;
+  const db = c.var.db;
   const days = Math.min(90, Math.max(7, parseInt(c.req.query("days") ?? "30", 10) || 30));
   const now = Date.now();
   const since = new Date(now - days * 86400 * 1000).toISOString();

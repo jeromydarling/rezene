@@ -307,6 +307,7 @@ function LineSheetDetailPanel({ id }: { id: string }) {
           {[data.season, data.note].filter(Boolean).join(" · ") || "—"}
         </p>
       </div>
+      <div className="overflow-x-auto">
       <table className="admin-table">
         <thead>
           <tr>
@@ -354,6 +355,7 @@ function LineSheetDetailPanel({ id }: { id: string }) {
           ))}
         </tbody>
       </table>
+      </div>
       <p className="text-xs text-warmgrey">
         Edits save when you click away from a field. The shared page always shows current pricing.
       </p>

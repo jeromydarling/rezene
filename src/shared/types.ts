@@ -83,10 +83,29 @@ export interface PublicJournalPost {
   publishedAt: string | null;
 }
 
+export type PageLayout = "standard" | "hero" | "wide";
+
 export interface PublicPage {
   slug: string;
   title: string;
   bodyMd: string | null;
+  layout?: PageLayout;
+  heroImageUrl?: string | null;
+  heroEyebrow?: string | null;
+  subtitle?: string | null;
+  sections?: PageSection[] | null;
+  /** Language this payload is in; 'translated' true when machine-translated. */
+  lang?: string;
+  translated?: boolean;
+}
+
+export interface AiContentDraft {
+  title: string;
+  slug: string | null;
+  excerpt: string | null;
+  subtitle: string | null;
+  heroEyebrow: string | null;
+  bodyMd: string;
 }
 
 export interface PublicLookbook {
@@ -103,10 +122,59 @@ export interface PublicLookbook {
   }[];
 }
 
+// ---------- CMS blocks ----------
+export type SectionType =
+  | "home_hero"
+  | "hero"
+  | "prose"
+  | "image_text"
+  | "product_grid"
+  | "collection_strip"
+  | "gallery"
+  | "quote"
+  | "faq"
+  | "cta_band"
+  | "newsletter";
+
+/**
+ * A page section. Deliberately loose: each type reads the keys it knows
+ * (see SECTION_DEFS in the admin editor and PageBlocks renderer) so new
+ * block types never require a schema migration.
+ */
+export interface PageSection {
+  type: SectionType;
+  [key: string]: unknown;
+}
+
+export interface NavLinkItem {
+  label: string;
+  href: string;
+}
+
+export interface NavMenus {
+  header: NavLinkItem[];
+  footer: NavLinkItem[];
+}
+
+export interface HomeHero {
+  eyebrow?: string | null;
+  heading: string;
+  subheading?: string | null;
+  primaryCtaLabel?: string | null;
+  primaryCtaHref?: string | null;
+  secondaryCtaLabel?: string | null;
+  secondaryCtaHref?: string | null;
+  imageUrl?: string | null;
+}
+
 export interface BrandSettings {
   brandName: string;
   tagline: string;
   currency: string;
+  homeHero?: HomeHero | null;
+  navigation?: NavMenus | null;
+  /** Storefront languages, first entry is the default. */
+  languages?: string[];
 }
 
 export type LeadKind =
@@ -122,6 +190,8 @@ export interface SessionUser {
   email: string;
   name: string | null;
   roles: string[];
+  /** Verto HQ (platform CRM + shop registry) access. */
+  superAdmin?: boolean;
 }
 
 // ---------- Admin: product development ----------
@@ -232,8 +302,12 @@ export interface AdminSupplier {
   kind: string;
   city: string | null;
   country: string | null;
+  address: string | null;
+  mapUrl: string | null;
   email: string | null;
+  phone: string | null;
   whatsapp: string | null;
+  website: string | null;
   languages: string[];
   capabilities: string[];
   moqUnits: number | null;
@@ -470,6 +544,7 @@ export interface AdminFile {
   entityType: string | null;
   entityId: string | null;
   isPublic: boolean;
+  altText: string | null;
   createdAt: string;
 }
 
@@ -487,6 +562,101 @@ export interface DashboardSummary {
   pendingFactoryResponses: number;
   productionStageCounts: { stage: string; count: number }[];
   upcomingMilestones: { title: string; startsOn: string; kind: string }[];
+}
+
+// ---------- Shipping ----------
+export interface ShippingProviderSummary {
+  provider: string;
+  name: string;
+  blurb: string;
+  bestFor: string;
+  capabilities: string[];
+  credentialFields: { key: string; label: string; secret: boolean; placeholder?: string }[];
+  configFields: { key: string; label: string; kind: "text" | "boolean"; hint?: string }[];
+  docsUrl: string | null;
+  supportsWebhooks: boolean;
+  isEnabled: boolean;
+  useAtCheckout: boolean;
+  credentialsSet: Record<string, boolean>;
+  config: Record<string, unknown>;
+  lastVerifiedAt: string | null;
+  lastVerifyError: string | null;
+  webhookPath: string | null;
+}
+
+export interface ShippingSettings {
+  providers: ShippingProviderSummary[];
+  origin: {
+    name?: string;
+    company?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country: string;
+    phone?: string;
+    email?: string;
+  };
+  parcel: { lengthCm: number; widthCm: number; heightCm: number; weightKg: number };
+  perItemWeightKg: number;
+}
+
+export interface ShippingZoneRow {
+  id: string;
+  name: string;
+  countries_json: string;
+  sort_order: number;
+  is_active: number;
+}
+
+export interface ShippingRateRow {
+  id: string;
+  zone_id: string;
+  name: string;
+  amount_cents: number;
+  currency: string;
+  free_over_cents: number | null;
+  min_transit_days: number | null;
+  max_transit_days: number | null;
+  sort_order: number;
+  is_active: number;
+}
+
+export interface ShippingQuote {
+  provider?: string;
+  rateId?: string;
+  externalShipmentId?: string;
+  carrier: string;
+  service: string;
+  amountCents: number;
+  currency: string;
+  minDays?: number | null;
+  maxDays?: number | null;
+}
+
+export interface OrderShipmentRow {
+  id: string;
+  provider: string;
+  carrier: string | null;
+  service: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  label_url: string | null;
+  cost_cents: number | null;
+  currency: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShipmentEventRow {
+  shipment_id: string;
+  status: string | null;
+  description: string | null;
+  location: string | null;
+  occurred_at: string | null;
+  created_at: string;
 }
 
 // ---------- API envelope ----------

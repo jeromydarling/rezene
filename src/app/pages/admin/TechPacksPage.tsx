@@ -4,7 +4,8 @@ import { useFetch } from "../../lib/useFetch";
 import { useBrand } from "../../lib/brand";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatDate, titleCase } from "../../lib/format";
-import { SectionContent } from "../../components/TechPackContent";
+import { SectionContent, type SketchAnnotation } from "../../components/TechPackContent";
+import { SketchAnnotator } from "../../components/admin/SketchAnnotator";
 import {
   EmptyState,
   ErrorNote,
@@ -404,8 +405,8 @@ function FactorySharesPanel({ techPackId }: { techPackId: string }) {
                 <th>Label</th>
                 <th>Supplier</th>
                 <th>Lang</th>
-                <th>Views</th>
-                <th>Last viewed</th>
+                <th>Receipt</th>
+                <th>Last opened</th>
                 <th>Approval</th>
                 <th></th>
               </tr>
@@ -416,9 +417,17 @@ function FactorySharesPanel({ techPackId }: { techPackId: string }) {
                   <td>{share.label ?? "—"}</td>
                   <td>{share.supplier_name ?? "—"}</td>
                   <td className="uppercase">{share.language}</td>
-                  <td>{share.view_count}</td>
+                  <td>
+                    {share.view_count > 0 ? (
+                      <span className="badge badge-success">✓ opened</span>
+                    ) : (
+                      <span className="badge badge-neutral">not opened</span>
+                    )}
+                  </td>
                   <td className="text-xs text-warmgrey">
-                    {share.last_viewed_at ? formatDate(share.last_viewed_at) : "never"}
+                    {share.last_viewed_at
+                      ? `${formatDate(share.last_viewed_at)} · ${share.view_count} view${share.view_count === 1 ? "" : "s"}`
+                      : "—"}
                   </td>
                   <td>
                     {share.approved_at ? (
@@ -456,12 +465,13 @@ function FactorySharesPanel({ techPackId }: { techPackId: string }) {
 export function TechPackDetailPage() {
   const { id } = useParams();
   const brand = useBrand();
-  const { data, loading, error } = useFetch<AdminTechPackDetail>(
+  const { data, loading, error, reload } = useFetch<AdminTechPackDetail>(
     id ? `/api/admin/tech-packs/${id}` : null,
   );
   const exports = useFetch<TechPackExportRow[]>(id ? `/api/admin/tech-packs/${id}/exports` : null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [annotating, setAnnotating] = useState(false);
 
   async function exportSnapshot() {
     if (!id) return;
@@ -506,18 +516,63 @@ export function TechPackDetailPage() {
               <button
                 type="button"
                 className="btn btn-secondary"
+                onClick={() => setAnnotating((v) => !v)}
+              >
+                {annotating ? "Done annotating" : "Annotate flat"}
+              </button>
+              <a
+                href={`/api/admin/tech-packs/${data.id}/export.xlsx`}
+                className="btn btn-secondary"
+                download
+              >
+                Download Excel
+              </a>
+              <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
+                Print / save PDF
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
                 disabled={exporting}
                 onClick={() => void exportSnapshot()}
               >
                 {exporting ? "Archiving…" : "Archive snapshot"}
               </button>
-              <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
-                Print / save PDF
-              </button>
             </>
           }
         />
       </div>
+
+      {/* Flat-sketch annotator (edit mode) */}
+      {annotating && (
+        <div className="no-print mx-auto mb-4 max-w-4xl">
+          <div className="admin-card p-5">
+            <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-warmgrey">
+              Annotate flat sketch
+            </h2>
+            <p className="mb-4 text-sm text-warmgrey">
+              Drop numbered callouts on the flat. They print with the tech pack and show in the factory portal.
+            </p>
+            {(() => {
+              const sketch = data.sections.find((s) => s.kind === "flat_sketch");
+              const content = (sketch?.content ?? {}) as {
+                imageUrl?: string;
+                caption?: string;
+                annotations?: SketchAnnotation[];
+              };
+              return (
+                <SketchAnnotator
+                  techPackId={data.id}
+                  initialImageUrl={content.imageUrl ?? null}
+                  initialAnnotations={content.annotations ?? []}
+                  initialCaption={content.caption ?? null}
+                  onSaved={() => reload()}
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Printable document */}
       <div className="admin-card mx-auto max-w-4xl space-y-8 p-8 print:border-0 print:shadow-none">
@@ -545,6 +600,7 @@ export function TechPackDetailPage() {
             <h2 className="mb-3 border-b border-ink/10 pb-1 text-sm font-semibold uppercase tracking-wider text-ink/70">
               Construction Notes (EN / FR)
             </h2>
+            <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -563,6 +619,7 @@ export function TechPackDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 
@@ -571,6 +628,7 @@ export function TechPackDetailPage() {
             <h2 className="mb-3 border-b border-ink/10 pb-1 text-sm font-semibold uppercase tracking-wider text-ink/70">
               Stitch Details
             </h2>
+            <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -593,6 +651,7 @@ export function TechPackDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 
@@ -601,6 +660,7 @@ export function TechPackDetailPage() {
             <h2 className="mb-3 border-b border-ink/10 pb-1 text-sm font-semibold uppercase tracking-wider text-ink/70">
               Labels & Packaging
             </h2>
+            <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -621,6 +681,7 @@ export function TechPackDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 

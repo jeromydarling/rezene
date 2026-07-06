@@ -131,7 +131,9 @@ export function ProductDetailPage() {
 
       <div className="grid gap-12 md:grid-cols-2">
         {/* Images */}
-        <div className="space-y-4">
+        {/* min-w-0 on both columns so wide children (the size chart table)
+            scroll inside their own container instead of stretching the page */}
+        <div className="min-w-0 space-y-4">
           <EditorialImage
             src={product.images[0]?.url ?? null}
             alt={product.images[0]?.altText ?? product.name}
@@ -153,7 +155,7 @@ export function ProductDetailPage() {
         </div>
 
         {/* Purchase panel */}
-        <div>
+        <div className="min-w-0">
           <p className="eyebrow mb-2">{product.category}</p>
           <h1 className="font-display text-4xl font-light">{product.name}</h1>
           {product.subtitle && <p className="mt-1 text-sm text-warmgrey">{product.subtitle}</p>}
@@ -202,7 +204,7 @@ export function ProductDetailPage() {
           {colorways.length > 0 && (
             <div className="mt-8">
               <p className="label">Colorway — {colorway}</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {colorways.map((cw) => (
                   <button
                     key={cw}

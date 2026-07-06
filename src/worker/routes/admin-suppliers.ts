@@ -34,8 +34,12 @@ function mapSupplier(
     kind: row.kind as string,
     city: (row.city as string) ?? null,
     country: (row.country as string) ?? null,
+    address: (row.address as string) ?? null,
+    mapUrl: (row.map_url as string) ?? null,
     email: (row.email as string) ?? null,
+    phone: (row.phone as string) ?? null,
     whatsapp: (row.whatsapp as string) ?? null,
+    website: (row.website as string) ?? null,
     languages: jsonArray(row.languages),
     capabilities: jsonArray(row.capabilities),
     moqUnits: (row.moq_units as number) ?? null,
@@ -58,30 +62,30 @@ function mapSupplier(
 
 adminSupplierRoutes.get("/", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM suppliers ORDER BY name`,
   );
   return c.json(rows.map((r) => mapSupplier(r)));
 });
 
 adminSupplierRoutes.get("/:id", async (c) => {
-  const supplier = await loadSupplier(c.env.DB, c.req.param("id"));
+  const supplier = await loadSupplier(c.var.db, c.req.param("id"));
   if (!supplier) return c.json({ error: "Supplier not found" }, 404);
 
   const interactions = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM supplier_interactions WHERE supplier_id = ? ORDER BY created_at DESC LIMIT 50`,
     supplier.id,
   );
   const samples = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT sm.id, sm.round, sm.kind, sm.status, sm.requested_at, s.name AS style_name
      FROM samples sm JOIN styles s ON s.id = sm.style_id
      WHERE sm.supplier_id = ? ORDER BY sm.created_at DESC`,
     supplier.id,
   );
   const pos = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, po_number, status, currency, total_cost_cents, ex_factory_date
      FROM production_orders WHERE supplier_id = ? ORDER BY created_at DESC`,
     supplier.id,
@@ -98,15 +102,17 @@ adminSupplierRoutes.post("/", requireAdminWrite, async (c) => {
   const body = await parseBody(c, supplierCreateSchema);
   const id = newId("sup");
   await run(
-    c.env.DB,
-    `INSERT INTO suppliers (id, name, kind, city, country, email, phone, whatsapp, website,
+    c.var.db,
+    `INSERT INTO suppliers (id, name, kind, city, country, address, map_url, email, phone, whatsapp, website,
        languages, capabilities, moq_units, lead_time_days, risk_notes, notes, is_verified)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     body.name,
     body.kind ?? "factory",
     body.city ?? null,
     body.country ?? null,
+    body.address ?? null,
+    body.mapUrl ?? null,
     body.email || null,
     body.phone ?? null,
     body.whatsapp ?? null,
@@ -119,14 +125,14 @@ adminSupplierRoutes.post("/", requireAdminWrite, async (c) => {
     body.notes ?? null,
     body.isVerified ? 1 : 0,
   );
-  await writeAudit(c.env.DB, c.var.userId, "supplier.create", "supplier", id, { name: body.name });
-  return c.json(await loadSupplier(c.env.DB, id), 201);
+  await writeAudit(c.var.db, c.var.userId, "supplier.create", "supplier", id, { name: body.name });
+  return c.json(await loadSupplier(c.var.db, id), 201);
 });
 
 adminSupplierRoutes.patch("/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, supplierUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM suppliers WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM suppliers WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Supplier not found" }, 404);
 
   const sets: string[] = [];
@@ -136,6 +142,8 @@ adminSupplierRoutes.patch("/:id", requireAdminWrite, async (c) => {
     kind: "kind",
     city: "city",
     country: "country",
+    address: "address",
+    mapUrl: "map_url",
     email: "email",
     phone: "phone",
     whatsapp: "whatsapp",
@@ -165,19 +173,58 @@ adminSupplierRoutes.patch("/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE suppliers SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "supplier.update", "supplier", id, body);
-  return c.json(await loadSupplier(c.env.DB, id));
+  await run(c.var.db, `UPDATE suppliers SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "supplier.update", "supplier", id, body);
+  return c.json(await loadSupplier(c.var.db, id));
+});
+
+adminSupplierRoutes.delete("/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first<{ name: string }>(
+    c.var.db,
+    `SELECT name FROM suppliers WHERE id = ?`,
+    id,
+  );
+  if (!existing) return c.json({ error: "Supplier not found" }, 404);
+
+  // production_orders references suppliers ON DELETE RESTRICT — don't silently
+  // fail (or orphan a live PO). Block with a clear message so the merchant
+  // deals with the order first rather than losing the paper trail.
+  const po = await first<{ n: number }>(
+    c.var.db,
+    `SELECT COUNT(*) AS n FROM production_orders WHERE supplier_id = ?`,
+    id,
+  );
+  if (po && po.n > 0) {
+    return c.json(
+      {
+        error: `${existing.name} has ${po.n} production order${po.n === 1 ? "" : "s"}. Close or reassign those first — keeping the maker preserves that history.`,
+        code: "supplier_has_orders",
+      },
+      409,
+    );
+  }
+
+  // Children with ON DELETE CASCADE / SET NULL clean themselves up when FKs are
+  // enforced; remove the CRM children explicitly so it works either way.
+  await run(c.var.db, `DELETE FROM supplier_interactions WHERE supplier_id = ?`, id);
+  await run(c.var.db, `DELETE FROM supplier_contacts WHERE supplier_id = ?`, id);
+  await run(c.var.db, `DELETE FROM factories WHERE supplier_id = ?`, id);
+  await run(c.var.db, `DELETE FROM suppliers WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "supplier.delete", "supplier", id, {
+    name: existing.name,
+  });
+  return c.json({ ok: true });
 });
 
 adminSupplierRoutes.post("/:id/interactions", requireAdminWrite, async (c) => {
   const supplierId = c.req.param("id");
   const body = await parseBody(c, supplierInteractionSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM suppliers WHERE id = ?`, supplierId);
+  const existing = await first(c.var.db, `SELECT id FROM suppliers WHERE id = ?`, supplierId);
   if (!existing) return c.json({ error: "Supplier not found" }, 404);
   const id = newId("sint");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO supplier_interactions
        (id, supplier_id, kind, direction, subject, summary, follow_up_due, needs_response, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

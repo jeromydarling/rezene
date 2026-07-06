@@ -1,13 +1,17 @@
 import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
 import {
+  costingAiSchema,
   costSheetCreateSchema,
   costSheetUpdateSchema,
+  dutyAiLookupSchema,
+  dutyRuleCreateSchema,
   dutyRuleUpdateSchema,
   parseBody,
   scenarioCreateSchema,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
+import { reserveResearchQuota, quotaExceededBody } from "../services/ai-quota";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminCostSheet, AdminDutyRule, AdminLandedCostScenario } from "../../shared/types";
@@ -45,14 +49,14 @@ function mapScenario(row: Record<string, unknown>): AdminLandedCostScenario {
 
 adminCostingRoutes.get("/cost-sheets", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT cs.*, s.name AS style_name FROM cost_sheets cs
      JOIN styles s ON s.id = cs.style_id ORDER BY cs.updated_at DESC`,
   );
   const sheets: AdminCostSheet[] = [];
   for (const row of rows) {
     const scenarios = await all<Record<string, unknown>>(
-      c.env.DB,
+      c.var.db,
       `SELECT * FROM landed_cost_scenarios WHERE cost_sheet_id = ? ORDER BY name`,
       row.id,
     );
@@ -87,24 +91,74 @@ adminCostingRoutes.get("/cost-sheets", async (c) => {
 adminCostingRoutes.post("/cost-sheets", requireAdminWrite, async (c) => {
   const body = await parseBody(c, costSheetCreateSchema);
   const style = await first<{ id: string; name: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, name FROM styles WHERE id = ?`,
     body.styleId,
   );
   if (!style) return c.json({ error: "Style not found" }, 404);
   const id = newId("cost");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO cost_sheets (id, style_id, name, wholesale_price_cents) VALUES (?, ?, ?, ?)`,
     id,
     style.id,
     body.name ?? `${style.name} costing`,
     body.wholesalePriceCents ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "cost_sheet.create", "cost_sheet", id, {
+  await writeAudit(c.var.db, c.var.userId, "cost_sheet.create", "cost_sheet", id, {
     styleId: style.id,
   });
   return c.json({ id }, 201);
+});
+
+/**
+ * AI costing assist (Perplexity): benchmark a first-pass cost breakdown for a
+ * garment so a blank cost sheet starts filled. Returns suggested amounts (major
+ * currency units) the merchant reviews before applying. Estimates only.
+ */
+adminCostingRoutes.post("/cost-sheets/ai-suggest", requireAdminWrite, async (c) => {
+  const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
+  if (!perplexityConfigured(c.env)) {
+    return c.json({ error: "AI research isn't switched on for this store yet.", code: "unconfigured" }, 503);
+  }
+  const quota = await reserveResearchQuota(c);
+  if (!quota.ok) return c.json(quotaExceededBody(quota), 429);
+  const body = await parseBody(c, costingAiSchema);
+  const currency = (body.currency || "USD").toUpperCase();
+  try {
+    const research = await perplexityResearch(c.env, {
+      system:
+        `You are an apparel costing analyst. Benchmark a realistic per-unit cost breakdown for the described garment, made at the given origin, for a small production run. All amounts are PER UNIT in ${currency} as plain numbers (major units, e.g. 8.5 not 850). Respond with ONLY a JSON object, plain-text values (no markdown, no citation markers): {"fabricCost":<num>,"trimCost":<num>,"cutSewMake":<num>,"packaging":<num>,"freightPerUnit":<num>,"targetRetail":<num>,"suggestedMarginPct":<num>,"notes":"one or two sentences on assumptions & the biggest cost driver"}. Base it on current market rates; be realistic for low volumes. Never invent precision you don't have — round sensibly.`,
+      prompt: `Garment: ${body.garment}${body.materials ? ` (${body.materials})` : ""}\nMade in: ${body.origin || "unspecified"}\nSold in: ${body.targetMarket || "unspecified"}\nRun size: ${body.quantity || "small pilot"}.`,
+      maxTokens: 1100,
+    });
+    const { parseModelJson } = await import("../services/anthropic");
+    let out: Record<string, unknown> = {};
+    try {
+      const p = parseModelJson(research.text);
+      if (p && typeof p === "object") out = p as Record<string, unknown>;
+    } catch {
+      /* leave empty */
+    }
+    const cents = (v: unknown): number | null =>
+      typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : null;
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && Number.isFinite(v) ? v : null;
+    return c.json({
+      currency,
+      fabricCostCents: cents(out.fabricCost),
+      trimCostCents: cents(out.trimCost),
+      cutSewMakeCents: cents(out.cutSewMake),
+      packagingCents: cents(out.packaging),
+      freightCents: cents(out.freightPerUnit),
+      targetRetailCents: cents(out.targetRetail),
+      suggestedMarginPct: num(out.suggestedMarginPct),
+      notes: typeof out.notes === "string" ? out.notes.slice(0, 600) : null,
+      citations: research.citations,
+    });
+  } catch (err) {
+    return c.json({ error: `Couldn't research costs: ${String(err).slice(0, 160)}` }, 502);
+  }
 });
 
 /**
@@ -116,7 +170,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
   const sheetId = c.req.param("id");
   const body = await parseBody(c, scenarioCreateSchema);
   const sheet = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM cost_sheets WHERE id = ?`,
     sheetId,
   );
@@ -140,7 +194,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
 
   const id = newId("lcs");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO landed_cost_scenarios
        (id, cost_sheet_id, name, destination_region, duty_rate_used, freight_cents,
         insurance_cents, landed_cost_cents, retail_price_cents, gross_margin_pct, notes)
@@ -157,7 +211,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
     margin,
     body.notes ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "landed_scenario.create", "cost_sheet", sheetId, {
+  await writeAudit(c.var.db, c.var.userId, "landed_scenario.create", "cost_sheet", sheetId, {
     name: body.name,
     region: body.destinationRegion,
   });
@@ -166,7 +220,7 @@ adminCostingRoutes.post("/cost-sheets/:id/scenarios", requireAdminWrite, async (
 
 adminCostingRoutes.delete("/scenarios/:id", requireAdminWrite, async (c) => {
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `DELETE FROM landed_cost_scenarios WHERE id = ?`,
     c.req.param("id"),
   );
@@ -177,7 +231,7 @@ adminCostingRoutes.delete("/scenarios/:id", requireAdminWrite, async (c) => {
 adminCostingRoutes.patch("/cost-sheets/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, costSheetUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM cost_sheets WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM cost_sheets WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Cost sheet not found" }, 404);
 
   const fieldMap: Record<string, string> = {
@@ -206,14 +260,30 @@ adminCostingRoutes.patch("/cost-sheets/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE cost_sheets SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "cost_sheet.update", "cost_sheet", id, body);
+  await run(c.var.db, `UPDATE cost_sheets SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "cost_sheet.update", "cost_sheet", id, body);
+  return c.json({ ok: true });
+});
+
+adminCostingRoutes.delete("/cost-sheets/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first<{ name: string }>(
+    c.var.db,
+    `SELECT name FROM cost_sheets WHERE id = ?`,
+    id,
+  );
+  if (!existing) return c.json({ error: "Cost sheet not found" }, 404);
+  await run(c.var.db, `DELETE FROM landed_cost_scenarios WHERE cost_sheet_id = ?`, id);
+  await run(c.var.db, `DELETE FROM cost_sheets WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "cost_sheet.delete", "cost_sheet", id, {
+    name: existing.name,
+  });
   return c.json({ ok: true });
 });
 
 adminCostingRoutes.get("/duty-rules", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM duty_rules ORDER BY destination_region, is_preferential DESC`,
   );
   const rules: AdminDutyRule[] = rows.map((r) => ({
@@ -235,7 +305,7 @@ adminCostingRoutes.get("/duty-rules", async (c) => {
 adminCostingRoutes.patch("/duty-rules/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, dutyRuleUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM duty_rules WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM duty_rules WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Duty rule not found" }, 404);
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -261,14 +331,95 @@ adminCostingRoutes.patch("/duty-rules/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE duty_rules SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "duty_rule.update", "duty_rule", id, body);
+  await run(c.var.db, `UPDATE duty_rules SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "duty_rule.update", "duty_rule", id, body);
   return c.json({ ok: true });
+});
+
+adminCostingRoutes.post("/duty-rules", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, dutyRuleCreateSchema);
+  if (body.dutyRateMax < body.dutyRateMin) {
+    return c.json({ error: "Max duty rate can't be below the min." }, 400);
+  }
+  const id = newId("duty");
+  await run(
+    c.var.db,
+    `INSERT INTO duty_rules
+       (id, name, destination_region, origin_country, hs_category, qualifies_condition,
+        duty_rate_min, duty_rate_max, is_preferential, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    id,
+    body.name,
+    body.destinationRegion,
+    body.originCountry ?? "MA",
+    body.hsCategory ?? null,
+    body.qualifiesCondition ?? null,
+    body.dutyRateMin,
+    body.dutyRateMax,
+    body.isPreferential ? 1 : 0,
+  );
+  await writeAudit(c.var.db, c.var.userId, "duty_rule.create", "duty_rule", id, { name: body.name });
+  return c.json({ id }, 201);
+});
+
+adminCostingRoutes.delete("/duty-rules/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const result = await run(c.var.db, `DELETE FROM duty_rules WHERE id = ?`, id);
+  if (!result.meta.changes) return c.json({ error: "Duty rule not found" }, 404);
+  await writeAudit(c.var.db, c.var.userId, "duty_rule.delete", "duty_rule", id, {});
+  return c.json({ ok: true });
+});
+
+/**
+ * AI duty lookup (Perplexity): given a garment + trade lane, research the HS
+ * classification, the applicable trade program, and a current duty-rate range,
+ * returned as a DRAFT duty rule the merchant reviews and saves. Estimates only.
+ */
+adminCostingRoutes.post("/duty-rules/ai-lookup", requireAdminWrite, async (c) => {
+  const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
+  if (!perplexityConfigured(c.env)) {
+    return c.json({ error: "AI research isn't switched on for this store yet.", code: "unconfigured" }, 503);
+  }
+  const quota = await reserveResearchQuota(c);
+  if (!quota.ok) return c.json(quotaExceededBody(quota), 429);
+  const body = await parseBody(c, dutyAiLookupSchema);
+  try {
+    const research = await perplexityResearch(c.env, {
+      system:
+        "You are a customs & trade classification analyst for apparel. For the given finished garment and trade lane, identify the likely HS/HTS classification and the current import duty treatment. Respond with ONLY a JSON object, plain-text values (no markdown, no citation markers): {\"name\":\"short rule name e.g. 'US MFN — woven cotton shirt'\",\"hsCategory\":\"HS heading/subheading with a word of context\",\"qualifiesCondition\":\"the rule of origin or condition to get the preferential rate, or 'MFN / no program' \",\"dutyRateMinPct\":<number, percent>,\"dutyRateMaxPct\":<number, percent>,\"isPreferential\":<true if a free-trade program/preferential rate applies>,\"note\":\"one sentence on what drives the rate and any big caveat\"}. Percentages are numbers like 16.5 (not 0.165). If a preferential program exists, min can reflect the preferential (often 0) and max the MFN fallback. Never invent — if unsure, give the MFN range and say so.",
+      prompt: `Garment: ${body.garment}${body.materials ? ` (${body.materials})` : ""}\nExport lane: ${body.origin} → ${body.destination}.`,
+      maxTokens: 1200,
+    });
+    const { parseModelJson } = await import("../services/anthropic");
+    let out: Record<string, unknown> = {};
+    try {
+      const p = parseModelJson(research.text);
+      if (p && typeof p === "object") out = p as Record<string, unknown>;
+    } catch {
+      /* leave empty */
+    }
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && Number.isFinite(v) ? v : null;
+    const str = (v: unknown, n: number): string | null =>
+      typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null" ? v.trim().slice(0, n) : null;
+    return c.json({
+      name: str(out.name, 200),
+      hsCategory: str(out.hsCategory, 200),
+      qualifiesCondition: str(out.qualifiesCondition, 2000),
+      dutyRateMinPct: num(out.dutyRateMinPct),
+      dutyRateMaxPct: num(out.dutyRateMaxPct),
+      isPreferential: Boolean(out.isPreferential),
+      note: str(out.note, 600),
+      citations: research.citations,
+    });
+  } catch (err) {
+    return c.json({ error: `Couldn't research duties: ${String(err).slice(0, 160)}` }, 502);
+  }
 });
 
 adminCostingRoutes.get("/margin-targets", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, channel, category, target_gross_margin_pct, floor_gross_margin_pct, notes FROM margin_targets`,
   );
   return c.json(rows);
@@ -287,7 +438,7 @@ adminCostingRoutes.get("/estimate", async (c) => {
     return c.json({ error: "baseCents must be a positive integer" }, 400);
   }
   const rules = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT * FROM duty_rules WHERE destination_region = ? AND is_active = 1`,
     region,
   );

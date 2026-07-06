@@ -1,0 +1,96 @@
+# One-shot: delete a stray Cloudflare Worker script via the Cloudflare API.
+#
+# Why this exists: the old `wrangler deploy` step (since removed) minted an
+# orphan Worker named "rezene" that nothing routes to — the live site is served
+# by the Workers Builds script "verto". This deletes the orphan.
+#
+# It is GUARDED by a commit-message marker so it never fires by accident: the
+# delete job runs only when the head commit message contains
+# "[delete-orphan-worker]". Push an empty commit with that marker to trigger it
+# once; ordinary pushes skip the job entirely. Deleting an already-gone script
+# is treated as success, so re-runs are harmless.
+#
+# Uses the Cloudflare REST API directly (deterministic, no interactive prompt).
+# Needs the same repo secrets the deploy workflow uses:
+#   CLOUDFLARE_API_TOKEN  — Workers Scripts:Edit
+#   CLOUDFLARE_ACCOUNT_ID — optional; derived from the token if unset.
+
+name: Delete orphan Worker (guarded one-shot)
+
+on:
+  push:
+    branches: [main, claude/cloudflare-vite-react-scaffold-aluycl]
+  workflow_dispatch:
+    inputs:
+      script_name:
+        description: Worker script name to delete
+        required: true
+        default: rezene
+
+jobs:
+  delete-orphan:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[delete-orphan-worker]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the orphan Worker script
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SCRIPT_NAME: ${{ github.event.inputs.script_name || 'rezene' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CF_API_TOKEN:-}" ]; then
+            echo "CLOUDFLARE_API_TOKEN is not set — cannot delete." >&2
+            exit 1
+          fi
+          acct="${CF_ACCOUNT_ID:-}"
+          if [ -z "$acct" ]; then
+            echo "No CLOUDFLARE_ACCOUNT_ID secret — deriving account id from the token…"
+            acct=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer ${CF_API_TOKEN}" \
+              | python3 -c 'import sys,json; d=json.load(sys.stdin); print((d.get("result") or [{}])[0].get("id",""))')
+          fi
+          if [ -z "$acct" ]; then
+            echo "Could not determine the Cloudflare account id." >&2
+            exit 1
+          fi
+
+          # Safety gate: refuse to delete a Worker that still serves a custom
+          # domain. This is the "does anything route to it?" check — a routed
+          # Worker must have its domain detached first.
+          echo "Checking for custom domains attached to \"${SCRIPT_NAME}\"…"
+          domains=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${acct}/workers/domains?service=${SCRIPT_NAME}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          echo "$domains"
+          count=$(printf '%s' "$domains" | python3 -c 'import sys,json
+try:
+    d=json.load(sys.stdin)
+    print(len(d.get("result") or []) if d.get("success") else "err")
+except Exception:
+    print("err")')
+          if [ "$count" = "err" ]; then
+            echo "❌ Could not read attached domains — aborting for safety." >&2
+            exit 1
+          fi
+          if [ "$count" != "0" ]; then
+            echo "❌ \"${SCRIPT_NAME}\" has ${count} custom domain(s) attached — it IS routed. Not deleting; detach the domain(s) first." >&2
+            exit 1
+          fi
+          echo "No custom domains attached — safe to delete."
+
+          echo "Deleting Worker \"${SCRIPT_NAME}\" in account ${acct}…"
+          code=$(curl -s -o /tmp/cf.json -w '%{http_code}' -X DELETE \
+            "https://api.cloudflare.com/client/v4/accounts/${acct}/workers/scripts/${SCRIPT_NAME}?force=true" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          echo "HTTP ${code}"; cat /tmp/cf.json; echo
+          # Success, or a "not found" (already deleted) → treat as done.
+          if [ "$code" = "200" ] && grep -q '"success":true' /tmp/cf.json; then
+            echo "✅ Deleted ${SCRIPT_NAME}."; exit 0
+          fi
+          if [ "$code" = "404" ] || grep -qiE 'not.?found|does not exist|10007' /tmp/cf.json; then
+            echo "ℹ️  ${SCRIPT_NAME} is already gone — nothing to do."; exit 0
+          fi
+          echo "❌ Delete failed." >&2
+          exit 1

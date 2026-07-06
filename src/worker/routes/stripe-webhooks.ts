@@ -60,7 +60,12 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const orderId = await handleCheckoutCompleted(c.env.DB, stripe, event.data.object);
+        const session = event.data.object;
+        if (session.metadata?.kind === "video_render") {
+          await handleVideoRenderAuthorized(c.env, session);
+          break;
+        }
+        const orderId = await handleCheckoutCompleted(c.env.DB, stripe, session);
         if (orderId) c.executionCtx.waitUntil(notifyOrderPaid(c.env, orderId));
         break;
       }
@@ -161,6 +166,41 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
   }
 }
 
+/**
+ * Promo-video render checkout completed → the card is now authorized (manual
+ * capture holds the funds). Record the intent, queue the job, and dispatch the
+ * GitHub Actions render. The hold is only captured when the finished MP4 lands
+ * (see render-callbacks finalize), so an uncompleted render costs nothing.
+ */
+async function handleVideoRenderAuthorized(env: Env, session: Stripe.Checkout.Session): Promise<void> {
+  const jobId = session.metadata?.job_id;
+  const shopId = session.metadata?.shop_id;
+  if (!jobId || !shopId) return;
+  const { getShopDb } = await import("../services/tenant-db");
+  const { PRIMARY_SHOP_ID } = await import("../services/shops");
+  const { dispatchRender } = await import("../services/video-render");
+  const db = getShopDb(env, shopId, PRIMARY_SHOP_ID);
+  const pi = typeof session.payment_intent === "string" ? session.payment_intent : null;
+  const formats = (() => {
+    try {
+      return JSON.parse(session.metadata?.formats || "[\"16:9\"]") as ("16:9" | "9:16" | "1:1")[];
+    } catch {
+      return ["16:9"] as ("16:9" | "9:16" | "1:1")[];
+    }
+  })();
+  await run(
+    db,
+    `UPDATE video_jobs SET status = 'queued', progress = 0, progress_label = 'Queued',
+       stripe_payment_intent_id = ?, updated_at = datetime('now') WHERE id = ?`,
+    pi,
+    jobId,
+  );
+  const dispatched = await dispatchRender(env, { shopId, jobId, formats });
+  if (!dispatched.ok) {
+    await run(db, `UPDATE video_jobs SET status = 'failed', error = ? WHERE id = ?`, dispatched.error ?? "dispatch failed", jobId);
+  }
+}
+
 async function handleCheckoutCompleted(
   db: D1Database,
   stripe: Stripe,
@@ -213,6 +253,18 @@ async function handleCheckoutCompleted(
     (session as { shipping_details?: { address?: unknown; name?: string } }).shipping_details ??
     session.customer_details;
 
+  // Chosen shipping option (when checkout offered live rates).
+  const shippingCents = session.shipping_cost?.amount_total ?? null;
+  let shippingMethod: string | null = null;
+  if (typeof session.shipping_cost?.shipping_rate === "string") {
+    try {
+      const rate = await stripe.shippingRates.retrieve(session.shipping_cost.shipping_rate);
+      shippingMethod = rate.display_name ?? null;
+    } catch {
+      // Display name is cosmetic; the amount is already captured.
+    }
+  }
+
   await run(
     db,
     `UPDATE orders SET
@@ -222,6 +274,8 @@ async function handleCheckoutCompleted(
        email = COALESCE(?, email),
        subtotal_cents = COALESCE(?, subtotal_cents),
        tax_cents = COALESCE(?, tax_cents),
+       shipping_cents = COALESCE(?, shipping_cents),
+       shipping_method = COALESCE(?, shipping_method),
        total_cents = COALESCE(?, total_cents),
        shipping_country = COALESCE(?, shipping_country),
        shipping_address_json = COALESCE(?, shipping_address_json),
@@ -233,6 +287,8 @@ async function handleCheckoutCompleted(
     email?.toLowerCase() ?? null,
     session.amount_subtotal,
     session.total_details?.amount_tax ?? null,
+    shippingCents,
+    shippingMethod,
     session.amount_total,
     session.customer_details?.address?.country ?? null,
     shipping ? JSON.stringify(shipping) : null,

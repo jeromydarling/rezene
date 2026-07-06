@@ -15,6 +15,27 @@ const SESSION_TTL_HOURS = 24 * 14;
 
 export const SESSION_COOKIE = "ma_session";
 
+/**
+ * Verto HQ (the platform CRM + shop registry) is SuperAdmin-only. The primary
+ * shop (Rezene) happens to share the platform's D1, so being a Rezene admin is
+ * NOT enough — HQ requires a SuperAdmin identity. A user qualifies via the
+ * 'superadmin' role, the SUPERADMIN_EMAILS allowlist, or by being the
+ * bootstrap founder (ADMIN_EMAIL) so the operator is never locked out of HQ.
+ */
+export function isSuperAdmin(env: Env, email: string | null, roles: string[]): boolean {
+  if (roles.includes("superadmin")) return true;
+  const e = email?.trim().toLowerCase();
+  if (!e) return false;
+  const allow = (env.SUPERADMIN_EMAILS || "")
+    .toLowerCase()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (allow.includes(e)) return true;
+  if (env.ADMIN_EMAIL && e === env.ADMIN_EMAIL.trim().toLowerCase()) return true;
+  return false;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const bits = await deriveBits(password, salt);
@@ -94,6 +115,62 @@ export async function destroySession(db: D1Database, token: string): Promise<voi
   if (id) await run(db, `DELETE FROM sessions WHERE id = ?`, id);
 }
 
+// ---------- Password reset / invite tokens ----------
+
+const RESET_TTL_HOURS = 2;
+const INVITE_TTL_HOURS = 24 * 7;
+
+/**
+ * Mint a single-use token for "forgot password" (purpose 'reset') or "set
+ * your password" onboarding (purpose 'invite'). Only the hash is stored; the
+ * raw token travels once, in the emailed/copied link.
+ */
+export async function createResetToken(
+  db: D1Database,
+  userId: string,
+  purpose: "reset" | "invite" = "reset",
+): Promise<string> {
+  const secret = randomToken(32);
+  const token = `${userId}.${secret}`;
+  const ttl = purpose === "invite" ? INVITE_TTL_HOURS : RESET_TTL_HOURS;
+  const expiresAt = new Date(Date.now() + ttl * 3600 * 1000).toISOString();
+  // One live token per user+purpose: supersede any earlier unused ones.
+  await run(db, `DELETE FROM password_reset_tokens WHERE user_id = ? AND purpose = ? AND used_at IS NULL`, userId, purpose);
+  await run(
+    db,
+    `INSERT INTO password_reset_tokens (id, user_id, token_hash, purpose, expires_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    newId("prt"),
+    userId,
+    await sha256Hex(secret),
+    purpose,
+    expiresAt,
+  );
+  return token;
+}
+
+/** Validate and burn a reset/invite token, returning the target user. */
+export async function consumeResetToken(
+  db: D1Database,
+  token: string,
+): Promise<{ userId: string; purpose: string } | null> {
+  const dot = token.indexOf(".");
+  if (dot < 1) return null;
+  const userId = token.slice(0, dot);
+  const secret = token.slice(dot + 1);
+  const row = await first<{ id: string; purpose: string; expires_at: string; used_at: string | null }>(
+    db,
+    `SELECT id, purpose, expires_at, used_at FROM password_reset_tokens
+     WHERE user_id = ? AND token_hash = ?`,
+    userId,
+    await sha256Hex(secret),
+  );
+  if (!row || row.used_at) return null;
+  if (row.expires_at < new Date().toISOString()) return null;
+  await run(db, `UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`, row.id);
+  return { userId, purpose: row.purpose };
+}
+
 export async function resolveSession(
   db: D1Database,
   token: string | undefined,
@@ -142,6 +219,7 @@ export async function resolveSession(
  */
 export async function maybeBootstrapAdmin(
   env: Env,
+  db: D1Database,
   email: string,
   password: string,
 ): Promise<boolean> {
@@ -154,18 +232,18 @@ export async function maybeBootstrapAdmin(
   if (email.trim().toLowerCase() !== adminEmail.toLowerCase()) return false;
   if (password.trim() !== adminPassword) return false;
 
-  const existing = await first<{ n: number }>(env.DB, `SELECT count(*) AS n FROM users`);
+  const existing = await first<{ n: number }>(db, `SELECT count(*) AS n FROM users`);
   if (existing && existing.n > 0) return false;
 
   const userId = newId("usr");
   await run(
-    env.DB,
+    db,
     `INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)`,
     userId,
     adminEmail.toLowerCase(),
     "Founder",
     await hashPassword(adminPassword),
   );
-  await run(env.DB, `INSERT INTO user_roles (user_id, role_id) VALUES (?, 'admin')`, userId);
+  await run(db, `INSERT INTO user_roles (user_id, role_id) VALUES (?, 'admin')`, userId);
   return true;
 }

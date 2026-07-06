@@ -11,6 +11,19 @@ const DEFAULT_BRAND: BrandSettings = {
   brandName: "Maison Atlantique",
   tagline: "Tailored resortwear, cut in Casablanca.",
   currency: "USD",
+  homeHero: {
+    eyebrow: "Casablanca · Atlantic Riviera · SS27",
+    heading: "Dressed for the last hour of light.",
+    subheading:
+      "High-waisted linen tailoring and draped resortwear, cut in the ateliers of Casablanca. Old-world proportions, modern ease, honest cloth.",
+    primaryCtaLabel: "Shop the collection",
+    primaryCtaHref: "/products",
+    secondaryCtaLabel: "Our story",
+    secondaryCtaHref: "/story",
+    imageUrl: null,
+  },
+  navigation: null,
+  languages: ["en"],
 };
 
 const BrandContext = createContext<BrandSettings>(DEFAULT_BRAND);
@@ -26,6 +39,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           brandName: settings.brandName || DEFAULT_BRAND.brandName,
           tagline: settings.tagline || DEFAULT_BRAND.tagline,
           currency: settings.currency || DEFAULT_BRAND.currency,
+          homeHero: settings.homeHero ?? DEFAULT_BRAND.homeHero,
+          navigation: settings.navigation ?? null,
+          languages:
+            settings.languages && settings.languages.length > 0 ? settings.languages : ["en"],
         });
         if (settings.brandName) document.title = settings.brandName;
       })

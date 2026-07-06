@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { all, first, jsonArray, run } from "../services/db";
 import { leadNotification, sendNotification } from "../services/email";
+import { getSupportedLanguages, translateFields } from "../services/translate";
 import { analyticsEventSchema, leadSchema, parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import { newId } from "../utils/id";
@@ -23,22 +24,69 @@ export const publicRoutes = new Hono<AppContext>();
 // ---------- Brand settings ----------
 publicRoutes.get("/settings", async (c) => {
   const rows = await all<{ key: string; value: string }>(
-    c.env.DB,
-    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline','default_currency')`,
+    c.var.db,
+    `SELECT key, value FROM settings
+     WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero','nav_menus','supported_languages')`,
   );
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const parse = <T>(value: string | undefined): T | null => {
+    try {
+      return value ? (JSON.parse(value) as T) : null;
+    } catch {
+      return null; // corrupt setting → client falls back to built-in defaults
+    }
+  };
+  const languages = parse<string[]>(map.supported_languages);
   const settings: BrandSettings = {
     brandName: map.brand_name ?? c.env.BRAND_NAME,
     tagline: map.brand_tagline ?? "",
     currency: map.default_currency ?? "USD",
+    homeHero: parse<BrandSettings["homeHero"]>(map.home_hero),
+    navigation: parse<BrandSettings["navigation"]>(map.nav_menus),
+    languages: Array.isArray(languages) && languages.length > 0 ? languages : ["en"],
   };
   return c.json(settings);
 });
 
+// ---------- Marketing email unsubscribe (link in every campaign email) ----------
+publicRoutes.get("/unsubscribe", async (c) => {
+  const email = (c.req.query("email") ?? "").toLowerCase().slice(0, 200);
+  const token = c.req.query("token") ?? "";
+  if (!email || !token) return c.text("Invalid unsubscribe link.", 400);
+  const { sha256Hex } = await import("../utils/id");
+  const expected = (await sha256Hex(`${email}${c.env.SESSION_SECRET ?? ""}`)).slice(0, 32);
+  if (token !== expected) return c.text("Invalid unsubscribe link.", 400);
+  // Browser GET (no tenant header): the link itself names the shop.
+  let db = c.var.db;
+  const shopSlugParam = c.req.query("shop");
+  if (shopSlugParam) {
+    const { getShopBySlug, PRIMARY_SHOP_ID } = await import("../services/shops");
+    const { getShopDb } = await import("../services/tenant-db");
+    const shop = await getShopBySlug(c.env.DB, shopSlugParam);
+    if (shop) db = getShopDb(c.env, shop.id, PRIMARY_SHOP_ID);
+  }
+  await run(
+    db,
+    `UPDATE leads SET unsubscribed_at = datetime('now') WHERE lower(email) = ? AND unsubscribed_at IS NULL`,
+    email,
+  );
+  return c.text("You're unsubscribed. You won't hear from us again unless you sign back up.");
+});
+
+/** True when the request carries the site's draft-preview token. */
+async function previewAllowed(db: D1Database, token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  const row = await first<{ value: string }>(
+    db,
+    `SELECT value FROM settings WHERE key = 'preview_token'`,
+  );
+  return Boolean(row?.value && row.value === token);
+}
+
 // ---------- Collections ----------
 publicRoutes.get("/collections", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT id, slug, name, season, description, editorial_copy, hero_image_url
      FROM collections WHERE is_published = 1 ORDER BY sort_order`,
   );
@@ -47,14 +95,14 @@ publicRoutes.get("/collections", async (c) => {
 
 publicRoutes.get("/collections/:slug", async (c) => {
   const row = await first(
-    c.env.DB,
+    c.var.db,
     `SELECT id, slug, name, season, description, editorial_copy, hero_image_url
      FROM collections WHERE slug = ? AND is_published = 1`,
     c.req.param("slug"),
   );
   if (!row) return c.json({ error: "Collection not found" }, 404);
   const products = await queryProductSummaries(
-    c.env.DB,
+    c.var.db,
     `WHERE p.is_published = 1 AND p.collection_id = ?`,
     [row.id],
   );
@@ -70,12 +118,12 @@ publicRoutes.get("/products", async (c) => {
     where += ` AND p.gender = ?`;
     params.push(gender);
   }
-  return c.json(await queryProductSummaries(c.env.DB, where, params));
+  return c.json(await queryProductSummaries(c.var.db, where, params));
 });
 
 publicRoutes.get("/products/:slug", async (c) => {
   const p = await first<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT p.*, c.slug AS collection_slug FROM products p
      LEFT JOIN collections c ON c.id = p.collection_id
      WHERE p.slug = ? AND p.is_published = 1`,
@@ -84,7 +132,7 @@ publicRoutes.get("/products/:slug", async (c) => {
   if (!p) return c.json({ error: "Product not found" }, 404);
 
   const images = await all<{ url: string; alt_text: string | null; colorway_name: string | null }>(
-    c.env.DB,
+    c.var.db,
     `SELECT url, alt_text, colorway_name FROM product_images WHERE product_id = ? ORDER BY sort_order`,
     p.id,
   );
@@ -97,7 +145,7 @@ publicRoutes.get("/products/:slug", async (c) => {
     on_hand: number | null;
     reserved: number | null;
   }>(
-    c.env.DB,
+    c.var.db,
     `SELECT v.id, v.colorway_name, v.size, v.price_cents, v.currency,
             i.on_hand, i.reserved
      FROM product_variants v
@@ -120,7 +168,7 @@ publicRoutes.get("/products/:slug", async (c) => {
   });
 
   const related = await queryProductSummaries(
-    c.env.DB,
+    c.var.db,
     `WHERE p.is_published = 1 AND p.id != ? AND (p.collection_id = ? OR p.gender = ?)
      ORDER BY CASE WHEN p.collection_id = ? THEN 0 ELSE 1 END, p.sort_order LIMIT 4`,
     [p.id, p.collection_id, p.gender, p.collection_id],
@@ -128,8 +176,8 @@ publicRoutes.get("/products/:slug", async (c) => {
   );
 
   const detail: PublicProductDetail = {
-    campaign: await loadCampaign(c.env.DB, p.id as string),
-    sizeChart: p.style_id ? await loadSizeChart(c.env.DB, p.style_id as string) : null,
+    campaign: await loadCampaign(c.var.db, p.id as string),
+    sizeChart: p.style_id ? await loadSizeChart(c.var.db, p.style_id as string) : null,
     ...mapProductSummary({
       ...p,
       image_url: images[0]?.url ?? null,
@@ -157,7 +205,7 @@ publicRoutes.get("/products/:slug", async (c) => {
 // ---------- Lookbook ----------
 publicRoutes.get("/lookbooks", async (c) => {
   const books = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, slug, title, season, intro_copy FROM lookbooks WHERE is_published = 1
      ORDER BY created_at DESC`,
   );
@@ -170,7 +218,7 @@ publicRoutes.get("/lookbooks", async (c) => {
       product_name: string | null;
       product_price: number | null;
     }>(
-      c.env.DB,
+      c.var.db,
       `SELECT li.image_url, li.caption,
               pr.slug AS product_slug, pr.name AS product_name, pr.base_price_cents AS product_price
        FROM lookbook_images li
@@ -198,7 +246,7 @@ publicRoutes.get("/lookbooks", async (c) => {
 // ---------- Journal ----------
 publicRoutes.get("/journal", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT slug, title, excerpt, hero_image_url, author, published_at
      FROM journal_posts WHERE is_published = 1 ORDER BY published_at DESC`,
   );
@@ -206,25 +254,103 @@ publicRoutes.get("/journal", async (c) => {
 });
 
 publicRoutes.get("/journal/:slug", async (c) => {
+  const allowDraft = await previewAllowed(c.var.db, c.req.query("preview"));
   const row = await first(
-    c.env.DB,
-    `SELECT slug, title, excerpt, body_md, hero_image_url, author, published_at
-     FROM journal_posts WHERE slug = ? AND is_published = 1`,
+    c.var.db,
+    `SELECT id, slug, title, excerpt, body_md, hero_image_url, author, published_at
+     FROM journal_posts WHERE slug = ? ${allowDraft ? "" : "AND is_published = 1"}`,
     c.req.param("slug"),
   );
   if (!row) return c.json({ error: "Post not found" }, 404);
-  return c.json(mapJournal(row, true));
+  const post = mapJournal(row, true) as PublicJournalPost & { lang?: string; translated?: boolean };
+
+  const lang = (c.req.query("lang") ?? "").toLowerCase().slice(0, 5);
+  if (lang) {
+    const languages = await getSupportedLanguages(c.var.db);
+    if (lang !== languages[0] && languages.includes(lang)) {
+      const translated = await translateFields(c.env, c.var.db, "journal_post", row.id as string, lang, {
+        title: post.title,
+        excerpt: post.excerpt,
+        bodyMd: post.bodyMd,
+      });
+      if (translated) {
+        post.title = translated.title ?? post.title;
+        post.excerpt = translated.excerpt ?? post.excerpt;
+        post.bodyMd = translated.bodyMd ?? post.bodyMd;
+        post.lang = lang;
+        post.translated = true;
+      }
+    }
+  }
+  return c.json(post);
 });
 
 // ---------- Static pages ----------
 publicRoutes.get("/pages/:slug", async (c) => {
-  const row = await first<{ slug: string; title: string; body_md: string | null }>(
-    c.env.DB,
-    `SELECT slug, title, body_md FROM pages WHERE slug = ? AND is_published = 1`,
+  const allowDraft = await previewAllowed(c.var.db, c.req.query("preview"));
+  const row = await first<{
+    id: string;
+    slug: string;
+    title: string;
+    body_md: string | null;
+    layout: string | null;
+    hero_image_url: string | null;
+    hero_eyebrow: string | null;
+    subtitle: string | null;
+    sections_json: string | null;
+  }>(
+    c.var.db,
+    `SELECT id, slug, title, body_md, layout, hero_image_url, hero_eyebrow, subtitle, sections_json
+     FROM pages WHERE slug = ? ${allowDraft ? "" : "AND is_published = 1"}`,
     c.req.param("slug"),
   );
   if (!row) return c.json({ error: "Page not found" }, 404);
-  const page: PublicPage = { slug: row.slug, title: row.title, bodyMd: row.body_md };
+
+  let sections: PublicPage["sections"] = null;
+  if (row.sections_json) {
+    try {
+      sections = JSON.parse(row.sections_json) as PublicPage["sections"];
+    } catch {
+      /* malformed sections → fall back to markdown body */
+    }
+  }
+  const page: PublicPage = {
+    slug: row.slug,
+    title: row.title,
+    bodyMd: row.body_md,
+    layout: (row.layout as PublicPage["layout"]) ?? "standard",
+    heroImageUrl: row.hero_image_url,
+    heroEyebrow: row.hero_eyebrow,
+    subtitle: row.subtitle,
+    sections,
+  };
+
+  // On-demand translation (markdown pages only; block sections stay in the
+  // default language — "decent translations without full localization").
+  const lang = (c.req.query("lang") ?? "").toLowerCase().slice(0, 5);
+  if (lang) {
+    const languages = await getSupportedLanguages(c.var.db);
+    if (lang !== languages[0] && languages.includes(lang) && !sections) {
+      const translated = await translateFields(c.env, c.var.db, "page", row.id, lang, {
+        title: row.title,
+        subtitle: row.subtitle,
+        heroEyebrow: row.hero_eyebrow,
+        bodyMd: row.body_md,
+      });
+      if (translated) {
+        page.title = translated.title ?? page.title;
+        page.subtitle = translated.subtitle ?? page.subtitle;
+        page.heroEyebrow = translated.heroEyebrow ?? page.heroEyebrow;
+        page.bodyMd = translated.bodyMd ?? page.bodyMd;
+        page.lang = lang;
+        page.translated = true;
+      } else if (allowDraft) {
+        // Preview-token holders (admins) get the failure reason inline.
+        const { lastTranslateError } = await import("../services/translate");
+        (page as unknown as Record<string, unknown>).translationError = lastTranslateError;
+      }
+    }
+  }
   return c.json(page);
 });
 
@@ -235,7 +361,7 @@ publicRoutes.post(
   async (c) => {
     const body = await parseBody(c, leadSchema);
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO leads (id, kind, email, name, company, message, product_id, source_path)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       newId("lead"),
@@ -273,7 +399,7 @@ publicRoutes.post(
   async (c) => {
     const body = await parseBody(c, analyticsEventSchema);
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO analytics_events
         (id, event, session_key, entity_type, entity_id, path, referrer, country, properties_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

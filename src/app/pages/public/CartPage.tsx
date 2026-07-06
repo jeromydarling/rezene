@@ -6,10 +6,58 @@ import { formatMoney } from "../../lib/format";
 import { track } from "../../lib/analytics";
 import { EditorialImage } from "../../components/ImagePlaceholder";
 
+const ESTIMATE_COUNTRIES: { code: string; label: string }[] = [
+  { code: "US", label: "United States" },
+  { code: "GB", label: "United Kingdom" },
+  { code: "CA", label: "Canada" },
+  { code: "MA", label: "Morocco" },
+  { code: "FR", label: "France" },
+  { code: "DE", label: "Germany" },
+  { code: "ES", label: "Spain" },
+  { code: "IT", label: "Italy" },
+  { code: "NL", label: "Netherlands" },
+  { code: "BE", label: "Belgium" },
+  { code: "PT", label: "Portugal" },
+  { code: "IE", label: "Ireland" },
+  { code: "AT", label: "Austria" },
+  { code: "DK", label: "Denmark" },
+  { code: "SE", label: "Sweden" },
+];
+
+interface CartQuote {
+  carrier: string;
+  service: string;
+  amountCents: number;
+  currency: string;
+  minDays: number | null;
+  maxDays: number | null;
+}
+
 export function CartPage() {
   const cart = useCart();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [country, setCountry] = useState("");
+  const [quotes, setQuotes] = useState<CartQuote[] | null>(null);
+  const [quoting, setQuoting] = useState(false);
+
+  async function estimate(nextCountry: string) {
+    setCountry(nextCountry);
+    setQuotes(null);
+    if (!nextCountry) return;
+    setQuoting(true);
+    try {
+      const res = await api.post<{ quotes: CartQuote[] }>("/api/public/shipping/quote", {
+        country: nextCountry,
+        items: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+      });
+      setQuotes(res.quotes);
+    } catch {
+      setQuotes([]); // estimate is a nicety — checkout still works without it
+    } finally {
+      setQuoting(false);
+    }
+  }
 
   async function checkout() {
     setBusy(true);
@@ -18,6 +66,7 @@ export function CartPage() {
     try {
       const res = await api.post<{ url: string }>("/api/public/checkout", {
         items: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+        ...(country ? { shippingCountry: country } : {}),
       });
       window.location.href = res.url;
     } catch (err) {
@@ -113,6 +162,44 @@ export function CartPage() {
           <p className="font-display text-2xl font-light">
             {formatMoney(cart.subtotalCents, currency)}
           </p>
+        </div>
+
+        <div className="border-t border-ink/10 pt-4">
+          <label className="mb-2 block text-xs uppercase tracking-editorial text-warmgrey">
+            Estimate shipping
+          </label>
+          <select
+            className="w-full border border-ink/20 bg-transparent px-3 py-2 text-sm"
+            value={country}
+            onChange={(e) => void estimate(e.target.value)}
+          >
+            <option value="">Select your country…</option>
+            {ESTIMATE_COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          {quoting && <p className="mt-2 text-xs text-warmgrey">Checking rates…</p>}
+          {quotes && quotes.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {quotes.slice(0, 4).map((q, i) => (
+                <li key={i} className="flex items-baseline justify-between">
+                  <span className="text-warmgrey">
+                    {q.carrier} — {q.service}
+                    {q.minDays != null &&
+                      ` (${q.minDays}${q.maxDays && q.maxDays !== q.minDays ? `–${q.maxDays}` : ""} days)`}
+                  </span>
+                  <span>{q.amountCents === 0 ? "Free" : formatMoney(q.amountCents, q.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {quotes && quotes.length === 0 && !quoting && (
+            <p className="mt-2 text-xs text-warmgrey">
+              Rates for this destination are confirmed at checkout.
+            </p>
+          )}
         </div>
         {hasPreOrder && (
           <p className="bg-saffron/15 px-4 py-3 text-sm text-bark">

@@ -8,31 +8,12 @@ import {
 import { requireAdminWrite } from "../middleware/auth";
 import { getBrandName } from "../services/brand";
 import { renderTechPackHtml } from "../services/techpack-html";
+import { DEFAULT_SECTIONS } from "../services/techpacks";
 import { newId, randomToken, sha256Hex } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminTechPackDetail, AdminTechPackSummary } from "../../shared/types";
 
 export const adminTechPackRoutes = new Hono<AppContext>();
-
-/** Sections every new tech pack starts with, in factory-reading order. */
-const DEFAULT_SECTIONS: { kind: string; title: string }[] = [
-  { kind: "cover", title: "Cover" },
-  { kind: "style_overview", title: "Style Overview" },
-  { kind: "flat_sketch", title: "Flat Sketch / Reference" },
-  { kind: "bom", title: "Bill of Materials" },
-  { kind: "fabric_details", title: "Fabric Details" },
-  { kind: "trim_details", title: "Trim Details" },
-  { kind: "colorways", title: "Colorways" },
-  { kind: "size_spec", title: "Size Specification" },
-  { kind: "measurement_points", title: "Measurement Points" },
-  { kind: "grading", title: "Grading Rules" },
-  { kind: "construction", title: "Construction Notes" },
-  { kind: "stitch_details", title: "Stitch Details" },
-  { kind: "labels_packaging", title: "Labels & Packaging" },
-  { kind: "care_label", title: "Care Label" },
-  { kind: "qc_checklist", title: "QC Checklist" },
-  { kind: "revision_history", title: "Revision History" },
-];
 
 const TP_SELECT = `
   SELECT tp.*, s.name AS style_name FROM tech_packs tp
@@ -54,7 +35,7 @@ function mapSummary(row: Record<string, unknown>): AdminTechPackSummary {
 }
 
 adminTechPackRoutes.get("/", async (c) => {
-  const rows = await all(c.env.DB, `${TP_SELECT} ORDER BY tp.updated_at DESC`);
+  const rows = await all(c.var.db, `${TP_SELECT} ORDER BY tp.updated_at DESC`);
   return c.json(rows.map(mapSummary));
 });
 
@@ -143,7 +124,7 @@ export async function loadTechPackDetail(
 
 adminTechPackRoutes.get("/:id", async (c) => {
   const detail = await loadTechPackDetail(
-    c.env.DB,
+    c.var.db,
     c.req.param("id"),
     await getBrandName(c.env),
   );
@@ -156,7 +137,7 @@ adminTechPackRoutes.get("/:id", async (c) => {
 /** Create a tokenized factory link. The raw token is returned exactly once. */
 adminTechPackRoutes.post("/:id/shares", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
-  const pack = await first(c.env.DB, `SELECT id FROM tech_packs WHERE id = ?`, id);
+  const pack = await first(c.var.db, `SELECT id FROM tech_packs WHERE id = ?`, id);
   if (!pack) return c.json({ error: "Tech pack not found" }, 404);
   const body = (await c.req.json().catch(() => ({}))) as {
     label?: string;
@@ -166,7 +147,7 @@ adminTechPackRoutes.post("/:id/shares", requireAdminWrite, async (c) => {
   const token = randomToken(24);
   const shareId = newId("tps");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO tech_pack_shares (id, tech_pack_id, supplier_id, label, token_hash, language, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     shareId,
@@ -177,13 +158,15 @@ adminTechPackRoutes.post("/:id/shares", requireAdminWrite, async (c) => {
     body.language === "fr" ? "fr" : "en",
     c.var.userId,
   );
-  await writeAudit(c.env.DB, c.var.userId, "tech_pack.share", "tech_pack", id, { shareId });
-  return c.json({ id: shareId, url: `/factory/${token}` }, 201);
+  await writeAudit(c.var.db, c.var.userId, "tech_pack.share", "tech_pack", id, { shareId });
+  const { getPrimaryShopBase } = await import("../services/shops");
+  const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
+  return c.json({ id: shareId, url: `${shopBase}/factory/${token}` }, 201);
 });
 
 adminTechPackRoutes.get("/:id/shares", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT s.id, s.label, s.language, s.status, s.approved_at, s.approved_by_name,
             s.approval_note, s.last_viewed_at, s.view_count, s.created_at,
             sup.name AS supplier_name
@@ -196,12 +179,12 @@ adminTechPackRoutes.get("/:id/shares", async (c) => {
 
 adminTechPackRoutes.post("/shares/:shareId/revoke", requireAdminWrite, async (c) => {
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE tech_pack_shares SET status = 'revoked' WHERE id = ? AND status = 'active'`,
     c.req.param("shareId"),
   );
   if (!result.meta.changes) return c.json({ error: "Share not found or already revoked" }, 404);
-  await writeAudit(c.env.DB, c.var.userId, "tech_pack.share_revoke", "tech_pack_share", c.req.param("shareId"));
+  await writeAudit(c.var.db, c.var.userId, "tech_pack.share_revoke", "tech_pack_share", c.req.param("shareId"));
   return c.json({ ok: true });
 });
 
@@ -211,7 +194,7 @@ adminTechPackRoutes.post("/shares/:shareId/revoke", requireAdminWrite, async (c)
 adminTechPackRoutes.post("/:id/export", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const brandName = await getBrandName(c.env);
-  const detail = await loadTechPackDetail(c.env.DB, id, brandName);
+  const detail = await loadTechPackDetail(c.var.db, id, brandName);
   if (!detail) return c.json({ error: "Tech pack not found" }, 404);
 
   const html = renderTechPackHtml(detail, brandName);
@@ -223,7 +206,7 @@ adminTechPackRoutes.post("/:id/export", requireAdminWrite, async (c) => {
     httpMetadata: { contentType: "text/html; charset=utf-8" },
   });
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO tech_pack_exports (id, tech_pack_id, format, r2_key, version, exported_by)
      VALUES (?, ?, 'html', ?, ?, ?)`,
     exportId,
@@ -232,13 +215,13 @@ adminTechPackRoutes.post("/:id/export", requireAdminWrite, async (c) => {
     detail.version,
     c.var.userId,
   );
-  await writeAudit(c.env.DB, c.var.userId, "tech_pack.export", "tech_pack", id, { r2Key });
+  await writeAudit(c.var.db, c.var.userId, "tech_pack.export", "tech_pack", id, { r2Key });
   return c.json({ id: exportId, r2Key, format: "html", version: detail.version }, 201);
 });
 
 adminTechPackRoutes.get("/:id/exports", async (c) => {
   const rows = await all(
-    c.env.DB,
+    c.var.db,
     `SELECT e.id, e.format, e.r2_key, e.version, e.created_at, u.email AS exported_by
      FROM tech_pack_exports e LEFT JOIN users u ON u.id = e.exported_by
      WHERE e.tech_pack_id = ? ORDER BY e.created_at DESC`,
@@ -250,7 +233,7 @@ adminTechPackRoutes.get("/:id/exports", async (c) => {
 /** Stream an export snapshot from R2 (session-gated like all admin routes). */
 adminTechPackRoutes.get("/exports/:exportId/download", async (c) => {
   const row = await first<{ r2_key: string }>(
-    c.env.DB,
+    c.var.db,
     `SELECT r2_key FROM tech_pack_exports WHERE id = ?`,
     c.req.param("exportId"),
   );
@@ -275,7 +258,7 @@ adminTechPackRoutes.post("/", requireAdminWrite, async (c) => {
   let seedOverview: Record<string, unknown> = {};
   if (body.styleId) {
     const style = await first<Record<string, unknown>>(
-      c.env.DB,
+      c.var.db,
       `SELECT style_code, name, description, fit_notes, fabric_summary, season FROM styles WHERE id = ?`,
       body.styleId,
     );
@@ -291,7 +274,7 @@ adminTechPackRoutes.post("/", requireAdminWrite, async (c) => {
   const code = `TP-${codeBase}-v${version}`;
 
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO tech_packs (id, style_id, code, name, version, status, season, source, summary, created_by)
      VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
     id,
@@ -306,7 +289,7 @@ adminTechPackRoutes.post("/", requireAdminWrite, async (c) => {
   );
 
   const stmts = DEFAULT_SECTIONS.map((s, i) =>
-    c.env.DB.prepare(
+    c.var.db.prepare(
       `INSERT INTO tech_pack_sections (id, tech_pack_id, kind, title, content_json, sort_order)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).bind(
@@ -318,29 +301,48 @@ adminTechPackRoutes.post("/", requireAdminWrite, async (c) => {
       i + 1,
     ),
   );
-  await c.env.DB.batch(stmts);
+  await c.var.db.batch(stmts);
 
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO analytics_events (id, event, entity_type, entity_id) VALUES (?, 'tech_pack_created', 'tech_pack', ?)`,
     newId("evt"),
     id,
   );
-  await writeAudit(c.env.DB, c.var.userId, "tech_pack.create", "tech_pack", id, { code });
-  const row = await first(c.env.DB, `${TP_SELECT} WHERE tp.id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "tech_pack.create", "tech_pack", id, { code });
+  const row = await first(c.var.db, `${TP_SELECT} WHERE tp.id = ?`, id);
   return c.json(mapSummary(row!), 201);
 });
 
 adminTechPackRoutes.patch("/:id/sections/:kind", requireAdminWrite, async (c) => {
   const { id, kind } = c.req.param();
   const body = await parseBody(c, techPackSectionUpdateSchema);
-  const section = await first<{ id: string }>(
-    c.env.DB,
+  let section = await first<{ id: string }>(
+    c.var.db,
     `SELECT id FROM tech_pack_sections WHERE tech_pack_id = ? AND kind = ?`,
     id,
     kind,
   );
-  if (!section) return c.json({ error: "Section not found" }, 404);
+  // Create the section on first edit — seeded/older tech packs may not have
+  // every section row (e.g. flat_sketch), and the annotator writes to it.
+  if (!section) {
+    const template = DEFAULT_SECTIONS.find((t) => t.kind === kind);
+    if (!template) return c.json({ error: "Unknown section" }, 404);
+    const pack = await first<{ id: string }>(c.var.db, `SELECT id FROM tech_packs WHERE id = ?`, id);
+    if (!pack) return c.json({ error: "Tech pack not found" }, 404);
+    const newSectionId = newId("tps");
+    await run(
+      c.var.db,
+      `INSERT INTO tech_pack_sections (id, tech_pack_id, kind, title, content_json, sort_order)
+       VALUES (?, ?, ?, ?, '{}', ?)`,
+      newSectionId,
+      id,
+      kind,
+      body.title ?? template.title,
+      DEFAULT_SECTIONS.findIndex((t) => t.kind === kind),
+    );
+    section = { id: newSectionId };
+  }
   const sets: string[] = [`updated_at = datetime('now')`];
   const params: unknown[] = [];
   if (body.title !== undefined) {
@@ -352,13 +354,13 @@ adminTechPackRoutes.patch("/:id/sections/:kind", requireAdminWrite, async (c) =>
     params.push(JSON.stringify(body.content ?? {}));
   }
   await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE tech_pack_sections SET ${sets.join(", ")} WHERE id = ?`,
     ...params,
     section.id,
   );
-  await run(c.env.DB, `UPDATE tech_packs SET updated_at = datetime('now') WHERE id = ?`, id);
-  await writeAudit(c.env.DB, c.var.userId, "tech_pack.section_update", "tech_pack", id, { kind });
+  await run(c.var.db, `UPDATE tech_packs SET updated_at = datetime('now') WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "tech_pack.section_update", "tech_pack", id, { kind });
   return c.json({ ok: true });
 });
 
@@ -379,12 +381,25 @@ adminTechPackRoutes.patch("/:id", requireAdminWrite, async (c) => {
   if (sets.length === 0) return c.json({ error: "No valid fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
   const result = await run(
-    c.env.DB,
+    c.var.db,
     `UPDATE tech_packs SET ${sets.join(", ")} WHERE id = ?`,
     ...params,
     id,
   );
   if (!result.meta.changes) return c.json({ error: "Tech pack not found" }, 404);
-  await writeAudit(c.env.DB, c.var.userId, "tech_pack.update", "tech_pack", id, body);
+  await writeAudit(c.var.db, c.var.userId, "tech_pack.update", "tech_pack", id, body);
   return c.json({ ok: true });
+});
+
+// ---------- Factory-ready Excel export (always current, never a snapshot) ----------
+adminTechPackRoutes.get("/:id/export.xlsx", async (c) => {
+  const { buildTechPackXlsx } = await import("../services/techpack-xlsx");
+  const result = await buildTechPackXlsx(c.var.db, c.req.param("id"), await getBrandName(c.env));
+  if (!result) return c.json({ error: "Tech pack not found" }, 404);
+  return new Response(result.bytes, {
+    headers: {
+      "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "content-disposition": `attachment; filename="${result.filename}"`,
+    },
+  });
 });

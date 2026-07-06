@@ -38,6 +38,34 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(200),
 });
 
+export const demoAccessSchema = z.object({
+  email: z.string().email().max(200),
+  name: z.string().max(120).optional(),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email().max(200),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(10).max(200),
+  password: z.string().min(8).max(200),
+});
+
+const TEAM_ROLES = ["admin", "ops", "viewer"] as const;
+
+export const inviteUserSchema = z.object({
+  email: z.string().email().max(200),
+  name: z.string().max(120).optional(),
+  role: z.enum(TEAM_ROLES).default("ops"),
+});
+
+export const updateUserSchema = z.object({
+  name: z.string().max(120).optional(),
+  role: z.enum(TEAM_ROLES).optional(),
+  isActive: z.boolean().optional(),
+});
+
 // ---------- Leads / public forms ----------
 export const leadSchema = z.object({
   kind: z.enum(["newsletter", "waitlist", "drop_notification", "wholesale_inquiry", "contact"]),
@@ -104,17 +132,153 @@ export const colorwayCreateSchema = z.object({
 });
 
 // ---------- Products ----------
+const GENDERS = ["mens", "womens", "unisex"] as const;
+const AVAILABILITIES = ["draft", "available", "pre_order", "sold_out", "archived"] as const;
+
 export const productUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
+  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/, "lowercase letters, numbers and hyphens only").optional(),
   subtitle: z.string().max(300).nullable().optional(),
   description: z.string().max(8000).nullable().optional(),
   editorialStory: z.string().max(8000).nullable().optional(),
+  gender: z.enum(GENDERS).optional(),
+  category: z.string().min(1).max(60).optional(),
+  collectionId: z.string().max(60).nullable().optional(),
   basePriceCents: z.number().int().nonnegative().optional(),
-  availability: z.enum(["draft", "available", "pre_order", "sold_out", "archived"]).optional(),
+  compareAtPriceCents: z.number().int().nonnegative().nullable().optional(),
+  currency: z.string().length(3).optional(),
+  availability: z.enum(AVAILABILITIES).optional(),
   isPublished: z.boolean().optional(),
+  fabricComposition: z.string().max(1000).nullable().optional(),
+  careSummary: z.string().max(1000).nullable().optional(),
+  originStatement: z.string().max(500).nullable().optional(),
   preOrderNote: z.string().max(1000).nullable().optional(),
   shippingNote: z.string().max(1000).nullable().optional(),
   fitNotes: z.string().max(2000).nullable().optional(),
+});
+
+export const productCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),
+  gender: z.enum(GENDERS).default("unisex"),
+  category: z.string().min(1).max(60).default("apparel"),
+  collectionId: z.string().max(60).nullable().optional(),
+  basePriceCents: z.number().int().nonnegative().default(0),
+  currency: z.string().length(3).default("USD"),
+  description: z.string().max(8000).nullable().optional(),
+});
+
+export const productImageSchema = z.object({
+  url: z.string().min(1).max(1000),
+  altText: z.string().max(300).nullable().optional(),
+  colorwayName: z.string().max(80).nullable().optional(),
+});
+
+export const imageReorderSchema = z.object({ order: z.array(z.string()).max(60) });
+
+export const variantCreateSchema = z.object({
+  colorwayName: z.string().min(1).max(80),
+  size: z.string().min(1).max(40),
+  skuCode: z.string().max(80).nullable().optional(),
+  priceCents: z.number().int().nonnegative().nullable().optional(),
+  onHand: z.number().int().nonnegative().max(1_000_000).optional(),
+});
+
+export const variantUpdateSchema = z.object({
+  colorwayName: z.string().min(1).max(80).optional(),
+  size: z.string().min(1).max(40).optional(),
+  skuCode: z.string().max(80).nullable().optional(),
+  priceCents: z.number().int().nonnegative().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+// ---------- Design Studio (Flux) ----------
+export const fluxGenerateSchema = z.object({
+  prompt: z.string().min(3).max(2000),
+  seed: z.number().int().nonnegative().nullable().optional(),
+  count: z.number().int().min(1).max(4).default(4),
+  useHouseStyle: z.boolean().default(true),
+});
+
+export const promptSuggestSchema = z.object({
+  brief: z.string().min(1).max(1000),
+  fields: z.record(z.string(), z.string()).optional(),
+});
+
+export const houseStyleSchema = z.object({ value: z.string().max(1200) });
+
+export const referenceAttachSchema = z.object({
+  fileId: z.string().min(1).max(60),
+  label: z.string().max(80).nullable().optional(),
+});
+
+export const useImageSchema = z.object({
+  target: z.enum(["product", "lookbook"]),
+  productId: z.string().max(60).nullable().optional(),
+  lookbookId: z.string().max(60).nullable().optional(),
+});
+
+export const conceptShipSchema = z.object({
+  generationId: z.string().max(60).optional(),
+  supplierId: z.string().max(60).nullable().optional(),
+  styleId: z.string().max(60).nullable().optional(),
+  kind: z.enum(["proto", "fit", "sms", "pp", "top"]).default("proto"),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
+// ---------- Sourcing (find a maker) ----------
+export const sourcingSearchSchema = z.object({
+  garment: z.string().min(1).max(200),
+  materials: z.string().max(200).optional(),
+  moq: z.string().max(60).optional(),
+  location: z.string().max(120).optional(),
+  style: z.string().max(200).optional(),
+  notes: z.string().max(600).optional(),
+});
+
+export const sourcingEnrichSchema = z.object({
+  name: z.string().min(1).max(200),
+  city: z.string().max(120).nullable().optional(),
+  country: z.string().max(80).nullable().optional(),
+  website: z.string().max(300).nullable().optional(),
+});
+
+export const sourcingAddSchema = z.object({
+  name: z.string().min(1).max(200),
+  city: z.string().max(120).nullable().optional(),
+  country: z.string().max(80).nullable().optional(),
+  address: z.string().max(400).nullable().optional(),
+  website: z.string().max(300).nullable().optional(),
+  email: z.string().max(200).nullable().optional(),
+  phone: z.string().max(40).nullable().optional(),
+  whatsapp: z.string().max(40).nullable().optional(),
+  specialties: z.array(z.string().max(60)).max(20).optional(),
+  moqUnits: z.number().int().nonnegative().nullable().optional(),
+  leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+  whyFit: z.string().max(1000).nullable().optional(),
+  citations: z.array(z.string().max(400)).max(20).optional(),
+});
+
+export const feedbackCreateSchema = z.object({
+  kind: z.enum(["bug", "feature", "question"]).default("bug"),
+  title: z.string().min(3).max(200),
+  body: z.string().max(6000).nullable().optional(),
+  severity: z.enum(["low", "medium", "high"]).nullable().optional(),
+  pagePath: z.string().max(300).nullable().optional(),
+});
+
+export const feedbackUpdateSchema = z.object({
+  status: z.enum(["open", "in_progress", "resolved", "closed", "wont_fix"]).optional(),
+  adminNote: z.string().max(4000).nullable().optional(),
+  severity: z.enum(["low", "medium", "high"]).nullable().optional(),
+  kind: z.enum(["bug", "feature", "question"]).optional(),
+});
+
+export const collectionCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),
+  season: z.string().max(40).nullable().optional(),
+  description: z.string().max(4000).nullable().optional(),
 });
 
 // ---------- Suppliers ----------
@@ -122,7 +286,9 @@ export const supplierCreateSchema = z.object({
   name: z.string().min(1).max(200),
   kind: z.enum(["factory", "fabric_mill", "trim_supplier", "service", "logistics"]).optional(),
   city: z.string().max(120).optional(),
-  country: z.string().max(10).optional(),
+  country: z.string().max(80).optional(),
+  address: z.string().max(400).optional(),
+  mapUrl: z.string().max(500).optional(),
   email: z.string().email().max(200).optional().or(z.literal("")),
   phone: z.string().max(40).optional(),
   whatsapp: z.string().max(40).optional(),
@@ -168,6 +334,64 @@ export const calendarEventCreateSchema = z.object({
   endsOn: z.string().max(30).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
 });
+
+// ---------- Fabrics & trims ----------
+export const fabricCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  supplierId: z.string().max(80).nullable().optional(),
+  composition: z.string().max(200).nullable().optional(),
+  weightGsm: z.number().int().nonnegative().nullable().optional(),
+  originCountry: z.string().max(80).nullable().optional(),
+  pricePerMeterCents: z.number().int().nonnegative().nullable().optional(),
+  currency: z.string().max(8).optional(),
+  leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+  moqMeters: z.number().int().nonnegative().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const fabricUpdateSchema = fabricCreateSchema.partial();
+
+export const trimCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  supplierId: z.string().max(80).nullable().optional(),
+  spec: z.string().max(400).nullable().optional(),
+  pricePerUnitCents: z.number().int().nonnegative().nullable().optional(),
+  currency: z.string().max(8).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const trimUpdateSchema = trimCreateSchema.partial();
+
+// ---------- Purchase / production orders ----------
+const poItemSchema = z.object({
+  description: z.string().min(1).max(300),
+  styleId: z.string().max(80).nullable().optional(),
+  quantity: z.number().int().positive(),
+  unitCostCents: z.number().int().nonnegative().nullable().optional(),
+});
+export const productionOrderCreateSchema = z.object({
+  supplierId: z.string().min(1).max(80),
+  poNumber: z.string().max(60).optional(),
+  currency: z.string().max(8).optional(),
+  status: z
+    .enum(["draft", "sent", "confirmed", "in_production", "qc", "shipped", "received", "cancelled"])
+    .optional(),
+  incoterms: z.string().max(60).nullable().optional(),
+  issueDate: z.string().max(30).nullable().optional(),
+  exFactoryDate: z.string().max(30).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  items: z.array(poItemSchema).max(200).optional(),
+});
+export const productionOrderUpdateSchema = z.object({
+  status: z
+    .enum(["draft", "sent", "confirmed", "in_production", "qc", "shipped", "received", "cancelled"])
+    .optional(),
+  currency: z.string().max(8).optional(),
+  incoterms: z.string().max(60).nullable().optional(),
+  issueDate: z.string().max(30).nullable().optional(),
+  exFactoryDate: z.string().max(30).nullable().optional(),
+  receivedDate: z.string().max(30).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const productionOrderItemSchema = poItemSchema;
 
 export const sampleCreateSchema = z.object({
   styleId: z.string().min(1).max(80),
@@ -298,6 +522,34 @@ export const dutyRuleUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const dutyRuleCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  destinationRegion: z.string().min(1).max(40),
+  originCountry: z.string().max(80).optional(),
+  hsCategory: z.string().max(200).nullable().optional(),
+  qualifiesCondition: z.string().max(2000).nullable().optional(),
+  dutyRateMin: z.number().min(0).max(2),
+  dutyRateMax: z.number().min(0).max(2),
+  isPreferential: z.boolean().optional(),
+});
+
+// AI helpers (Perplexity) — free-text briefs that drive a research lookup.
+export const dutyAiLookupSchema = z.object({
+  garment: z.string().min(1).max(200),
+  origin: z.string().min(1).max(80),
+  destination: z.string().min(1).max(80),
+  materials: z.string().max(200).optional(),
+});
+
+export const costingAiSchema = z.object({
+  garment: z.string().min(1).max(200),
+  materials: z.string().max(200).optional(),
+  origin: z.string().max(80).optional(),
+  targetMarket: z.string().max(80).optional(),
+  quantity: z.string().max(60).optional(),
+  currency: z.string().max(8).optional(),
+});
+
 // ---------- Settings ----------
 export const settingsUpdateSchema = z.record(z.string().max(2000));
 
@@ -325,16 +577,99 @@ const slugField = z
   .max(80)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, and hyphens only");
 
+const pageLayout = z.enum(["standard", "hero", "wide"]);
+const SECTION_TYPES = [
+  "home_hero",
+  "hero",
+  "prose",
+  "image_text",
+  "product_grid",
+  "collection_strip",
+  "gallery",
+  "quote",
+  "faq",
+  "cta_band",
+  "newsletter",
+] as const;
+/** Block sections: type is validated, per-type fields stay open (loose blocks). */
+const sectionsField = z
+  .array(z.object({ type: z.enum(SECTION_TYPES) }).passthrough())
+  .max(40)
+  .refine((arr) => JSON.stringify(arr).length <= 120_000, "Sections too large");
+const seoFields = {
+  metaTitle: z.string().max(120).nullable().optional(),
+  metaDescription: z.string().max(300).nullable().optional(),
+  publishAt: z.string().max(30).nullable().optional(),
+};
 export const pageCreateSchema = z.object({
   slug: slugField,
   title: z.string().min(1).max(200),
   bodyMd: z.string().max(60000).optional(),
+  layout: pageLayout.optional(),
+  heroImageUrl: z.string().max(500).nullable().optional(),
+  heroEyebrow: z.string().max(120).nullable().optional(),
+  subtitle: z.string().max(300).nullable().optional(),
+  sections: sectionsField.nullable().optional(),
+  ...seoFields,
   isPublished: z.boolean().optional(),
 });
 export const pageUpdateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   bodyMd: z.string().max(60000).nullable().optional(),
+  layout: pageLayout.optional(),
+  heroImageUrl: z.string().max(500).nullable().optional(),
+  heroEyebrow: z.string().max(120).nullable().optional(),
+  subtitle: z.string().max(300).nullable().optional(),
+  sections: sectionsField.nullable().optional(),
+  ...seoFields,
   isPublished: z.boolean().optional(),
+});
+
+const navLinks = z
+  .array(z.object({ label: z.string().min(1).max(60), href: z.string().min(1).max(300) }))
+  .max(20);
+export const navMenusSchema = z.object({ header: navLinks, footer: navLinks });
+
+export const brandVoiceSchema = z.object({ voice: z.string().max(2000) });
+
+export const aiRewriteSchema = z.object({
+  text: z.string().min(1).max(20000),
+  instruction: z.string().min(1).max(300),
+});
+
+export const aiMetaSchema = z.object({
+  title: z.string().min(1).max(200),
+  body: z.string().max(30000),
+});
+
+export const siteStarterSchema = z.object({
+  whatYouMake: z.string().min(3).max(1000),
+  whereMade: z.string().max(500).optional(),
+  audience: z.string().max(500).optional(),
+  pricePosture: z.string().max(300).optional(),
+  differentiator: z.string().max(1000).optional(),
+  toneWords: z.string().max(300).optional(),
+  extras: z.string().max(1000).optional(),
+});
+
+export const homeHeroSchema = z.object({
+  eyebrow: z.string().max(120).nullable().optional(),
+  heading: z.string().min(1).max(200),
+  subheading: z.string().max(500).nullable().optional(),
+  primaryCtaLabel: z.string().max(60).nullable().optional(),
+  primaryCtaHref: z.string().max(300).nullable().optional(),
+  secondaryCtaLabel: z.string().max(60).nullable().optional(),
+  secondaryCtaHref: z.string().max(300).nullable().optional(),
+  imageUrl: z.string().max(500).nullable().optional(),
+});
+
+export const aiDraftSchema = z.object({
+  kind: z.enum(["page", "journal"]),
+  topic: z.string().min(3).max(2000),
+  audience: z.string().max(300).optional(),
+  tone: z.string().max(60).optional(),
+  keyPoints: z.string().max(2000).optional(),
+  length: z.enum(["short", "medium", "long"]).optional(),
 });
 
 export const journalCreateSchema = z.object({
@@ -345,6 +680,7 @@ export const journalCreateSchema = z.object({
   author: z.string().max(120).optional(),
   heroImageUrl: z.string().max(500).nullable().optional(),
   publishedAt: z.string().max(30).nullable().optional(),
+  ...seoFields,
   isPublished: z.boolean().optional(),
 });
 export const journalUpdateSchema = journalCreateSchema.partial().omit({ slug: true });

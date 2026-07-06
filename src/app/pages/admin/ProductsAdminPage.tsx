@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatMoney, titleCase } from "../../lib/format";
@@ -16,6 +17,7 @@ import type { AdminProduct } from "../../../shared/types";
 export function ProductsAdminPage() {
   const { data, loading, error, reload } = useFetch<AdminProduct[]>("/api/admin/products");
   const [importOpen, setImportOpen] = useState(false);
+  const navigate = useNavigate();
 
   async function togglePublish(product: AdminProduct) {
     await api.patch(`/api/admin/products/${product.id}`, { isPublished: !product.isPublished });
@@ -29,15 +31,28 @@ export function ProductsAdminPage() {
         title="Products"
         description="The storefront catalog — publication state, pricing, and stock at a glance."
         actions={
-          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>
-            Import CSV
-          </button>
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>
+              Import CSV
+            </button>
+            <Link to="/admin/products/new" className="btn btn-primary">
+              New product
+            </Link>
+          </>
         }
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
       {data && data.length === 0 && (
-        <EmptyState title="No products" hint="Products are the sellable face of styles." />
+        <EmptyState
+          title="No products yet"
+          hint="Add your first product — set a price, upload photos, and add colours & sizes."
+          action={
+            <Link to="/admin/products/new" className="btn btn-primary">
+              New product
+            </Link>
+          }
+        />
       )}
       {data && data.length > 0 && (
         <div className="admin-card overflow-x-auto">
@@ -55,7 +70,7 @@ export function ProductsAdminPage() {
             </thead>
             <tbody>
               {data.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} className="cursor-pointer hover:bg-cream" onClick={() => navigate(`/admin/products/${p.id}`)}>
                   <td>
                     <span className="font-medium">{p.name}</span>
                     <span className="ml-2 text-xs text-warmgrey">/{p.slug}</span>
@@ -70,7 +85,10 @@ export function ProductsAdminPage() {
                   <td>
                     <button
                       type="button"
-                      onClick={() => void togglePublish(p)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void togglePublish(p);
+                      }}
                       className={`badge ${p.isPublished ? "badge-success" : "badge-neutral"} cursor-pointer`}
                     >
                       {p.isPublished ? "Live" : "Hidden"}
@@ -216,6 +234,33 @@ export function CollectionsAdminPage() {
     "/api/admin/products/collections/all",
   );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newSeason, setNewSeason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  async function createCollection() {
+    setBusy(true);
+    setFormError(null);
+    try {
+      await api.post("/api/admin/products/collections", { name: newName, season: newSeason || null });
+      setNewName("");
+      setNewSeason("");
+      setCreating(false);
+      reload();
+    } catch (e) {
+      setFormError(e instanceof ApiRequestError ? e.message : "Couldn't create collection");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeCollection(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? Products in it will simply lose the grouping.`)) return;
+    await api.delete(`/api/admin/products/collections/${id}`);
+    reload();
+  }
 
   return (
     <div>
@@ -223,6 +268,11 @@ export function CollectionsAdminPage() {
         eyebrow="Catalog"
         title="Collections"
         description="Seasonal groupings across the storefront and the design pipeline. Copy and hero imagery are editable here."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+            New collection
+          </button>
+        }
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable rows={3} />}
@@ -251,9 +301,16 @@ export function CollectionsAdminPage() {
                       {col.is_published ? "Live" : "Hidden"}
                     </span>
                   </td>
-                  <td>
+                  <td className="whitespace-nowrap">
                     <button type="button" className="link-quiet text-xs" onClick={() => setEditingId(col.id)}>
                       Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="ml-3 text-xs text-warmgrey hover:text-red-700 hover:underline"
+                      onClick={() => void removeCollection(col.id, col.name)}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -262,6 +319,23 @@ export function CollectionsAdminPage() {
           </table>
         </div>
       )}
+      <SlideOver open={creating} title="New collection" onClose={() => setCreating(false)}>
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-warmgrey">Name</span>
+            <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Spring / Summer 2027" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-warmgrey">Season (optional)</span>
+            <input className="input" value={newSeason} onChange={(e) => setNewSeason(e.target.value)} placeholder="SS27" />
+          </label>
+          {formError && <ErrorNote message={formError} />}
+          <button type="button" className="btn btn-primary w-full" disabled={busy || !newName} onClick={() => void createCollection()}>
+            {busy ? "Creating…" : "Create collection"}
+          </button>
+          <p className="text-xs text-warmgrey">You can add copy, a hero image, and publish it from Edit.</p>
+        </div>
+      </SlideOver>
       <SlideOver open={Boolean(editingId)} title="Edit collection" onClose={() => setEditingId(null)}>
         {editingId && (
           <CollectionEditForm

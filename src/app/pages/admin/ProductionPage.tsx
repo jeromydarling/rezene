@@ -37,6 +37,12 @@ export function ProductionPage() {
     tasks.reload();
   }
 
+  async function deleteTask(task: AdminProductionTask) {
+    if (!window.confirm(`Delete task "${task.title}"?`)) return;
+    await api.delete(`/api/admin/production/tasks/${task.id}`);
+    tasks.reload();
+  }
+
   const byStatus = useMemo(() => {
     const map = new Map<string, AdminProductionTask[]>();
     for (const col of KANBAN_COLUMNS) map.set(col.status, []);
@@ -137,6 +143,7 @@ export function ProductionPage() {
                 <th>Due</th>
                 <th>Status</th>
                 <th>Risk</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -152,6 +159,11 @@ export function ProductionPage() {
                     <StatusBadge status={t.status} />
                   </td>
                   <td>{t.riskFlag ? <span className="badge badge-danger">risk</span> : "—"}</td>
+                  <td className="text-right">
+                    <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void deleteTask(t)}>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

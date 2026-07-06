@@ -1,6 +1,7 @@
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { formatDate } from "../../lib/format";
+import { langParam, useLang } from "../../lib/lang";
 import { Markdown } from "../../components/Markdown";
 import { EditorialImage } from "../../components/ImagePlaceholder";
 import type { PublicJournalPost } from "../../../shared/types";
@@ -34,8 +35,16 @@ export function JournalPage() {
 
 export function JournalPostPage() {
   const { slug } = useParams();
+  const { lang, defaultLang } = useLang();
+  const preview = new URLSearchParams(useLocation().search).get("preview");
+  const params = [
+    langParam(lang, defaultLang),
+    preview ? `preview=${encodeURIComponent(preview)}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
   const { data, loading, error } = useFetch<PublicJournalPost>(
-    slug ? `/api/public/journal/${slug}` : null,
+    slug ? `/api/public/journal/${slug}${params ? `?${params}` : ""}` : null,
   );
   if (error) {
     return (
@@ -64,7 +73,7 @@ export function JournalPostPage() {
               className="mb-8"
             />
           )}
-          <Markdown text={data.bodyMd ?? ""} />
+          <Markdown text={data.bodyMd ?? ""} headingBase={2} />
         </>
       )}
     </article>

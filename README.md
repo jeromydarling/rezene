@@ -9,6 +9,40 @@ Business context lives in [`BUSINESS_PLAN_CONTEXT.md`](./BUSINESS_PLAN_CONTEXT.m
 the build brief in [`CLAUDE_CODE_PROMPT.md`](./CLAUDE_CODE_PROMPT.md).
 The brand name is a placeholder — it is data (Settings → brand), not code.
 
+## Verto — the platform layer
+
+This app now serves two things from one Worker:
+
+- **`/` — Verto**, the platform's marketing site (features, pricing,
+  signup). Signups reserve a slug as a `pending` row in the `shops` table
+  and notify the founder; provisioning/tenant scoping is the next phase.
+- **`/<shop-slug>` — a shop.** Each active row in `shops` routes its slug
+  to the storefront + admin (Rezene is shop #1 at `/rezene` — same data,
+  same login, only the URL prefix changed; legacy paths 301-redirect).
+  `shops.custom_domain` is already consulted first during resolution, so
+  putting a customer's CNAME on the Worker later is just DNS + one column.
+
+The edge injects `window.__VERTO__` (the resolved shop or null) into the
+document shell; the SPA boots the Verto marketing app or the shop app
+under a router basename accordingly.
+
+**Tenant isolation is physical.** Every non-primary shop's data lives in
+its own SQLite Durable Object (`ShopDatabase`), bootstrapped from the
+embedded schema migrations (`scripts/embed-migrations.mjs` — rerun after
+adding a migration; it runs on every build). The tenant middleware
+resolves the shop (custom domain → `X-Verto-Shop` header → primary) and
+hangs the right database on the request before authentication runs, so a
+session token only exists in its own shop's database. The primary shop
+(Rezene) stays on the bound D1. Provisioning (Admin → System → Verto
+Shops, primary shop only) turns a pending signup into a live shop: schema
+bootstrap, neutral seed (roles, settings, block homepage, legal drafts),
+owner admin account with a one-time-shown generated password, credentials
+emailed, slug routing instantly. Suspending a shop stops its routing.
+
+Platform-wide for now (per-shop in the Stripe Connect phase): Stripe
+keys, Anthropic key, email sending, R2 bucket (rows per shop DB keep
+objects private per tenant).
+
 ## Architecture
 
 ```
@@ -145,6 +179,44 @@ stripe listen --forward-to localhost:5173/api/stripe/webhooks
 stripe trigger checkout.session.completed
 ```
 
+## Shipping providers
+
+Shops choose their own carrier stack under **Admin → Shipping**. The
+`manual` provider (flat rates per destination zone) is enabled by default
+so checkout always has something to quote; connect any of DHL Express
+(MyDHL API), Shippo, EasyPost, ShipEngine, Sendcloud, or Easyship by
+pasting that provider's API credentials — keys are stored in D1
+(`shipping_provider_configs`) and never returned to the browser.
+
+Per provider you can toggle:
+
+- **Enabled** — available for fulfillment (quoting + label purchase on
+  the order panel under Admin → Orders).
+- **Quote live rates to buyers at checkout** — rates for the buyer's
+  country are passed to Stripe Checkout as `shipping_options` (max 5,
+  cheapest first, matching the cart currency).
+
+**Test connection** runs a live rate request against the provider and
+surfaces the provider's own error message if credentials are wrong.
+
+**Tracking webhooks:** each connected provider gets a secret webhook URL
+(shown in its configure panel) — paste it into the provider's dashboard.
+Inbound events append to `shipment_events`, advance the shipment status
+(never backwards), and roll the order's fulfillment status up to
+`shipped`/`delivered` once every parcel on the order has arrived.
+EasyPost events are additionally HMAC-verified when a webhook secret is
+configured.
+
+Labels bought from providers that return raw PDF bytes (DHL, Sendcloud)
+are stored in R2 under `shipping-labels/` and served via an
+admin-authenticated route; URL-hosted labels (Shippo, EasyPost,
+ShipEngine, Easyship) link out directly.
+
+The ship-from address, default parcel size, and per-item weight used for
+quoting live in `settings` (`shipping_origin`, `shipping_default_parcel`,
+`shipping_per_item_weight_kg`) and are editable at the top of the
+Shipping page.
+
 ## Outbound email — Cloudflare Email Service
 
 All email — founder notifications and buyer confirmations — runs on
@@ -218,7 +290,16 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Analytics event foundation (11 event types) | D1 `analytics_events` | ✅ working |
 | Settings: brand identity as data, integration status | admin System | ✅ working |
 | Cron: daily late-task risk sweep | `wrangler.toml [triggers]` | ✅ working |
-| CMS: pages, journal, lookbooks with drafts + revision history | admin Content | ✅ working |
+| CMS: block-composed pages (11 section types), templates, 3 layouts, hero images, editable homepage (blocks) + hero + navigation, journal, lookbooks, drafts + revision history + delete | admin Content | ✅ working |
+| CMS ops: draft preview links, scheduled publishing (hourly cron), media library with alt text | admin Content | ✅ working |
+| Edge SEO: per-route meta/OG injection into the SPA shell, sitemap.xml, robots.txt, SEO fields | worker `services/seo.ts` | ✅ working |
+| AI content suite: interview drafting, selection rewrite, SEO meta, image alt text, brand voice, site-starter interview | admin Content (needs Anthropic key) | ✅ working |
+| Storefront translations: EN/FR toggle, on-demand Llama translation via Workers AI, cached in D1 | `services/translate.ts` | ✅ working |
+| Marketing suite: AI campaign kits (IG/story/TikTok/Pinterest/X/FB, email, blog, press release, Google/Meta ads), posting calendar, graphics studio (SVG→PNG), subscriber email sends w/ unsubscribe, SEO content ideas | admin Marketing (Anthropic key or Workers AI Llama) | ✅ working |
+| Verto platform: marketing site + pricing + signup at `/`, shop registry with path routing (`/rezene`) and CNAME-ready domain mapping, legacy 301s | `services/shops.ts`, `verto/VertoApp.tsx` | ✅ working |
+| Multi-tenancy: per-shop SQLite Durable Object databases, tenant middleware, one-click provisioning of signups, suspend/reactivate, per-shop webhooks/media/SEO/unsubscribe | `do/shop-database.ts`, `services/tenant-db.ts`, `services/provision.ts` | ✅ working |
+| Instant self-serve onboarding: signup auto-provisions the shop (~10s, credentials shown once + emailed; falls back to pending on failure) | `routes/verto.ts` | ✅ working |
+| Cinematic Verto marketing site: scroll storytelling, Ken Burns hero + particle field, pinned manifesto, parallax scenes, AI typewriter demo, tilt pricing, magnetic CTAs, route transitions, reduced-motion safe, AI-generated lifestyle photography | `verto/cinema.tsx`, `verto/VertoApp.tsx`, `public/verto/` | ✅ working |
 | Factory share portal: tokenized live tech packs, EN/FR, comments, approval | `/factory/:token` | ✅ working |
 | Photo/sketch → AI tech pack draft (vision) | Tech Packs → "From photo" | ✅ working (needs key) |
 | Pre-order campaigns: MOQ goals, cutoffs, caps, funded → production task | admin Commerce → Pre-orders | ✅ working |
@@ -227,6 +308,7 @@ Nothing secret is ever exposed to the browser or stored in D1.
 | Cart + multi-item checkout + buyer confirmation email | `/cart`, `src/app/lib/cart.tsx` | ✅ working |
 | Wholesale line sheets: tokenized links, wholesale pricing, buyer inquiries | admin Commerce → Line Sheets, `/linesheet/:token` | ✅ working |
 | Product CSV import (Shopify export or simple template) | admin Products → Import CSV | ✅ working |
+| Multi-provider shipping: manual rates, DHL Express, Shippo, EasyPost, ShipEngine, Sendcloud, Easyship — checkout rates, labels, tracking webhooks | admin Commerce → Shipping | ✅ working (carriers need keys) |
 
 ### Formerly scaffolds — now wired
 

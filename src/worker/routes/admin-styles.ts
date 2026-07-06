@@ -53,21 +53,21 @@ adminStyleRoutes.get("/", async (c) => {
     where = `WHERE s.status = ?`;
     params.push(status);
   }
-  const rows = await all(c.env.DB, `${STYLE_SELECT} ${where} ORDER BY s.style_code`, ...params);
+  const rows = await all(c.var.db, `${STYLE_SELECT} ${where} ORDER BY s.style_code`, ...params);
   return c.json(rows.map(mapStyle));
 });
 
 adminStyleRoutes.get("/:id", async (c) => {
-  const row = await first(c.env.DB, `${STYLE_SELECT} WHERE s.id = ?`, c.req.param("id"));
+  const row = await first(c.var.db, `${STYLE_SELECT} WHERE s.id = ?`, c.req.param("id"));
   if (!row) return c.json({ error: "Style not found" }, 404);
 
   const colorways = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT id, style_id, name, color_code, is_primary FROM colorways WHERE style_id = ? ORDER BY sort_order`,
     row.id,
   );
   const skus = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT k.id, k.sku_code, k.style_id, k.size, k.status, cw.name AS colorway_name
      FROM skus k LEFT JOIN colorways cw ON cw.id = k.colorway_id
      WHERE k.style_id = ? ORDER BY k.sku_code`,
@@ -84,7 +84,7 @@ adminStyleRoutes.post("/", requireAdminWrite, async (c) => {
   const body = await parseBody(c, styleCreateSchema);
   const id = newId("sty");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO styles (id, style_code, name, category, gender, season, collection_id, status,
        description, fit_notes, fabric_summary, target_cost_cents, target_retail_cents)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -102,15 +102,15 @@ adminStyleRoutes.post("/", requireAdminWrite, async (c) => {
     body.targetCostCents ?? null,
     body.targetRetailCents ?? null,
   );
-  await writeAudit(c.env.DB, c.var.userId, "style.create", "style", id, { name: body.name });
-  const row = await first(c.env.DB, `${STYLE_SELECT} WHERE s.id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "style.create", "style", id, { name: body.name });
+  const row = await first(c.var.db, `${STYLE_SELECT} WHERE s.id = ?`, id);
   return c.json(mapStyle(row!), 201);
 });
 
 adminStyleRoutes.patch("/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, styleUpdateSchema);
-  const existing = await first(c.env.DB, `SELECT id FROM styles WHERE id = ?`, id);
+  const existing = await first(c.var.db, `SELECT id FROM styles WHERE id = ?`, id);
   if (!existing) return c.json({ error: "Style not found" }, 404);
 
   const sets: string[] = [];
@@ -137,20 +137,20 @@ adminStyleRoutes.patch("/:id", requireAdminWrite, async (c) => {
   }
   if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
   sets.push(`updated_at = datetime('now')`);
-  await run(c.env.DB, `UPDATE styles SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
-  await writeAudit(c.env.DB, c.var.userId, "style.update", "style", id, body);
-  const row = await first(c.env.DB, `${STYLE_SELECT} WHERE s.id = ?`, id);
+  await run(c.var.db, `UPDATE styles SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "style.update", "style", id, body);
+  const row = await first(c.var.db, `${STYLE_SELECT} WHERE s.id = ?`, id);
   return c.json(mapStyle(row!));
 });
 
 adminStyleRoutes.post("/:id/colorways", requireAdminWrite, async (c) => {
   const styleId = c.req.param("id");
   const body = await parseBody(c, colorwayCreateSchema);
-  const style = await first(c.env.DB, `SELECT id FROM styles WHERE id = ?`, styleId);
+  const style = await first(c.var.db, `SELECT id FROM styles WHERE id = ?`, styleId);
   if (!style) return c.json({ error: "Style not found" }, 404);
   const id = newId("cw");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO colorways (id, style_id, name, color_code, is_primary) VALUES (?, ?, ?, ?, ?)`,
     id,
     styleId,
@@ -164,7 +164,7 @@ adminStyleRoutes.post("/:id/colorways", requireAdminWrite, async (c) => {
 // SKU master (flat list across styles)
 adminStyleRoutes.get("/skus/all", async (c) => {
   const rows = await all<Record<string, unknown>>(
-    c.env.DB,
+    c.var.db,
     `SELECT k.id, k.sku_code, k.style_id, k.size, k.status,
             cw.name AS colorway_name, s.name AS style_name
      FROM skus k
@@ -177,11 +177,11 @@ adminStyleRoutes.get("/skus/all", async (c) => {
 
 adminStyleRoutes.post("/skus", requireAdminWrite, async (c) => {
   const body = await parseBody(c, skuCreateSchema);
-  const style = await first(c.env.DB, `SELECT id FROM styles WHERE id = ?`, body.styleId);
+  const style = await first(c.var.db, `SELECT id FROM styles WHERE id = ?`, body.styleId);
   if (!style) return c.json({ error: "Style not found" }, 404);
   const id = newId("sku");
   await run(
-    c.env.DB,
+    c.var.db,
     `INSERT INTO skus (id, sku_code, style_id, colorway_id, size) VALUES (?, ?, ?, ?, ?)`,
     id,
     body.skuCode,
@@ -189,8 +189,18 @@ adminStyleRoutes.post("/skus", requireAdminWrite, async (c) => {
     body.colorwayId ?? null,
     body.size,
   );
-  await writeAudit(c.env.DB, c.var.userId, "sku.create", "sku", id, { skuCode: body.skuCode });
+  await writeAudit(c.var.db, c.var.userId, "sku.create", "sku", id, { skuCode: body.skuCode });
   return c.json({ id }, 201);
+});
+
+adminStyleRoutes.delete("/skus/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  if (!(await first(c.var.db, `SELECT id FROM skus WHERE id = ?`, id))) {
+    return c.json({ error: "SKU not found" }, 404);
+  }
+  await run(c.var.db, `DELETE FROM skus WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "sku.delete", "sku", id);
+  return c.json({ ok: true });
 });
 
 function mapColorway(row: Record<string, unknown>): AdminColorway {

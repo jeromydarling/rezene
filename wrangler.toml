@@ -9,6 +9,12 @@
 # Actions (.github/workflows/deploy.yml); it applies D1 migrations and
 # deploys the Worker. See README "Deployment".
 
+# NOTE: the LIVE production Worker that serves verto.style is the script named
+# "verto" — Cloudflare Workers Builds deploys under its own dashboard-configured
+# name, not this one. This `name` is retained only for local `wrangler` calls;
+# CI (.github/workflows/deploy.yml) syncs secrets to "verto" explicitly. Don't
+# run a bare `wrangler deploy` from this config — it would recreate a stray,
+# unrouted "rezene" script.
 name = "rezene"
 main = "./src/worker/index.ts"
 compatibility_date = "2026-01-01"
@@ -17,8 +23,14 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# API traffic and public R2 media must reach the Worker, never the asset layer.
-run_worker_first = ["/api/*", "/media/*"]
+# API traffic and public R2 media must reach the Worker, never the asset
+# layer. Document routes also go worker-first so per-page SEO meta tags can
+# be injected into index.html at the edge (src/worker/services/seo.ts).
+# Hashed bundles under /assets/ go worker-first too: the asset layer's SPA
+# fallback would answer a stale bundle URL with index.html as 200 text/html
+# (a blank white app); the worker converts that fallback into a real 404
+# (serveDocument in src/worker/index.ts).
+run_worker_first = ["/*"]
 
 [observability]
 enabled = true
@@ -28,7 +40,7 @@ enabled = true
 [vars]
 # Deployed value. Local dev overrides this via .dev.vars (APP_ENV=development).
 APP_ENV = "production"
-APP_URL = "https://rezene.jer-f84.workers.dev"
+APP_URL = "https://verto.style"
 BRAND_NAME = "Rezene"
 BRAND_SLUG = "rezene"
 R2_PUBLIC_BASE_URL = ""
@@ -41,6 +53,15 @@ NOTIFY_EMAIL_TO = ""
 # Sending to arbitrary recipients requires the domain to be onboarded to
 # Email Sending; set this to an address on that domain to activate.
 BUYER_EMAIL_FROM = ""
+# Promo-video render backend. RENDER_REPO's GitHub Actions do the heavy
+# Playwright→ffmpeg render off-Worker; set the matching secrets with
+# `wrangler secret put RENDER_CALLBACK_SECRET` and `... GITHUB_DISPATCH_TOKEN`.
+# Renders stay disabled (free preview still works) until both are set.
+RENDER_REPO = "jeromydarling/rezene"
+VIDEO_EXPORT_PRICE_CENTS = "1900"
+# Hostname a shop points a CNAME record at to connect their own domain.
+# Set to the Cloudflare-for-SaaS fallback origin once configured.
+CUSTOM_DOMAIN_TARGET = "verto.style"
 
 [[d1_databases]]
 binding = "DB"
@@ -63,9 +84,26 @@ id = "79bcbb9c583f4ad0b90f715897bd8d2e"
 [[send_email]]
 name = "EMAIL"
 
-# Daily ops digest / low-stock + late-task sweep (see scheduled handler in src/worker/index.ts).
+# Workers AI: lightweight content translation (storefront language toggle).
+[ai]
+binding = "AI"
+
+# Per-shop SQLite databases: every non-primary shop's data lives in its own
+# ShopDatabase Durable Object — physical tenant isolation, one object per
+# shop, schema bootstrapped from the embedded migrations.
+[[durable_objects.bindings]]
+name = "SHOP_DB"
+class_name = "ShopDatabase"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShopDatabase"]
+
+# 06:00 daily — ops digest / low-stock + late-task sweep.
+# :30 hourly — publish scheduled pages & journal posts that are due.
+# (see scheduled handler in src/worker/index.ts)
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 6 * * *", "30 * * * *"]
 
 # --- Future bindings (uncomment when the account has them enabled) -----------
 # Async pipelines (webhook fan-out, AI batch jobs, export rendering):

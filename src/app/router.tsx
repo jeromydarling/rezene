@@ -1,7 +1,9 @@
 import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
+import { ToastProvider } from "./lib/toast";
 import { CartProvider } from "./lib/cart";
 import { BrandProvider } from "./lib/brand";
+import { LangProvider } from "./lib/lang";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { HomePage } from "./pages/public/HomePage";
@@ -17,9 +19,17 @@ import { CartPage } from "./pages/public/CartPage";
 import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
 import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
+import { TeamPage } from "./pages/admin/TeamPage";
+import { SupportPage } from "./pages/admin/SupportPage";
+import { SourcingPage } from "./pages/admin/SourcingPage";
+import { DomainPage } from "./pages/admin/DomainPage";
+import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
 import { ProductsAdminPage, CollectionsAdminPage } from "./pages/admin/ProductsAdminPage";
+import { ProductEditorPage } from "./pages/admin/ProductEditorPage";
+import { ImportStudioPage } from "./pages/admin/ImportStudioPage";
 import { InventoryPage } from "./pages/admin/InventoryPage";
 import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/CommercePages";
 import { LineSheetsPage } from "./pages/admin/WholesalePage";
@@ -28,8 +38,15 @@ import { SuppliersPage } from "./pages/admin/SuppliersPage";
 import { SamplesPage, PurchaseOrdersPage, MaterialsPage } from "./pages/admin/SamplesPage";
 import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
 import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
-import { AiConceptsPage, ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
+import { ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
+import { DesignStudioPage } from "./pages/admin/DesignStudioPage";
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
+import { ShippingPage } from "./pages/admin/ShippingPage";
+import { MarketingPage } from "./pages/admin/MarketingPage";
+import { VideoStudioPage } from "./pages/admin/VideoStudioPage";
+import { PlatformPage } from "./pages/admin/PlatformPage";
+import { CrmAtlasPage, CrmPage } from "./pages/admin/CrmPage";
+import { SearchCheckupPage } from "./pages/admin/SearchCheckupPage";
 import {
   PagesEditorPage,
   JournalEditorPage,
@@ -59,7 +76,9 @@ function NotFoundPage() {
 
 export function AppRouter() {
   return (
+    <ToastProvider>
     <BrandProvider>
+      <LangProvider>
       <AuthProvider>
         <CartProvider>
         <Routes>
@@ -101,11 +120,15 @@ export function AppRouter() {
 
         {/* Auth */}
         <Route path="admin/login" element={<LoginPage />} />
+        <Route path="admin/reset" element={<ResetPasswordPage />} />
 
         {/* Admin OS */}
         <Route path="admin" element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="products" element={<ProductsAdminPage />} />
+          <Route path="products/new" element={<ProductEditorPage />} />
+          <Route path="products/:id" element={<ProductEditorPage />} />
+          <Route path="import" element={<ImportStudioPage />} />
           <Route path="styles" element={<StylesPage />} />
           <Route path="skus" element={<SkusPage />} />
           <Route path="collections" element={<CollectionsAdminPage />} />
@@ -114,28 +137,42 @@ export function AppRouter() {
           <Route path="customers" element={<CustomersPage />} />
           <Route path="pre-orders" element={<PreOrdersPage />} />
           <Route path="line-sheets" element={<LineSheetsPage />} />
+          <Route path="shipping" element={<ShippingPage />} />
+          <Route path="marketing" element={<MarketingPage />} />
+          <Route path="marketing/video" element={<VideoStudioPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="sourcing" element={<SourcingPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
           <Route path="tech-packs" element={<TechPacksPage />} />
           <Route path="tech-packs/:id" element={<TechPackDetailPage />} />
           <Route path="tech-packs/:id/ai-assist" element={<TechPackAiPage />} />
-          <Route path="ai-concepts" element={<AiConceptsPage />} />
+          <Route path="ai-concepts" element={<DesignStudioPage />} />
           <Route path="3d" element={<ThreeDPage />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="costing" element={<CostingPage />} />
           <Route path="duties" element={<DutiesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="team" element={<TeamPage />} />
+          <Route path="domain" element={<DomainPage />} />
+          <Route path="support" element={<SupportPage />} />
+          <Route path="platform" element={<PlatformPage />} />
+          <Route path="feedback" element={<FeedbackInboxPage />} />
+          <Route path="crm" element={<CrmPage />} />
+          <Route path="crm/atlas" element={<CrmAtlasPage />} />
           <Route path="content/pages" element={<PagesEditorPage />} />
+          <Route path="content/search" element={<SearchCheckupPage />} />
           <Route path="content/journal" element={<JournalEditorPage />} />
           <Route path="content/lookbooks" element={<LookbooksEditorPage />} />
         </Route>
         </Routes>
         </CartProvider>
       </AuthProvider>
+      </LangProvider>
     </BrandProvider>
+    </ToastProvider>
   );
 }

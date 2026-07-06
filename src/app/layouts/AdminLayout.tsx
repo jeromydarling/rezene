@@ -1,7 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
+  HeartHandshake,
+  Map,
+  Menu,
+  X,
   BookOpen,
   Boxes,
   Calendar,
@@ -15,22 +19,38 @@ import {
   Images,
   Landmark,
   LayoutDashboard,
+  Megaphone,
+  Clapperboard,
+  UsersRound,
+  ChevronRight,
+  LifeBuoy,
+  Upload,
+  Compass,
+  Globe,
   Layers,
   Newspaper,
   Package,
   Rotate3d,
   Scissors,
+  SearchCheck,
   Settings,
   Shirt,
   ShoppingBag,
+  Store,
   Sparkles,
   Tags,
+  Truck,
   Users,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
+import { isDemoShop } from "../lib/shop";
 
-const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: typeof Shirt }[] }[] = [
+const NAV_SECTIONS: {
+  title: string;
+  superAdminOnly?: boolean;
+  items: { to: string; label: string; icon: typeof Shirt }[];
+}[] = [
   {
     title: "Overview",
     items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
@@ -43,6 +63,7 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
       { to: "/admin/skus", label: "SKUs", icon: Tags },
       { to: "/admin/collections", label: "Collections", icon: Layers },
       { to: "/admin/inventory", label: "Inventory", icon: Boxes },
+      { to: "/admin/import", label: "Import studio", icon: Upload },
     ],
   },
   {
@@ -51,6 +72,14 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
       { to: "/admin/content/pages", label: "Pages", icon: BookOpen },
       { to: "/admin/content/journal", label: "Journal", icon: Newspaper },
       { to: "/admin/content/lookbooks", label: "Lookbooks", icon: Images },
+      { to: "/admin/content/search", label: "Search Checkup", icon: SearchCheck },
+    ],
+  },
+  {
+    title: "Marketing",
+    items: [
+      { to: "/admin/marketing", label: "Campaigns", icon: Megaphone },
+      { to: "/admin/marketing/video", label: "Promo Video", icon: Clapperboard },
     ],
   },
   {
@@ -58,6 +87,7 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
     items: [
       { to: "/admin/orders", label: "Orders", icon: Package },
       { to: "/admin/pre-orders", label: "Pre-orders", icon: Sparkles },
+      { to: "/admin/shipping", label: "Shipping", icon: Truck },
       { to: "/admin/line-sheets", label: "Line Sheets", icon: FileSpreadsheet },
       { to: "/admin/customers", label: "Customers", icon: Users },
     ],
@@ -67,6 +97,7 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
     items: [
       { to: "/admin/production", label: "Production Calendar", icon: Calendar },
       { to: "/admin/suppliers", label: "Factories & Suppliers", icon: Factory },
+      { to: "/admin/sourcing", label: "Find a Maker", icon: Compass },
       { to: "/admin/materials", label: "Fabrics & Materials", icon: Scissors },
       { to: "/admin/samples", label: "Samples", icon: ClipboardList },
       { to: "/admin/purchase-orders", label: "Purchase Orders", icon: FileText },
@@ -76,7 +107,7 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
     title: "Studio",
     items: [
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
-      { to: "/admin/ai-concepts", label: "AI Concept Lab", icon: Sparkles },
+      { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
     ],
@@ -91,9 +122,30 @@ const NAV_SECTIONS: { title: string; items: { to: string; label: string; icon: t
   },
   {
     title: "System",
-    items: [{ to: "/admin/settings", label: "Settings", icon: Settings }],
+    items: [
+      { to: "/admin/settings", label: "Settings", icon: Settings },
+      { to: "/admin/domain", label: "Custom Domain", icon: Globe },
+      { to: "/admin/team", label: "Team", icon: UsersRound },
+      { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },
+    ],
+  },
+  {
+    title: "Verto HQ",
+    superAdminOnly: true,
+    items: [
+      { to: "/admin/crm", label: "Customers", icon: HeartHandshake },
+      { to: "/admin/crm/atlas", label: "Atlas", icon: Map },
+      { to: "/admin/feedback", label: "Support tickets", icon: LifeBuoy },
+      { to: "/admin/platform", label: "Verto Shops", icon: Store },
+    ],
   },
 ];
+
+function visibleSections(superAdmin: boolean) {
+  // Verto HQ is platform-operator only. Rezene shares the platform DB, so this
+  // must key off the SuperAdmin identity — never merely "is the primary shop".
+  return NAV_SECTIONS.filter((s) => !s.superAdminOnly || superAdmin);
+}
 
 const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
@@ -103,12 +155,46 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
+  // Navigating always closes the drawer; a route change means the choice landed.
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
+  const superAdmin = Boolean(user?.superAdmin);
+  // Collapsible nav — closed by default, active section auto-opens, choices persist.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("verto_nav_open") || "{}") as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  });
+  const toggleSection = (title: string, active: boolean) => {
+    setOpenSections((s) => {
+      const current = s[title] ?? active;
+      const next = { ...s, [title]: !current };
+      try {
+        localStorage.setItem("verto_nav_open", JSON.stringify(next));
+      } catch {
+        /* private mode — non-fatal */
+      }
+      return next;
+    });
+  };
   const matches = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return ALL_ITEMS.filter((i) => i.label.toLowerCase().includes(q)).slice(0, 6);
-  }, [query]);
+    return visibleSections(superAdmin)
+      .flatMap((s) => s.items)
+      .filter((i) => i.label.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [query, superAdmin]);
 
   const breadcrumb = useMemo(() => {
     const current = ALL_ITEMS.filter((i) => i.to !== "/admin").find((i) =>
@@ -128,70 +214,130 @@ export function AdminLayout() {
     return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
   }
 
+  const sidebar = (
+    <>
+      <Link to="/admin" className="block border-b border-chalk/10 px-5 py-5">
+        <p className="font-display text-lg font-light">{brand.brandName}</p>
+        <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/70">
+          Brand Operating System
+        </p>
+      </Link>
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {visibleSections(superAdmin).map((section) => {
+          const active = section.items.some(
+            (i) => location.pathname === i.to || (i.to !== "/admin" && location.pathname.startsWith(i.to)),
+          );
+          const open = openSections[section.title] ?? active;
+          return (
+            <div key={section.title} className="mb-1.5">
+              <button
+                type="button"
+                onClick={() => toggleSection(section.title, active)}
+                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/60 hover:text-chalk"
+                aria-expanded={open}
+              >
+                <span>{section.title}</span>
+                <ChevronRight size={13} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+              </button>
+              {open && (
+                <ul className="mb-3 mt-0.5 space-y-0.5">
+                  {section.items.map((item) => (
+                    <li key={item.to}>
+                      <NavLink
+                        to={item.to}
+                        end={item.to === "/admin"}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2.5 rounded px-2 py-2 text-[0.8rem] transition-colors lg:py-1.5 ${
+                            isActive
+                              ? "bg-chalk/15 text-chalk"
+                              : "text-chalk/65 hover:bg-chalk/8 hover:text-chalk"
+                          }`
+                        }
+                      >
+                        <item.icon size={15} strokeWidth={1.7} />
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+      <div className="border-t border-chalk/10 px-5 py-4">
+        <p className="truncate text-xs text-chalk/70">{user.email}</p>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-[0.65rem] uppercase tracking-wider text-chalk/60">
+            {user.roles.join(", ") || "no role"}
+          </p>
+          <button
+            type="button"
+            onClick={() => void logout().then(() => navigate("/admin/login"))}
+            className="text-[0.7rem] uppercase tracking-wider text-chalk/60 hover:text-chalk"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex min-h-screen bg-cream/60">
-      {/* Sidebar */}
+      {/* Sidebar (desktop, static) */}
       <aside className="fixed inset-y-0 hidden w-60 flex-col border-r border-ink/10 bg-navy text-chalk lg:flex">
-        <Link to="/admin" className="border-b border-chalk/10 px-5 py-5">
-          <p className="font-display text-lg font-light">{brand.brandName}</p>
-          <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/50">
-            Brand Operating System
-          </p>
-        </Link>
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.title} className="mb-5">
-              <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/40">
-                {section.title}
-              </p>
-              <ul className="space-y-0.5">
-                {section.items.map((item) => (
-                  <li key={item.to}>
-                    <NavLink
-                      to={item.to}
-                      end={item.to === "/admin"}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 rounded px-2 py-1.5 text-[0.8rem] transition-colors ${
-                          isActive
-                            ? "bg-chalk/15 text-chalk"
-                            : "text-chalk/65 hover:bg-chalk/8 hover:text-chalk"
-                        }`
-                      }
-                    >
-                      <item.icon size={15} strokeWidth={1.7} />
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-        <div className="border-t border-chalk/10 px-5 py-4">
-          <p className="truncate text-xs text-chalk/70">{user.email}</p>
-          <div className="mt-1 flex items-center justify-between">
-            <p className="text-[0.65rem] uppercase tracking-wider text-chalk/40">
-              {user.roles.join(", ") || "no role"}
-            </p>
+        {sidebar}
+      </aside>
+
+      {/* Sidebar (mobile, slide-over drawer) */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="absolute inset-0 bg-navy-deep/50"
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-[19rem] max-w-[85vw] flex-col bg-navy text-chalk shadow-2xl">
             <button
               type="button"
-              onClick={() => void logout().then(() => navigate("/admin/login"))}
-              className="text-[0.7rem] uppercase tracking-wider text-chalk/60 hover:text-chalk"
+              aria-label="Close menu"
+              className="absolute right-3 top-4 rounded p-2 text-chalk/70 hover:text-chalk"
+              onClick={() => setMenuOpen(false)}
             >
-              Sign out
+              <X size={18} />
             </button>
-          </div>
+            {sidebar}
+          </aside>
         </div>
-      </aside>
+      )}
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
-        <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-ink/10 bg-white/95 px-5 py-3 backdrop-blur">
-          <div className="text-xs uppercase tracking-wider text-warmgrey lg:hidden">
-            <Link to="/admin" className="font-semibold text-ink">
-              MA Admin
-            </Link>
+        {isDemoShop() && (
+          <div className="bg-terracotta px-4 py-1.5 text-center text-xs text-chalk">
+            You're touring the {brand.brandName} demo (read-only).{" "}
+            <a href="/signup" className="font-semibold underline">
+              Open your own shop →
+            </a>
           </div>
+        )}
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink/10 bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
+          <button
+            type="button"
+            aria-label="Open menu"
+            className="-ml-1 rounded p-1.5 text-ink/70 hover:bg-cream hover:text-ink lg:hidden"
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu size={20} strokeWidth={1.8} />
+          </button>
+          <Link
+            to="/admin"
+            className="max-w-[9rem] truncate text-xs font-semibold uppercase tracking-wider text-ink lg:hidden"
+          >
+            {brand.brandName}
+          </Link>
           <nav className="hidden text-xs text-warmgrey md:block">
             <Link to="/admin" className="hover:text-ink">
               Admin

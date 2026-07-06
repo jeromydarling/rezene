@@ -1,31 +1,37 @@
-# Deploys the Worker (static assets + API) to Cloudflare.
+# Migrations + secret sync for the Cloudflare Worker.
+#
+# IMPORTANT: this workflow does NOT deploy the Worker code. Cloudflare Workers
+# Builds (dashboard-connected) ships this branch's code on every push. It does
+# not, however, run D1 migrations or sync secrets — so that's this workflow's
+# job. We deliberately dropped the `wrangler deploy` step: running it here
+# raced Workers Builds on the Durable Object namespace ("rezene_ShopDatabase
+# already in use", code 10065) and left every run red. Migrations + secret
+# puts don't touch the DO namespace, so they run cleanly alongside it.
 #
 # One-time repository setup (Settings → Secrets and variables → Actions):
-#   CLOUDFLARE_API_TOKEN   (required) — token with Workers Scripts:Edit,
-#                          D1:Edit, Workers KV:Edit, Workers R2:Edit
+#   CLOUDFLARE_API_TOKEN   (required) — token with D1:Edit + Workers Scripts:Edit
 #   CLOUDFLARE_ACCOUNT_ID  (recommended) — the Cloudflare account id
 #
-# Optional application secrets — any that are set as GitHub secrets are
-# synced to the Worker after deploy (skipped when absent):
-#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY,
-#   ANTHROPIC_API_KEY, SESSION_SECRET, ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD
-#
-# The D1 database, KV namespace, and R2 bucket referenced in wrangler.toml
-# already exist — this workflow only migrates and deploys.
+# Optional application secrets — any set as GitHub secrets are synced to the
+# Worker (skipped when absent): STRIPE_*, ANTHROPIC_API_KEY, SESSION_SECRET,
+# ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, RENDER_CALLBACK_SECRET,
+# GITHUB_DISPATCH_TOKEN, PERPLEXITY_API_KEY.
 
-name: Deploy
+name: Migrate & secrets
 
+# Workers Builds deploys the code; this runs migrations + secret sync alongside.
+# Trim the branch list back to [main] once development moves to PRs.
 on:
   push:
-    branches: [main]
+    branches: [main, claude/cloudflare-vite-react-scaffold-aluycl]
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: migrate-secrets
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  migrate:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -41,20 +47,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Type-check is our fast red/green signal; Workers Builds does the real
+      # build + deploy and will surface any build failure on its own.
       - name: Type-check
         run: npx tsc -b
-
-      - name: Build (client + worker bundle)
-        run: npx vite build
 
       - name: Apply D1 migrations (remote)
         run: npx wrangler d1 migrations apply maison-atlantique-db --remote
 
-      - name: Deploy Worker
-        run: npx wrangler deploy
-
+      # The production Worker that serves verto.style is the "verto" script
+      # (Cloudflare Workers Builds deploys it from this repo). NOTE: the
+      # wrangler.toml `name` ("rezene") does NOT match — Workers Builds deploys
+      # under the dashboard-configured name "verto", and a stray "rezene" script
+      # (an orphan from the old `wrangler deploy` step) has been deleted. We
+      # therefore target the live script explicitly by name here rather than
+      # relying on the config name. Add more names to WORKER_TARGETS only if a
+      # second live script ever needs the same secrets.
       - name: Sync application secrets to the Worker
         env:
+          WORKER_TARGETS: "verto"
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -62,26 +73,30 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
+          GITHUB_DISPATCH_TOKEN: ${{ secrets.GITHUB_DISPATCH_TOKEN }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
         run: |
           for name in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY \
-                      ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD; do
+                      ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD \
+                      RENDER_CALLBACK_SECRET GITHUB_DISPATCH_TOKEN PERPLEXITY_API_KEY; do
             value="${!name}"
             if [ -z "$value" ]; then
               echo "skipped $name (not set as a GitHub secret)"
               continue
             fi
-            # Retry transient network failures — the deploy itself already
-            # succeeded by this point, so don't fail the run on a blip.
-            for attempt in 1 2 3; do
-              if printf '%s' "$value" | npx wrangler secret put "$name"; then
-                echo "synced $name"
-                break
-              elif [ "$attempt" = 3 ]; then
-                echo "failed to sync $name after 3 attempts" >&2
-                exit 1
-              else
-                echo "retrying $name (attempt $attempt failed)"
-                sleep $((attempt * 5))
-              fi
+            for target in $WORKER_TARGETS; do
+              for attempt in 1 2 3; do
+                if printf '%s' "$value" | npx wrangler secret put "$name" --name "$target"; then
+                  echo "synced $name -> $target"
+                  break
+                elif [ "$attempt" = 3 ]; then
+                  echo "failed to sync $name -> $target after 3 attempts" >&2
+                  exit 1
+                else
+                  echo "retrying $name -> $target (attempt $attempt failed)"
+                  sleep $((attempt * 5))
+                fi
+              done
             done
           done

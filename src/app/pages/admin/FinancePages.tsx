@@ -245,7 +245,16 @@ export function CostingPage() {
         title={editingFresh ? `${editingFresh.styleName} — ${editingFresh.name}` : ""}
         onClose={() => setEditing(null)}
       >
-        {editingFresh && <CostSheetDetail sheet={editingFresh} onChanged={reload} />}
+        {editingFresh && (
+          <CostSheetDetail
+            sheet={editingFresh}
+            onChanged={reload}
+            onDeleted={() => {
+              setEditing(null);
+              reload();
+            }}
+          />
+        )}
       </SlideOver>
       <SlideOver open={createOpen} title="New cost sheet" onClose={() => setCreateOpen(false)}>
         <CostSheetCreateForm
@@ -323,11 +332,152 @@ function CostSheetCreateForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-function CostSheetDetail({ sheet, onChanged }: { sheet: AdminCostSheet; onChanged: () => void }) {
+function CostSheetDetail({
+  sheet,
+  onChanged,
+  onDeleted,
+}: {
+  sheet: AdminCostSheet;
+  onChanged: () => void;
+  onDeleted: () => void;
+}) {
+  const { data: aiConfig } = useFetch<{ enabled: boolean }>("/api/admin/sourcing/config");
+  async function del() {
+    if (!window.confirm(`Delete "${sheet.name}" and its destinations?`)) return;
+    try {
+      await api.delete(`/api/admin/costing/cost-sheets/${sheet.id}`);
+      onDeleted();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Couldn't delete.");
+    }
+  }
   return (
     <div className="space-y-6">
+      {aiConfig?.enabled && <AiCostAssist sheet={sheet} onApplied={onChanged} />}
       <CostSheetEditForm sheet={sheet} onSaved={onChanged} />
       <ScenarioManager sheet={sheet} onChanged={onChanged} />
+      <div className="border-t border-ink/10 pt-3 text-right">
+        <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void del()}>
+          Delete this cost sheet
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface CostAiResult {
+  currency: string;
+  fabricCostCents: number | null;
+  trimCostCents: number | null;
+  cutSewMakeCents: number | null;
+  packagingCents: number | null;
+  freightCents: number | null;
+  targetRetailCents: number | null;
+  suggestedMarginPct: number | null;
+  notes: string | null;
+  citations: string[];
+}
+
+function AiCostAssist({ sheet, onApplied }: { sheet: AdminCostSheet; onApplied: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ garment: sheet.styleName, materials: "", origin: "", targetMarket: "" });
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<CostAiResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+
+  async function research() {
+    if (!form.garment.trim()) return setError("Describe the garment.");
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<CostAiResult>("/api/admin/costing/cost-sheets/ai-suggest", {
+        garment: form.garment,
+        materials: form.materials || undefined,
+        origin: form.origin || undefined,
+        targetMarket: form.targetMarket || undefined,
+        currency: sheet.currency,
+      });
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "AI costing failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function apply() {
+    if (!result) return;
+    setApplying(true);
+    try {
+      const payload: Record<string, number> = {};
+      if (result.fabricCostCents != null) payload.fabricCostCents = result.fabricCostCents;
+      if (result.trimCostCents != null) payload.trimCostCents = result.trimCostCents;
+      if (result.cutSewMakeCents != null) payload.cutSewMakeCents = result.cutSewMakeCents;
+      if (result.packagingCents != null) payload.packagingCents = result.packagingCents;
+      if (result.freightCents != null) payload.freightCents = result.freightCents;
+      if (result.targetRetailCents != null) payload.targetRetailCents = result.targetRetailCents;
+      await api.patch(`/api/admin/costing/cost-sheets/${sheet.id}`, payload);
+      setResult(null);
+      setOpen(false);
+      onApplied();
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  const money = (c: number | null) => (c != null ? formatMoney(c, sheet.currency) : "—");
+
+  return (
+    <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3 text-sm">
+      <button type="button" className="flex w-full items-center justify-between" onClick={() => setOpen(!open)}>
+        <span className="text-xs font-semibold uppercase tracking-wider text-warmgrey">🔍 Fill with AI benchmarks</span>
+        <span className="text-warmgrey">{open ? "–" : "+"}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <input className="input" placeholder="Garment" value={form.garment} onChange={(e) => setForm({ ...form, garment: e.target.value })} />
+          <input className="input" placeholder="Materials (optional)" value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} />
+          <div className="grid grid-cols-2 gap-2">
+            <input className="input" placeholder="Made in" value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} />
+            <input className="input" placeholder="Sold in" value={form.targetMarket} onChange={(e) => setForm({ ...form, targetMarket: e.target.value })} />
+          </div>
+          <button type="button" className="btn btn-secondary w-full !py-1.5 text-xs" disabled={busy} onClick={() => void research()}>
+            {busy ? "Benchmarking costs…" : "Benchmark this garment"}
+          </button>
+          {error && <p className="field-error">{error}</p>}
+          {result && (
+            <div className="space-y-1.5 rounded border border-ink/10 bg-white/60 p-2.5 text-xs">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                <span>Fabric</span><span className="text-right">{money(result.fabricCostCents)}</span>
+                <span>Trims</span><span className="text-right">{money(result.trimCostCents)}</span>
+                <span>Cut / sew / make</span><span className="text-right">{money(result.cutSewMakeCents)}</span>
+                <span>Packaging</span><span className="text-right">{money(result.packagingCents)}</span>
+                <span>Freight / unit</span><span className="text-right">{money(result.freightCents)}</span>
+                <span>Suggested retail</span><span className="text-right">{money(result.targetRetailCents)}</span>
+              </div>
+              {result.suggestedMarginPct != null && (
+                <p className="text-warmgrey">Suggested margin ~{result.suggestedMarginPct}%</p>
+              )}
+              {result.notes && <p className="text-ink/75">{result.notes}</p>}
+              {result.citations.length > 0 && (
+                <details className="text-[11px] text-warmgrey">
+                  <summary className="cursor-pointer">{result.citations.length} sources</summary>
+                  <ul className="mt-1 space-y-0.5">
+                    {result.citations.slice(0, 8).map((cite, i) => (
+                      <li key={i}><a href={cite} target="_blank" rel="noreferrer" className="text-navy hover:underline">{cite}</a></li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <button type="button" className="btn btn-primary w-full !py-1.5 text-xs" disabled={applying} onClick={() => void apply()}>
+                {applying ? "Applying…" : "Apply these to the sheet"}
+              </button>
+              <p className="text-[11px] italic text-warmgrey">Benchmarks only — review and adjust to your real quotes.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -497,13 +647,25 @@ interface DutyEstimate {
 
 export function DutiesPage() {
   const { data, loading, error, reload } = useFetch<AdminDutyRule[]>("/api/admin/costing/duty-rules");
+  const { data: aiConfig } = useFetch<{ enabled: boolean }>("/api/admin/sourcing/config");
   const [est, setEst] = useState({ region: "US", base: "70", freight: "7" });
   const [estimates, setEstimates] = useState<DutyEstimate[] | null>(null);
   const [estBusy, setEstBusy] = useState(false);
+  const [ruleFormOpen, setRuleFormOpen] = useState(false);
 
   async function toggleRule(rule: AdminDutyRule) {
     await api.patch(`/api/admin/costing/duty-rules/${rule.id}`, { isActive: !rule.isActive });
     reload();
+  }
+
+  async function deleteRule(rule: AdminDutyRule) {
+    if (!window.confirm(`Delete duty rule "${rule.name}"?`)) return;
+    try {
+      await api.delete(`/api/admin/costing/duty-rules/${rule.id}`);
+      reload();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Couldn't delete.");
+    }
   }
 
   async function runEstimate() {
@@ -524,6 +686,11 @@ export function DutiesPage() {
         eyebrow="Finance"
         title="Duties & Landed Cost"
         description="An editable rules engine, not a customs authority. Every figure is an estimate requiring trade/legal review."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setRuleFormOpen(true)}>
+            + New duty rule
+          </button>
+        }
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
@@ -539,6 +706,7 @@ export function DutiesPage() {
                 <th>Rate range</th>
                 <th>Preferential</th>
                 <th>Active</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -561,12 +729,25 @@ export function DutiesPage() {
                       {r.isActive ? "active" : "off"}
                     </button>
                   </td>
+                  <td className="text-right">
+                    <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void deleteRule(r)}>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <SlideOver open={ruleFormOpen} title="New duty rule" onClose={() => setRuleFormOpen(false)}>
+        <DutyRuleForm
+          aiEnabled={Boolean(aiConfig?.enabled)}
+          onSaved={() => { setRuleFormOpen(false); reload(); }}
+          onCancel={() => setRuleFormOpen(false)}
+        />
+      </SlideOver>
 
       <div className="admin-card mt-6 p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-warmgrey">
@@ -634,6 +815,163 @@ export function DutiesPage() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface DutyAiResult {
+  name: string | null;
+  hsCategory: string | null;
+  qualifiesCondition: string | null;
+  dutyRateMinPct: number | null;
+  dutyRateMaxPct: number | null;
+  isPreferential: boolean;
+  note: string | null;
+  citations: string[];
+}
+
+function DutyRuleForm({
+  aiEnabled,
+  onSaved,
+  onCancel,
+}: {
+  aiEnabled: boolean;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [ai, setAi] = useState({ garment: "", materials: "", origin: "Morocco", destination: "United States" });
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [citations, setCitations] = useState<string[]>([]);
+  const [form, setForm] = useState({
+    name: "",
+    destinationRegion: "US",
+    originCountry: "MA",
+    hsCategory: "",
+    qualifiesCondition: "",
+    dutyRateMinPct: "",
+    dutyRateMaxPct: "",
+    isPreferential: false,
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function runAi() {
+    if (!ai.garment.trim()) return setError("Describe the garment for the AI lookup.");
+    setAiBusy(true);
+    setError(null);
+    setAiNote(null);
+    try {
+      const res = await api.post<DutyAiResult>("/api/admin/costing/duty-rules/ai-lookup", {
+        garment: ai.garment,
+        materials: ai.materials || undefined,
+        origin: ai.origin,
+        destination: ai.destination,
+      });
+      setForm((f) => ({
+        ...f,
+        name: res.name ?? f.name,
+        hsCategory: res.hsCategory ?? f.hsCategory,
+        qualifiesCondition: res.qualifiesCondition ?? f.qualifiesCondition,
+        dutyRateMinPct: res.dutyRateMinPct != null ? String(res.dutyRateMinPct) : f.dutyRateMinPct,
+        dutyRateMaxPct: res.dutyRateMaxPct != null ? String(res.dutyRateMaxPct) : f.dutyRateMaxPct,
+        isPreferential: res.isPreferential,
+      }));
+      setAiNote(res.note);
+      setCitations(res.citations ?? []);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "AI lookup failed");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function save() {
+    const min = parseFloat(form.dutyRateMinPct);
+    const max = parseFloat(form.dutyRateMaxPct);
+    if (!form.name.trim()) return setError("Give the rule a name.");
+    if (Number.isNaN(min) || Number.isNaN(max)) return setError("Enter min and max rates (percent).");
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/admin/costing/duty-rules", {
+        name: form.name.trim(),
+        destinationRegion: form.destinationRegion.trim(),
+        originCountry: form.originCountry.trim() || undefined,
+        hsCategory: form.hsCategory.trim() || null,
+        qualifiesCondition: form.qualifiesCondition.trim() || null,
+        dutyRateMin: min / 100,
+        dutyRateMax: max / 100,
+        isPreferential: form.isPreferential,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Couldn't save the rule.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 text-sm">
+      {aiEnabled && (
+        <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-warmgrey">
+            🔍 Research with AI
+          </p>
+          <div className="space-y-2">
+            <input className="input" placeholder="Garment (e.g. woven cotton shirt)" value={ai.garment} onChange={(e) => setAi({ ...ai, garment: e.target.value })} />
+            <input className="input" placeholder="Materials (optional)" value={ai.materials} onChange={(e) => setAi({ ...ai, materials: e.target.value })} />
+            <div className="grid grid-cols-2 gap-2">
+              <input className="input" placeholder="Origin" value={ai.origin} onChange={(e) => setAi({ ...ai, origin: e.target.value })} />
+              <input className="input" placeholder="Destination" value={ai.destination} onChange={(e) => setAi({ ...ai, destination: e.target.value })} />
+            </div>
+            <button type="button" className="btn btn-secondary w-full !py-1.5 text-xs" disabled={aiBusy} onClick={() => void runAi()}>
+              {aiBusy ? "Researching duties…" : "Look up HS code & duty rate"}
+            </button>
+          </div>
+          {aiNote && <p className="mt-2 text-xs text-ink/75">{aiNote}</p>}
+          {citations.length > 0 && (
+            <details className="mt-1 text-[11px] text-warmgrey">
+              <summary className="cursor-pointer">{citations.length} sources</summary>
+              <ul className="mt-1 space-y-0.5">
+                {citations.slice(0, 8).map((cite, i) => (
+                  <li key={i}><a href={cite} target="_blank" rel="noreferrer" className="text-navy hover:underline">{cite}</a></li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <p className="mt-2 text-[11px] italic text-warmgrey">Fills the form below — always review before saving. Estimates only.</p>
+        </div>
+      )}
+
+      <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">Rule name *</span>
+        <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">Destination region</span>
+          <input className="input" placeholder="US, EU, UK…" value={form.destinationRegion} onChange={(e) => setForm({ ...form, destinationRegion: e.target.value })} /></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">Origin country</span>
+          <input className="input" value={form.originCountry} onChange={(e) => setForm({ ...form, originCountry: e.target.value })} /></label>
+      </div>
+      <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">HS category</span>
+        <input className="input" placeholder="e.g. 6205.20 — men's cotton shirts" value={form.hsCategory} onChange={(e) => setForm({ ...form, hsCategory: e.target.value })} /></label>
+      <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">Qualifying condition</span>
+        <textarea className="input" rows={2} placeholder="e.g. yarn-forward rule of origin for preferential 0%" value={form.qualifiesCondition} onChange={(e) => setForm({ ...form, qualifiesCondition: e.target.value })} /></label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">Duty rate min (%)</span>
+          <input className="input" inputMode="decimal" value={form.dutyRateMinPct} onChange={(e) => setForm({ ...form, dutyRateMinPct: e.target.value })} /></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium text-warmgrey">Duty rate max (%)</span>
+          <input className="input" inputMode="decimal" value={form.dutyRateMaxPct} onChange={(e) => setForm({ ...form, dutyRateMaxPct: e.target.value })} /></label>
+      </div>
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={form.isPreferential} onChange={(e) => setForm({ ...form, isPreferential: e.target.checked })} />
+        Preferential program applies (e.g. free-trade agreement)
+      </label>
+      {error && <p className="field-error">{error}</p>}
+      <div className="flex gap-2 pt-1">
+        <button type="button" className="btn btn-primary flex-1" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save duty rule"}</button>
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );

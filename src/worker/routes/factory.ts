@@ -51,25 +51,25 @@ factoryRoutes.get(
     if (!share) return c.json({ error: "This link is invalid or has been revoked." }, 404);
 
     const brandName = await getBrandName(c.env);
-    const pack = await loadTechPackDetail(c.env.DB, share.tech_pack_id, brandName);
+    const pack = await loadTechPackDetail(c.var.db, share.tech_pack_id, brandName);
     if (!pack) return c.json({ error: "Tech pack not found" }, 404);
 
     const comments = await all(
-      c.env.DB,
+      c.var.db,
       `SELECT id, author, author_kind, body, created_at FROM tech_pack_comments
        WHERE tech_pack_id = ? AND resolved = 0 ORDER BY created_at`,
       share.tech_pack_id,
     );
     const supplier = share.supplier_id
       ? await first<{ name: string }>(
-          c.env.DB,
+          c.var.db,
           `SELECT name FROM suppliers WHERE id = ?`,
           share.supplier_id,
         )
       : null;
 
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE tech_pack_shares SET last_viewed_at = datetime('now'), view_count = view_count + 1
        WHERE id = ?`,
       share.id,
@@ -102,7 +102,7 @@ factoryRoutes.post(
     if (!share) return c.json({ error: "This link is invalid or has been revoked." }, 404);
     const body = await parseBody(c, factoryCommentSchema);
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO tech_pack_comments (id, tech_pack_id, author, author_kind, body, share_id)
        VALUES (?, ?, ?, 'factory', ?, ?)`,
       newId("tpc"),
@@ -136,7 +136,7 @@ factoryRoutes.post(
     const body = await parseBody(c, factoryApproveSchema);
 
     await run(
-      c.env.DB,
+      c.var.db,
       `UPDATE tech_pack_shares SET approved_at = datetime('now'), approved_by_name = ?, approval_note = ?
        WHERE id = ?`,
       body.name,
@@ -144,7 +144,7 @@ factoryRoutes.post(
       share.id,
     );
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO analytics_events (id, event, entity_type, entity_id, properties_json)
        VALUES (?, 'tech_pack_factory_approved', 'tech_pack', ?, ?)`,
       newId("evt"),
@@ -158,5 +158,26 @@ factoryRoutes.post(
       }),
     );
     return c.json({ ok: true, approvedAt: new Date().toISOString() });
+  },
+);
+
+// Factories live in spreadsheets: the portal offers the same always-current
+// Excel workbook the brand sees, no login required.
+factoryRoutes.get(
+  "/:token/export.xlsx",
+  rateLimit({ key: "factory-xlsx", limit: 30, windowSeconds: 3600 }),
+  async (c) => {
+    const share = await resolveShare(c.env, c.req.param("token"));
+    if (!share) return c.json({ error: "This link is invalid or has been revoked." }, 404);
+    const { buildTechPackXlsx } = await import("../services/techpack-xlsx");
+    const { getBrandName } = await import("../services/brand");
+    const result = await buildTechPackXlsx(c.var.db, share.tech_pack_id, await getBrandName(c.env));
+    if (!result) return c.json({ error: "Tech pack not found" }, 404);
+    return new Response(result.bytes, {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="${result.filename}"`,
+      },
+    });
   },
 );

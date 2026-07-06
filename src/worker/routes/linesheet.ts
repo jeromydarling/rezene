@@ -33,11 +33,11 @@ lineSheetRoutes.get(
   "/:token",
   rateLimit({ key: "linesheet-view", limit: 120, windowSeconds: 3600 }),
   async (c) => {
-    const sheet = await resolveSheet(c.env.DB, c.req.param("token"));
+    const sheet = await resolveSheet(c.var.db, c.req.param("token"));
     if (!sheet) return c.json({ error: "This line sheet link is invalid or has been revoked." }, 404);
 
     const items = await all(
-      c.env.DB,
+      c.var.db,
       `SELECT i.product_id, i.wholesale_price_cents, i.min_qty,
               p.name, p.subtitle, p.category, p.gender, p.base_price_cents AS msrp_cents,
               p.fabric_composition, p.origin_statement,
@@ -74,7 +74,7 @@ lineSheetRoutes.post(
   "/:token/inquiry",
   rateLimit({ key: "linesheet-inquiry", limit: 10, windowSeconds: 3600 }),
   async (c) => {
-    const sheet = await resolveSheet(c.env.DB, c.req.param("token"));
+    const sheet = await resolveSheet(c.var.db, c.req.param("token"));
     if (!sheet) return c.json({ error: "This line sheet link is invalid or has been revoked." }, 404);
     const body = await parseBody(c, inquirySchema);
 
@@ -84,7 +84,7 @@ lineSheetRoutes.post(
       const parts: string[] = [];
       for (const req of body.requests) {
         const product = await first<{ name: string }>(
-          c.env.DB,
+          c.var.db,
           `SELECT name FROM products WHERE id = ?`,
           req.productId,
         );
@@ -101,7 +101,7 @@ lineSheetRoutes.post(
       .join("\n");
 
     await run(
-      c.env.DB,
+      c.var.db,
       `INSERT INTO leads (id, kind, email, name, company, message, source_path)
        VALUES (?, 'wholesale_inquiry', ?, ?, ?, ?, ?)`,
       newId("lead"),
