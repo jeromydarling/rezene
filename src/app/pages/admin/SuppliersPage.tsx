@@ -112,7 +112,20 @@ export function SuppliersPage() {
 
 function SupplierDetailPanel({ id }: { id: string }) {
   const { data, loading, error, reload } = useFetch<SupplierDetail>(`/api/admin/suppliers/${id}`);
+  const [verifying, setVerifying] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+
+  async function toggleVerified() {
+    if (!data) return;
+    setVerifying(true);
+    try {
+      await api.patch(`/api/admin/suppliers/${id}`, { isVerified: !data.isVerified });
+      reload();
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   const [log, setLog] = useState({ kind: "email", subject: "", summary: "", needsResponse: false });
   const [logError, setLogError] = useState<string | null>(null);
 
@@ -141,13 +154,29 @@ function SupplierDetailPanel({ id }: { id: string }) {
   return (
     <div className="space-y-6 text-sm">
       <div>
-        <h3 className="font-display text-xl font-light">{data.name}</h3>
-        <p className="text-warmgrey">
-          {[data.city, data.country].filter(Boolean).join(", ")} · {titleCase(data.kind)}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display text-xl font-light">{data.name}</h3>
+            <p className="text-warmgrey">
+              {[data.city, data.country].filter(Boolean).join(", ")} · {titleCase(data.kind)}
+            </p>
+          </div>
+          <button
+            type="button"
+            className={`shrink-0 rounded-full border px-3 py-1 text-xs transition ${
+              data.isVerified
+                ? "border-palm/40 bg-palm/10 text-palm hover:bg-palm/20"
+                : "border-navy bg-navy text-chalk hover:bg-navy/90"
+            }`}
+            disabled={verifying}
+            onClick={() => void toggleVerified()}
+          >
+            {verifying ? "Saving…" : data.isVerified ? "✓ Verified — undo" : "Mark verified"}
+          </button>
+        </div>
         {!data.isVerified && (
           <p className="mt-2 rounded bg-saffron/15 px-3 py-2 text-xs text-bark">
-            Research/demo lead — verify capabilities, MOQ, and terms before use.
+            Research/demo lead — verify capabilities, MOQ, and terms, then mark it verified.
           </p>
         )}
       </div>
