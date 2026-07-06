@@ -522,6 +522,34 @@ export const dutyRuleUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const dutyRuleCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  destinationRegion: z.string().min(1).max(40),
+  originCountry: z.string().max(80).optional(),
+  hsCategory: z.string().max(200).nullable().optional(),
+  qualifiesCondition: z.string().max(2000).nullable().optional(),
+  dutyRateMin: z.number().min(0).max(2),
+  dutyRateMax: z.number().min(0).max(2),
+  isPreferential: z.boolean().optional(),
+});
+
+// AI helpers (Perplexity) — free-text briefs that drive a research lookup.
+export const dutyAiLookupSchema = z.object({
+  garment: z.string().min(1).max(200),
+  origin: z.string().min(1).max(80),
+  destination: z.string().min(1).max(80),
+  materials: z.string().max(200).optional(),
+});
+
+export const costingAiSchema = z.object({
+  garment: z.string().min(1).max(200),
+  materials: z.string().max(200).optional(),
+  origin: z.string().max(80).optional(),
+  targetMarket: z.string().max(80).optional(),
+  quantity: z.string().max(60).optional(),
+  currency: z.string().max(8).optional(),
+});
+
 // ---------- Settings ----------
 export const settingsUpdateSchema = z.record(z.string().max(2000));
 

@@ -61,6 +61,8 @@ export interface Env {
   SUPERADMIN_EMAILS?: string;
   /** Perplexity API key for the Sourcing (find-a-maker) deep research. */
   PERPLEXITY_API_KEY?: string;
+  /** Per-shop daily cap on paid Perplexity research calls (default 40). */
+  PERPLEXITY_DAILY_LIMIT?: string;
   /** Shared secret the render worker (GitHub Action) presents on callbacks. */
   RENDER_CALLBACK_SECRET?: string;
   /** GitHub token (repo scope) used to trigger the render workflow. */

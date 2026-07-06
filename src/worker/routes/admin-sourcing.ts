@@ -7,6 +7,7 @@ import {
   sourcingSearchSchema,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
+import { reserveResearchQuota, quotaExceededBody } from "../services/ai-quota";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
 
@@ -39,6 +40,10 @@ adminSourcingRoutes.get("/export-intel", async (c) => {
     const cached = await c.env.KV.get(key);
     if (cached) return c.json({ enabled: true, cached: true, ...(JSON.parse(cached) as object) });
   }
+
+  // Only a cache MISS costs a Perplexity call — reserve quota here, not above.
+  const quota = await reserveResearchQuota(c);
+  if (!quota.ok) return c.json({ enabled: true, ...quotaExceededBody(quota) }, 429);
 
   try {
     const research = await perplexityResearch(c.env, {
@@ -90,6 +95,8 @@ adminSourcingRoutes.post("/search", requireAdminWrite, async (c) => {
   if (!perplexityConfigured(c.env)) {
     return c.json({ error: "Maker sourcing isn't switched on yet.", code: "sourcing_unconfigured" }, 503);
   }
+  const quota = await reserveResearchQuota(c);
+  if (!quota.ok) return c.json(quotaExceededBody(quota), 429);
   const body = await parseBody(c, sourcingSearchSchema);
   const wants = [
     `Garment: ${body.garment}`,
@@ -152,6 +159,8 @@ adminSourcingRoutes.post("/enrich", requireAdminWrite, async (c) => {
   if (!perplexityConfigured(c.env)) {
     return c.json({ error: "Maker sourcing isn't switched on yet.", code: "sourcing_unconfigured" }, 503);
   }
+  const quota = await reserveResearchQuota(c);
+  if (!quota.ok) return c.json(quotaExceededBody(quota), 429);
   const body = await parseBody(c, sourcingEnrichSchema);
   const who = [body.name, body.city, body.country].filter(Boolean).join(", ");
   try {
