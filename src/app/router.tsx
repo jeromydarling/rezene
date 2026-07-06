@@ -21,7 +21,7 @@ import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { TeamPage } from "./pages/admin/TeamPage";
-import { SupportPage } from "./pages/admin/SupportPage";
+import { KnowledgeBasePage } from "./pages/admin/KnowledgeBasePage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
@@ -158,7 +158,8 @@ export function AppRouter() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="domain" element={<DomainPage />} />
-          <Route path="support" element={<SupportPage />} />
+          <Route path="support" element={<KnowledgeBasePage />} />
+          <Route path="support/kb/:slug" element={<KnowledgeBasePage />} />
           <Route path="platform" element={<PlatformPage />} />
           <Route path="feedback" element={<FeedbackInboxPage />} />
           <Route path="crm" element={<CrmPage />} />

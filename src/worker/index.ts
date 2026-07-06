@@ -32,6 +32,7 @@ import { adminPlatformRoutes } from "./routes/admin-platform";
 import { adminCrmRoutes } from "./routes/admin-crm";
 import { adminUsersRoutes } from "./routes/admin-users";
 import { adminFeedbackRoutes } from "./routes/admin-feedback";
+import { adminKbRoutes } from "./routes/admin-kb";
 import { adminSourcingRoutes } from "./routes/admin-sourcing";
 import { adminDomainRoutes } from "./routes/admin-domain";
 import { tenantMiddleware } from "./middleware/tenant";
@@ -315,6 +316,7 @@ admin.route("/feedback", adminFeedbackRoutes);
 admin.route("/sourcing", adminSourcingRoutes);
 admin.route("/domain", adminDomainRoutes);
 admin.route("/import", adminImportRoutes);
+admin.route("/kb", adminKbRoutes);
 app.route("/api/admin", admin);
 
 // Everything else that's a GET is a document: Verto pages, shop
