@@ -32,6 +32,7 @@ import { adminPlatformRoutes } from "./routes/admin-platform";
 import { adminCrmRoutes } from "./routes/admin-crm";
 import { adminUsersRoutes } from "./routes/admin-users";
 import { adminFeedbackRoutes } from "./routes/admin-feedback";
+import { adminSourcingRoutes } from "./routes/admin-sourcing";
 import { tenantMiddleware } from "./middleware/tenant";
 import { getShopDb } from "./services/tenant-db";
 import type { AppContext, Env } from "./types/env";
@@ -310,6 +311,7 @@ admin.route("/platform", adminPlatformRoutes);
 admin.route("/crm", adminCrmRoutes);
 admin.route("/users", adminUsersRoutes);
 admin.route("/feedback", adminFeedbackRoutes);
+admin.route("/sourcing", adminSourcingRoutes);
 admin.route("/import", adminImportRoutes);
 app.route("/api/admin", admin);
 

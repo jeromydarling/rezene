@@ -57,6 +57,8 @@ export interface Env {
   /** Comma-separated emails granted Verto HQ (SuperAdmin) access. The
    *  bootstrap ADMIN_EMAIL is always included. */
   SUPERADMIN_EMAILS?: string;
+  /** Perplexity API key for the Sourcing (find-a-maker) deep research. */
+  PERPLEXITY_API_KEY?: string;
   /** Shared secret the render worker (GitHub Action) presents on callbacks. */
   RENDER_CALLBACK_SECRET?: string;
   /** GitHub token (repo scope) used to trigger the render workflow. */

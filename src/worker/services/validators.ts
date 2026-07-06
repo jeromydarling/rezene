@@ -226,6 +226,29 @@ export const conceptShipSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+// ---------- Sourcing (find a maker) ----------
+export const sourcingSearchSchema = z.object({
+  garment: z.string().min(1).max(200),
+  materials: z.string().max(200).optional(),
+  moq: z.string().max(60).optional(),
+  location: z.string().max(120).optional(),
+  style: z.string().max(200).optional(),
+  notes: z.string().max(600).optional(),
+});
+
+export const sourcingAddSchema = z.object({
+  name: z.string().min(1).max(200),
+  city: z.string().max(120).nullable().optional(),
+  country: z.string().max(80).nullable().optional(),
+  website: z.string().max(300).nullable().optional(),
+  email: z.string().max(200).nullable().optional(),
+  specialties: z.array(z.string().max(60)).max(20).optional(),
+  moqUnits: z.number().int().nonnegative().nullable().optional(),
+  leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+  whyFit: z.string().max(1000).nullable().optional(),
+  citations: z.array(z.string().max(400)).max(20).optional(),
+});
+
 export const feedbackCreateSchema = z.object({
   kind: z.enum(["bug", "feature", "question"]).default("bug"),
   title: z.string().min(3).max(200),

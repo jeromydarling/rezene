@@ -25,6 +25,7 @@ import {
   ChevronRight,
   LifeBuoy,
   Upload,
+  Compass,
   Layers,
   Newspaper,
   Package,
@@ -95,6 +96,7 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/production", label: "Production Calendar", icon: Calendar },
       { to: "/admin/suppliers", label: "Factories & Suppliers", icon: Factory },
+      { to: "/admin/sourcing", label: "Find a Maker", icon: Compass },
       { to: "/admin/materials", label: "Fabrics & Materials", icon: Scissors },
       { to: "/admin/samples", label: "Samples", icon: ClipboardList },
       { to: "/admin/purchase-orders", label: "Purchase Orders", icon: FileText },

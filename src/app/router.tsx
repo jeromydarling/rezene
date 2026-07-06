@@ -22,6 +22,7 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { TeamPage } from "./pages/admin/TeamPage";
 import { SupportPage } from "./pages/admin/SupportPage";
+import { SourcingPage } from "./pages/admin/SourcingPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
@@ -140,6 +141,7 @@ export function AppRouter() {
           <Route path="marketing/video" element={<VideoStudioPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="sourcing" element={<SourcingPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
