@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { useAuth } from "../../lib/auth";
 import { SlideOver } from "../../components/admin/ui";
 import { KbMarkdown, extractHeadings } from "../../kb/KbMarkdown";
 import { KB_PARTS, articlesByPart, mergeArticles, type KbArticle } from "../../kb";
@@ -14,21 +15,22 @@ import { KB_PARTS, articlesByPart, mergeArticles, type KbArticle } from "../../k
 export function KnowledgeBasePage() {
   const { slug } = useParams();
   const location = useLocation();
+  const { user } = useAuth();
+  const superAdmin = Boolean(user?.superAdmin);
   const [query, setQuery] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+  const [editing, setEditing] = useState<KbArticle | "new" | null>(null);
 
   // Admin overlay (edits/additions on top of the in-repo book). Absent = base.
   const [overlay, setOverlay] = useState<Partial<KbArticle>[] | null>(null);
-  useEffect(() => {
-    let live = true;
+  const loadOverlay = () =>
     api
       .get<{ articles: Partial<KbArticle>[] }>("/api/admin/kb/overrides")
-      .then((r) => live && setOverlay(r.articles ?? []))
-      .catch(() => live && setOverlay([]));
-    return () => {
-      live = false;
-    };
+      .then((r) => setOverlay(r.articles ?? []))
+      .catch(() => setOverlay([]));
+  useEffect(() => {
+    void loadOverlay();
   }, []);
 
   const articles = useMemo(() => mergeArticles(overlay), [overlay]);
@@ -77,6 +79,11 @@ export function KnowledgeBasePage() {
           <button type="button" className="btn btn-secondary lg:hidden" onClick={() => setTocOpen(true)}>
             Contents
           </button>
+          {superAdmin && (
+            <button type="button" className="btn btn-secondary" onClick={() => setEditing("new")}>
+              + New chapter
+            </button>
+          )}
           <button type="button" className="btn btn-primary" onClick={() => setReportOpen(true)}>
             Report a bug or idea
           </button>
@@ -116,7 +123,7 @@ export function KnowledgeBasePage() {
 
         {/* Center — the chapter */}
         <article className="min-w-0">
-          {current && <Chapter article={current} />}
+          {current && <Chapter article={current} canEdit={superAdmin} onEdit={() => setEditing(current)} />}
           {/* Prev / next */}
           <div className="mt-10 grid gap-3 border-t border-ink/10 pt-5 sm:grid-cols-2">
             {prev ? (
@@ -157,6 +164,23 @@ export function KnowledgeBasePage() {
 
       <SlideOver open={reportOpen} title="Report a bug or idea" onClose={() => setReportOpen(false)}>
         <ReportForm onDone={() => setReportOpen(false)} />
+      </SlideOver>
+
+      <SlideOver
+        open={editing !== null}
+        title={editing === "new" ? "New chapter" : "Edit chapter"}
+        onClose={() => setEditing(null)}
+      >
+        {editing !== null && (
+          <KbEditor
+            article={editing === "new" ? undefined : editing}
+            onSaved={() => {
+              setEditing(null);
+              void loadOverlay();
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        )}
       </SlideOver>
     </div>
   );
@@ -222,13 +246,21 @@ function TocSearchResults({ results, currentSlug }: { results: KbArticle[]; curr
   );
 }
 
-function Chapter({ article }: { article: KbArticle }) {
+function Chapter({ article, canEdit, onEdit }: { article: KbArticle; canEdit?: boolean; onEdit?: () => void }) {
   const part = KB_PARTS.find((p) => p.slug === article.part);
   return (
     <div>
-      <nav className="mb-3 text-xs text-warmgrey">
-        <Link to="/admin/support" className="hover:text-navy">Handbook</Link>
-        {part && <> › <span>{part.title}</span></>}
+      <nav className="mb-3 flex items-center justify-between text-xs text-warmgrey">
+        <span>
+          <Link to="/admin/support" className="hover:text-navy">Handbook</Link>
+          {part && <> › <span>{part.title}</span></>}
+          {article.custom && <span className="ml-2 rounded bg-navy/10 px-1.5 py-0.5 text-[0.6rem] text-navy">added</span>}
+        </span>
+        {canEdit && (
+          <button type="button" className="link-quiet" onClick={onEdit}>
+            Edit chapter
+          </button>
+        )}
       </nav>
       {article.summary && <p className="mb-4 text-base text-warmgrey">{article.summary}</p>}
       {article.screenshot && <HeroShot src={article.screenshot} alt={`${article.title} screen`} />}
@@ -255,6 +287,159 @@ function HeroShot({ src, alt }: { src: string; alt: string }) {
     <figure className="mb-6 overflow-hidden rounded-xl border border-ink/10 bg-cream/40 shadow-sm">
       <img src={src} alt={alt} loading="lazy" className="block w-full" onError={() => setFailed(true)} />
     </figure>
+  );
+}
+
+function KbEditor({
+  article,
+  onSaved,
+  onCancel,
+}: {
+  article?: KbArticle;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const toast = useToast();
+  const isNew = !article;
+  const [form, setForm] = useState({
+    slug: article?.slug ?? "",
+    title: article?.title ?? "",
+    summary: article?.summary ?? "",
+    part: article?.part ?? "getting-started",
+    moduleRoute: article?.moduleRoute ?? "",
+    body: article?.body ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const [feature, setFeature] = useState("");
+  const [preview, setPreview] = useState(false);
+
+  async function draft() {
+    if (!feature.trim()) return toast.error("Describe the feature to document.");
+    setDrafting(true);
+    try {
+      const d = await api.post<Partial<KbArticle>>("/api/admin/kb/draft", {
+        feature,
+        part: form.part,
+        moduleRoute: form.moduleRoute || undefined,
+      });
+      setForm((f) => ({
+        ...f,
+        slug: f.slug || d.slug || "",
+        title: d.title || f.title,
+        summary: d.summary || f.summary,
+        part: d.part || f.part,
+        body: d.body || f.body,
+      }));
+      toast.success("Draft ready", "Review and edit, then Save to publish it into the handbook.");
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Draft failed");
+    } finally {
+      setDrafting(false);
+    }
+  }
+
+  async function save() {
+    if (!form.slug.trim() || !form.title.trim() || !form.body.trim()) {
+      return toast.error("Slug, title, and body are required.");
+    }
+    setBusy(true);
+    try {
+      await api.put(`/api/admin/kb/overrides/${form.slug.trim()}`, {
+        title: form.title,
+        summary: form.summary,
+        part: form.part,
+        moduleRoute: form.moduleRoute || null,
+        body: form.body,
+        isCustom: isNew,
+      });
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revert() {
+    if (!article) return;
+    if (!window.confirm("Revert this chapter to the built-in version? Your edits will be removed.")) return;
+    try {
+      await api.delete(`/api/admin/kb/overrides/${article.slug}`);
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Revert failed");
+    }
+  }
+
+  return (
+    <div className="space-y-3 text-sm">
+      {isNew && (
+        <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-warmgrey">✨ Draft from a feature</p>
+          <textarea
+            className="input"
+            rows={2}
+            placeholder="Describe the feature that shipped — Verto drafts the chapter in the handbook's voice."
+            value={feature}
+            onChange={(e) => setFeature(e.target.value)}
+          />
+          <button type="button" className="btn btn-secondary mt-2 w-full !py-1.5 text-xs" disabled={drafting} onClick={() => void draft()}>
+            {drafting ? "Drafting…" : "Draft this chapter"}
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Slug *</span>
+          <input className="input" value={form.slug} disabled={!isNew} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="kebab-case" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Part</span>
+          <select className="input" value={form.part} onChange={(e) => setForm({ ...form, part: e.target.value })}>
+            {KB_PARTS.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Title *</span>
+        <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Summary</span>
+        <input className="input" value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="One sentence — used in search & help-dots" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Module route</span>
+        <input className="input" value={form.moduleRoute} onChange={(e) => setForm({ ...form, moduleRoute: e.target.value })} placeholder="/admin/products (optional)" />
+      </label>
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs font-medium text-warmgrey">Body (Markdown) *</span>
+          <button type="button" className="link-quiet text-xs" onClick={() => setPreview(!preview)}>{preview ? "Edit" : "Preview"}</button>
+        </div>
+        {preview ? (
+          <div className="max-h-80 overflow-y-auto rounded-lg border border-ink/10 p-3">
+            <KbMarkdown text={form.body} />
+          </div>
+        ) : (
+          <textarea className="input font-mono !text-xs" rows={14} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+        )}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <button type="button" className="btn btn-primary flex-1" disabled={busy} onClick={() => void save()}>
+          {busy ? "Saving…" : "Save chapter"}
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+        {!isNew && (
+          <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void revert()}>
+            Revert to built-in
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-warmgrey">Edits publish to the handbook for everyone. The in-repo book is the source of truth; this overlays on top.</p>
+    </div>
   );
 }
 
