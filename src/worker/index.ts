@@ -120,7 +120,12 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
   const url = new URL(c.req.url);
 
   // API/media misses stay JSON 404s — the SPA shell would mask real errors.
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/media/")) {
+  // Exception: /media/placeholder/* is the seed catalog's static demo
+  // photography, shipped as assets rather than R2 uploads.
+  if (
+    url.pathname.startsWith("/api/") ||
+    (url.pathname.startsWith("/media/") && !url.pathname.startsWith("/media/placeholder/"))
+  ) {
     return c.json({ error: "Not found" }, 404);
   }
 
