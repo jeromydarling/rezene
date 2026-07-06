@@ -308,70 +308,149 @@ export function buildStructuredData(
   return `<script type="application/ld+json">${json}</script>`;
 }
 
-export async function buildSitemap(env: Env): Promise<string> {
-  const base = env.APP_URL.replace(/\/$/, "");
-  // Shop URLs carry the shop's path prefix (single active shop today).
-  const { getPrimaryShopBase } = await import("./shops");
-  const shopBase = await getPrimaryShopBase(env.DB);
-  const urls: { loc: string; lastmod?: string }[] = [
-    { loc: "/" },
-    { loc: "/why" },
-    { loc: "/features" },
-    { loc: "/compare" },
-    { loc: "/pricing" },
-    { loc: `${shopBase}/` },
-    { loc: `${shopBase}/products` },
-    { loc: `${shopBase}/collections` },
-    { loc: `${shopBase}/lookbook` },
-    { loc: `${shopBase}/journal` },
-    { loc: `${shopBase}/contact` },
-  ];
-  // Every other live shop gets its section fronts. The demo shop is
-  // deliberately absent — it's noindex'd fictional content.
-  const { DEMO_SHOP_SLUG, PRIMARY_SHOP_ID } = await import("./shops");
-  const otherShops = await all<{ slug: string }>(
-    env.DB,
-    `SELECT slug FROM shops WHERE status = 'active' AND id != ? AND slug != ?`,
-    PRIMARY_SHOP_ID,
-    DEMO_SHOP_SLUG,
+// ---------- Per-shop SEO configuration (settings-driven) ----------
+export interface ShopSeoConfig {
+  /** 'hidden' shops noindex everything and vanish from sitemaps. */
+  hidden: boolean;
+  defaultOgImage: string | null;
+  verificationGoogle: string | null;
+  verificationBing: string | null;
+}
+
+export async function getShopSeoConfig(db: D1Database): Promise<ShopSeoConfig> {
+  const rows = await all<{ key: string; value: string }>(
+    db,
+    `SELECT key, value FROM settings WHERE key IN
+     ('search_visibility','default_og_image','site_verification_google','site_verification_bing')`,
   );
-  for (const s of otherShops) {
-    for (const p of ["/", "/products", "/collections", "/lookbook", "/journal"]) {
-      urls.push({ loc: `/${s.slug}${p === "/" ? "" : p}` });
-    }
-  }
+  const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  return {
+    hidden: map.search_visibility === "hidden",
+    defaultOgImage: map.default_og_image || null,
+    verificationGoogle: map.site_verification_google || null,
+    verificationBing: map.site_verification_bing || null,
+  };
+}
+
+/** Search-console ownership proofs, injected on every shop document. */
+export function injectVerification(html: string, cfg: ShopSeoConfig): string {
+  const tags = [
+    cfg.verificationGoogle
+      ? `<meta name="google-site-verification" content="${escapeHtml(cfg.verificationGoogle)}">`
+      : "",
+    cfg.verificationBing
+      ? `<meta name="msvalidate.01" content="${escapeHtml(cfg.verificationBing)}">`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n    ");
+  if (!tags) return html;
+  return html.replace("</head>", `    ${tags}\n  </head>`);
+}
+
+// ---------- Product rich results ----------
+/** Product/Offer JSON-LD for a shop's product page — rich-result eligibility. */
+export async function buildProductLd(
+  env: Env,
+  db: D1Database,
+  productSlug: string,
+  canonicalUrl: string,
+): Promise<string | null> {
+  const row = await first<{
+    id: string;
+    name: string;
+    subtitle: string | null;
+    description: string | null;
+    base_price_cents: number;
+    currency: string;
+    availability: string;
+  }>(
+    db,
+    `SELECT id, name, subtitle, description, base_price_cents, currency, availability
+     FROM products WHERE slug = ? AND is_published = 1`,
+    productSlug,
+  );
+  if (!row) return null;
+  const image = await first<{ url: string }>(
+    db,
+    `SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order LIMIT 1`,
+    row.id,
+  );
+  const schemaAvailability =
+    row.availability === "sold_out"
+      ? "https://schema.org/OutOfStock"
+      : row.availability === "pre_order"
+        ? "https://schema.org/PreOrder"
+        : "https://schema.org/InStock";
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: row.name,
+    description: row.subtitle ?? row.description?.slice(0, 300) ?? undefined,
+    image: image ? [absolute(env, image.url)] : undefined,
+    url: canonicalUrl,
+    offers: {
+      "@type": "Offer",
+      url: canonicalUrl,
+      priceCurrency: row.currency,
+      price: (row.base_price_cents / 100).toFixed(2),
+      availability: schemaAvailability,
+    },
+  };
+  return `<script type="application/ld+json">${JSON.stringify(ld).replaceAll("<", "\\u003c")}</script>`;
+}
+
+// ---------- Sitemaps ----------
+interface SitemapUrl {
+  loc: string;
+  lastmod?: string;
+}
+
+/** Every indexable URL for one shop, prefixed with its base path ('' on a custom domain). */
+export async function buildShopUrls(db: D1Database, basePath: string): Promise<SitemapUrl[]> {
+  const urls: SitemapUrl[] = [
+    { loc: `${basePath}/` },
+    { loc: `${basePath}/products` },
+    { loc: `${basePath}/collections` },
+    { loc: `${basePath}/lookbook` },
+    { loc: `${basePath}/journal` },
+    { loc: `${basePath}/contact` },
+  ];
   const pages = await all<{ slug: string; updated_at: string }>(
-    env.DB,
+    db,
     `SELECT slug, updated_at FROM pages WHERE is_published = 1 AND slug != 'home'`,
   );
   for (const p of pages) {
     urls.push({
-      loc: ROOT_PAGE_SLUGS.has(p.slug) ? `${shopBase}/${p.slug}` : `${shopBase}/p/${p.slug}`,
+      loc: ROOT_PAGE_SLUGS.has(p.slug) ? `${basePath}/${p.slug}` : `${basePath}/p/${p.slug}`,
       lastmod: p.updated_at?.slice(0, 10),
     });
   }
   const posts = await all<{ slug: string; published_at: string | null }>(
-    env.DB,
+    db,
     `SELECT slug, published_at FROM journal_posts WHERE is_published = 1`,
   );
   for (const post of posts) {
-    urls.push({ loc: `${shopBase}/journal/${post.slug}`, lastmod: post.published_at?.slice(0, 10) });
+    urls.push({ loc: `${basePath}/journal/${post.slug}`, lastmod: post.published_at?.slice(0, 10) });
   }
   const products = await all<{ slug: string; updated_at: string }>(
-    env.DB,
+    db,
     `SELECT slug, updated_at FROM products WHERE is_published = 1 AND availability != 'archived'`,
   );
   for (const product of products) {
-    urls.push({ loc: `${shopBase}/products/${product.slug}`, lastmod: product.updated_at?.slice(0, 10) });
+    urls.push({ loc: `${basePath}/products/${product.slug}`, lastmod: product.updated_at?.slice(0, 10) });
   }
   const collections = await all<{ slug: string; updated_at: string }>(
-    env.DB,
+    db,
     `SELECT slug, updated_at FROM collections WHERE is_published = 1`,
   );
   for (const col of collections) {
-    urls.push({ loc: `${shopBase}/collections/${col.slug}`, lastmod: col.updated_at?.slice(0, 10) });
+    urls.push({ loc: `${basePath}/collections/${col.slug}`, lastmod: col.updated_at?.slice(0, 10) });
   }
+  return urls;
+}
 
+function renderSitemap(base: string, urls: SitemapUrl[]): string {
   const body = urls
     .map(
       (u) =>
@@ -379,4 +458,90 @@ export async function buildSitemap(env: Env): Promise<string> {
     )
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>`;
+}
+
+/**
+ * The platform sitemap: marketing pages plus the FULL contents of every
+ * active shop (pages, posts, products, collections — each read from that
+ * shop's own database). Excludes the demo shop and any shop whose owner
+ * flipped "search engine visibility" off.
+ */
+export async function buildSitemap(env: Env): Promise<string> {
+  const base = env.APP_URL.replace(/\/$/, "");
+  const urls: SitemapUrl[] = [
+    { loc: "/" },
+    { loc: "/why" },
+    { loc: "/features" },
+    { loc: "/compare" },
+    { loc: "/pricing" },
+  ];
+  const { DEMO_SHOP_SLUG } = await import("./shops");
+  const { getShopDb } = await import("./tenant-db");
+  const { PRIMARY_SHOP_ID } = await import("./shops");
+  const shops = await all<{ id: string; slug: string; custom_domain: string | null }>(
+    env.DB,
+    `SELECT id, slug, custom_domain FROM shops WHERE status = 'active' AND slug != ?`,
+    DEMO_SHOP_SLUG,
+  );
+  for (const shop of shops) {
+    try {
+      const db = getShopDb(env, shop.id, PRIMARY_SHOP_ID);
+      const cfg = await getShopSeoConfig(db);
+      if (cfg.hidden) continue;
+      // Shops on their own domain are indexed there, not under verto.style.
+      if (shop.custom_domain) continue;
+      urls.push(...(await buildShopUrls(db, `/${shop.slug}`)));
+    } catch (err) {
+      console.error(`[seo] sitemap skip /${shop.slug}:`, String(err).slice(0, 120));
+    }
+  }
+  return renderSitemap(base, urls);
+}
+
+/** A custom-domain shop's own sitemap, rooted at its domain. */
+export async function buildShopSitemap(
+  env: Env,
+  shop: { id: string; custom_domain: string | null },
+): Promise<string> {
+  const { getShopDb } = await import("./tenant-db");
+  const { PRIMARY_SHOP_ID } = await import("./shops");
+  const db = getShopDb(env, shop.id, PRIMARY_SHOP_ID);
+  const cfg = await getShopSeoConfig(db);
+  const urls = cfg.hidden ? [] : await buildShopUrls(db, "");
+  return renderSitemap(`https://${shop.custom_domain}`, urls);
+}
+
+/** A shop's own llms.txt (served on its custom domain). */
+export async function buildShopLlms(
+  env: Env,
+  shop: { id: string; name: string; custom_domain: string | null },
+): Promise<string> {
+  const { getShopDb } = await import("./tenant-db");
+  const { PRIMARY_SHOP_ID } = await import("./shops");
+  const db = getShopDb(env, shop.id, PRIMARY_SHOP_ID);
+  const brand = await brandBits(env, db);
+  const base = `https://${shop.custom_domain}`;
+  const lines = [
+    `# ${brand.name}`,
+    ``,
+    `> ${brand.tagline || `${brand.name} — an independent clothing label.`}`,
+    ``,
+    `## Pages`,
+    ``,
+    `- [Shop](${base}/products): the current pieces`,
+    `- [Collections](${base}/collections)`,
+    `- [Lookbook](${base}/lookbook)`,
+    `- [Journal](${base}/journal)`,
+    `- [Contact](${base}/contact)`,
+  ];
+  const pages = await all<{ slug: string; title: string }>(
+    db,
+    `SELECT slug, title FROM pages WHERE is_published = 1 AND slug != 'home' LIMIT 20`,
+  );
+  for (const p of pages) {
+    const path = ROOT_PAGE_SLUGS.has(p.slug) ? `/${p.slug}` : `/p/${p.slug}`;
+    lines.push(`- [${p.title}](${base}${path})`);
+  }
+  lines.push("", `Powered by [Verto](${env.APP_URL}).`, "");
+  return lines.join("\n");
 }

@@ -25,6 +25,7 @@ import {
   Package,
   Rotate3d,
   Scissors,
+  SearchCheck,
   Settings,
   Shirt,
   ShoppingBag,
@@ -63,6 +64,7 @@ const NAV_SECTIONS: {
       { to: "/admin/content/pages", label: "Pages", icon: BookOpen },
       { to: "/admin/content/journal", label: "Journal", icon: Newspaper },
       { to: "/admin/content/lookbooks", label: "Lookbooks", icon: Images },
+      { to: "/admin/content/search", label: "Search Checkup", icon: SearchCheck },
     ],
   },
   {

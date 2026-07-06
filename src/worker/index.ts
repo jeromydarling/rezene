@@ -92,7 +92,7 @@ app.get("/:shopSlug/media/:fileId", async (c) => {
 // domain) serves that shop's storefront — same SPA shell, with the shop
 // context and per-route SEO meta injected at the edge. Legacy Rezene-era
 // paths 301 to the shop-prefixed equivalents.
-import { buildSitemap, buildStructuredData, injectMeta, injectShopContext, resolveRouteMeta, VERTO_META } from "./services/seo";
+import { buildProductLd, buildSitemap, buildStructuredData, getShopSeoConfig, injectMeta, injectShopContext, injectVerification, resolveRouteMeta, VERTO_META } from "./services/seo";
 import { DEMO_SHOP_SLUG, getPrimaryShopBase, PRIMARY_SHOP_ID, resolveShop } from "./services/shops";
 import type { Context } from "hono";
 
@@ -153,23 +153,34 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
 
   const shell = await c.env.ASSETS.fetch(new Request(`${url.origin}/index.html`));
   if (!shell.ok) return shell as unknown as Response;
-  const canonicalBase = (c.env.APP_URL || url.origin).replace(/\/$/, "");
+  // Shops on their own domain canonicalize to that domain, not verto.style.
+  const onCustomDomain = Boolean(shop && shop.custom_domain === url.hostname);
+  const canonicalBase = (onCustomDomain ? url.origin : c.env.APP_URL || url.origin).replace(/\/$/, "");
+  const shopDb = shop ? getShopDb(c.env, shop.id, PRIMARY_SHOP_ID) : null;
   const meta = shop
-    ? await resolveRouteMeta(
-        c.env,
-        getShopDb(c.env, shop.id, PRIMARY_SHOP_ID),
-        strippedPath,
-      )
+    ? await resolveRouteMeta(c.env, shopDb!, strippedPath)
     : VERTO_META[url.pathname] ?? VERTO_META["/"];
   // The demo shop is a fictional label — keep its boilerplate out of the index.
   if (shop && shop.slug === DEMO_SHOP_SLUG) meta.noindex = true;
-  let html = injectMeta(await shell.text(), meta, `${canonicalBase}${basePath}${strippedPath === "/" && shop ? "" : shop ? strippedPath : url.pathname}`);
+  // Shop-level SEO settings: visibility, default social image, verification.
+  const seoCfg = shopDb ? await getShopSeoConfig(shopDb).catch(() => null) : null;
+  if (seoCfg?.hidden) meta.noindex = true;
+  if (seoCfg?.defaultOgImage && !meta.image) meta.image = seoCfg.defaultOgImage;
+  const canonicalUrl = `${canonicalBase}${basePath}${strippedPath === "/" && shop ? "" : shop ? strippedPath : url.pathname}`;
+  let html = injectMeta(await shell.text(), meta, canonicalUrl);
+  if (seoCfg) html = injectVerification(html, seoCfg);
   // Identity schema on home documents only (platform root / shop home).
   if ((shop && strippedPath === "/") || (!shop && url.pathname === "/")) {
     html = html.replace(
       "</head>",
       `    ${buildStructuredData(c.env, shop ? { slug: shop.slug, name: shop.name, basePath } : null, meta)}\n  </head>`,
     );
+  }
+  // Product rich results on shop product pages.
+  const productMatch = shop && strippedPath.match(/^\/products\/([^/]+)$/);
+  if (productMatch && shopDb) {
+    const ld = await buildProductLd(c.env, shopDb, decodeURIComponent(productMatch[1]), canonicalUrl).catch(() => null);
+    if (ld) html = html.replace("</head>", `    ${ld}\n  </head>`);
   }
   html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
   // The shell must never be stale: it pins the hashed bundle URL, and a
@@ -178,22 +189,45 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
   return c.html(html, 200, { "cache-control": "no-cache" });
 }
 
-app.get("/sitemap.xml", async (c) =>
-  c.text(await buildSitemap(c.env), 200, {
-    "content-type": "application/xml",
-    "cache-control": "public, max-age=3600",
-  }),
-);
+// Host-aware: a custom-domain shop gets ITS sitemap at its own root; the
+// platform host gets the full platform sitemap. KV-cached — the platform
+// version reads every shop's database.
+app.get("/sitemap.xml", async (c) => {
+  const url = new URL(c.req.url);
+  const cacheKey = `sitemap:${url.hostname}`;
+  const cached = await c.env.KV.get(cacheKey);
+  if (cached) {
+    return c.text(cached, 200, { "content-type": "application/xml", "cache-control": "public, max-age=3600" });
+  }
+  const { getShopByDomain } = await import("./services/shops");
+  const domainShop = await getShopByDomain(c.env.DB, url.hostname);
+  const { buildShopSitemap } = await import("./services/seo");
+  const xml = domainShop ? await buildShopSitemap(c.env, domainShop) : await buildSitemap(c.env);
+  await c.env.KV.put(cacheKey, xml, { expirationTtl: 3600 });
+  return c.text(xml, 200, { "content-type": "application/xml", "cache-control": "public, max-age=3600" });
+});
 app.get("/robots.txt", (c) => {
-  const base = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const url = new URL(c.req.url);
+  // The sitemap reference must live on the SAME host — a custom-domain shop
+  // points crawlers at its own sitemap, not the platform's.
   return c.text(
-    `User-agent: *\nAllow: /\nDisallow: /*/admin\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`,
+    `User-agent: *\nAllow: /\nDisallow: /*/admin\nDisallow: /admin\nSitemap: ${url.origin}/sitemap.xml\n`,
   );
 });
 
 // llms.txt — the linked index AI assistants read first (llmstxt.org).
-app.get("/llms.txt", (c) => {
-  const base = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+// Host-aware: a custom-domain shop serves its own.
+app.get("/llms.txt", async (c) => {
+  const url = new URL(c.req.url);
+  const { getShopByDomain } = await import("./services/shops");
+  const domainShop = await getShopByDomain(c.env.DB, url.hostname);
+  if (domainShop) {
+    const { buildShopLlms } = await import("./services/seo");
+    return c.text(await buildShopLlms(c.env, domainShop), 200, {
+      "cache-control": "public, max-age=3600",
+    });
+  }
+  const base = (c.env.APP_URL || url.origin).replace(/\/$/, "");
   const body = [
     `# Verto`,
     ``,

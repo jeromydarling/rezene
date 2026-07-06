@@ -35,6 +35,7 @@ import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
 import { PlatformPage } from "./pages/admin/PlatformPage";
 import { CrmAtlasPage, CrmPage } from "./pages/admin/CrmPage";
+import { SearchCheckupPage } from "./pages/admin/SearchCheckupPage";
 import {
   PagesEditorPage,
   JournalEditorPage,
@@ -141,6 +142,7 @@ export function AppRouter() {
           <Route path="crm" element={<CrmPage />} />
           <Route path="crm/atlas" element={<CrmAtlasPage />} />
           <Route path="content/pages" element={<PagesEditorPage />} />
+          <Route path="content/search" element={<SearchCheckupPage />} />
           <Route path="content/journal" element={<JournalEditorPage />} />
           <Route path="content/lookbooks" element={<LookbooksEditorPage />} />
         </Route>
