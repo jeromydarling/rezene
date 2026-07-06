@@ -22,6 +22,7 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { TeamPage } from "./pages/admin/TeamPage";
 import { KnowledgeBasePage } from "./pages/admin/KnowledgeBasePage";
+import { LaunchPlaybookPage } from "./pages/admin/LaunchPlaybookPage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
@@ -125,6 +126,7 @@ export function AppRouter() {
         {/* Admin OS */}
         <Route path="admin" element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="launch" element={<LaunchPlaybookPage />} />
           <Route path="products" element={<ProductsAdminPage />} />
           <Route path="products/new" element={<ProductEditorPage />} />
           <Route path="products/:id" element={<ProductEditorPage />} />

@@ -30,6 +30,7 @@ import {
   Layers,
   Newspaper,
   Package,
+  Rocket,
   Rotate3d,
   Scissors,
   SearchCheck,
@@ -53,7 +54,10 @@ const NAV_SECTIONS: {
 }[] = [
   {
     title: "Overview",
-    items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
+    items: [
+      { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/admin/launch", label: "Launch Playbook", icon: Rocket },
+    ],
   },
   {
     title: "Catalog",
