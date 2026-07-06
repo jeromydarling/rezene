@@ -233,6 +233,34 @@ function MiniCms() {
   );
 }
 
+function MiniSeoCheckup() {
+  return (
+    <MiniShell title="Search Checkup">
+      <div className="space-y-1.5">
+        {[
+          { ok: true, t: "Product rich results published", sub: "price + availability schema on every piece" },
+          { ok: true, t: "Sitemap current", sub: "rebuilt on every publish, submitted once" },
+          { ok: true, t: "AI assistants indexed", sub: "llms.txt generated from your pages" },
+          { ok: false, t: "2 pages missing a search description", sub: "✨ draft them in your voice" },
+        ].map((r) => (
+          <div key={r.t} className="flex items-start gap-2 rounded bg-white p-2 shadow-sm">
+            <span className={`mt-0.5 text-[10px] ${r.ok ? "text-palm" : "text-saffron"}`}>{r.ok ? "✓" : "▲"}</span>
+            <div className="min-w-0">
+              <p className="truncate text-[9px] font-medium text-ink">{r.t}</p>
+              <p className="truncate text-[8px] text-warmgrey">{r.sub}</p>
+            </div>
+          </div>
+        ))}
+        <div className="flex gap-1.5">
+          <span className={badge("bg-navy/10 text-navy")}>canonical URLs</span>
+          <span className={badge("bg-navy/10 text-navy")}>social previews</span>
+          <span className={badge("bg-navy/10 text-navy")}>search console</span>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
 function MiniLookbook() {
   return (
     <MiniShell title="Lookbook — Atlantic Riviera">
@@ -442,6 +470,19 @@ const FEATURES: Feature[] = [
     points: ["Block editor with layout presets", "Draft preview links + scheduling", "Edge-rendered meta, sitemap, canonical URLs"],
     screen: MiniCms,
     url: "verto.style/maison/admin/content/pages",
+  },
+  {
+    id: "seo",
+    eyebrow: "Be found",
+    heading: "SEO that Shopify sells you in pieces.",
+    body: "Product rich results, per-page tags and canonicals, social previews, self-updating sitemaps, alt-text tracking, an llms.txt index for AI assistants — and a Search Checkup screen in plain merchant language. On the big platforms this is three or four apps and a freelancer; here it ships in the box and updates itself on every publish.",
+    points: [
+      "Product schema with price & availability — rich-result eligible",
+      "Search Checkup: findings + one-tap fixes, AI-drafted descriptions",
+      "Ready for AI search: llms.txt + structured data by default",
+    ],
+    screen: MiniSeoCheckup,
+    url: "verto.style/maison/admin/content/search",
   },
   {
     id: "lookbooks",

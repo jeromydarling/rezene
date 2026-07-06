@@ -216,6 +216,7 @@ const MATRIX_ROWS: { label: string; verto: boolean; shopify: boolean; erp: boole
   { label: "Multi-carrier shipping + customs docs", verto: true, shopify: false, erp: true, patchwork: false },
   { label: "Duties & landed-cost tooling", verto: true, shopify: false, erp: true, patchwork: false },
   { label: "Wholesale line sheets & pre-orders", verto: true, shopify: false, erp: true, patchwork: false },
+  { label: "SEO suite built in (schema, sitemaps, AI-search index)", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "AI marketing suite in your brand voice", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "AI site starter (drafted in minutes)", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "Storefront translations built in", verto: true, shopify: false, erp: false, patchwork: false },
