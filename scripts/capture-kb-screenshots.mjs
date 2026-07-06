@@ -32,6 +32,7 @@ function findChromium() {
 const SHOTS = [
   ["dashboard", "/admin"],
   ["launch", "/admin/launch"],
+  ["fitting", "/admin/fitting"],
   ["products", "/admin/products"],
   ["skus", "/admin/skus"],
   ["inventory", "/admin/inventory"],
@@ -78,6 +79,12 @@ const browser = await chromium.launch({
     // the agent proxy; stop them so they don't reset the session.
     "--disable-background-networking",
     "--check-for-update-interval=31536000",
+    // Headless runners have no GPU — render WebGL (the 3D Fitting Room) via
+    // SwiftShader software rasterization so <canvas> pages aren't blank.
+    "--enable-unsafe-swiftshader",
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--ignore-gpu-blocklist",
   ],
 });
 const context = await browser.newContext({
@@ -102,6 +109,10 @@ for (const [name, route] of SHOTS) {
   try {
     await page.goto(`${BASE}${route}`, { waitUntil: "networkidle", timeout: 25000 });
     await page.waitForTimeout(1800); // let data + images settle
+    // WebGL pages (the 3D Fitting Room) paint on a <canvas>, not via network —
+    // wait for the canvas and give SwiftShader extra time to render a frame.
+    const canvas = await page.$("canvas");
+    if (canvas) await page.waitForTimeout(2500);
     await page.screenshot({ path: join(OUT, `${name}.png`) }); // viewport-clipped hero
     console.log(`✓ ${name}`);
     ok++;
