@@ -49,6 +49,8 @@ export function VertoWhy() {
         <img
           src="/verto/wall.jpg"
           alt="A designer in high-waisted navy trousers against a sun-washed wall"
+          fetchPriority="high"
+          decoding="async"
           className="verto-kenburns absolute inset-0 h-full w-full object-cover object-top"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-deep/90 via-navy-deep/30 to-transparent" />

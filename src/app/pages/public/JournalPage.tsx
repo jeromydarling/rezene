@@ -73,7 +73,7 @@ export function JournalPostPage() {
               className="mb-8"
             />
           )}
-          <Markdown text={data.bodyMd ?? ""} />
+          <Markdown text={data.bodyMd ?? ""} headingBase={2} />
         </>
       )}
     </article>

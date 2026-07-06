@@ -228,7 +228,7 @@ function VertoLayout({ children }: { children: ReactNode }) {
             </Link>
           </div>
         </div>
-        <div className="border-t border-chalk/10 px-5 py-4 text-center text-xs text-chalk/40">
+        <div className="border-t border-chalk/10 px-5 py-4 text-center text-xs text-chalk/65">
           © {new Date().getFullYear()} Verto
         </div>
       </footer>
@@ -248,6 +248,8 @@ function Hero() {
       <img
         src="/verto/hero.jpg"
         alt="Three friends in linen resortwear walking Morocco's Atlantic ramparts at golden hour"
+        fetchPriority="high"
+        decoding="async"
         className="verto-kenburns absolute inset-0 h-full w-full object-cover"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-navy-deep/90 via-navy-deep/30 to-transparent" />

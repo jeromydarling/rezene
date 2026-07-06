@@ -175,14 +175,14 @@ export function AdminLayout() {
     <>
       <Link to="/admin" className="block border-b border-chalk/10 px-5 py-5">
         <p className="font-display text-lg font-light">{brand.brandName}</p>
-        <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/50">
+        <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/70">
           Brand Operating System
         </p>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {visibleSections().map((section) => (
           <div key={section.title} className="mb-5">
-            <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/40">
+            <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/60">
               {section.title}
             </p>
             <ul className="space-y-0.5">
@@ -211,7 +211,7 @@ export function AdminLayout() {
       <div className="border-t border-chalk/10 px-5 py-4">
         <p className="truncate text-xs text-chalk/70">{user.email}</p>
         <div className="mt-1 flex items-center justify-between">
-          <p className="text-[0.65rem] uppercase tracking-wider text-chalk/40">
+          <p className="text-[0.65rem] uppercase tracking-wider text-chalk/60">
             {user.roles.join(", ") || "no role"}
           </p>
           <button

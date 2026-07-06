@@ -15,6 +15,8 @@ export interface RouteMeta {
   image: string | null;
   /** noindex for utility pages (cart etc.) */
   noindex?: boolean;
+  /** LCP hint: preload this image from the document head. */
+  preloadImage?: string;
 }
 
 /** Platform (Verto) marketing pages served at the domain root. */
@@ -23,36 +25,38 @@ export const VERTO_META: Record<string, RouteMeta> = {
     title: "Verto — The operating system for independent clothing labels",
     description:
       "Storefront, CMS, production, shipping, and AI marketing in one purpose-built platform for independent fashion brands. From first sample to sold out.",
-    image: null,
+    image: "/verto/hero.jpg",
+    preloadImage: "/verto/hero.jpg",
   },
   "/features": {
     title: "Features — the full tour — Verto",
     description:
       "Production calendar, tech packs, factory portals, multi-carrier shipping, landed cost, block CMS, lookbooks, AI marketing, translations, wholesale, analytics — one platform.",
-    image: null,
+    image: "/verto/atelier.jpg",
   },
   "/why": {
     title: "Why Verto exists — Verto",
     description:
       "Fashion tech forgot the people who make fashion. The problem with running an independent label on generic commerce tools — and how Verto solves it.",
-    image: null,
+    image: "/verto/wall.jpg",
+    preloadImage: "/verto/wall.jpg",
   },
   "/compare": {
     title: "Verto vs. Shopify, fashion ERPs & the spreadsheet patchwork — Verto",
     description:
       "An honest, capability-by-capability comparison of Verto against Shopify plus apps, retail ERP/PLM suites, and the DIY spreadsheet stack.",
-    image: null,
+    image: "/verto/hero.jpg",
   },
   "/pricing": {
     title: "Pricing — Verto",
     description:
       "Plans for every stage of a label — from pre-launch side project to multi-collection house. Start free for 14 days.",
-    image: null,
+    image: "/verto/dusk.jpg",
   },
   "/signup": {
     title: "Open your shop — Verto",
     description: "Reserve your shop address and be first in when we onboard new labels.",
-    image: null,
+    image: "/verto/dusk.jpg",
   },
 };
 
@@ -235,6 +239,9 @@ function escapeHtml(text: string): string {
 /** Replace <title> and inject meta/OG tags into the SPA shell. */
 export function injectMeta(html: string, meta: RouteMeta, canonicalUrl: string): string {
   const title = escapeHtml(meta.title);
+  // Relative og/preload images become absolute against the canonical origin.
+  const origin = canonicalUrl.match(/^https?:\/\/[^/]+/)?.[0] ?? "";
+  const abs = (url: string) => (/^https?:\/\//.test(url) ? url : `${origin}${url}`);
   const tags = [
     meta.description ? `<meta name="description" content="${escapeHtml(meta.description)}">` : "",
     meta.noindex ? `<meta name="robots" content="noindex">` : "",
@@ -245,14 +252,60 @@ export function injectMeta(html: string, meta: RouteMeta, canonicalUrl: string):
       : "",
     `<meta property="og:type" content="website">`,
     `<meta property="og:url" content="${escapeHtml(canonicalUrl)}">`,
-    meta.image ? `<meta property="og:image" content="${escapeHtml(meta.image)}">` : "",
+    meta.image ? `<meta property="og:image" content="${escapeHtml(abs(meta.image))}">` : "",
     `<meta name="twitter:card" content="${meta.image ? "summary_large_image" : "summary"}">`,
+    meta.preloadImage
+      ? `<link rel="preload" as="image" href="${escapeHtml(abs(meta.preloadImage))}" fetchpriority="high">`
+      : "",
   ]
     .filter(Boolean)
     .join("\n    ");
   return html
     .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+    // The shell's static description would otherwise duplicate the injected one.
+    .replace(/\s*<meta\s+name="description"[\s\S]*?\/?>/, "")
     .replace("</head>", `    ${tags}\n  </head>`);
+}
+
+/**
+ * Organization + WebSite JSON-LD for the platform root; Organization for a
+ * shop's home page. Injected only on home documents — one authoritative
+ * statement of identity, not schema wallpaper on every route.
+ */
+export function buildStructuredData(
+  env: Env,
+  shop: { slug: string; name: string; basePath: string } | null,
+  meta: RouteMeta,
+): string {
+  const base = env.APP_URL.replace(/\/$/, "");
+  const ld = shop
+    ? [
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: shop.name,
+          url: `${base}${shop.basePath || ""}`,
+          description: meta.description ?? undefined,
+        },
+      ]
+    : [
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "Verto",
+          url: base,
+          logo: `${base}/verto/hero.jpg`,
+          description: meta.description ?? undefined,
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Verto",
+          url: base,
+        },
+      ];
+  const json = JSON.stringify(ld.length === 1 ? ld[0] : ld).replaceAll("<", "\\u003c");
+  return `<script type="application/ld+json">${json}</script>`;
 }
 
 export async function buildSitemap(env: Env): Promise<string> {
@@ -273,6 +326,20 @@ export async function buildSitemap(env: Env): Promise<string> {
     { loc: `${shopBase}/journal` },
     { loc: `${shopBase}/contact` },
   ];
+  // Every other live shop gets its section fronts. The demo shop is
+  // deliberately absent — it's noindex'd fictional content.
+  const { DEMO_SHOP_SLUG, PRIMARY_SHOP_ID } = await import("./shops");
+  const otherShops = await all<{ slug: string }>(
+    env.DB,
+    `SELECT slug FROM shops WHERE status = 'active' AND id != ? AND slug != ?`,
+    PRIMARY_SHOP_ID,
+    DEMO_SHOP_SLUG,
+  );
+  for (const s of otherShops) {
+    for (const p of ["/", "/products", "/collections", "/lookbook", "/journal"]) {
+      urls.push({ loc: `/${s.slug}${p === "/" ? "" : p}` });
+    }
+  }
   const pages = await all<{ slug: string; updated_at: string }>(
     env.DB,
     `SELECT slug, updated_at FROM pages WHERE is_published = 1 AND slug != 'home'`,

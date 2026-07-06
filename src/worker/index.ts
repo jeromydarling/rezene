@@ -92,8 +92,8 @@ app.get("/:shopSlug/media/:fileId", async (c) => {
 // domain) serves that shop's storefront — same SPA shell, with the shop
 // context and per-route SEO meta injected at the edge. Legacy Rezene-era
 // paths 301 to the shop-prefixed equivalents.
-import { buildSitemap, injectMeta, injectShopContext, resolveRouteMeta, VERTO_META } from "./services/seo";
-import { getPrimaryShopBase, PRIMARY_SHOP_ID, resolveShop } from "./services/shops";
+import { buildSitemap, buildStructuredData, injectMeta, injectShopContext, resolveRouteMeta, VERTO_META } from "./services/seo";
+import { DEMO_SHOP_SLUG, getPrimaryShopBase, PRIMARY_SHOP_ID, resolveShop } from "./services/shops";
 import type { Context } from "hono";
 
 /** Storefront/app paths that existed before the shop prefix (for 301s). */
@@ -161,7 +161,16 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
         strippedPath,
       )
     : VERTO_META[url.pathname] ?? VERTO_META["/"];
+  // The demo shop is a fictional label — keep its boilerplate out of the index.
+  if (shop && shop.slug === DEMO_SHOP_SLUG) meta.noindex = true;
   let html = injectMeta(await shell.text(), meta, `${canonicalBase}${basePath}${strippedPath === "/" && shop ? "" : shop ? strippedPath : url.pathname}`);
+  // Identity schema on home documents only (platform root / shop home).
+  if ((shop && strippedPath === "/") || (!shop && url.pathname === "/")) {
+    html = html.replace(
+      "</head>",
+      `    ${buildStructuredData(c.env, shop ? { slug: shop.slug, name: shop.name, basePath } : null, meta)}\n  </head>`,
+    );
+  }
   html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
   // The shell must never be stale: it pins the hashed bundle URL, and a
   // cached copy that outlives a deploy points at assets that no longer
@@ -180,6 +189,31 @@ app.get("/robots.txt", (c) => {
   return c.text(
     `User-agent: *\nAllow: /\nDisallow: /*/admin\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`,
   );
+});
+
+// llms.txt — the linked index AI assistants read first (llmstxt.org).
+app.get("/llms.txt", (c) => {
+  const base = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const body = [
+    `# Verto`,
+    ``,
+    `> Verto is the operating system for independent clothing labels: storefront, CMS, production (tech packs, samples, factory portals), multi-carrier shipping with customs paperwork, landed-cost and duties tooling, wholesale line sheets, pre-orders, and an AI marketing suite — one platform, one database, from first sample to sold out. Shops live at verto.style/<shop-name> or on their own domain.`,
+    ``,
+    `## Pages`,
+    ``,
+    `- [Why Verto exists](${base}/why): the problem with fashion tech's two worlds — storefront builders and enterprise ERPs — and the missing middle Verto serves`,
+    `- [Features — the full tour](${base}/features): all twelve modules with miniature interface previews`,
+    `- [Compare](${base}/compare): honest capability matrix vs. Shopify, retail ERP/PLM suites, and the spreadsheet patchwork`,
+    `- [Pricing](${base}/pricing): plans from $19/mo (annual) with a declining application fee; every plan includes the full platform`,
+    `- [Open your shop](${base}/signup): instant provisioning — a live shop with admin credentials in seconds`,
+    ``,
+    `## Demo`,
+    ``,
+    `- [Maison Atlantique demo storefront](${base}/maison): a fictional label running the full platform`,
+    `- [Demo admin tour](${base}/maison/admin): read-only walkthrough of the operating system behind a shop (email-gated)`,
+    ``,
+  ].join("\n");
+  return c.text(body, 200, { "cache-control": "public, max-age=3600" });
 });
 
 // Public API — no auth, rate-limited where it accepts writes.

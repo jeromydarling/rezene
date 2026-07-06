@@ -104,7 +104,7 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center text-chalk">
           <p className="font-display text-2xl font-light">{brand.brandName}</p>
-          <p className="mt-1 text-[0.65rem] uppercase tracking-editorial text-chalk/50">
+          <p className="mt-1 text-[0.65rem] uppercase tracking-editorial text-chalk/70">
             Brand Operating System
           </p>
         </div>

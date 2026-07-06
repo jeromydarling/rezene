@@ -49,7 +49,7 @@ export function MarkdownPage({ slug, eyebrow }: { slug: string; eyebrow?: string
     <PageBlocks sections={data.sections!} />
   ) : (
     <div className="mx-auto max-w-2xl px-5 py-16">
-      <Markdown text={data.bodyMd ?? ""} />
+      <Markdown text={data.bodyMd ?? ""} headingBase={2} />
     </div>
   );
 
@@ -103,7 +103,7 @@ export function MarkdownPage({ slug, eyebrow }: { slug: string; eyebrow?: string
           <PageBlocks sections={data.sections!} />
         ) : (
           <div className="mx-auto max-w-3xl">
-            <Markdown text={data.bodyMd ?? ""} />
+            <Markdown text={data.bodyMd ?? ""} headingBase={2} />
           </div>
         )}
       </article>
@@ -133,7 +133,7 @@ export function MarkdownPage({ slug, eyebrow }: { slug: string; eyebrow?: string
         {data.heroImageUrl && (
           <img src={data.heroImageUrl} alt="" className="mb-8 w-full object-cover" />
         )}
-        <Markdown text={data.bodyMd ?? ""} />
+        <Markdown text={data.bodyMd ?? ""} headingBase={2} />
       </article>
     </div>
   );

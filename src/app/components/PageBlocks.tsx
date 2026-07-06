@@ -218,7 +218,7 @@ function ImageTextBlock({ section }: { section: PageSection }) {
       )}
       {str(section.body) && (
         <div className={`mt-4 max-w-md ${dark ? "text-sm leading-relaxed text-chalk/75" : ""}`}>
-          <Markdown text={str(section.body)} />
+          <Markdown text={str(section.body)} headingBase={2} />
         </div>
       )}
       {str(section.ctaLabel) && str(section.ctaHref) && (
@@ -376,7 +376,7 @@ function ProseBlock({ section }: { section: PageSection }) {
   if (!str(section.markdown)) return null;
   return (
     <section className="mx-auto max-w-2xl px-5 py-12">
-      <Markdown text={str(section.markdown)} />
+      <Markdown text={str(section.markdown)} headingBase={2} />
     </section>
   );
 }
