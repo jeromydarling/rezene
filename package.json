@@ -15,6 +15,16 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "@freesewing/config": "^4.10.0",
+    "@freesewing/core": "^4.10.0",
+    "@freesewing/models": "^4.10.0",
+    "@freesewing/penelope": "^4.10.0",
+    "@freesewing/plugin-theme": "^4.10.0",
+    "@freesewing/plugin-transform": "^4.10.0",
+    "@freesewing/sophie": "^4.10.0",
+    "@freesewing/sven": "^4.10.0",
+    "@freesewing/teagan": "^4.10.0",
+    "@freesewing/titan": "^4.10.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "hono": "^4.6.0",

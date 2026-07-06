@@ -13,6 +13,7 @@ import {
 } from "../../../shared/garments";
 import { FABRIC_LIBRARY, type FabricRef } from "../../../shared/fabrics";
 import { buildGarment, buildMannequin, disposeGroup, fabricAppearance } from "../../lib/garmentGeometry";
+import { draftPatternSvg, patternLabel } from "../../lib/patterns";
 import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
@@ -113,6 +114,23 @@ export function FittingStudioPage() {
   const [fit, setFit] = useState<FitConfig>(DEFAULT_FIT);
   const [spin, setSpin] = useState(true);
   const [showBody, setShowBody] = useState(true);
+  const [view, setView] = useState<"3d" | "pattern">("3d");
+
+  const pattern = useMemo(
+    () => (view === "pattern" ? draftPatternSvg(garmentId, fit.size) : null),
+    [view, garmentId, fit.size],
+  );
+
+  function downloadPattern() {
+    if (!pattern) return;
+    const blob = new Blob([pattern.svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${garmentId}-${fit.size}-pattern.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
   const [styleId, setStyleId] = useState("");
   const [lookName, setLookName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -199,14 +217,56 @@ export function FittingStudioPage() {
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         {/* Viewer */}
         <div className="overflow-hidden rounded-lg border border-ink/10 bg-[#f4f2ee]">
-          <div className="h-[540px] w-full">
-            <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} showBody={showBody} />
+          <div className="flex items-center justify-between border-b border-ink/10 bg-white/60 px-3 py-2">
+            <div className="flex overflow-hidden rounded-md border border-ink/15">
+              {(["3d", "pattern"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  className={`px-3 py-1.5 text-xs uppercase tracking-wider ${
+                    view === v ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                  }`}
+                >
+                  {v === "3d" ? "3D preview" : "Pattern"}
+                </button>
+              ))}
+            </div>
+            {view === "pattern" && pattern && (
+              <button type="button" className="btn btn-secondary text-xs" onClick={downloadPattern}>
+                Download SVG
+              </button>
+            )}
           </div>
+
+          {view === "3d" ? (
+            <div className="h-[540px] w-full">
+              <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} showBody={showBody} />
+            </div>
+          ) : (
+            <div className="h-[540px] w-full overflow-auto bg-white p-4">
+              {pattern ? (
+                <div
+                  className="[&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
+                  // FreeSewing renders a self-contained SVG string (its own styles).
+                  dangerouslySetInnerHTML={{ __html: pattern.svg }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-warmgrey">
+                  A drafted sewing pattern isn’t wired for this silhouette yet — try the tee, hoodie, slip dress,
+                  wide trouser, or skirt.
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-t border-ink/10 bg-white/60 px-4 py-2 text-xs text-warmgrey">
             <span>
-              {garment.name} · {fabric?.name ?? "—"} · size {fit.size}
+              {view === "3d"
+                ? `${garment.name} · ${fabric?.name ?? "—"} · size ${fit.size}`
+                : (pattern?.label ?? patternLabel(garmentId) ?? garment.name) + ` · size ${fit.size}`}
             </span>
-            <span>Drag to orbit · scroll to zoom</span>
+            <span>{view === "3d" ? "Drag to orbit · scroll to zoom" : "Real, manufacturable pattern"}</span>
           </div>
         </div>
 
@@ -420,10 +480,12 @@ export function FittingStudioPage() {
       </div>
 
       <p className="mt-6 max-w-3xl text-xs text-warmgrey">
-        <strong>How to read this:</strong> the Fitting Room is a stylized proportion and fabric study, not a
-        physics-accurate garment simulation. It's great for exploring silhouette, ease, and fabric feel early.
-        For true made-to-measure draping and fit, bring a CLO&nbsp;3D / Browzwear / Style3D file into the 3D
-        Simulation bridge — native pattern-based simulation is on the roadmap.
+        <strong>Two views, both real work:</strong> the <strong>3D preview</strong> is a stylized proportion and
+        fabric study — great for exploring silhouette, ease, and fabric feel early (not a physics-accurate drape).
+        The <strong>Pattern</strong> view drafts a genuine, manufacturable 2D sewing pattern for the size you pick
+        (powered by FreeSewing) that you can download as SVG and hand to a factory or drop into a tech pack. For
+        full physics draping and made-to-measure fit, bring a CLO&nbsp;3D / Browzwear / Style3D file into the 3D
+        Simulation bridge.
       </p>
     </div>
   );
