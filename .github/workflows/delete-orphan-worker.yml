@@ -31,16 +31,28 @@ jobs:
   delete-orphan:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, '[delete-orphan-worker]')
+      contains(github.event.head_commit.message, '[delete-orphan-worker')
     runs-on: ubuntu-latest
     steps:
       - name: Delete the orphan Worker script
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SCRIPT_NAME: ${{ github.event.inputs.script_name || 'rezene' }}
+          DISPATCH_NAME: ${{ github.event.inputs.script_name }}
+          MARKER_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
+          # Resolve the target script: the workflow_dispatch input, else the
+          # name inside a "[delete-orphan-worker:NAME]" commit marker, else the
+          # default "rezene" for a bare "[delete-orphan-worker]" marker.
+          SCRIPT_NAME="${DISPATCH_NAME:-}"
+          if [ -z "$SCRIPT_NAME" ]; then
+            SCRIPT_NAME=$(printf '%s' "${MARKER_MSG:-}" \
+              | grep -oE '\[delete-orphan-worker:[A-Za-z0-9_.-]+\]' \
+              | head -1 | sed -E 's/.*:([A-Za-z0-9_.-]+)\]/\1/')
+          fi
+          SCRIPT_NAME="${SCRIPT_NAME:-rezene}"
+          echo "Target script: ${SCRIPT_NAME}"
           if [ -z "${CF_API_TOKEN:-}" ]; then
             echo "CLOUDFLARE_API_TOKEN is not set — cannot delete." >&2
             exit 1
