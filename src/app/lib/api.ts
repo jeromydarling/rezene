@@ -11,6 +11,7 @@ export class ApiRequestError extends Error {
 }
 
 import { getShop } from "./shop";
+import { emitToast, reportError } from "./toast";
 
 /** Tenant selector: tells the worker which shop's database serves this call. */
 function shopHeaders(): Record<string, string> {
@@ -19,11 +20,23 @@ function shopHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { "content-type": "application/json", ...shopHeaders(), ...init?.headers },
-    credentials: "same-origin",
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      headers: { "content-type": "application/json", ...shopHeaders(), ...init?.headers },
+      credentials: "same-origin",
+      ...init,
+    });
+  } catch (networkErr) {
+    // Offline / DNS / TLS — the request never reached the server.
+    reportError(networkErr, { path });
+    emitToast({
+      kind: "error",
+      message: "Can’t reach the server",
+      detail: "Check your connection — we’ll keep your work here and you can retry.",
+    });
+    throw new ApiRequestError(0, "Network error — please try again");
+  }
   const isJson = res.headers.get("content-type")?.includes("application/json");
   const body = isJson ? await res.json().catch(() => null) : null;
   if (!res.ok) {
@@ -31,6 +44,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body && typeof body === "object" && "error" in body
         ? String((body as { error: unknown }).error)
         : `Request failed (${res.status})`;
+    // Server-side faults get a reassuring global toast + a report; expected
+    // 4xx (validation, auth, not-found) are surfaced inline by the caller.
+    if (res.status >= 500) {
+      reportError(new Error(`${res.status} ${path}: ${message}`), { path, status: res.status });
+      emitToast({
+        kind: "error",
+        message: "Something went wrong on our end",
+        detail: "We’ve logged it and we’re looking into it. Please try again in a moment.",
+      });
+    }
     throw new ApiRequestError(res.status, message, (body as { details?: unknown })?.details);
   }
   return body as T;

@@ -22,6 +22,8 @@ import {
   Megaphone,
   Clapperboard,
   UsersRound,
+  ChevronRight,
+  LifeBuoy,
   Layers,
   Newspaper,
   Package,
@@ -118,6 +120,7 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/settings", label: "Settings", icon: Settings },
       { to: "/admin/team", label: "Team", icon: UsersRound },
+      { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },
     ],
   },
   {
@@ -126,6 +129,7 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/crm", label: "Customers", icon: HeartHandshake },
       { to: "/admin/crm/atlas", label: "Atlas", icon: Map },
+      { to: "/admin/feedback", label: "Support tickets", icon: LifeBuoy },
       { to: "/admin/platform", label: "Verto Shops", icon: Store },
     ],
   },
@@ -157,6 +161,26 @@ export function AdminLayout() {
   }, [menuOpen]);
 
   const superAdmin = Boolean(user?.superAdmin);
+  // Collapsible nav — closed by default, active section auto-opens, choices persist.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("verto_nav_open") || "{}") as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  });
+  const toggleSection = (title: string, active: boolean) => {
+    setOpenSections((s) => {
+      const current = s[title] ?? active;
+      const next = { ...s, [title]: !current };
+      try {
+        localStorage.setItem("verto_nav_open", JSON.stringify(next));
+      } catch {
+        /* private mode — non-fatal */
+      }
+      return next;
+    });
+  };
   const matches = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
@@ -193,33 +217,47 @@ export function AdminLayout() {
         </p>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {visibleSections(superAdmin).map((section) => (
-          <div key={section.title} className="mb-5">
-            <p className="mb-1.5 px-2 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/60">
-              {section.title}
-            </p>
-            <ul className="space-y-0.5">
-              {section.items.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    end={item.to === "/admin"}
-                    className={({ isActive }) =>
-                      `flex items-center gap-2.5 rounded px-2 py-2 text-[0.8rem] transition-colors lg:py-1.5 ${
-                        isActive
-                          ? "bg-chalk/15 text-chalk"
-                          : "text-chalk/65 hover:bg-chalk/8 hover:text-chalk"
-                      }`
-                    }
-                  >
-                    <item.icon size={15} strokeWidth={1.7} />
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        {visibleSections(superAdmin).map((section) => {
+          const active = section.items.some(
+            (i) => location.pathname === i.to || (i.to !== "/admin" && location.pathname.startsWith(i.to)),
+          );
+          const open = openSections[section.title] ?? active;
+          return (
+            <div key={section.title} className="mb-1.5">
+              <button
+                type="button"
+                onClick={() => toggleSection(section.title, active)}
+                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-[0.62rem] font-semibold uppercase tracking-wider text-chalk/60 hover:text-chalk"
+                aria-expanded={open}
+              >
+                <span>{section.title}</span>
+                <ChevronRight size={13} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+              </button>
+              {open && (
+                <ul className="mb-3 mt-0.5 space-y-0.5">
+                  {section.items.map((item) => (
+                    <li key={item.to}>
+                      <NavLink
+                        to={item.to}
+                        end={item.to === "/admin"}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2.5 rounded px-2 py-2 text-[0.8rem] transition-colors lg:py-1.5 ${
+                            isActive
+                              ? "bg-chalk/15 text-chalk"
+                              : "text-chalk/65 hover:bg-chalk/8 hover:text-chalk"
+                          }`
+                        }
+                      >
+                        <item.icon size={15} strokeWidth={1.7} />
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
       <div className="border-t border-chalk/10 px-5 py-4">
         <p className="truncate text-xs text-chalk/70">{user.email}</p>

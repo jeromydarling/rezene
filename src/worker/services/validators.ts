@@ -192,6 +192,21 @@ export const variantUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const feedbackCreateSchema = z.object({
+  kind: z.enum(["bug", "feature", "question"]).default("bug"),
+  title: z.string().min(3).max(200),
+  body: z.string().max(6000).nullable().optional(),
+  severity: z.enum(["low", "medium", "high"]).nullable().optional(),
+  pagePath: z.string().max(300).nullable().optional(),
+});
+
+export const feedbackUpdateSchema = z.object({
+  status: z.enum(["open", "in_progress", "resolved", "closed", "wont_fix"]).optional(),
+  adminNote: z.string().max(4000).nullable().optional(),
+  severity: z.enum(["low", "medium", "high"]).nullable().optional(),
+  kind: z.enum(["bug", "feature", "question"]).optional(),
+});
+
 export const collectionCreateSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),

@@ -1,5 +1,6 @@
 import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
+import { ToastProvider } from "./lib/toast";
 import { CartProvider } from "./lib/cart";
 import { BrandProvider } from "./lib/brand";
 import { LangProvider } from "./lib/lang";
@@ -20,6 +21,8 @@ import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { TeamPage } from "./pages/admin/TeamPage";
+import { SupportPage } from "./pages/admin/SupportPage";
+import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
 import { ProductsAdminPage, CollectionsAdminPage } from "./pages/admin/ProductsAdminPage";
@@ -69,6 +72,7 @@ function NotFoundPage() {
 
 export function AppRouter() {
   return (
+    <ToastProvider>
     <BrandProvider>
       <LangProvider>
       <AuthProvider>
@@ -147,7 +151,9 @@ export function AppRouter() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="team" element={<TeamPage />} />
+          <Route path="support" element={<SupportPage />} />
           <Route path="platform" element={<PlatformPage />} />
+          <Route path="feedback" element={<FeedbackInboxPage />} />
           <Route path="crm" element={<CrmPage />} />
           <Route path="crm/atlas" element={<CrmAtlasPage />} />
           <Route path="content/pages" element={<PagesEditorPage />} />
@@ -160,5 +166,6 @@ export function AppRouter() {
       </AuthProvider>
       </LangProvider>
     </BrandProvider>
+    </ToastProvider>
   );
 }
