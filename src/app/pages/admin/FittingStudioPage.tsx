@@ -5,7 +5,6 @@ import * as THREE from "three";
 import {
   GARMENT_LIBRARY,
   SIZE_STEPS,
-  SIZE_SCALE,
   FIT_PRESETS,
   DEFAULT_FIT,
   type BaseGarment,
@@ -13,6 +12,7 @@ import {
   type SizeStep,
 } from "../../../shared/garments";
 import { FABRIC_LIBRARY, type FabricRef } from "../../../shared/fabrics";
+import { buildGarment, buildMannequin, disposeGroup, fabricAppearance } from "../../lib/garmentGeometry";
 import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
@@ -20,146 +20,35 @@ import { useToast } from "../../lib/toast";
 import type { AdminStyle } from "../../../shared/types";
 
 // ---------------------------------------------------------------------------
-// Geometry: a stylized parametric silhouette (surface of revolution + tubes).
-// NOT a physics drape — a fast, asset-free preview of proportion, fit and
-// fabric. The real GarmentCode + Warp simulation is a later phase.
+// Viewer — builds the garment (and optional mannequin) via the shared geometry
+// module, so the live app matches the offline previews exactly. A stylized
+// proportion+fabric study, not a physics drape (that's a later phase).
 // ---------------------------------------------------------------------------
 
-const K = 0.01; // cm-ish → world units
-
-type Cyl = {
-  args: [number, number, number, number];
-  position: [number, number, number];
-  rotation: [number, number, number];
-};
-
-interface Parts {
-  profile: THREE.Vector2[] | null;
-  cylinders: Cyl[];
-}
-
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-function computeParts(g: BaseGarment, fit: FitConfig, weight: FabricRef["weight"]): Parts {
-  const s = SIZE_SCALE[fit.size];
-  // Heavier cloth holds structure (more flare); light/drapey cloth clings.
-  const flare = weight === "light" ? 0.9 : weight === "heavy" ? 1.12 : 1.0;
-  const chest = g.silhouette.chest * fit.ease * s;
-  const hem = g.silhouette.hem * Math.pow(fit.ease, 0.5) * s * flare;
-  const shoulder = (g.silhouette.shoulder || chest * 0.9) * fit.ease * s;
-  const len = g.silhouette.length * fit.length * s;
-  const sleeveLen = g.silhouette.sleeve * fit.sleeve * s;
-
-  const V = (r: number, y: number) => new THREE.Vector2(Math.max(r, 0.001) * K, y * K);
-  const cylinders: Cyl[] = [];
-  let profile: THREE.Vector2[] | null = null;
-
-  if (g.type === "pants") {
-    const waist = chest;
-    const inseam = g.silhouette.inseam * fit.length * s;
-    profile = [V(waist * 0.98, len), V(waist, len * 0.5), V(waist * 1.03, 0)];
-    const legTop = waist * 0.62;
-    const legBot = hem * 0.5;
-    const legX = waist * 0.5 * K;
-    for (const sign of [-1, 1]) {
-      cylinders.push({
-        args: [legTop * K, legBot * K, inseam * K, 24],
-        position: [sign * legX, -(inseam * 0.5) * K, 0],
-        rotation: [0, 0, sign * 0.03],
-      });
-    }
-  } else if (g.type === "skirt") {
-    profile = [V(chest, len), V(chest * 1.03, len * 0.72), V(lerp(chest, hem, 0.5), len * 0.36), V(hem, 0)];
-  } else {
-    // tops & dresses
-    const neck = chest * 0.42;
-    const waist = chest * 0.95;
-    profile = [
-      V(neck, len),
-      V(shoulder, len * 0.965),
-      V(chest, len * 0.8),
-      V(waist, len * 0.55),
-      V(lerp(waist, hem, 0.5), len * 0.3),
-      V(hem, 0),
-    ];
-    if (sleeveLen > 1 && g.silhouette.shoulder > 0) {
-      const topY = len * 0.95;
-      for (const sign of [-1, 1]) {
-        cylinders.push({
-          args: [chest * 0.34 * K, chest * 0.24 * K, sleeveLen * K, 20],
-          position: [sign * shoulder * 0.9 * K, (topY - sleeveLen * 0.42) * K, 0],
-          rotation: [0, 0, sign * (Math.PI / 2 - 0.55)],
-        });
-      }
-    }
-  }
-  return { profile, cylinders };
-}
-
-// Plain-language fabric → surface appearance. Colour is a sensible default the
-// user can override; roughness reads silk vs. fleece vs. denim.
-function fabricAppearance(f: FabricRef | undefined): { color: string; roughness: number } {
-  if (!f) return { color: "#b8b2a6", roughness: 0.7 };
-  const byId: Record<string, { color: string; roughness: number }> = {
-    "silk-charmeuse": { color: "#d9ccbe", roughness: 0.22 },
-    sateen: { color: "#cdbfd6", roughness: 0.35 },
-    "viscose-crepe": { color: "#c2b8a8", roughness: 0.5 },
-    linen: { color: "#c8bda2", roughness: 0.9 },
-    "cotton-linen": { color: "#cabfa6", roughness: 0.85 },
-    poplin: { color: "#e6e3dc", roughness: 0.6 },
-    denim: { color: "#3b5b7a", roughness: 0.85 },
-    "wool-suiting": { color: "#3a3a42", roughness: 0.7 },
-    "wool-cashmere": { color: "#6b6258", roughness: 0.75 },
-    "brushed-fleece": { color: "#6b7280", roughness: 0.95 },
-    "french-terry": { color: "#8b8578", roughness: 0.9 },
-    "cotton-jersey": { color: "#b9b3a6", roughness: 0.8 },
-    "organic-cotton-jersey": { color: "#b3ac9a", roughness: 0.8 },
-    "modal-jersey": { color: "#a9a29a", roughness: 0.55 },
-    twill: { color: "#7a6f57", roughness: 0.8 },
-    ponte: { color: "#4a4650", roughness: 0.7 },
-    "rib-knit": { color: "#9a9488", roughness: 0.8 },
-    "waffle-knit": { color: "#a59a86", roughness: 0.85 },
-  };
-  if (byId[f.id]) return byId[f.id];
-  const r = f.weight === "light" ? 0.5 : f.weight === "heavy" ? 0.9 : 0.7;
-  return { color: "#b8b2a6", roughness: r };
-}
-
-function GarmentModel({
+function GarmentScene({
   garment,
   fit,
   fabric,
   color,
+  showBody,
 }: {
   garment: BaseGarment;
   fit: FitConfig;
   fabric: FabricRef | undefined;
   color: string;
+  showBody: boolean;
 }) {
-  const parts = useMemo(
-    () => computeParts(garment, fit, fabric?.weight ?? "medium"),
-    [garment, fit, fabric?.weight],
-  );
-  const appearance = fabricAppearance(fabric);
-  const material = (
-    <meshStandardMaterial color={color} roughness={appearance.roughness} metalness={0} side={THREE.DoubleSide} />
-  );
+  const group = useMemo(() => {
+    const g = new THREE.Group();
+    if (showBody) g.add(buildMannequin());
+    g.add(buildGarment(garment, fit, fabric, color));
+    return g;
+  }, [garment, fit, fabric, color, showBody]);
+  // Dispose the previous group's geometries/materials when it's replaced.
+  useEffect(() => () => disposeGroup(group), [group]);
   return (
     <Center>
-      <group>
-        {parts.profile && (
-          <mesh>
-            <latheGeometry args={[parts.profile, 72]} />
-            {material}
-          </mesh>
-        )}
-        {parts.cylinders.map((c, i) => (
-          <mesh key={i} position={c.position} rotation={c.rotation}>
-            <cylinderGeometry args={c.args} />
-            {material}
-          </mesh>
-        ))}
-      </group>
+      <primitive object={group} />
     </Center>
   );
 }
@@ -170,26 +59,28 @@ function Viewer({
   fabric,
   color,
   spin,
+  showBody,
 }: {
   garment: BaseGarment;
   fit: FitConfig;
   fabric: FabricRef | undefined;
   color: string;
   spin: boolean;
+  showBody: boolean;
 }) {
   return (
-    <Canvas camera={{ position: [0, 0.15, 3], fov: 40 }} dpr={[1, 2]}>
+    <Canvas camera={{ position: [0, 0, 3.4], fov: 38 }} dpr={[1, 2]}>
       <color attach="background" args={["#f4f2ee"]} />
       <ambientLight intensity={0.65} />
       <hemisphereLight args={["#ffffff", "#b8b0a4", 0.5]} />
       <directionalLight position={[4, 6, 5]} intensity={1.2} />
       <directionalLight position={[-5, 2, -3]} intensity={0.35} />
-      <GarmentModel garment={garment} fit={fit} fabric={fabric} color={color} />
-      <ContactShadows position={[0, -1.05, 0]} opacity={0.35} scale={5} blur={2.4} far={3} />
+      <GarmentScene garment={garment} fit={fit} fabric={fabric} color={color} showBody={showBody} />
+      <ContactShadows position={[0, -1.1, 0]} opacity={0.35} scale={5} blur={2.4} far={3} />
       <OrbitControls
         enablePan={false}
         minDistance={1.6}
-        maxDistance={5}
+        maxDistance={6}
         autoRotate={spin}
         autoRotateSpeed={1.6}
         target={[0, 0, 0]}
@@ -221,6 +112,7 @@ export function FittingStudioPage() {
   const [color, setColor] = useState(fabricAppearance(fabric).color);
   const [fit, setFit] = useState<FitConfig>(DEFAULT_FIT);
   const [spin, setSpin] = useState(true);
+  const [showBody, setShowBody] = useState(true);
   const [styleId, setStyleId] = useState("");
   const [lookName, setLookName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -293,9 +185,14 @@ export function FittingStudioPage() {
         title="3D Fitting Room"
         description="Preview a base garment in 3D, dial in the fit, and drape it in a fabric. A fast, stylized proportion study — the physics-accurate drape lands in a later release."
         actions={
-          <button type="button" className="btn btn-secondary" onClick={() => setSpin((s) => !s)}>
-            {spin ? "Stop spin" : "Auto-spin"}
-          </button>
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowBody((b) => !b)}>
+              {showBody ? "Hide body" : "Show body"}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setSpin((s) => !s)}>
+              {spin ? "Stop spin" : "Auto-spin"}
+            </button>
+          </>
         }
       />
 
@@ -303,7 +200,7 @@ export function FittingStudioPage() {
         {/* Viewer */}
         <div className="overflow-hidden rounded-lg border border-ink/10 bg-[#f4f2ee]">
           <div className="h-[540px] w-full">
-            <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} />
+            <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} showBody={showBody} />
           </div>
           <div className="flex items-center justify-between border-t border-ink/10 bg-white/60 px-4 py-2 text-xs text-warmgrey">
             <span>
