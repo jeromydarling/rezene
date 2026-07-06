@@ -34,8 +34,12 @@ function mapSupplier(
     kind: row.kind as string,
     city: (row.city as string) ?? null,
     country: (row.country as string) ?? null,
+    address: (row.address as string) ?? null,
+    mapUrl: (row.map_url as string) ?? null,
     email: (row.email as string) ?? null,
+    phone: (row.phone as string) ?? null,
     whatsapp: (row.whatsapp as string) ?? null,
+    website: (row.website as string) ?? null,
     languages: jsonArray(row.languages),
     capabilities: jsonArray(row.capabilities),
     moqUnits: (row.moq_units as number) ?? null,
@@ -99,14 +103,16 @@ adminSupplierRoutes.post("/", requireAdminWrite, async (c) => {
   const id = newId("sup");
   await run(
     c.var.db,
-    `INSERT INTO suppliers (id, name, kind, city, country, email, phone, whatsapp, website,
+    `INSERT INTO suppliers (id, name, kind, city, country, address, map_url, email, phone, whatsapp, website,
        languages, capabilities, moq_units, lead_time_days, risk_notes, notes, is_verified)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     body.name,
     body.kind ?? "factory",
     body.city ?? null,
     body.country ?? null,
+    body.address ?? null,
+    body.mapUrl ?? null,
     body.email || null,
     body.phone ?? null,
     body.whatsapp ?? null,
@@ -136,6 +142,8 @@ adminSupplierRoutes.patch("/:id", requireAdminWrite, async (c) => {
     kind: "kind",
     city: "city",
     country: "country",
+    address: "address",
+    mapUrl: "map_url",
     email: "email",
     phone: "phone",
     whatsapp: "whatsapp",
@@ -168,6 +176,45 @@ adminSupplierRoutes.patch("/:id", requireAdminWrite, async (c) => {
   await run(c.var.db, `UPDATE suppliers SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
   await writeAudit(c.var.db, c.var.userId, "supplier.update", "supplier", id, body);
   return c.json(await loadSupplier(c.var.db, id));
+});
+
+adminSupplierRoutes.delete("/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first<{ name: string }>(
+    c.var.db,
+    `SELECT name FROM suppliers WHERE id = ?`,
+    id,
+  );
+  if (!existing) return c.json({ error: "Supplier not found" }, 404);
+
+  // production_orders references suppliers ON DELETE RESTRICT — don't silently
+  // fail (or orphan a live PO). Block with a clear message so the merchant
+  // deals with the order first rather than losing the paper trail.
+  const po = await first<{ n: number }>(
+    c.var.db,
+    `SELECT COUNT(*) AS n FROM production_orders WHERE supplier_id = ?`,
+    id,
+  );
+  if (po && po.n > 0) {
+    return c.json(
+      {
+        error: `${existing.name} has ${po.n} production order${po.n === 1 ? "" : "s"}. Close or reassign those first — keeping the maker preserves that history.`,
+        code: "supplier_has_orders",
+      },
+      409,
+    );
+  }
+
+  // Children with ON DELETE CASCADE / SET NULL clean themselves up when FKs are
+  // enforced; remove the CRM children explicitly so it works either way.
+  await run(c.var.db, `DELETE FROM supplier_interactions WHERE supplier_id = ?`, id);
+  await run(c.var.db, `DELETE FROM supplier_contacts WHERE supplier_id = ?`, id);
+  await run(c.var.db, `DELETE FROM factories WHERE supplier_id = ?`, id);
+  await run(c.var.db, `DELETE FROM suppliers WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "supplier.delete", "supplier", id, {
+    name: existing.name,
+  });
+  return c.json({ ok: true });
 });
 
 adminSupplierRoutes.post("/:id/interactions", requireAdminWrite, async (c) => {

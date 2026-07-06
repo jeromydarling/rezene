@@ -26,8 +26,9 @@ interface SupplierDetail extends AdminSupplier {
 }
 
 export function SuppliersPage() {
-  const { data, loading, error } = useFetch<AdminSupplier[]>("/api/admin/suppliers");
+  const { data, loading, error, reload } = useFetch<AdminSupplier[]>("/api/admin/suppliers");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   return (
     <div>
@@ -35,6 +36,11 @@ export function SuppliersPage() {
         eyebrow="Production"
         title="Factories & Suppliers"
         description="Your maker network. Leads marked 'unverified' are AI-researched — confirm details before committing production."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+            + New supplier
+          </button>
+        }
       />
       <ExportIntelPanel suppliers={data ?? []} />
       {error && <ErrorNote message={error} />}
@@ -104,16 +110,44 @@ export function SuppliersPage() {
         title="Supplier profile"
         onClose={() => setSelectedId(null)}
       >
-        {selectedId && <SupplierDetailPanel id={selectedId} />}
+        {selectedId && (
+          <SupplierDetailPanel
+            id={selectedId}
+            onChanged={reload}
+            onDeleted={() => {
+              setSelectedId(null);
+              reload();
+            }}
+          />
+        )}
+      </SlideOver>
+      <SlideOver open={creating} title="New supplier" onClose={() => setCreating(false)}>
+        <SupplierForm
+          onSaved={() => {
+            setCreating(false);
+            reload();
+          }}
+          onCancel={() => setCreating(false)}
+        />
       </SlideOver>
     </div>
   );
 }
 
-function SupplierDetailPanel({ id }: { id: string }) {
+function SupplierDetailPanel({
+  id,
+  onChanged,
+  onDeleted,
+}: {
+  id: string;
+  onChanged?: () => void;
+  onDeleted?: () => void;
+}) {
   const { data, loading, error, reload } = useFetch<SupplierDetail>(`/api/admin/suppliers/${id}`);
   const [verifying, setVerifying] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function toggleVerified() {
     if (!data) return;
@@ -121,8 +155,29 @@ function SupplierDetailPanel({ id }: { id: string }) {
     try {
       await api.patch(`/api/admin/suppliers/${id}`, { isVerified: !data.isVerified });
       reload();
+      onChanged?.();
     } finally {
       setVerifying(false);
+    }
+  }
+
+  async function remove() {
+    if (!data) return;
+    if (
+      !window.confirm(
+        `Remove ${data.name}? This deletes the profile and its interaction log. Suppliers with production orders are kept.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete(`/api/admin/suppliers/${id}`);
+      onDeleted?.();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Couldn't remove this supplier.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -151,6 +206,26 @@ function SupplierDetailPanel({ id }: { id: string }) {
   if (error) return <ErrorNote message={error} />;
   if (!data) return null;
 
+  if (editing) {
+    return (
+      <SupplierForm
+        supplier={data}
+        onSaved={() => {
+          setEditing(false);
+          reload();
+          onChanged?.();
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  }
+
+  const mapHref =
+    data.mapUrl ||
+    (data.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${data.name} ${data.address}`)}`
+      : null);
+
   return (
     <div className="space-y-6 text-sm">
       <div>
@@ -161,18 +236,33 @@ function SupplierDetailPanel({ id }: { id: string }) {
               {[data.city, data.country].filter(Boolean).join(", ")} · {titleCase(data.kind)}
             </p>
           </div>
-          <button
-            type="button"
-            className={`shrink-0 rounded-full border px-3 py-1 text-xs transition ${
-              data.isVerified
-                ? "border-palm/40 bg-palm/10 text-palm hover:bg-palm/20"
-                : "border-navy bg-navy text-chalk hover:bg-navy/90"
-            }`}
-            disabled={verifying}
-            onClick={() => void toggleVerified()}
-          >
-            {verifying ? "Saving…" : data.isVerified ? "✓ Verified — undo" : "Mark verified"}
-          </button>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                data.isVerified
+                  ? "border-palm/40 bg-palm/10 text-palm hover:bg-palm/20"
+                  : "border-navy bg-navy text-chalk hover:bg-navy/90"
+              }`}
+              disabled={verifying}
+              onClick={() => void toggleVerified()}
+            >
+              {verifying ? "Saving…" : data.isVerified ? "✓ Verified — undo" : "Mark verified"}
+            </button>
+            <div className="flex gap-3 text-xs">
+              <button type="button" className="link-quiet" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+              <button
+                type="button"
+                className="text-terracotta hover:underline disabled:opacity-50"
+                disabled={deleting}
+                onClick={() => void remove()}
+              >
+                {deleting ? "Removing…" : "Remove"}
+              </button>
+            </div>
+          </div>
         </div>
         {!data.isVerified && (
           <p className="mt-2 rounded bg-saffron/15 px-3 py-2 text-xs text-bark">
@@ -181,14 +271,65 @@ function SupplierDetailPanel({ id }: { id: string }) {
         )}
       </div>
 
+      {(data.address || data.email || data.phone || data.whatsapp || data.website) && (
+        <div className="space-y-1.5 rounded-lg border border-ink/8 p-3">
+          <h4 className="text-[0.68rem] font-semibold uppercase tracking-wider text-warmgrey">Contact</h4>
+          {data.address && (
+            <p className="text-ink/85">
+              {data.address}
+              {mapHref && (
+                <>
+                  {" "}
+                  <a href={mapHref} target="_blank" rel="noreferrer" className="text-navy hover:underline">
+                    map ↗
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {data.phone && (
+              <a href={`tel:${data.phone.replace(/[^+\d]/g, "")}`} className="text-navy hover:underline">
+                📞 {data.phone}
+              </a>
+            )}
+            {data.whatsapp && (
+              <a
+                href={`https://wa.me/${data.whatsapp.replace(/[^\d]/g, "")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-navy hover:underline"
+              >
+                WhatsApp {data.whatsapp}
+              </a>
+            )}
+            {data.email && (
+              <a href={`mailto:${data.email}`} className="text-navy hover:underline">
+                ✉ {data.email}
+              </a>
+            )}
+            {data.website && (
+              <a
+                href={data.website.startsWith("http") ? data.website : `https://${data.website}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-navy hover:underline"
+              >
+                {data.website.replace(/^https?:\/\//, "")} ↗
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <dl className="grid grid-cols-2 gap-3">
         {[
-          ["Email", data.email],
-          ["WhatsApp", data.whatsapp],
           ["MOQ", data.moqUnits ? `${data.moqUnits} units` : null],
           ["Lead time", data.leadTimeDays ? `${data.leadTimeDays} days` : null],
           ["Languages", data.languages.join(", ") || null],
+          ["Capabilities", data.capabilities.map(titleCase).join(", ") || null],
           ["On-time score", data.onTimeScore?.toFixed(1) ?? null],
+          ["Quality score", data.qualityScore?.toFixed(1) ?? null],
         ]
           .filter(([, v]) => v)
           .map(([k, v]) => (
@@ -310,6 +451,173 @@ function SupplierDetailPanel({ id }: { id: string }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- Create / edit form ----------
+const SUPPLIER_KINDS = ["factory", "fabric_mill", "trim_supplier", "service", "logistics"] as const;
+
+function SupplierForm({
+  supplier,
+  onSaved,
+  onCancel,
+}: {
+  supplier?: AdminSupplier;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: supplier?.name ?? "",
+    kind: supplier?.kind ?? "factory",
+    city: supplier?.city ?? "",
+    country: supplier?.country ?? "",
+    address: supplier?.address ?? "",
+    phone: supplier?.phone ?? "",
+    whatsapp: supplier?.whatsapp ?? "",
+    email: supplier?.email ?? "",
+    website: supplier?.website ?? "",
+    moqUnits: supplier?.moqUnits != null ? String(supplier.moqUnits) : "",
+    leadTimeDays: supplier?.leadTimeDays != null ? String(supplier.leadTimeDays) : "",
+    capabilities: (supplier?.capabilities ?? []).join(", "),
+    languages: (supplier?.languages ?? []).join(", "),
+    notes: supplier?.notes ?? "",
+    isVerified: supplier?.isVerified ?? false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  const toList = (s: string) =>
+    s
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+  async function save() {
+    if (!form.name.trim()) {
+      setError("A name is required.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const payload = {
+      name: form.name.trim(),
+      kind: form.kind,
+      city: form.city.trim() || undefined,
+      country: form.country.trim() || undefined,
+      address: form.address.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      whatsapp: form.whatsapp.trim() || undefined,
+      email: form.email.trim() || "",
+      website: form.website.trim() || undefined,
+      moqUnits: form.moqUnits.trim() ? Number(form.moqUnits) : null,
+      leadTimeDays: form.leadTimeDays.trim() ? Number(form.leadTimeDays) : null,
+      capabilities: toList(form.capabilities),
+      languages: toList(form.languages),
+      notes: form.notes.trim() || undefined,
+      isVerified: form.isVerified,
+    };
+    try {
+      if (supplier) await api.patch(`/api/admin/suppliers/${supplier.id}`, payload);
+      else await api.post("/api/admin/suppliers", payload);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Couldn't save this supplier.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const input = "input";
+  return (
+    <div className="space-y-3 text-sm">
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Name *</span>
+        <input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Atelier name" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Kind</span>
+        <select className={input} value={form.kind} onChange={(e) => set("kind", e.target.value)}>
+          {SUPPLIER_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {titleCase(k)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">City</span>
+          <input className={input} value={form.city} onChange={(e) => set("city", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Country</span>
+          <input className={input} value={form.country} onChange={(e) => set("country", e.target.value)} />
+        </label>
+      </div>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Street address</span>
+        <input className={input} value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="Full postal address" />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Phone</span>
+          <input className={input} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+212 …" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">WhatsApp</span>
+          <input className={input} value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Email</span>
+          <input className={input} value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="hello@…" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Website</span>
+          <input className={input} value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="example.com" />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">MOQ (units)</span>
+          <input className={input} inputMode="numeric" value={form.moqUnits} onChange={(e) => set("moqUnits", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-warmgrey">Lead time (days)</span>
+          <input className={input} inputMode="numeric" value={form.leadTimeDays} onChange={(e) => set("leadTimeDays", e.target.value)} />
+        </label>
+      </div>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Capabilities</span>
+        <input className={input} value={form.capabilities} onChange={(e) => set("capabilities", e.target.value)} placeholder="tailoring, small_batch, knitwear (comma-separated)" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Languages</span>
+        <input className={input} value={form.languages} onChange={(e) => set("languages", e.target.value)} placeholder="fr, ar, en (comma-separated)" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-warmgrey">Notes</span>
+        <textarea className={input} rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+      </label>
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={form.isVerified} onChange={(e) => set("isVerified", e.target.checked)} />
+        Mark as a verified maker (you've confirmed capabilities & terms)
+      </label>
+      {error && <p className="field-error">{error}</p>}
+      <div className="flex gap-2 pt-1">
+        <button type="button" className="btn btn-primary flex-1" disabled={saving} onClick={() => void save()}>
+          {saving ? "Saving…" : supplier ? "Save changes" : "Add supplier"}
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

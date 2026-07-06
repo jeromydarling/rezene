@@ -302,8 +302,12 @@ export interface AdminSupplier {
   kind: string;
   city: string | null;
   country: string | null;
+  address: string | null;
+  mapUrl: string | null;
   email: string | null;
+  phone: string | null;
   whatsapp: string | null;
+  website: string | null;
   languages: string[];
   capabilities: string[];
   moqUnits: number | null;

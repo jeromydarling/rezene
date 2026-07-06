@@ -69,8 +69,11 @@ interface MakerLead {
   name: string;
   city?: string | null;
   country?: string | null;
+  address?: string | null;
   website?: string | null;
   email?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
   specialties?: string[];
   moqUnits?: number | null;
   leadTimeDays?: number | null;
@@ -99,9 +102,9 @@ adminSourcingRoutes.post("/search", requireAdminWrite, async (c) => {
   try {
     const research = await perplexityResearch(c.env, {
       system:
-        "You are a fashion production sourcing scout. Find REAL, currently-operating clothing manufacturers, tailors, ateliers and small cut-and-sew studios that match the brief. Favor makers that take small/low-MOQ orders and emerging brands. Only include makers you can find evidence for. Respond with ONLY a JSON array (no prose) of up to 8 objects: {\"name\":\"\",\"city\":\"\",\"country\":\"\",\"website\":\"\",\"email\":null,\"specialties\":[\"\"],\"moqUnits\":null,\"leadTimeDays\":null,\"whyFit\":\"one sentence\"}. Use null when unknown.",
+        "You are a fashion production sourcing scout. Find REAL, currently-operating clothing manufacturers, tailors, ateliers and small cut-and-sew studios that match the brief. Favor makers that take small/low-MOQ orders and emerging brands. Only include makers you can find evidence for. For each maker, look up its FULL CONTACT DETAILS — street address, phone number, WhatsApp, and email — from its website, business listings, or directories, and include whatever you can verify. Respond with ONLY a JSON array (no prose) of up to 8 objects: {\"name\":\"\",\"city\":\"\",\"country\":\"\",\"address\":\"full street address if found, else null\",\"website\":\"\",\"email\":null,\"phone\":\"international format if found, else null\",\"whatsapp\":null,\"specialties\":[\"\"],\"moqUnits\":null,\"leadTimeDays\":null,\"whyFit\":\"one sentence\"}. Use null when a field is genuinely unknown — never invent a phone number or address.",
       prompt: `Find garment makers for this brief:\n${wants}`,
-      maxTokens: 1800,
+      maxTokens: 2600,
     });
     citations = research.citations;
     const { parseModelJson } = await import("../services/anthropic");
@@ -122,8 +125,11 @@ adminSourcingRoutes.post("/search", requireAdminWrite, async (c) => {
       name: String(l.name).slice(0, 200),
       city: l.city ?? null,
       country: l.country ?? null,
+      address: l.address ? String(l.address).slice(0, 400) : null,
       website: l.website ?? null,
       email: l.email ?? null,
+      phone: l.phone ? String(l.phone).slice(0, 40) : null,
+      whatsapp: l.whatsapp ? String(l.whatsapp).slice(0, 40) : null,
       specialties: Array.isArray(l.specialties) ? l.specialties.slice(0, 12).map((s) => String(s).slice(0, 60)) : [],
       moqUnits: typeof l.moqUnits === "number" ? l.moqUnits : null,
       leadTimeDays: typeof l.leadTimeDays === "number" ? l.leadTimeDays : null,
@@ -149,13 +155,16 @@ adminSourcingRoutes.post("/add", requireAdminWrite, async (c) => {
   ].filter(Boolean);
   await run(
     c.var.db,
-    `INSERT INTO suppliers (id, name, kind, city, country, email, website, capabilities, moq_units, lead_time_days, is_verified, notes)
-     VALUES (?, ?, 'factory', ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    `INSERT INTO suppliers (id, name, kind, city, country, address, email, phone, whatsapp, website, capabilities, moq_units, lead_time_days, is_verified, notes)
+     VALUES (?, ?, 'factory', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
     id,
     body.name,
     body.city ?? null,
     body.country ?? null,
+    body.address ?? null,
     body.email ?? null,
+    body.phone ?? null,
+    body.whatsapp ?? null,
     body.website ?? null,
     JSON.stringify(body.specialties ?? []),
     body.moqUnits ?? null,

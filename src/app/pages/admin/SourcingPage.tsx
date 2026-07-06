@@ -14,8 +14,11 @@ interface MakerLead {
   name: string;
   city: string | null;
   country: string | null;
+  address: string | null;
   website: string | null;
   email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
   specialties: string[];
   moqUnits: number | null;
   leadTimeDays: number | null;
@@ -133,6 +136,44 @@ export function SourcingPage() {
                     </span>
                   ))}
                 </div>
+              )}
+              {(lead.address || lead.phone || lead.whatsapp || lead.email) && (
+                <dl className="mt-3 grid grid-cols-1 gap-1.5 border-t border-ink/8 pt-3 text-xs sm:grid-cols-2">
+                  {lead.address && (
+                    <div className="sm:col-span-2">
+                      <dt className="font-semibold uppercase tracking-wider text-warmgrey">Address</dt>
+                      <dd className="text-ink/80">
+                        {lead.address}{" "}
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lead.name} ${lead.address}`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-navy hover:underline"
+                        >
+                          map ↗
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  {lead.phone && (
+                    <div>
+                      <dt className="font-semibold uppercase tracking-wider text-warmgrey">Phone</dt>
+                      <dd><a href={`tel:${lead.phone.replace(/[^+\d]/g, "")}`} className="text-navy hover:underline">{lead.phone}</a></dd>
+                    </div>
+                  )}
+                  {lead.whatsapp && (
+                    <div>
+                      <dt className="font-semibold uppercase tracking-wider text-warmgrey">WhatsApp</dt>
+                      <dd><a href={`https://wa.me/${lead.whatsapp.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer" className="text-navy hover:underline">{lead.whatsapp}</a></dd>
+                    </div>
+                  )}
+                  {lead.email && (
+                    <div>
+                      <dt className="font-semibold uppercase tracking-wider text-warmgrey">Email</dt>
+                      <dd><a href={`mailto:${lead.email}`} className="text-navy hover:underline">{lead.email}</a></dd>
+                    </div>
+                  )}
+                </dl>
               )}
               {lead.website && (
                 <a href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-navy hover:underline">
