@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
@@ -162,6 +162,31 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
   const [checklist, setChecklist] = useState<Record<string, boolean>>(brain.checklist ?? {});
   const [compiling, setCompiling] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped whenever answers are set programmatically (LLM fill), so the
+  // uncontrolled inputs remount and show the new values.
+  const [fillVersion, setFillVersion] = useState(0);
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [assisting, setAssisting] = useState<Record<string, boolean>>({});
+
+  async function assistSection(sectionId: string) {
+    setAssisting((s) => ({ ...s, [sectionId]: true }));
+    try {
+      const res = await api.post<{ answers: Record<string, unknown>; explanation: string | null }>(
+        "/api/admin/brain/assist-section",
+        { sectionId },
+      );
+      if (res.answers && Object.keys(res.answers).length) {
+        setAnswers((a) => ({ ...a, ...res.answers }));
+        setFillVersion((v) => v + 1);
+      }
+      if (res.explanation) setExplanations((e) => ({ ...e, [sectionId]: res.explanation as string }));
+      toast.success("Filled that in for you", "Review the numbers — they're a solid starting point you can adjust.");
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Couldn't fill that in");
+    } finally {
+      setAssisting((s) => ({ ...s, [sectionId]: false }));
+    }
+  }
 
   const filledCount = useMemo(
     () => Object.values(answers).filter((v) => (Array.isArray(v) ? v.length : String(v ?? "").trim())).length,
@@ -181,8 +206,8 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
   }
 
   function mergeAnswers(incoming: Record<string, unknown>) {
-    const merged = { ...answers, ...incoming };
-    setAnswers(merged);
+    setAnswers((a) => ({ ...a, ...incoming }));
+    setFillVersion((v) => v + 1);
     void api.put("/api/admin/brain", { answers: incoming }).catch(() => {});
     const n = Object.keys(incoming).length;
     toast.success(`Filled ${n} field${n === 1 ? "" : "s"}`, "Review and tweak anything — it's all yours to edit.");
@@ -227,9 +252,27 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
             <div className="space-y-5">
               {part.sections.map((section) => (
                 <div key={section.id} className="admin-card p-4">
-                  <h3 className="text-sm font-semibold">{section.title}</h3>
-                  {section.intro && <p className="mt-0.5 text-xs text-warmgrey">{section.intro}</p>}
-                  <div className="mt-3 grid gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">{section.title}</h3>
+                      {section.intro && <p className="mt-0.5 text-xs text-warmgrey">{section.intro}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-full border border-navy/25 bg-navy/[0.04] px-2.5 py-1 text-[11px] font-medium text-navy transition hover:bg-navy/10 disabled:opacity-50"
+                      disabled={assisting[section.id]}
+                      onClick={() => void assistSection(section.id)}
+                      title="Let Verto research and fill this section in for you, in plain English"
+                    >
+                      {assisting[section.id] ? "Working…" : "✨ Fill this in for me"}
+                    </button>
+                  </div>
+                  {explanations[section.id] && (
+                    <div className="mt-2 rounded-lg border border-palm/25 bg-palm/[0.06] px-3 py-2 text-xs text-ink/80">
+                      <span className="mr-1">💬</span>{explanations[section.id]}
+                    </div>
+                  )}
+                  <div className="mt-3 grid gap-3" key={fillVersion}>
                     {section.fields.map((f) => (
                       <FieldInput
                         key={f.id}
@@ -282,6 +325,9 @@ function FieldInput({
       {field.help && <span className="ml-1 font-normal text-warmgrey/70">— {field.help}</span>}
     </span>
   );
+  if (field.type === "images") {
+    return <ImagesField label={label} value={value} onCommit={onCommit} />;
+  }
   if (field.type === "select") {
     return (
       <label className="block">
@@ -335,6 +381,85 @@ function FieldInput({
         onBlur={(e) => { onChange(e.target.value); onCommit(e.target.value); }}
       />
     </label>
+  );
+}
+
+interface RefImage {
+  id: string;
+  url: string;
+  name: string;
+}
+
+function ImagesField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: ReactNode;
+  value: unknown;
+  onCommit: (v: unknown) => void;
+}) {
+  const toast = useToast();
+  const images: RefImage[] = Array.isArray(value) ? (value as RefImage[]) : [];
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function upload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    try {
+      const added: RefImage[] = [];
+      for (const file of Array.from(files).slice(0, 20)) {
+        if (!file.type.startsWith("image/")) continue;
+        const form = new FormData();
+        form.set("file", file);
+        form.set("entityType", "brand");
+        form.set("isPublic", "true");
+        const res = await api.upload<{ id: string; filename: string }>("/api/admin/files/upload", form);
+        added.push({ id: res.id, url: `/media/${res.id}`, name: res.filename });
+      }
+      if (added.length) onCommit([...images, ...added]);
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+  function remove(id: string) {
+    onCommit(images.filter((i) => i.id !== id));
+  }
+
+  return (
+    <div className="block">
+      {label}
+      {images.length > 0 && (
+        <div className="mb-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {images.map((img) => (
+            <div key={img.id} className="group relative aspect-square overflow-hidden rounded-md border border-ink/10 bg-cream">
+              <img src={img.url} alt={img.name} className="h-full w-full object-cover" loading="lazy" />
+              <button
+                type="button"
+                onClick={() => remove(img.id)}
+                className="absolute right-0.5 top-0.5 hidden rounded-full bg-ink/70 px-1.5 text-xs text-chalk group-hover:block"
+                aria-label="Remove image"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void upload(e.target.files)} />
+      <button
+        type="button"
+        className="rounded-md border border-dashed border-ink/25 px-3 py-2 text-xs text-warmgrey transition hover:border-navy hover:text-navy disabled:opacity-50"
+        disabled={busy}
+        onClick={() => fileRef.current?.click()}
+      >
+        {busy ? "Uploading…" : images.length ? "+ Add more references" : "📷 Upload reference images"}
+      </button>
+    </div>
   );
 }
 

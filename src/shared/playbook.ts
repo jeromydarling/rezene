@@ -6,7 +6,7 @@
  * Brand Brain.
  */
 
-export type PbFieldType = "text" | "textarea" | "list" | "select";
+export type PbFieldType = "text" | "textarea" | "list" | "select" | "images";
 
 export interface PbField {
   id: string;
@@ -73,6 +73,7 @@ export const PLAYBOOK: PbPart[] = [
         title: "Visual identity",
         intro: "Brief the look before you commission it.",
         fields: [
+          { id: "brand.moodboard", label: "Mood board & references", type: "images", help: "Upload 6–20 images that capture the world of the brand — these also feed the Design Studio.", seeds: "studio" },
           { id: "brand.palette", label: "Colour palette", type: "list", placeholder: "3–5 core colours (hex / Pantone)" },
           { id: "brand.type", label: "Typography direction", type: "text", placeholder: "e.g. elegant French serif + clean grotesk" },
         ],

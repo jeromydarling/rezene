@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { first, run, writeAudit } from "../services/db";
 import { requireAdminWrite } from "../middleware/auth";
 import { reserveResearchQuota, quotaExceededBody } from "../services/ai-quota";
-import { PLAYBOOK_FIELDS } from "../../shared/playbook";
+import { PLAYBOOK, PLAYBOOK_FIELDS } from "../../shared/playbook";
 import type { AppContext } from "../types/env";
 
 /**
@@ -51,9 +51,9 @@ function serialize(row: BrainRow) {
   };
 }
 
-const FIELD_MANIFEST = PLAYBOOK_FIELDS.map(
-  (f) => `${f.id} — ${f.label}${f.type === "list" ? " (list of short strings)" : ""}`,
-).join("\n");
+const FIELD_MANIFEST = PLAYBOOK_FIELDS.filter((f) => f.type !== "images")
+  .map((f) => `${f.id} — ${f.label}${f.type === "list" ? " (list of short strings)" : ""}`)
+  .join("\n");
 
 adminBrainRoutes.get("/", async (c) => {
   const row = await loadBrain(c.var.db);
@@ -124,6 +124,83 @@ adminBrainRoutes.post("/generate", requireAdminWrite, async (c) => {
   }
 });
 
+/**
+ * The "invisible business admin": fill in ONE section for the founder using the
+ * context they've already given, and explain it in plain language. This is what
+ * lets a new brand skip researching tariffs, landed cost, and margins — Verto
+ * fills the technical sections and tells them what the numbers mean.
+ */
+adminBrainRoutes.post("/assist-section", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { sectionId?: string };
+  const section = PLAYBOOK.flatMap((p) => p.sections).find((s) => s.id === body.sectionId);
+  if (!section) return c.json({ error: "Unknown section." }, 400);
+
+  const row = await loadBrain(c.var.db);
+  const answers = safeParse(row.answers_json);
+  const contextText = PLAYBOOK_FIELDS.filter(
+    (f) => f.type !== "images" && answers[f.id] != null && answers[f.id] !== "",
+  )
+    .map((f) => `${f.label}: ${Array.isArray(answers[f.id]) ? (answers[f.id] as string[]).join(", ") : answers[f.id]}`)
+    .join("\n");
+  const sectionManifest = section.fields
+    .filter((f) => f.type !== "images")
+    .map((f) => `${f.id} — ${f.label}${f.type === "list" ? " (list of short strings)" : ""}${f.type === "select" && f.options ? ` (one of: ${f.options.join(", ")})` : ""}`)
+    .join("\n");
+
+  const system = `You are the invisible business admin for a launching clothing brand — an expert who quietly handles the parts a first-time founder shouldn't have to research (tariffs, landed cost, margins, sourcing regions). Fill in the "${section.title}" section for them using everything they've already told you. Respond with ONLY a JSON object: {"answers":{fieldId:value,...},"explanation":"2-4 short sentences, warm and plain-English (no jargon), explaining what these values mean for their costs, margins, and launch — like a smart friend who's done this before"}. Use current, realistic benchmarks (price is typically 5-8x unit cost for DTC; DTC gross margin 70-85%). Only include fields from this list, and use a value from the allowed options where given:\n${sectionManifest}`;
+  const prompt = `What they've told me so far:\n${contextText || "(not much yet — infer sensible defaults for an emerging brand)"}\n\nFill in the "${section.title}" section.`;
+
+  try {
+    const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
+    let text: string;
+    if (perplexityConfigured(c.env)) {
+      const quota = await reserveResearchQuota(c);
+      if (!quota.ok) return c.json(quotaExceededBody(quota), 429);
+      text = (await perplexityResearch(c.env, { system, prompt, maxTokens: 1400 })).text;
+    } else {
+      const { aiComplete } = await import("../services/ai");
+      text = (await aiComplete(c.env, { system, prompt, maxTokens: 1400 })).text;
+    }
+    const { answers: rawAnswers, explanation } = parseAssist(text);
+    // Keep only this section's fields, dropping blanks.
+    const sectionFieldIds = new Set(section.fields.map((f) => f.id));
+    const scoped: Record<string, unknown> = {};
+    if (rawAnswers && typeof rawAnswers === "object") {
+      for (const [k, v] of Object.entries(rawAnswers as Record<string, unknown>)) {
+        if (sectionFieldIds.has(k) && v != null && v !== "") scoped[k] = v;
+      }
+    }
+
+    if (Object.keys(scoped).length) {
+      await run(
+        c.var.db,
+        `UPDATE brand_brain SET answers_json = ?, updated_at = datetime('now') WHERE id = 'brain'`,
+        JSON.stringify({ ...answers, ...scoped }),
+      );
+    }
+    return c.json({ answers: scoped, explanation });
+  } catch (err) {
+    return c.json({ error: `Couldn't fill that in: ${String(err).slice(0, 160)}` }, 502);
+  }
+});
+
+/** Pull {answers, explanation} out of a model response, tolerant of prose. */
+function parseAssist(text: string): { answers: unknown; explanation: string | null } {
+  const start = text.search(/\{/);
+  if (start !== -1) {
+    try {
+      const obj = JSON.parse(text.slice(start, text.lastIndexOf("}") + 1)) as {
+        answers?: unknown;
+        explanation?: string;
+      };
+      return { answers: obj.answers ?? {}, explanation: obj.explanation ?? null };
+    } catch {
+      /* fall through */
+    }
+  }
+  return { answers: {}, explanation: null };
+}
+
 /** Parse a pasted / PDF-extracted launch plan into the Playbook fields. */
 adminBrainRoutes.post("/parse", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { text?: string };
@@ -147,7 +224,9 @@ adminBrainRoutes.post("/compile", requireAdminWrite, async (c) => {
     return c.json({ error: "Fill in some of the Playbook first." }, 400);
   }
   const { aiComplete } = await import("../services/ai");
-  const answersText = PLAYBOOK_FIELDS.filter((f) => answers[f.id] != null && answers[f.id] !== "")
+  const answersText = PLAYBOOK_FIELDS.filter(
+    (f) => f.type !== "images" && answers[f.id] != null && answers[f.id] !== "",
+  )
     .map((f) => `${f.label}: ${Array.isArray(answers[f.id]) ? (answers[f.id] as string[]).join(", ") : answers[f.id]}`)
     .join("\n");
 
