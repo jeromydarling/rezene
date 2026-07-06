@@ -97,6 +97,14 @@ admin3dRoutes.patch("/projects/:id", requireAdminWrite, async (c) => {
   return c.json({ ok: true });
 });
 
+admin3dRoutes.delete("/projects/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const result = await run(c.var.db, `DELETE FROM clo3d_projects WHERE id = ?`, id);
+  if (!result.meta.changes) return c.json({ error: "Project not found" }, 404);
+  await writeAudit(c.var.db, c.var.userId, "clo3d_project.delete", "clo3d_project", id, {});
+  return c.json({ ok: true });
+});
+
 /** File a sample-revision task from a fit issue found in simulation. */
 admin3dRoutes.post("/projects/:id/fit-issue-task", requireAdminWrite, async (c) => {
   const id = c.req.param("id");

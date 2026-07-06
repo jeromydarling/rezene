@@ -69,12 +69,27 @@ adminFileRoutes.get("/", async (c) => {
 
 /** Update file metadata (currently: alt text for the media library). */
 adminFileRoutes.patch("/:id", requireAdminWrite, async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { altText?: string | null };
-  if (body.altText === undefined) return c.json({ error: "Nothing to update" }, 400);
+  const body = (await c.req.json().catch(() => ({}))) as {
+    altText?: string | null;
+    filename?: string;
+  };
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  if (body.altText !== undefined) {
+    sets.push(`alt_text = ?`);
+    params.push(body.altText ? String(body.altText).slice(0, 300) : null);
+  }
+  if (body.filename !== undefined) {
+    const name = String(body.filename).trim().slice(0, 255);
+    if (!name) return c.json({ error: "Filename can't be empty" }, 400);
+    sets.push(`filename = ?`);
+    params.push(name);
+  }
+  if (sets.length === 0) return c.json({ error: "Nothing to update" }, 400);
   const result = await run(
     c.var.db,
-    `UPDATE files SET alt_text = ? WHERE id = ?`,
-    body.altText ? String(body.altText).slice(0, 300) : null,
+    `UPDATE files SET ${sets.join(", ")} WHERE id = ?`,
+    ...params,
     c.req.param("id"),
   );
   if (!result.meta.changes) return c.json({ error: "File not found" }, 404);

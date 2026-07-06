@@ -37,6 +37,16 @@ export function SamplesPage() {
     reload();
   }
 
+  async function del(sample: AdminSample) {
+    if (!window.confirm(`Delete this ${sample.kind.toUpperCase()} sample for ${sample.styleName}?`)) return;
+    try {
+      await api.delete(`/api/admin/production/samples/${sample.id}`);
+      reload();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Couldn't delete.");
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -66,6 +76,7 @@ export function SamplesPage() {
                 <th>Requested</th>
                 <th>Status</th>
                 <th>Notes</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -90,6 +101,11 @@ export function SamplesPage() {
                     </select>
                   </td>
                   <td className="max-w-xs truncate text-xs text-warmgrey">{s.notes ?? "—"}</td>
+                  <td className="text-right">
+                    <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void del(s)}>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

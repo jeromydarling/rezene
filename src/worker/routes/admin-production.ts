@@ -290,6 +290,22 @@ adminProductionRoutes.patch("/samples/:id", requireAdminWrite, async (c) => {
   return c.json(mapSample(row!));
 });
 
+adminProductionRoutes.delete("/samples/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const result = await run(c.var.db, `DELETE FROM samples WHERE id = ?`, id);
+  if (!result.meta.changes) return c.json({ error: "Sample not found" }, 404);
+  await writeAudit(c.var.db, c.var.userId, "sample.delete", "sample", id, {});
+  return c.json({ ok: true });
+});
+
+adminProductionRoutes.delete("/tasks/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const result = await run(c.var.db, `DELETE FROM production_tasks WHERE id = ?`, id);
+  if (!result.meta.changes) return c.json({ error: "Task not found" }, 404);
+  await writeAudit(c.var.db, c.var.userId, "production_task.delete", "production_task", id, {});
+  return c.json({ ok: true });
+});
+
 // ---------- Fabrics & materials ----------
 adminProductionRoutes.get("/materials", async (c) => {
   const fabrics = await all(

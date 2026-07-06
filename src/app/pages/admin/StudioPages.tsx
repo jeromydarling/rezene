@@ -424,6 +424,16 @@ export function ThreeDPage() {
     setTimeout(() => setTaskCreated(null), 2500);
   }
 
+  async function del(project: AdminClo3dProject) {
+    if (!window.confirm(`Delete 3D project "${project.name}"?`)) return;
+    try {
+      await api.delete(`/api/admin/3d/projects/${project.id}`);
+      reload();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Couldn't delete.");
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -471,13 +481,20 @@ export function ThreeDPage() {
                   </td>
                   <td className="max-w-sm truncate text-xs text-warmgrey">{p.notes ?? "—"}</td>
                   <td className="text-xs text-warmgrey">{formatDate(p.updatedAt)}</td>
-                  <td>
+                  <td className="whitespace-nowrap text-right">
                     <button
                       type="button"
-                      className="link-quiet whitespace-nowrap text-xs"
+                      className="link-quiet text-xs"
                       onClick={() => void logFitIssue(p)}
                     >
                       {taskCreated === p.id ? "Task created ✓" : "Log fit issue → task"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ml-3 text-xs text-terracotta hover:underline"
+                      onClick={() => void del(p)}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -514,6 +531,27 @@ export function FilesPage() {
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  async function rename(f: AdminFile) {
+    const next = window.prompt("Rename file", f.filename);
+    if (!next || next.trim() === f.filename) return;
+    try {
+      await api.patch(`/api/admin/files/${f.id}`, { filename: next.trim() });
+      reload();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Rename failed");
+    }
+  }
+
+  async function del(f: AdminFile) {
+    if (!window.confirm(`Delete ${f.filename}? This removes the file for good.`)) return;
+    try {
+      await api.delete(`/api/admin/files/${f.id}`);
+      reload();
+    } catch (err) {
+      window.alert(err instanceof ApiRequestError ? err.message : "Delete failed");
     }
   }
 
@@ -589,15 +627,21 @@ export function FilesPage() {
                     <span className="badge badge-neutral">{titleCase(f.entityType ?? "general")}</span>
                   </td>
                   <td className="text-xs text-warmgrey">{formatDate(f.createdAt)}</td>
-                  <td>
+                  <td className="whitespace-nowrap text-right text-xs">
                     <a
                       href={`/api/admin/files/${f.id}/download`}
                       target="_blank"
                       rel="noreferrer"
-                      className="link-quiet text-xs"
+                      className="link-quiet"
                     >
                       Open
                     </a>
+                    <button type="button" className="link-quiet ml-3" onClick={() => void rename(f)}>
+                      Rename
+                    </button>
+                    <button type="button" className="ml-3 text-terracotta hover:underline" onClick={() => void del(f)}>
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
