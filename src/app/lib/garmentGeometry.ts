@@ -211,6 +211,25 @@ export function buildGarment(
   const shell = addMesh(new THREE.LatheGeometry(profile, 64));
   shell.scale.z = FLATTEN_Z;
 
+  // Finished neckline — a slim collar ring so the top isn't an open hole.
+  const collar = addMesh(
+    new THREE.TorusGeometry(neck, isDress ? 0.008 : 0.014, 10, 28),
+    [0, topY, 0],
+    [Math.PI / 2, 0, 0],
+  );
+  collar.scale.z = FLATTEN_Z;
+
+  // Sleeveless pieces get thin shoulder straps so they sit on the body.
+  if (sleeveLen <= 0.02) {
+    for (const sx of [-1, 1]) {
+      addMesh(
+        new THREE.CylinderGeometry(0.014, 0.014, 0.11, 10),
+        [sx * neck * 0.72, topY - 0.02, 0],
+        [0, 0, sx * 0.16],
+      );
+    }
+  }
+
   // Sleeves — hang from the shoulder down-and-out, following the arm's A-pose.
   if (sleeveLen > 0.02 && garment.silhouette.shoulder > 0) {
     const angle = 0.34; // radians out from vertical
