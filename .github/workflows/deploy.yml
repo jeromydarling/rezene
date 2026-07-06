@@ -56,15 +56,16 @@ jobs:
         run: npx wrangler d1 migrations apply maison-atlantique-db --remote
 
       # The production Worker that serves verto.style is the "verto" script
-      # (Cloudflare Workers Builds deploys it from this repo). The wrangler.toml
-      # `name` ("rezene") is a legacy/orphan script left over from the old
-      # `wrangler deploy` step — nothing routes to it. We therefore sync each
-      # secret to every script in WORKER_TARGETS so the live Worker always gets
-      # them regardless of which name Workers Builds settles on; putting a
-      # secret on an unused script is harmless.
+      # (Cloudflare Workers Builds deploys it from this repo). NOTE: the
+      # wrangler.toml `name` ("rezene") does NOT match — Workers Builds deploys
+      # under the dashboard-configured name "verto", and a stray "rezene" script
+      # (an orphan from the old `wrangler deploy` step) has been deleted. We
+      # therefore target the live script explicitly by name here rather than
+      # relying on the config name. Add more names to WORKER_TARGETS only if a
+      # second live script ever needs the same secrets.
       - name: Sync application secrets to the Worker
         env:
-          WORKER_TARGETS: "verto rezene"
+          WORKER_TARGETS: "verto"
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}

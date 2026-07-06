@@ -9,6 +9,12 @@
 # Actions (.github/workflows/deploy.yml); it applies D1 migrations and
 # deploys the Worker. See README "Deployment".
 
+# NOTE: the LIVE production Worker that serves verto.style is the script named
+# "verto" — Cloudflare Workers Builds deploys under its own dashboard-configured
+# name, not this one. This `name` is retained only for local `wrangler` calls;
+# CI (.github/workflows/deploy.yml) syncs secrets to "verto" explicitly. Don't
+# run a bare `wrangler deploy` from this config — it would recreate a stray,
+# unrouted "rezene" script.
 name = "rezene"
 main = "./src/worker/index.ts"
 compatibility_date = "2026-01-01"
