@@ -55,7 +55,7 @@ export function TechPackAiPage() {
       });
       setResponse(res);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "AI assist failed");
+      setError(err instanceof ApiRequestError ? err.message : "LLM assist failed");
     } finally {
       setBusy(false);
     }
@@ -76,9 +76,9 @@ export function TechPackAiPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="AI Assist"
+        eyebrow="LLM Assist"
         title={pack.data.name}
-        description="AI drafts the tedious parts — bills of materials, construction notes, QC checklists — and you review every line before anything reaches a factory."
+        description="LLM drafts the tedious parts — bills of materials, construction notes, QC checklists — and you review every line before anything reaches a factory."
         actions={
           <Link to={`/admin/tech-packs/${id}`} className="btn btn-secondary">
             Back to tech pack

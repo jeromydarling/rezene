@@ -27,7 +27,7 @@ The search captures websites and, where it can verify them, phone numbers and ad
 **+ Add to factories** files the maker in [Factories & Suppliers](/admin/support/kb/suppliers) as an **unverified** lead with its sources attached, ready for you to reach out and request a sample.
 
 > [!NOTE]
-> Maker research and contact lookups draw from a shared **daily research quota** per shop (see [AI research limits](/admin/support/kb/ai-limits)). Cached results are free.`,
+> Maker research and contact lookups draw from a shared **daily research quota** per shop (see [LLM research limits](/admin/support/kb/ai-limits)). Cached results are free.`,
   },
   {
     slug: "suppliers",

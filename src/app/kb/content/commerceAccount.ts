@@ -110,20 +110,20 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
 **Account → Settings** holds the essentials.
 
 - **Brand** — name, tagline, and identity. Change them here and they update everywhere, from the storefront to your tech pack covers.
-- **Integrations** — at-a-glance status for Payments (Stripe) and AI assistance. Connection keys live as encrypted secrets outside the app.
+- **Integrations** — at-a-glance status for Payments (Stripe) and LLM assistance. Connection keys live as encrypted secrets outside the app.
 - **Change password** — update your own password; all other sessions sign out.`,
   },
   {
     slug: "ai-limits",
-    title: "AI research limits",
-    summary: "How the shared daily quota on paid AI research works.",
+    title: "LLM research limits",
+    summary: "How the shared daily quota on paid LLM research works.",
     part: "account",
     moduleRoute: "/admin/sourcing",
     keywords: "ai quota limit research perplexity daily cap rate limit cost",
     updated: "2026-07-06",
-    body: `# AI research limits
+    body: `# LLM research limits
 
-Some features do **live web research** (Find a Maker, contact lookups, export intelligence, the duty and costing AI helpers). These run on Verto's research provider and share one **daily quota per shop**.
+Some features do **live web research** (Find a Maker, contact lookups, export intelligence, the duty and costing LLM helpers). These run on Verto's research provider and share one **daily quota per shop**.
 
 ## What counts
 

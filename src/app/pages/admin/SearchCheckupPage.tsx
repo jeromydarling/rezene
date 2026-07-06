@@ -82,7 +82,7 @@ export function SearchCheckupPage() {
       <PageHeader
         eyebrow="Content"
         title="Search Checkup"
-        description="How your shop looks to Google and AI assistants. The plumbing — sitemaps, per-page tags, product rich results — is automatic; these are the parts only you can supply."
+        description="How your shop looks to Google and LLM assistants. The plumbing — sitemaps, per-page tags, product rich results — is automatic; these are the parts only you can supply."
       />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable rows={5} />}
@@ -172,7 +172,7 @@ export function SearchCheckupPage() {
             detail={
               data.pagesMissingMeta.length === 0
                 ? `All ${data.publishedPages} published pages describe themselves to search results.`
-                : "Search engines write their own (often clumsy) snippet when a page has no description. The ✨ AI draft button in the page editor writes one in your voice."
+                : "Search engines write their own (often clumsy) snippet when a page has no description. The ✨ LLM draft button in the page editor writes one in your voice."
             }
             action={{ label: "Open Pages", to: "/admin/content/pages" }}
           >

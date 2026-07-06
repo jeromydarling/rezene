@@ -40,7 +40,7 @@ export async function bootstrapDemoShop(env: Env): Promise<{ created: boolean; s
   const extras: [string, string, string][] = [
     ["preview_token", randomToken(12), "Static token that unlocks draft preview links."],
     ["supported_languages", '["en","fr"]', "Storefront languages."],
-    ["brand_voice", "", "How the brand sounds — consumed by every AI writing feature"],
+    ["brand_voice", "", "How the brand sounds — consumed by every LLM writing feature"],
   ];
   for (const [key, value, description] of extras) {
     await run(

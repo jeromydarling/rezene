@@ -15,7 +15,7 @@ const REWRITE_ACTIONS = [
 ];
 
 /**
- * Markdown editor with live preview and an AI edit menu: select text (or
+ * Markdown editor with live preview and an LLM edit menu: select text (or
  * nothing, for the whole document) and apply a rewrite. The result replaces
  * the selection in place — undo is one revision-restore away.
  */
@@ -351,7 +351,7 @@ export function ImageField({
 }
 
 /**
- * AI drafting interview: a handful of plain questions become a ready
+ * LLM drafting interview: a handful of plain questions become a ready
  * draft (title, slug, body, kicker…). The caller decides what to do with
  * the accepted draft — prefill a create form or replace an editor's fields.
  */

@@ -21,7 +21,7 @@ This handbook is a complete field guide. Every module has a chapter that explain
 The admin sidebar groups screens into sections that mirror how a collection actually comes to life:
 
 - **Catalog** — the products, variants, inventory, and collections you sell.
-- **Design & Development** — styles, tech packs, the AI Design Studio, and 3D.
+- **Design & Development** — styles, tech packs, the LLM Design Studio, and 3D.
 - **Sourcing & Production** — factories, materials, samples, purchase orders, the production board.
 - **Finance** — costing, duties & landed cost, shipping, analytics.
 - **Marketing & Content** — campaigns, promo video, your CMS pages, and SEO.
@@ -70,7 +70,7 @@ Open **Catalog → Products → New product**. A name, price, and category creat
 
 ## 3. Design something (optional but fun)
 
-Open **Design & Development → Design Studio** and describe a garment. Flux generates real concept imagery you can iterate on, drop onto a product, or send straight to a maker. See [The AI Design Studio](/admin/support/kb/design-studio).
+Open **Design & Development → Design Studio** and describe a garment. Flux generates real concept imagery you can iterate on, drop onto a product, or send straight to a maker. See [The LLM Design Studio](/admin/support/kb/design-studio).
 
 ## 4. Find a maker
 
@@ -78,10 +78,10 @@ No factory yet? **Sourcing & Production → Find a Maker** researches real, low-
 
 ## 5. Know your numbers
 
-Create a **Cost Sheet** for your hero style (**Finance → Costing**) and add a destination market. Verto shows your landed cost and margin — and its AI can benchmark a first-pass breakdown for you. See [Costing & margins](/admin/support/kb/costing).
+Create a **Cost Sheet** for your hero style (**Finance → Costing**) and add a destination market. Verto shows your landed cost and margin — and its LLM can benchmark a first-pass breakdown for you. See [Costing & margins](/admin/support/kb/costing).
 
 > [!NOTE]
-> Nothing you do here is destructive or public until you choose. Products stay drafts until published; AI outputs are always yours to edit; reports and sheets are private to your team.`,
+> Nothing you do here is destructive or public until you choose. Products stay drafts until published; LLM outputs are always yours to edit; reports and sheets are private to your team.`,
   },
   {
     slug: "accounts-and-security",
@@ -114,6 +114,6 @@ The last remaining admin can't be removed or demoted, so you never lock yourself
 A small set of platform-level screens — the **Verto HQ CRM** and **Platform** tools — are visible only to Verto SuperAdmins, not to shops. If you don't see them, they're not meant for your account.
 
 > [!WARNING]
-> Connection keys (Stripe, AI providers) are stored as encrypted secrets **outside** the database and never appear in the app or the browser. Never paste an API key into a note, product field, or chat.`,
+> Connection keys (Stripe, LLM providers) are stored as encrypted secrets **outside** the database and never appear in the app or the browser. Never paste an API key into a note, product field, or chat.`,
   },
 ];

@@ -6,7 +6,7 @@ import { EmptyState, ErrorNote, LoadingTable, PageHeader, SlideOver, StatusBadge
 
 /**
  * Design Studio — a home for designing the next line, powered natively by
- * Flux (Cloudflare Workers AI, no keys to bring). A guided prompt builder, a
+ * Flux (Cloudflare Workers LLM, no keys to bring). A guided prompt builder, a
  * contact sheet of generations you can pin and vary, a per-shop house style for
  * a consistent look, and a one-click hand-off to a factory for a sample.
  */
@@ -86,7 +86,7 @@ export function DesignStudioPage() {
       <PageHeader
         eyebrow="Studio"
         title="Design Studio"
-        description="Design your next line with AI — build a prompt, generate looks with Flux, then ship a favorite to your factory for a sample."
+        description="Design your next line with LLM — build a prompt, generate looks with Flux, then ship a favorite to your factory for a sample."
         actions={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setStyleOpen(true)}>

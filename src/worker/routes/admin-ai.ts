@@ -232,7 +232,7 @@ adminAiRoutes.post("/prompt-suggest", requireAdminWrite, async (c) => {
     });
     return c.json({ prompt: res.text.trim().replace(/^["']|["']$/g, "") });
   } catch {
-    return c.json({ error: "AI prompt help is unavailable — write the prompt by hand." }, 503);
+    return c.json({ error: "LLM prompt help is unavailable — write the prompt by hand." }, 503);
   }
 });
 

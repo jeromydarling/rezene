@@ -262,7 +262,7 @@ function VideoEditor({
       await loadPreview();
       setNotice("Drafted in your brand voice — edit anything you like.");
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "AI drafting unavailable");
+      setErr(e instanceof ApiRequestError ? e.message : "LLM drafting unavailable");
     } finally {
       setBusy(null);
     }
@@ -354,7 +354,7 @@ function VideoEditor({
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-lg font-light">Script</h2>
               <button type="button" className="btn btn-secondary !py-1.5 text-xs" disabled={busy === "ai"} onClick={() => void aiDraft()}>
-                {busy === "ai" ? "Drafting…" : "✦ Draft with AI"}
+                {busy === "ai" ? "Drafting…" : "✦ Draft with LLM"}
               </button>
             </div>
             <label className="block">

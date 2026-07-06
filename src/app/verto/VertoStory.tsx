@@ -31,8 +31,8 @@ const BELIEFS = [
     body: "Enterprise PLM starts at hundreds of dollars a month plus a consulting project. Website builders top out at 'add product, sell product.' A label doing $200K a year is a real business — it deserves better than choosing between too much and too little.",
   },
   {
-    heading: "AI should sound like you, not like AI.",
-    body: "Generic AI writes generic brands. Verto learns your voice once and writes everything — campaigns, pages, translations, press — inside it. Every draft waits for your edit; nothing publishes itself.",
+    heading: "An LLM should sound like you, not like a robot.",
+    body: "A generic LLM writes generic brands. Verto learns your voice once and writes everything — campaigns, pages, translations, press — inside it. Every draft waits for your edit; nothing publishes itself.",
   },
   {
     heading: "One system, one truth.",
@@ -156,7 +156,7 @@ export function VertoWhy() {
           <Reveal delay={450}>
             <p className="prose-editorial mt-4">
               And because a five-person label can't hire a marketing department, Verto ships with
-              one: AI that learns your voice and drafts your campaigns, pages, and press — for your
+              one: LLM that learns your voice and drafts your campaigns, pages, and press — for your
               edit, never on its own.
             </p>
           </Reveal>
@@ -216,9 +216,9 @@ const MATRIX_ROWS: { label: string; verto: boolean; shopify: boolean; erp: boole
   { label: "Multi-carrier shipping + customs docs", verto: true, shopify: false, erp: true, patchwork: false },
   { label: "Duties & landed-cost tooling", verto: true, shopify: false, erp: true, patchwork: false },
   { label: "Wholesale line sheets & pre-orders", verto: true, shopify: false, erp: true, patchwork: false },
-  { label: "SEO suite built in (schema, sitemaps, AI-search index)", verto: true, shopify: false, erp: false, patchwork: false },
-  { label: "AI marketing suite in your brand voice", verto: true, shopify: false, erp: false, patchwork: false },
-  { label: "AI site starter (drafted in minutes)", verto: true, shopify: false, erp: false, patchwork: false },
+  { label: "SEO suite built in (schema, sitemaps, LLM-search index)", verto: true, shopify: false, erp: false, patchwork: false },
+  { label: "LLM marketing suite in your brand voice", verto: true, shopify: false, erp: false, patchwork: false },
+  { label: "LLM site starter (drafted in minutes)", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "Storefront translations built in", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "Live in an afternoon, no implementation project", verto: true, shopify: true, erp: false, patchwork: false },
 ];

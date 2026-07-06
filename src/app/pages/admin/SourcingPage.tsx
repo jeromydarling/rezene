@@ -248,7 +248,7 @@ export function SourcingPage() {
             </details>
           )}
           <p className="text-center text-[11px] text-warmgrey">
-            Leads are AI-researched and unverified — always confirm capabilities and terms before committing.
+            Leads are LLM-researched and unverified — always confirm capabilities and terms before committing.
           </p>
         </div>
       )}

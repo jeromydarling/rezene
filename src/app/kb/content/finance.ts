@@ -20,9 +20,9 @@ A **cost sheet** tells you what a style really costs to make and land — and th
 2. Open it and fill the cost lines: fabric, trims, cut/sew/make, sample allocation, packaging, freight, insurance, duty, payment processing, returns reserve.
 3. Verto totals them and shows **gross margin** against your target or actual retail.
 
-## Let AI benchmark it
+## Let LLM benchmark it
 
-On any sheet, open **🔍 Fill with AI benchmarks**. Describe the garment, where it's made, and where it sells, and Verto benchmarks a first-pass per-unit breakdown (fabric, trims, CMT, packaging, freight) plus a suggested retail and margin — with sources. Click **Apply** to fill the sheet, then adjust to your real quotes.
+On any sheet, open **🔍 Fill with LLM benchmarks**. Describe the garment, where it's made, and where it sells, and Verto benchmarks a first-pass per-unit breakdown (fabric, trims, CMT, packaging, freight) plus a suggested retail and margin — with sources. Click **Apply** to fill the sheet, then adjust to your real quotes.
 
 ## Destinations (landed cost by market)
 
@@ -34,7 +34,7 @@ Add a **destination** to a sheet to model a specific market. Duty is charged on 
   {
     slug: "duties",
     title: "Duties & landed cost",
-    summary: "An editable duty-rules engine with an AI HS-code + rate lookup.",
+    summary: "An editable duty-rules engine with an LLM HS-code + rate lookup.",
     part: "finance",
     moduleRoute: "/admin/duties",
     keywords: "duty tariff hs code landed cost rule preferential yarn forward estimate ai lookup",
@@ -48,7 +48,7 @@ This is an **editable rules engine**, not a customs authority. It holds the duty
 
 Each rule captures a **destination region**, **origin country**, an optional **HS category**, the **qualifying condition** (e.g. a yarn-forward rule of origin for a preferential 0%), and a **duty-rate range**. Toggle a rule active/off, or delete it.
 
-## Add a rule with AI
+## Add a rule with LLM
 
 Click **+ New duty rule** and use **🔍 Look up HS code & duty rate**: describe a garment and a trade lane (e.g. woven cotton shirt, Morocco → United States) and Verto drafts the rule — HS category, rule-of-origin condition, and a duty-rate range — with sources. Review, then save.
 

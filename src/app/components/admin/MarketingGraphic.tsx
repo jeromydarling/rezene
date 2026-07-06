@@ -5,7 +5,7 @@ import { ImageField } from "./cms";
 /**
  * Graphics studio: brand-styled social/print graphics composed as SVG and
  * exported to PNG entirely client-side — no image-generation API needed.
- * AI writes the words elsewhere; this gives them a designed canvas.
+ * LLM writes the words elsewhere; this gives them a designed canvas.
  */
 
 const SIZES = [

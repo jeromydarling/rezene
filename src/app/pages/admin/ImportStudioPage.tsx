@@ -5,7 +5,7 @@ import { useToast } from "../../lib/toast";
 import { ErrorNote, PageHeader } from "../../components/admin/ui";
 
 /**
- * AI-assisted import studio. Drop any product spreadsheet; the AI maps its
+ * LLM-assisted import studio. Drop any product spreadsheet; the LLM maps its
  * columns to Verto's catalog, you confirm the mapping and preview, then bulk
  * import — products grouped by name, each row becoming a variant, with
  * collections created on the fly.
@@ -90,7 +90,7 @@ export function ImportStudioPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Import studio"
-        description="Bring products in from any spreadsheet — the AI figures out your columns, you confirm, and it imports."
+        description="Bring products in from any spreadsheet — the LLM figures out your columns, you confirm, and it imports."
       />
 
       {error && <ErrorNote message={error} />}
@@ -142,7 +142,7 @@ export function ImportStudioPage() {
               <h2 className="font-display text-lg font-light">Match your columns</h2>
               <span className="text-xs text-warmgrey">
                 {fileName} · {analysis.rowCount} rows{analysis.truncated ? " (first 2000)" : ""} ·{" "}
-                {analysis.mappedBy === "ai" ? "AI-matched" : "auto-matched"}
+                {analysis.mappedBy === "ai" ? "LLM-matched" : "auto-matched"}
               </span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">

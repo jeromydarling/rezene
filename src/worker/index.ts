@@ -243,7 +243,7 @@ app.get("/llms.txt", async (c) => {
   const body = [
     `# Verto`,
     ``,
-    `> Verto is the operating system for independent clothing labels: storefront, CMS, production (tech packs, samples, factory portals), multi-carrier shipping with customs paperwork, landed-cost and duties tooling, wholesale line sheets, pre-orders, and an AI marketing suite — one platform, one database, from first sample to sold out. Shops live at verto.style/<shop-name> or on their own domain.`,
+    `> Verto is the operating system for independent clothing labels: storefront, CMS, production (tech packs, samples, factory portals), multi-carrier shipping with customs paperwork, landed-cost and duties tooling, wholesale line sheets, pre-orders, and an LLM marketing suite — one platform, one database, from first sample to sold out. Shops live at verto.style/<shop-name> or on their own domain.`,
     ``,
     `## Pages`,
     ``,

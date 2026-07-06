@@ -801,7 +801,7 @@ adminMarketingRoutes.post("/video/:id/draft", requireAdminWrite, async (c) => {
     await run(c.var.db, `UPDATE video_jobs SET spec_json = ?, updated_at = datetime('now') WHERE id = ?`, JSON.stringify(spec), c.req.param("id"));
     return c.json({ scenes: spec.scenes });
   } catch {
-    return c.json({ error: "AI drafting unavailable — edit the lines by hand" }, 503);
+    return c.json({ error: "LLM drafting unavailable — edit the lines by hand" }, 503);
   }
 });
 

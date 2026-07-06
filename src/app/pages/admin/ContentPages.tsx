@@ -80,7 +80,7 @@ function PreviewLink({ path }: { path: string }) {
   );
 }
 
-/** Collapsible SEO fields with AI generation from the content. */
+/** Collapsible SEO fields with LLM generation from the content. */
 function SeoFields({
   metaTitle,
   metaDescription,
@@ -185,7 +185,7 @@ export function PagesEditorPage() {
       <PageHeader
         eyebrow="Content"
         title="Pages"
-        description="Every page of the public site — including the homepage hero. Pick a layout, set a hero image, or let AI draft the first version. Every save keeps a restorable revision."
+        description="Every page of the public site — including the homepage hero. Pick a layout, set a hero image, or let LLM draft the first version. Every save keeps a restorable revision."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
             New page
@@ -449,7 +449,7 @@ function BrandVoiceCard() {
   return (
     <div className="admin-card flex flex-col p-4">
       <p className="text-xs font-semibold uppercase tracking-wider text-warmgrey">Brand voice</p>
-      <p className="font-display text-lg font-light">How AI writes for you</p>
+      <p className="font-display text-lg font-light">How LLM writes for you</p>
       <p className="truncate text-xs text-warmgrey">
         {data ? (data.voice ? data.voice.slice(0, 60) : "Not set — using the editorial default") : "Loading…"}
       </p>
@@ -461,7 +461,7 @@ function BrandVoiceCard() {
       <SlideOver open={open} title="Brand voice" onClose={() => setOpen(false)}>
         <div className="space-y-4">
           <p className="text-sm text-warmgrey">
-            Describe how your brand sounds — a few sentences plus words you never use. Every AI
+            Describe how your brand sounds — a few sentences plus words you never use. Every LLM
             feature (drafting, rewriting, the site starter) follows this.
           </p>
           <textarea
@@ -610,7 +610,7 @@ function SiteStarterForm({ onApplied }: { onApplied: () => void }) {
   return (
     <form onSubmit={generate} className="space-y-4">
       <p className="text-sm text-warmgrey">
-        Answer what you can — AI drafts your story page, FAQ, press page, first journal post, a
+        Answer what you can — LLM drafts your story page, FAQ, press page, first journal post, a
         homepage hero, and a brand voice. Everything arrives as drafts; nothing publishes itself.
       </p>
       <div>
@@ -937,7 +937,7 @@ function PageEditor({ page, onSaved }: { page: PageRow; onSaved: () => void }) {
             onRestored={onSaved}
           />
           <button type="button" className="link-quiet text-xs" onClick={() => setAiOpen(true)}>
-            ✨ Draft with AI
+            ✨ Draft with LLM
           </button>
           <button
             type="button"
@@ -966,7 +966,7 @@ function PageEditor({ page, onSaved }: { page: PageRow; onSaved: () => void }) {
           </button>
         </div>
       </div>
-      <SlideOver open={aiOpen} title="Draft this page with AI" onClose={() => setAiOpen(false)}>
+      <SlideOver open={aiOpen} title="Draft this page with LLM" onClose={() => setAiOpen(false)}>
         <AiDraftAssistant
           kind="page"
           onAccept={(draft) => {
@@ -1087,7 +1087,7 @@ function PageCreateForm({ onCreated }: { onCreated: () => void }) {
         bodyMd: draft?.bodyMd,
         heroEyebrow: draft?.heroEyebrow ?? undefined,
         subtitle: draft?.subtitle ?? undefined,
-        // An AI draft is markdown — it wins over a block template.
+        // An LLM draft is markdown — it wins over a block template.
         layout: template.layout,
         sections: draft ? null : template.sections,
         isPublished: false,
@@ -1124,7 +1124,7 @@ function PageCreateForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <button type="button" className="btn btn-secondary w-full" onClick={() => setMode("ai")}>
-        ✨ Answer a few questions — AI drafts it
+        ✨ Answer a few questions — LLM drafts it
       </button>
       <p className="text-center text-xs text-warmgrey">or start from scratch:</p>
       <div>
@@ -1168,7 +1168,7 @@ function PageCreateForm({ onCreated }: { onCreated: () => void }) {
       )}
       {draft && (
         <p className="rounded bg-palm/10 px-3 py-2 text-xs text-palm">
-          AI draft attached ({draft.bodyMd.split(/\s+/).length} words) — it lands in the editor
+          LLM draft attached ({draft.bodyMd.split(/\s+/).length} words) — it lands in the editor
           after you create the page.
         </p>
       )}
@@ -1397,7 +1397,7 @@ function JournalEditor({ post, onSaved }: { post: JournalRow; onSaved: () => voi
             onRestored={onSaved}
           />
           <button type="button" className="link-quiet text-xs" onClick={() => setAiOpen(true)}>
-            ✨ Draft with AI
+            ✨ Draft with LLM
           </button>
           <button
             type="button"
@@ -1421,7 +1421,7 @@ function JournalEditor({ post, onSaved }: { post: JournalRow; onSaved: () => voi
           </button>
         </div>
       </div>
-      <SlideOver open={aiOpen} title="Draft this post with AI" onClose={() => setAiOpen(false)}>
+      <SlideOver open={aiOpen} title="Draft this post with LLM" onClose={() => setAiOpen(false)}>
         <AiDraftAssistant
           kind="journal"
           onAccept={(draft) => {
@@ -1490,7 +1490,7 @@ function JournalCreateForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <button type="button" className="btn btn-secondary w-full" onClick={() => setMode("ai")}>
-        ✨ Answer a few questions — AI drafts it
+        ✨ Answer a few questions — LLM drafts it
       </button>
       <p className="text-center text-xs text-warmgrey">or start from scratch:</p>
       <div>
@@ -1519,7 +1519,7 @@ function JournalCreateForm({ onCreated }: { onCreated: () => void }) {
       </div>
       {draft && (
         <p className="rounded bg-palm/10 px-3 py-2 text-xs text-palm">
-          AI draft attached ({draft.bodyMd.split(/\s+/).length} words) — it lands in the editor
+          LLM draft attached ({draft.bodyMd.split(/\s+/).length} words) — it lands in the editor
           after you create the post.
         </p>
       )}

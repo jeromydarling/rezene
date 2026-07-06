@@ -400,7 +400,7 @@ function AiCostAssist({ sheet, onApplied }: { sheet: AdminCostSheet; onApplied: 
       });
       setResult(res);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "AI costing failed");
+      setError(err instanceof ApiRequestError ? err.message : "LLM costing failed");
     } finally {
       setBusy(false);
     }
@@ -431,7 +431,7 @@ function AiCostAssist({ sheet, onApplied }: { sheet: AdminCostSheet; onApplied: 
   return (
     <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3 text-sm">
       <button type="button" className="flex w-full items-center justify-between" onClick={() => setOpen(!open)}>
-        <span className="text-xs font-semibold uppercase tracking-wider text-warmgrey">🔍 Fill with AI benchmarks</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-warmgrey">🔍 Fill with LLM benchmarks</span>
         <span className="text-warmgrey">{open ? "–" : "+"}</span>
       </button>
       {open && (
@@ -858,7 +858,7 @@ function DutyRuleForm({
   const [error, setError] = useState<string | null>(null);
 
   async function runAi() {
-    if (!ai.garment.trim()) return setError("Describe the garment for the AI lookup.");
+    if (!ai.garment.trim()) return setError("Describe the garment for the LLM lookup.");
     setAiBusy(true);
     setError(null);
     setAiNote(null);
@@ -881,7 +881,7 @@ function DutyRuleForm({
       setAiNote(res.note);
       setCitations(res.citations ?? []);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "AI lookup failed");
+      setError(err instanceof ApiRequestError ? err.message : "LLM lookup failed");
     } finally {
       setAiBusy(false);
     }
@@ -918,7 +918,7 @@ function DutyRuleForm({
       {aiEnabled && (
         <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-warmgrey">
-            🔍 Research with AI
+            🔍 Research with LLM
           </p>
           <div className="space-y-2">
             <input className="input" placeholder="Garment (e.g. woven cotton shirt)" value={ai.garment} onChange={(e) => setAi({ ...ai, garment: e.target.value })} />
@@ -1647,7 +1647,7 @@ export function SettingsPage() {
                 </span>
               </li>
               <li className="flex items-center justify-between">
-                <span>AI assistance</span>
+                <span>LLM assistance</span>
                 <span
                   className={`badge ${data.secretStatus.anthropic ? "badge-success" : "badge-neutral"}`}
                 >

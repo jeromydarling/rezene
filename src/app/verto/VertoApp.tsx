@@ -33,7 +33,7 @@ const TIERS = [
     fee: "1.5%",
     gmv: "up to $10K/mo in sales",
     tagline: "Side projects and pre-launch labels",
-    features: ["Storefront + full CMS", "AI content & site starter", "Manual shipping rates", "Email capture & campaigns"],
+    features: ["Storefront + full CMS", "LLM content & site starter", "Manual shipping rates", "Email capture & campaigns"],
   },
   {
     key: "label",
@@ -44,7 +44,7 @@ const TIERS = [
     gmv: "up to $50K/mo in sales",
     tagline: "Active indie labels selling DTC",
     featured: true,
-    features: ["Everything in Starter", "Full AI marketing suite", "Carrier shipping & labels", "Production & tech packs", "Wholesale line sheets"],
+    features: ["Everything in Starter", "Full LLM marketing suite", "Carrier shipping & labels", "Production & tech packs", "Wholesale line sheets"],
   },
   {
     key: "studio",
@@ -263,7 +263,7 @@ function Hero() {
         </h1>
         <Reveal delay={1200}>
           <p className="prose-editorial mt-6 max-w-xl text-base !text-chalk/85">
-            Storefront, CMS, production, shipping, wholesale, and an AI marketing team — built for
+            Storefront, CMS, production, shipping, wholesale, and an LLM marketing team — built for
             brands that make clothes, from first sample to sold out.
           </p>
         </Reveal>
@@ -400,8 +400,8 @@ function SceneCopy({ scene }: { scene: (typeof SCENES)[number] }) {
   );
 }
 
-// ---------- Act IV: the AI moment ----------
-// "AI that writes like you" is the platform's boldest claim, so instead of
+// ---------- Act IV: the LLM moment ----------
+// "LLM that writes like you" is the platform's boldest claim, so instead of
 // asserting it, the section performs it: campaign copy composes itself,
 // character by character, inside a mock caption card. Seeing the product's
 // core loop is worth more than any adjective.
@@ -420,13 +420,13 @@ function AiMoment() {
           <p className="eyebrow mb-3 !text-chalk/50">The marketing team you don't have to hire</p>
         </Reveal>
         <Reveal delay={120}>
-          <h2 className="font-display text-3xl font-light md:text-5xl">AI that writes like you.</h2>
+          <h2 className="font-display text-3xl font-light md:text-5xl">LLM that writes like you.</h2>
         </Reveal>
         <Reveal delay={240}>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-chalk/75">
             Define your brand voice once. Verto then drafts whole campaigns — Instagram, TikTok
             scripts, email, press releases, ad copy — plus pages, posts, SEO metadata, and
-            translations. Bring your own AI key, or use ours out of the box.
+            translations. Bring your own LLM key, or use ours out of the box.
           </p>
         </Reveal>
         <Reveal delay={360}>
@@ -451,7 +451,7 @@ function AiMoment() {
 function CapabilityIndex() {
   const items = [
     "Block CMS & editorial layouts",
-    "AI campaign kits, 11 channels",
+    "LLM campaign kits, 11 channels",
     "Site starter interview",
     "6 shipping carriers + customs",
     "Wholesale line sheets",
@@ -555,7 +555,7 @@ const STACK_ITEMS = [
   { item: "SEO apps", tool: "all-in-one + schema + llms.txt apps", cost: "$30–80" },
   { item: "Translations", tool: "Weglot / Langify", cost: "$17–32" },
   { item: "Reviews · size charts · pre-orders", tool: "three small apps", cost: "$30–50" },
-  { item: "AI copywriting", tool: "Copy.ai / Jasper", cost: "$29–69" },
+  { item: "LLM copywriting", tool: "Copy.ai / Jasper", cost: "$29–69" },
   { item: "Social scheduling", tool: "Buffer / Later", cost: "$15–25" },
   { item: "Tech packs / PLM", tool: "Techpacker → Backbone, per seat", cost: "$70–398" },
   { item: "Production & inventory ops", tool: "ApparelMagic / Katana", cost: "$255–299" },

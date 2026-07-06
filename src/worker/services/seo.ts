@@ -24,14 +24,14 @@ export const VERTO_META: Record<string, RouteMeta> = {
   "/": {
     title: "Verto — The operating system for independent clothing labels",
     description:
-      "Storefront, CMS, production, shipping, and AI marketing in one purpose-built platform for independent fashion brands. From first sample to sold out.",
+      "Storefront, CMS, production, shipping, and LLM marketing in one purpose-built platform for independent fashion brands. From first sample to sold out.",
     image: "/verto/hero.jpg",
     preloadImage: "/verto/hero.jpg",
   },
   "/features": {
     title: "Features — the full tour — Verto",
     description:
-      "Production calendar, tech packs, factory portals, multi-carrier shipping, landed cost, block CMS, lookbooks, AI marketing, translations, wholesale, analytics — one platform.",
+      "Production calendar, tech packs, factory portals, multi-carrier shipping, landed cost, block CMS, lookbooks, LLM marketing, translations, wholesale, analytics — one platform.",
     image: "/verto/atelier.jpg",
   },
   "/why": {

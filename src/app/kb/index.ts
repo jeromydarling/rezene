@@ -13,7 +13,7 @@ export type { KbArticle, KbPart, KbHeading } from "./types";
 export const KB_PARTS: KbPart[] = [
   { slug: "getting-started", title: "Getting started", description: "What Verto is and how to find your way around.", icon: "🧭" },
   { slug: "catalog", title: "Catalog & inventory", description: "Products, variants, stock, collections, and bulk import.", icon: "🏷️" },
-  { slug: "design", title: "Design & development", description: "Styles, tech packs, the AI Design Studio, and 3D.", icon: "✏️" },
+  { slug: "design", title: "Design & development", description: "Styles, tech packs, the LLM Design Studio, and 3D.", icon: "✏️" },
   { slug: "sourcing", title: "Sourcing & production", description: "Makers, materials, samples, purchase orders, the board.", icon: "🏭" },
   { slug: "finance", title: "Costing & finance", description: "Cost sheets, duties & landed cost, shipping, analytics.", icon: "📊" },
   { slug: "marketing", title: "Marketing & content", description: "Campaigns, promo video, your CMS, and SEO.", icon: "📣" },

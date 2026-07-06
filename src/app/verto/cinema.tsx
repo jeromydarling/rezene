@@ -265,8 +265,8 @@ export function useSceneProgress(ref: React.RefObject<HTMLElement | null>): numb
   return progress;
 }
 
-// ---------- Typewriter: the AI writing in front of you ----------
-// Why it helps: "AI writes in your voice" is an abstract claim; watching a
+// ---------- Typewriter: the LLM writing in front of you ----------
+// Why it helps: "LLM writes in your voice" is an abstract claim; watching a
 // caption compose itself makes the product's core moment literal.
 export function Typewriter({ lines, className = "" }: { lines: string[]; className?: string }) {
   const [display, setDisplay] = useState("");

@@ -26,7 +26,7 @@ They're related but separate — a product can optionally point back to the styl
 
 ## "Missing tech pack"
 
-If a style shows **Missing tech pack**, that style simply has no tech pack record yet. Fix it by opening the style (or **Tech Packs → the style**) and creating one — start from a template, or let AI rough it in, then refine the measurements, BOM, and construction. See [Building the factory spec](/admin/support/kb/tech-packs).`,
+If a style shows **Missing tech pack**, that style simply has no tech pack record yet. Fix it by opening the style (or **Tech Packs → the style**) and creating one — start from a template, or let LLM rough it in, then refine the measurements, BOM, and construction. See [Building the factory spec](/admin/support/kb/tech-packs).`,
   },
   {
     slug: "tech-packs",
@@ -58,18 +58,18 @@ Open a tech pack and edit each section inline. When it's ready:
 
 ## Starting fast
 
-You don't have to build from a blank page. Create a tech pack **from a template** for common garment types, or use **AI assist** to rough in a first draft from a description or sketch, then refine. See also [Send a design straight to a maker](/admin/support/kb/design-studio#ship-to-a-maker).`,
+You don't have to build from a blank page. Create a tech pack **from a template** for common garment types, or use **LLM assist** to rough in a first draft from a description or sketch, then refine. See also [Send a design straight to a maker](/admin/support/kb/design-studio#ship-to-a-maker).`,
   },
   {
     slug: "design-studio",
-    title: "The AI Design Studio",
+    title: "The LLM Design Studio",
     summary: "Generate real garment concepts with Flux, iterate, and ship them to a maker.",
     part: "design",
     moduleRoute: "/admin/ai-concepts",
     keywords: "design studio flux ai image generate concept reference prompt lookbook ship maker sample",
     screenshot: "/kb/shots/design-studio.png",
     updated: "2026-07-06",
-    body: `# The AI Design Studio
+    body: `# The LLM Design Studio
 
 The Design Studio turns an idea into real, editable garment imagery — powered by **Flux**, built in. No external tools and no bring-your-own API keys.
 

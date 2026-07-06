@@ -56,7 +56,7 @@ export async function provisionShop(env: Env, shop: Shop, ownerEmail: string): P
     ["brand_tagline", "", "One-line tagline shown across the storefront"],
     ["default_currency", "USD", "Default checkout/display currency"],
     ["preview_token", randomToken(16), "Secret token for draft preview links"],
-    ["brand_voice", "", "How the brand sounds — consumed by every AI writing feature"],
+    ["brand_voice", "", "How the brand sounds — consumed by every LLM writing feature"],
     ["supported_languages", JSON.stringify(["en"]), "Storefront languages, first entry is the default"],
     [
       "home_hero",
@@ -103,7 +103,7 @@ export async function provisionShop(env: Env, shop: Shop, ownerEmail: string): P
       newId("pg"),
       slug,
       title,
-      `_Draft — write this before launch (the ✨ AI drafting can rough it in)._`,
+      `_Draft — write this before launch (the ✨ LLM drafting can rough it in)._`,
     );
   }
 

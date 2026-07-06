@@ -112,7 +112,7 @@ function OnboardingFork({ onChanged }: { onChanged: () => void }) {
 // ---------------- Established (import) lane ----------------
 
 const IMPORT_TARGETS = [
-  { label: "Products & variants", to: "/admin/import", note: "CSV import with AI column mapping — live now.", ready: true },
+  { label: "Products & variants", to: "/admin/import", note: "CSV import with LLM column mapping — live now.", ready: true },
   { label: "Suppliers / factories", to: "/admin/suppliers", note: "Add makers, or bulk-import (coming).", ready: true },
   { label: "Styles & tech packs", to: "/admin/styles", note: "Create styles; bulk import coming.", ready: true },
   { label: "Content & pages", to: "/admin/content/pages", note: "Build pages; site import coming.", ready: true },
@@ -207,7 +207,7 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
         eyebrow="Launch"
         title="Launch Playbook"
         help="welcome"
-        description="Fill in the blanks — or let AI draft them. When you're ready, compile it into a real plan that sets up every section of Verto."
+        description="Fill in the blanks — or let LLM draft them. When you're ready, compile it into a real plan that sets up every section of Verto."
         actions={
           <button type="button" className="btn btn-primary" disabled={compiling || filledCount === 0} onClick={() => void compile()}>
             {compiling ? "Compiling…" : "Compile my plan"}
@@ -390,7 +390,7 @@ function PlanImport({ onFilled }: { onFilled: (a: Record<string, unknown>) => vo
     <div className="admin-card p-4">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-warmgrey">Kickstart the plan</p>
       <div className="mb-3 flex gap-2 text-xs">
-        {([["ai", "✨ Draft with AI"], ["paste", "📋 Paste my plan"], ["pdf", "📄 Upload a PDF"]] as const).map(([k, l]) => (
+        {([["ai", "✨ Draft with LLM"], ["paste", "📋 Paste my plan"], ["pdf", "📄 Upload a PDF"]] as const).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)} className={`rounded-full border px-3 py-1 ${tab === k ? "border-navy bg-navy text-chalk" : "border-ink/15 hover:border-ink/40"}`}>
             {l}
           </button>

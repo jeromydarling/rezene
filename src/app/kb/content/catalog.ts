@@ -138,7 +138,7 @@ Set a product's collection from the **Collection** dropdown in the product edito
   {
     slug: "import",
     title: "The Import Studio",
-    summary: "Bulk-import products, variants, and prices from a CSV with AI column mapping.",
+    summary: "Bulk-import products, variants, and prices from a CSV with LLM column mapping.",
     part: "catalog",
     moduleRoute: "/admin/import",
     keywords: "import csv bulk upload spreadsheet mapping ai migrate shopify",
@@ -151,7 +151,7 @@ Moving a catalog in from a spreadsheet (or another platform's export)? **Catalog
 ## How it works
 
 1. **Upload or paste** your CSV.
-2. Verto **analyzes the columns** — AI (with a heuristic fallback) maps your headers to Verto fields like name, price, colour, size, SKU, and description. It's smart about messy real-world headers ("Product Title", "Variant SKU", etc.).
+2. Verto **analyzes the columns** — LLM (with a heuristic fallback) maps your headers to Verto fields like name, price, colour, size, SKU, and description. It's smart about messy real-world headers ("Product Title", "Variant SKU", etc.).
 3. **Review the mapping** and the previewed rows. Fix any column that mapped wrong.
 4. **Apply** — rows are grouped by product name, so multiple size/colour rows collapse into one product with many variants.
 

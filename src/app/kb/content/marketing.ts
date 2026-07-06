@@ -12,7 +12,7 @@ export const marketing: KbArticle[] = [
     updated: "2026-07-06",
     body: `# Campaigns & the marketing suite
 
-**Marketing → Campaigns** turns a single brief into a full multi-channel kit — social posts, email, blog, press, and ads — written by AI in **your brand voice**.
+**Marketing → Campaigns** turns a single brief into a full multi-channel kit — social posts, email, blog, press, and ads — written by LLM in **your brand voice**.
 
 ## How it works
 
@@ -27,7 +27,7 @@ export const marketing: KbArticle[] = [
 - **Email** — send to your subscribers from Verto.
 
 > [!NOTE]
-> AI drafts are a starting point, not a send button. You always review before anything reaches a customer.`,
+> LLM drafts are a starting point, not a send button. You always review before anything reaches a customer.`,
   },
   {
     slug: "promo-video",
@@ -44,7 +44,7 @@ export const marketing: KbArticle[] = [
 
 ## Build & preview
 
-Edit the on-screen lines (or let AI draft them) and watch the finished film play in real time in the preview. **What you preview is exactly what renders** — there are no surprises between the two.
+Edit the on-screen lines (or let LLM draft them) and watch the finished film play in real time in the preview. **What you preview is exactly what renders** — there are no surprises between the two.
 
 ## Export & billing
 
@@ -73,29 +73,29 @@ Build pages from **typed content blocks** — heroes, feature rows, galleries, q
 
 Run a **journal** (your blog) and **lookbooks** the same way. A **media library** with alt text keeps images organised and accessible.
 
-## AI help
+## LLM help
 
-An interview-style assistant can draft page copy in your brand voice, and inline AI can rewrite a selected passage — all editable before you publish.`,
+An interview-style assistant can draft page copy in your brand voice, and inline LLM can rewrite a selected passage — all editable before you publish.`,
   },
   {
     slug: "seo",
-    title: "Getting found: SEO & AI search",
-    summary: "Score and fix findability — titles, schema, sitemaps, and an llms.txt for AI.",
+    title: "Getting found: SEO & LLM search",
+    summary: "Score and fix findability — titles, schema, sitemaps, and an llms.txt for LLM.",
     part: "marketing",
     moduleRoute: "/admin/content/search",
     keywords: "seo search checkup sitemap schema meta google llms ai discovery structured data",
     screenshot: "/kb/shots/seo.png",
     updated: "2026-07-06",
-    body: `# Getting found: SEO & AI search
+    body: `# Getting found: SEO & LLM search
 
 **Marketing & Content → Search Checkup** scores how findable your store is and fixes the gaps.
 
 ## What it checks
 
-- Page **titles and descriptions** (with AI suggestions)
+- Page **titles and descriptions** (with LLM suggestions)
 - **Product schema** (structured data) so search engines understand your listings
 - **Sitemaps** — every published product and collection is included automatically
-- An **llms.txt** so AI assistants can read your catalog
+- An **llms.txt** so LLM assistants can read your catalog
 
 ## Custom domains
 
