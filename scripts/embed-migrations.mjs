@@ -22,6 +22,7 @@ const EXCLUDE = new Set([
   "0002_seed_demo_data.sql",
   "0009_verto_shops.sql",
   "0010_platform_crm.sql", // Verto HQ CRM — platform-only, like the registry
+  "0011_crm_health_inbox.sql", // CRM phase 2 — platform-only
 ]);
 
 const files = readdirSync(dir)

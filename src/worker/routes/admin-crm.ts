@@ -70,7 +70,7 @@ adminCrmRoutes.get("/contacts", async (c) => {
   }
   const rows = await all(
     c.env.DB,
-    `SELECT ct.id, ct.email, ct.name, ct.company, ct.shop_id, ct.source, ct.status,
+    `SELECT ct.id, ct.email, ct.name, ct.company, ct.shop_id, ct.source, ct.status, ct.health,
             ct.country, ct.city, ct.timezone, ct.tags, ct.last_touch_at, ct.next_followup_at,
             ct.created_at, s.slug AS shop_slug, s.status AS shop_status,
             (SELECT COUNT(*) FROM crm_tasks t WHERE t.contact_id = ct.id AND t.done_at IS NULL) AS open_tasks
@@ -97,6 +97,18 @@ adminCrmRoutes.post("/contacts", async (c) => {
 });
 
 adminCrmRoutes.get("/contacts/:id", async (c) => {
+  // Live shop pulse: refresh the health snapshot when it's stale so the
+  // drawer always shows current reality, not yesterday's cron.
+  const pre = await first<{ id: string; shop_id: string | null; status: string; name: string | null; email: string; health_checked_at: string | null }>(
+    c.env.DB,
+    `SELECT id, shop_id, status, name, email, health_checked_at FROM crm_contacts WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!pre) return c.json({ error: "Not found" }, 404);
+  if (pre.shop_id && (!pre.health_checked_at || pre.health_checked_at < oneHourAgo())) {
+    const { refreshContactHealth } = await import("../services/crm-activity");
+    await refreshContactHealth(c.env, pre);
+  }
   const contact = await first(
     c.env.DB,
     `SELECT ct.*, s.slug AS shop_slug, s.status AS shop_status, s.plan AS shop_plan
@@ -263,6 +275,69 @@ adminCrmRoutes.get("/atlas", async (c) => {
 
 // Manual sweep trigger (also runs on the daily cron).
 adminCrmRoutes.post("/sweep", async (c) => {
+  const { crmHealthSweep } = await import("../services/crm-activity");
+  await crmHealthSweep(c.env);
   await crmFollowupSweep(c.env);
   return c.json({ ok: true });
+});
+
+function oneHourAgo(): string {
+  return new Date(Date.now() - 3600_000).toISOString().slice(0, 19).replace("T", " ");
+}
+
+// ---------- AI check-in: a draft in the founder's voice, never auto-sent ----------
+adminCrmRoutes.post("/contacts/:id/draft-checkin", async (c) => {
+  const contact = await first<{
+    id: string;
+    email: string;
+    name: string | null;
+    company: string | null;
+    status: string;
+    city: string | null;
+    country: string | null;
+    notes_md: string | null;
+    health: string | null;
+    shop_slug: string | null;
+    shop_orders_total: number | null;
+    last_shop_publish_at: string | null;
+  }>(
+    c.env.DB,
+    `SELECT ct.id, ct.email, ct.name, ct.company, ct.status, ct.city, ct.country, ct.notes_md,
+            ct.health, ct.shop_orders_total, ct.last_shop_publish_at, s.slug AS shop_slug
+     FROM crm_contacts ct LEFT JOIN shops s ON s.id = ct.shop_id WHERE ct.id = ?`,
+    c.req.param("id"),
+  );
+  if (!contact) return c.json({ error: "Not found" }, 404);
+  const timeline = await all<{ kind: string; subject: string | null; created_at: string }>(
+    c.env.DB,
+    `SELECT kind, subject, created_at FROM crm_interactions
+     WHERE contact_id = ? ORDER BY created_at DESC LIMIT 10`,
+    contact.id,
+  );
+
+  const { aiComplete } = await import("../services/ai");
+  const facts = [
+    `Name: ${contact.name ?? "unknown"} <${contact.email}>`,
+    contact.company ? `Their label: ${contact.company}${contact.shop_slug ? ` (live at verto.style/${contact.shop_slug})` : ""}` : null,
+    contact.city || contact.country ? `Location: ${[contact.city, contact.country].filter(Boolean).join(", ")}` : null,
+    `Relationship status: ${contact.status}${contact.health ? `, shop health: ${contact.health}` : ""}`,
+    contact.shop_orders_total != null ? `Paid orders so far: ${contact.shop_orders_total}` : null,
+    contact.notes_md ? `Founder's private notes: ${contact.notes_md.slice(0, 600)}` : null,
+    `Recent timeline: ${timeline.map((t) => `${t.created_at.slice(0, 10)} ${t.kind}${t.subject ? ` (${t.subject})` : ""}`).join("; ") || "nothing yet"}`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    const result = await aiComplete(c.env, {
+      system:
+        "You draft short personal check-in emails for the founder of Verto, a platform for independent clothing labels. Write like one founder to another: warm, specific, under 130 words, plain text, no marketing language, no exclamation-mark enthusiasm, no emojis. Reference something real from the facts. End with one genuine, easy-to-answer question. Output exactly:\nSubject: <subject line>\n\n<email body>\nSign off with just \"— Jeromy\".",
+      prompt: `Draft a check-in email using these facts:\n${facts}`,
+      maxTokens: 400,
+    });
+    const match = result.text.match(/^Subject:\s*(.+?)\n+([\s\S]+)$/);
+    const subject = match?.[1]?.trim() ?? `Checking in from Verto`;
+    const body = (match?.[2] ?? result.text).trim();
+    return c.json({ subject, body, provider: result.provider });
+  } catch {
+    return c.json({ error: "AI drafting is unavailable right now — write it by hand" }, 503);
+  }
 });

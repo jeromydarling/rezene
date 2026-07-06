@@ -255,12 +255,24 @@ export default {
         publishDueContent(env)
           .then(() => runDailyOpsSweep(env))
           .then(async () => {
-            // CRM: silence becomes follow-up tasks (platform D1 only).
+            // CRM: shop-activity health + milestones, then silence → tasks.
+            const { crmHealthSweep } = await import("./services/crm-activity");
+            await crmHealthSweep(env).catch((err) => console.error("[crm] health sweep failed:", err));
             const { crmFollowupSweep } = await import("./services/crm");
             await crmFollowupSweep(env).catch((err) => console.error("[crm] sweep failed:", err));
           }),
       );
     }
+  },
+
+  /**
+   * Cloudflare Email Routing → shared inbox: mail to the routed address
+   * lands on the sender's CRM timeline, opens a reply task, and forwards
+   * to the founder's real inbox (see services/crm-inbox.ts for setup).
+   */
+  async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext) {
+    const { handleInboundEmail } = await import("./services/crm-inbox");
+    await handleInboundEmail(message, env);
   },
 } satisfies ExportedHandler<Env>;
 

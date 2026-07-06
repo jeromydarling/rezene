@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import {
+  Activity,
   CalendarClock,
   Circle,
   Eye,
+  Inbox,
   Mail,
   MapPin,
   MessageSquare,
+  PartyPopper,
   Phone,
   Rocket,
   Sparkles,
   StickyNote,
   Store,
+  Wand2,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { useFetch } from "../../lib/useFetch";
@@ -36,6 +40,7 @@ interface ContactRow {
   shop_status: string | null;
   source: string;
   status: string;
+  health: string | null;
   country: string | null;
   city: string | null;
   timezone: string | null;
@@ -78,11 +83,26 @@ const KIND_META: Record<string, { icon: typeof Mail; label: string }> = {
   provision: { icon: Rocket, label: "Shop provisioned" },
   demo_visit: { icon: Eye, label: "Demo tour" },
   email_out: { icon: Mail, label: "Email sent" },
+  email_in: { icon: Inbox, label: "Email received" },
+  milestone: { icon: PartyPopper, label: "Milestone" },
   note: { icon: StickyNote, label: "Note" },
   call: { icon: Phone, label: "Call" },
   meeting: { icon: CalendarClock, label: "Meeting" },
   support: { icon: MessageSquare, label: "Support" },
 };
+
+const HEALTH_META: Record<string, { dot: string; label: string }> = {
+  healthy: { dot: "bg-palm", label: "healthy — active in their shop this week" },
+  cooling: { dot: "bg-saffron", label: "cooling — quiet for 1–3 weeks" },
+  at_risk: { dot: "bg-terracotta", label: "at risk — shop quiet for 3+ weeks" },
+  unknown: { dot: "bg-ink/20", label: "no shop activity data yet" },
+};
+
+function HealthDot({ health }: { health: string | null }) {
+  if (!health) return null;
+  const meta = HEALTH_META[health] ?? HEALTH_META.unknown;
+  return <span title={meta.label} className={`inline-block h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />;
+}
 
 function StatusPill({ status }: { status: string }) {
   return (
@@ -234,7 +254,12 @@ export function CrmPage() {
                         </span>
                       )}
                     </td>
-                    <td><StatusPill status={ct.status} /></td>
+                    <td>
+                      <span className="inline-flex items-center gap-1.5">
+                        <HealthDot health={ct.health} />
+                        <StatusPill status={ct.status} />
+                      </span>
+                    </td>
                     <td className="text-sm text-ink/70">
                       {[ct.city, ct.country].filter(Boolean).join(", ") || "—"}
                       {lt && <span className="block text-xs text-warmgrey">{lt} local</span>}
@@ -310,7 +335,17 @@ function AddContactButton({ onAdded }: { onAdded: (id: string) => void }) {
 
 // ---------- Contact drawer: the whole relationship on one panel ----------
 interface ContactDetail {
-  contact: ContactRow & { notes_md: string | null; latitude: number | null; longitude: number | null; shop_plan: string | null };
+  contact: ContactRow & {
+    notes_md: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    shop_plan: string | null;
+    last_shop_login_at: string | null;
+    last_shop_order_at: string | null;
+    last_shop_publish_at: string | null;
+    shop_orders_total: number | null;
+    shop_orders_30d: number | null;
+  };
   interactions: { id: string; kind: string; subject: string | null; body_md: string | null; created_by: string | null; created_at: string }[];
   tasks: { id: string; title: string; due_at: string | null; done_at: string | null }[];
 }
@@ -361,6 +396,30 @@ function ContactDrawer({ id, onClose }: { id: string; onClose: () => void }) {
               {lt && <span>· {lt} their time</span>}
             </p>
           </div>
+
+          {/* Shop pulse: their activity, not our outreach */}
+          {ct.shop_slug && (
+            <div className="rounded border border-ink/10 p-3 text-sm">
+              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-warmgrey">
+                <Activity size={12} />
+                Shop pulse
+                <HealthDot health={ct.health} />
+                {ct.health && <span className="font-normal normal-case">{(HEALTH_META[ct.health] ?? HEALTH_META.unknown).label}</span>}
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink/75">
+                <span>Last admin login</span>
+                <span className="text-right">{ct.last_shop_login_at ? formatDate(ct.last_shop_login_at) : "—"}</span>
+                <span>Last paid order</span>
+                <span className="text-right">{ct.last_shop_order_at ? formatDate(ct.last_shop_order_at) : "—"}</span>
+                <span>Last content publish</span>
+                <span className="text-right">{ct.last_shop_publish_at ? formatDate(ct.last_shop_publish_at) : "—"}</span>
+                <span>Paid orders (total · 30d)</span>
+                <span className="text-right">
+                  {ct.shop_orders_total ?? 0} · {ct.shop_orders_30d ?? 0}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Status + follow-up promise */}
           <div className="grid grid-cols-2 gap-3">
@@ -531,6 +590,7 @@ function EmailComposer({ contactId, email, onDone }: { contactId: string; email:
   const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -545,9 +605,33 @@ function EmailComposer({ contactId, email, onDone }: { contactId: string; email:
       setBusy(false);
     }
   }
+  async function draft() {
+    setDrafting(true);
+    setResult(null);
+    try {
+      const res = await api.post<{ subject: string; body: string }>(`/api/admin/crm/contacts/${contactId}/draft-checkin`);
+      setSubject(res.subject);
+      setText(res.body);
+    } catch {
+      setResult("AI drafting is unavailable right now — write it by hand");
+    } finally {
+      setDrafting(false);
+    }
+  }
   return (
     <form onSubmit={submit} className="space-y-2">
-      <p className="text-xs text-warmgrey">To: {email} — plain text, from you. No templates, no tracking pixels.</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-warmgrey">To: {email} — plain text, from you. No templates, no tracking pixels.</p>
+        <button
+          type="button"
+          disabled={drafting}
+          onClick={() => void draft()}
+          className="inline-flex shrink-0 items-center gap-1 rounded bg-navy/8 px-2 py-1 text-xs font-medium text-navy hover:bg-navy/15"
+        >
+          <Wand2 size={12} />
+          {drafting ? "Drafting…" : "Draft check-in"}
+        </button>
+      </div>
       <input className="input !py-1.5 text-sm" required placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
       <textarea className="input min-h-24 text-sm" required placeholder="Write like a person…" value={text} onChange={(e) => setText(e.target.value)} />
       {result && <p className="text-xs text-palm">{result}</p>}
