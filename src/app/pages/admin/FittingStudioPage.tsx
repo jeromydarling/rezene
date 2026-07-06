@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { Component, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, Center } from "@react-three/drei";
+import { OrbitControls, ContactShadows, Center, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import {
   GARMENT_LIBRARY,
@@ -26,6 +26,40 @@ import type { AdminStyle } from "../../../shared/types";
 // proportion+fabric study, not a physics drape (that's a later phase).
 // ---------------------------------------------------------------------------
 
+// Realistic body: a CC0 MakeHuman base mesh (see public/models/README.md).
+const MANNEQUIN_URL = "/models/mannequin.glb";
+useGLTF.preload(MANNEQUIN_URL);
+const BODY_MATERIAL = new THREE.MeshStandardMaterial({ color: "#d7d3cd", roughness: 0.9, metalness: 0 });
+
+function RealBody() {
+  const gltf = useGLTF(MANNEQUIN_URL) as unknown as { scene: THREE.Group };
+  const body = useMemo(() => {
+    const c = gltf.scene.clone(true);
+    c.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) m.material = BODY_MATERIAL;
+    });
+    return c;
+  }, [gltf]);
+  return <primitive object={body} />;
+}
+
+// Fallback body (procedural primitives) shown while the GLB loads or if it fails.
+function ProceduralBody() {
+  const body = useMemo(() => buildMannequin(), []);
+  return <primitive object={body} />;
+}
+
+class BodyBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
 function GarmentScene({
   garment,
   fit,
@@ -41,14 +75,20 @@ function GarmentScene({
 }) {
   const group = useMemo(() => {
     const g = new THREE.Group();
-    if (showBody) g.add(buildMannequin());
     g.add(buildGarment(garment, fit, fabric, color));
     return g;
-  }, [garment, fit, fabric, color, showBody]);
+  }, [garment, fit, fabric, color]);
   // Dispose the previous group's geometries/materials when it's replaced.
   useEffect(() => () => disposeGroup(group), [group]);
   return (
     <Center>
+      {showBody && (
+        <BodyBoundary fallback={<ProceduralBody />}>
+          <Suspense fallback={<ProceduralBody />}>
+            <RealBody />
+          </Suspense>
+        </BodyBoundary>
+      )}
       <primitive object={group} />
     </Center>
   );
