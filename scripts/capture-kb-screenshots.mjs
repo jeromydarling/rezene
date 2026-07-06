@@ -31,6 +31,7 @@ function findChromium() {
 // name → admin route. name matches the article `screenshot` filename.
 const SHOTS = [
   ["dashboard", "/admin"],
+  ["launch", "/admin/launch"],
   ["products", "/admin/products"],
   ["skus", "/admin/skus"],
   ["inventory", "/admin/inventory"],
@@ -60,9 +61,13 @@ const OUT = "public/kb/shots";
 mkdirSync(OUT, { recursive: true });
 
 // This environment proxies outbound HTTPS; route the browser through it.
+// On a CI runner there's no proxy and no pre-installed Chromium — fall back to
+// the browser `npx playwright install chromium` puts on the default registry
+// path by leaving executablePath undefined.
 const proxyServer = process.env.HTTPS_PROXY || process.env.https_proxy;
+const executablePath = findChromium();
 const browser = await chromium.launch({
-  executablePath: findChromium(),
+  ...(executablePath ? { executablePath } : {}),
   headless: true,
   ...(proxyServer ? { proxy: { server: proxyServer } } : {}),
   args: [

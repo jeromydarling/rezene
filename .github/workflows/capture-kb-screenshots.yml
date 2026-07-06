@@ -1,0 +1,66 @@
+name: Capture KB screenshots
+
+# Drives the live admin app with headless Chromium to photograph every module,
+# then commits the PNGs back so each Knowledge Base chapter renders a real hero
+# image. Runs on a CI runner because this project's dev sandbox proxies raw
+# browser TLS (ERR_CONNECTION_RESET); a plain GitHub runner has open network.
+#
+# One-time repository setup (Settings → Secrets and variables → Actions):
+#   KB_EMAIL     — an admin login for the shop to photograph
+#   KB_PASSWORD  — that account's password
+# Optional variable (Settings → Variables → Actions):
+#   KB_BASE      — target site (default https://verto.style)
+#
+# Run it: Actions → "Capture KB screenshots" → Run workflow (pick the branch).
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Target site (overrides KB_BASE variable)"
+        required: false
+        default: ""
+
+concurrency:
+  group: kb-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright + Chromium
+        run: |
+          npm install playwright@1.48.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+
+      - name: Capture screenshots
+        env:
+          KB_EMAIL: ${{ secrets.KB_EMAIL }}
+          KB_PASSWORD: ${{ secrets.KB_PASSWORD }}
+          KB_BASE: ${{ github.event.inputs.base || vars.KB_BASE }}
+        run: node scripts/capture-kb-screenshots.mjs
+
+      - name: Commit screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/kb/shots
+          if git diff --staged --quiet; then
+            echo "No screenshot changes to commit."
+          else
+            git commit -m "kb: refresh module screenshots [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
