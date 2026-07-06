@@ -51,37 +51,53 @@ Look for the small **?** help-dots next to screen titles and controls. Hover for
   {
     slug: "first-15-minutes",
     title: "Your first 15 minutes",
-    summary: "A guided path from empty account to a published product and a plan.",
+    summary: "Start with the Launch Playbook — then a guided path to your first real product.",
     part: "getting-started",
-    moduleRoute: "/admin",
-    keywords: "onboarding setup quickstart new account checklist",
+    moduleRoute: "/admin/launch",
+    keywords: "onboarding setup quickstart new account checklist launch playbook plan brand brain established getting started",
     updated: "2026-07-06",
     body: `# Your first 15 minutes
 
-A brand-new Verto account starts empty — no products, no suppliers, no fake data. Here's the fastest path to something real.
+A brand-new Verto account starts empty — no products, no suppliers, no fake data. The fastest way to fill it isn't to click through screens one by one. It's the **Launch Playbook** (**Account → Launch Playbook**, or \`/admin/launch\`), which turns a plan into a working app and then guides you through everything else.
 
-## 1. Set your brand identity
+## Start with the Launch Playbook
 
-Go to **Account → Settings** and set your brand name and tagline. These flow everywhere — the storefront header, tech pack covers, email footers.
+The first time you open it, the Playbook asks one question: **which best describes you?**
 
-## 2. Add your first product
+- **I'm established** — you already have a brand, products, suppliers, and numbers. Take the **import lane**: paste or upload what you have and Verto seeds your catalog, sourcing, and costing from it, so you're not retyping a business you already run.
+- **I'm just getting started** — take the **guided lane**. Verto walks you through a real clothing-brand launch, one decision at a time, and builds the plan with you.
 
-Open **Catalog → Products → New product**. A name, price, and category create a draft. Add at least one **variant** (a colour + size) and click **Publish** — it's live on your storefront immediately. See [Adding and editing products](/admin/support/kb/products).
+You can switch lanes anytime — nothing is locked in by the choice.
 
-## 3. Design something (optional but fun)
+## The guided lane: build a plan, then a brand
 
-Open **Design & Development → Design Studio** and describe a garment. Flux generates real concept imagery you can iterate on, drop onto a product, or send straight to a maker. See [The LLM Design Studio](/admin/support/kb/design-studio).
+The guided Playbook is a clickable version of a complete brand-launch field guide, organized into parts — **brand foundation, product, sourcing, tariffs & landed cost, commerce, launch, finance**. You fill in the blanks; three things make it fast:
 
-## 4. Find a maker
+1. **Draft it with an LLM.** Don't have answers yet? Verto can research and draft a starting plan for your category and markets, which you then edit. You can also **paste** a plan you wrote elsewhere, or **upload a PDF** and let Verto parse it into the guide.
+2. **Invisible business admin.** A new founder shouldn't have to hand-calculate tariffs, landed cost, or margins. Sections like **Tariffs & landed cost** have a **"✨ Fill this in for me"** button — Verto fills them in and leaves a plain-English note explaining *why*, so you learn the reasoning instead of just getting numbers.
+3. **A living brief, not a document.** As you fill sections, the Playbook feeds a per-shop **Brand Brain** that seeds and guides the rest of the app — your positioning words shape LLM copy, your hero style and mood board flow into the Design Studio, your fabrics into Materials, your markets into Duties and Costing.
 
-No factory yet? **Sourcing & Production → Find a Maker** researches real, low-MOQ ateliers by garment, materials, and location, with sources. Add promising ones to your factory list. See [Finding a maker](/admin/support/kb/sourcing).
+> [!TIP]
+> On **Visual identity**, upload 6–20 images to build a **mood board** — it captures the world of the brand and feeds the Design Studio. On **Key fabrics**, pick from the built-in fabric library, or hit **"🧵 Not sure? Describe the feel"** and Verto suggests fabrics from a plain-English description like "soft and cozy for a hoodie."
 
-## 5. Know your numbers
+## Compile it, then set up your app
 
-Create a **Cost Sheet** for your hero style (**Finance → Costing**) and add a destination market. Verto shows your landed cost and margin — and its LLM can benchmark a first-pass breakdown for you. See [Costing & margins](/admin/support/kb/costing).
+When the plan is filled in, **compile** it into a clean business plan you can read and share — and the compiled view links straight into each module it seeds, so "set up your app" is a click, not a re-entry.
+
+The **launch-readiness checklist** at the bottom is a real tracker, not decoration. Each item (samples approved, checkout tested, shipping rates configured, returns policy published, launch emails drafted…) deep-links to the exact screen where you do it, and ticking it fills a **launch-ready progress bar**.
+
+## Then: your first real product
+
+With a plan in place, these five steps turn it into a live storefront. If you took the Playbook, most of the groundwork is already seeded.
+
+1. **Set your brand identity.** **Account → Settings** — brand name and tagline flow everywhere (storefront header, tech pack covers, email footers). The Playbook seeds this from your brand foundation.
+2. **Add your first product.** **Catalog → Products → New product**. A name, price, and category create a draft; add a **variant** (colour + size) and **Publish** to go live. See [Adding and editing products](/admin/support/kb/products).
+3. **Design your hero style.** **Design & Development → Design Studio** — describe the garment (your Playbook concept prompt is a head start) and Flux generates concept imagery to iterate on. See [The LLM Design Studio](/admin/support/kb/design-studio).
+4. **Find a maker.** **Sourcing & Production → Find a Maker** researches real, low-MOQ ateliers by garment, materials, and location, with sources. See [Finding a maker](/admin/support/kb/sourcing).
+5. **Know your numbers.** Create a **Cost Sheet** for your hero style (**Finance → Costing**), add a destination market, and Verto shows landed cost and margin — its LLM can benchmark a first-pass breakdown. See [Costing & margins](/admin/support/kb/costing).
 
 > [!NOTE]
-> Nothing you do here is destructive or public until you choose. Products stay drafts until published; LLM outputs are always yours to edit; reports and sheets are private to your team.`,
+> Nothing here is destructive or public until you choose. Products stay drafts until published; LLM outputs are always yours to edit; your plan and sheets are private to your team.`,
   },
   {
     slug: "accounts-and-security",
