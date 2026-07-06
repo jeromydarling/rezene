@@ -19,6 +19,52 @@ adminSourcingRoutes.get("/config", async (c) => {
   return c.json({ enabled: perplexityConfigured(c.env) });
 });
 
+// Live export/logistics intelligence for a trade lane (origin → destination),
+// powered by Perplexity and cached in KV for a day (it's slow + costs money).
+adminSourcingRoutes.get("/export-intel", async (c) => {
+  const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
+  const origin = (c.req.query("origin") || "Morocco").trim().slice(0, 60);
+  const destination = (c.req.query("destination") || "United States").trim().slice(0, 60);
+  if (!perplexityConfigured(c.env)) {
+    return c.json({ enabled: false });
+  }
+  const key = `xintel:${origin}:${destination}`.toLowerCase();
+  const refresh = c.req.query("refresh") === "1";
+  if (!refresh) {
+    const cached = await c.env.KV.get(key);
+    if (cached) return c.json({ enabled: true, cached: true, ...(JSON.parse(cached) as object) });
+  }
+
+  try {
+    const research = await perplexityResearch(c.env, {
+      system:
+        "You are a fashion trade & logistics analyst. For shipping FINISHED APPAREL from the given origin to the given destination, give current, practical export intelligence. Respond with ONLY JSON: {\"agreement\":\"the trade agreement / tariff program that applies (or 'None')\",\"duties\":\"duty/tariff summary with concrete rates\",\"documents\":[\"required export & import documents\"],\"gotchas\":[\"non-obvious pitfalls — rules of origin (e.g. yarn-forward), quotas, certifications, de minimis thresholds, labeling\"],\"freight\":\"ballpark freight cost and transit time by air and by sea\",\"leadTime\":\"typical end-to-end logistics lead time\",\"asOf\":\"the time period this reflects\"}. Be concrete with numbers.",
+      prompt: `Finished apparel export lane: ${origin} → ${destination}.`,
+      maxTokens: 1300,
+    });
+    const { parseModelJson } = await import("../services/anthropic");
+    let sections: Record<string, unknown> = {};
+    try {
+      const p = parseModelJson(research.text);
+      if (p && typeof p === "object") sections = p as Record<string, unknown>;
+    } catch {
+      /* fall back to raw */
+    }
+    const payload = {
+      origin,
+      destination,
+      sections,
+      raw: Object.keys(sections).length ? null : research.text,
+      citations: research.citations,
+      updatedAt: null as string | null, // stamped by the client on display
+    };
+    await c.env.KV.put(key, JSON.stringify(payload), { expirationTtl: 86400 });
+    return c.json({ enabled: true, cached: false, ...payload });
+  } catch (err) {
+    return c.json({ enabled: true, error: `Couldn't fetch export intel: ${String(err).slice(0, 160)}` }, 502);
+  }
+});
+
 interface MakerLead {
   name: string;
   city?: string | null;

@@ -34,8 +34,9 @@ export function SuppliersPage() {
       <PageHeader
         eyebrow="Production"
         title="Factories & Suppliers"
-        description="The Casablanca network. Leads marked 'unverified' are research data — verify before committing production."
+        description="Your maker network. Leads marked 'unverified' are AI-researched — confirm details before committing production."
       />
+      <ExportIntelPanel suppliers={data ?? []} />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
       {data && data.length === 0 && (
@@ -280,6 +281,162 @@ function SupplierDetailPanel({ id }: { id: string }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- Live export intelligence (Perplexity) ----------
+interface ExportIntel {
+  enabled: boolean;
+  cached?: boolean;
+  error?: string;
+  origin?: string;
+  destination?: string;
+  sections?: {
+    agreement?: string;
+    duties?: string;
+    documents?: string[];
+    gotchas?: string[];
+    freight?: string;
+    leadTime?: string;
+    asOf?: string;
+  };
+  raw?: string | null;
+  citations?: string[];
+}
+
+function ExportIntelPanel({ suppliers }: { suppliers: AdminSupplier[] }) {
+  const defaultOrigin =
+    suppliers.map((s) => s.country).find(Boolean) === "MA" ? "Morocco" : suppliers.map((s) => s.country).find(Boolean) || "Morocco";
+  const [open, setOpen] = useState(false);
+  const [origin, setOrigin] = useState(defaultOrigin);
+  const [destination, setDestination] = useState("United States");
+  const [data, setData] = useState<ExportIntel | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+
+  async function load(refresh = false) {
+    setBusy(true);
+    try {
+      const res = await api.get<ExportIntel>(
+        `/api/admin/sourcing/export-intel?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${refresh ? "&refresh=1" : ""}`,
+      );
+      if (!res.enabled) setUnavailable(true);
+      else setData(res);
+    } catch {
+      setData({ enabled: true, error: "Couldn't fetch export intel right now." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const s = data?.sections;
+  return (
+    <div className="admin-card mb-5 overflow-hidden p-0">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-cream"
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next && !data && !unavailable) void load();
+        }}
+      >
+        <span>
+          <span className="block text-[0.6rem] font-semibold uppercase tracking-wider text-warmgrey">Export intelligence</span>
+          <span className="text-sm font-medium">
+            {origin} → {destination}{" "}
+            <span className="text-xs font-normal text-warmgrey">· duties, docs & gotchas, live</span>
+          </span>
+        </span>
+        <span className="text-warmgrey">{open ? "–" : "+"}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 border-t border-ink/10 px-4 py-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-xs text-warmgrey">
+              <span className="mb-0.5 block">From</span>
+              <input className="input !py-1.5 text-sm" value={origin} onChange={(e) => setOrigin(e.target.value)} />
+            </label>
+            <label className="text-xs text-warmgrey">
+              <span className="mb-0.5 block">To</span>
+              <input className="input !py-1.5 text-sm" value={destination} onChange={(e) => setDestination(e.target.value)} />
+            </label>
+            <button type="button" className="btn btn-secondary !py-1.5 text-xs" disabled={busy} onClick={() => void load()}>
+              {busy ? "Researching…" : "Check lane"}
+            </button>
+            {data && !data.error && (
+              <button type="button" className="link-quiet text-xs" disabled={busy} onClick={() => void load(true)}>
+                Refresh
+              </button>
+            )}
+          </div>
+
+          {unavailable && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Export intelligence isn’t switched on yet (needs the research key). The live-duty features light up once it’s set.
+            </p>
+          )}
+          {busy && !data && <p className="text-xs text-warmgrey">Researching current trade conditions for this lane…</p>}
+          {data?.error && <p className="field-error">{data.error}</p>}
+
+          {data && !data.error && (s || data.raw) && (
+            <div className="space-y-2 text-sm">
+              {s?.agreement && <IntelRow label="Trade agreement" value={s.agreement} />}
+              {s?.duties && <IntelRow label="Duties & tariffs" value={s.duties} />}
+              {s?.freight && <IntelRow label="Freight & transit" value={s.freight} />}
+              {s?.leadTime && <IntelRow label="Lead time" value={s.leadTime} />}
+              {s?.documents && s.documents.length > 0 && <IntelList label="Documents" items={s.documents} />}
+              {s?.gotchas && s.gotchas.length > 0 && <IntelList label="Gotchas" items={s.gotchas} tone="warn" />}
+              {data.raw && <p className="whitespace-pre-wrap text-ink/80">{data.raw}</p>}
+              <div className="flex items-center justify-between pt-1 text-[11px] text-warmgrey">
+                <span>{s?.asOf ? `As of ${s.asOf}` : "Current"} {data.cached ? "· cached" : "· fresh"}</span>
+                {data.citations && data.citations.length > 0 && (
+                  <span>{data.citations.length} sources</span>
+                )}
+              </div>
+              {data.citations && data.citations.length > 0 && (
+                <details className="text-[11px] text-warmgrey">
+                  <summary className="cursor-pointer">Sources</summary>
+                  <ul className="mt-1 space-y-0.5">
+                    {data.citations.slice(0, 12).map((c, i) => (
+                      <li key={i}>
+                        <a href={c} target="_blank" rel="noreferrer" className="text-navy hover:underline">
+                          {c}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <p className="text-[11px] text-warmgrey">AI-researched — sanity-check duty rates against an official source before you commit.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IntelRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-navy/[0.03] px-3 py-2">
+      <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-warmgrey">{label}</p>
+      <p className="mt-0.5 text-ink/85">{value}</p>
+    </div>
+  );
+}
+
+function IntelList({ label, items, tone }: { label: string; items: string[]; tone?: "warn" }) {
+  return (
+    <div className={`rounded-md px-3 py-2 ${tone === "warn" ? "bg-amber-50" : "bg-navy/[0.03]"}`}>
+      <p className={`text-[0.6rem] font-semibold uppercase tracking-wider ${tone === "warn" ? "text-amber-800" : "text-warmgrey"}`}>{label}</p>
+      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-ink/85">
+        {items.map((it, i) => (
+          <li key={i}>{it}</li>
+        ))}
+      </ul>
     </div>
   );
 }
