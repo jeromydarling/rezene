@@ -56,6 +56,30 @@ jobs:
             echo "Could not determine the Cloudflare account id." >&2
             exit 1
           fi
+
+          # Safety gate: refuse to delete a Worker that still serves a custom
+          # domain. This is the "does anything route to it?" check — a routed
+          # Worker must have its domain detached first.
+          echo "Checking for custom domains attached to \"${SCRIPT_NAME}\"…"
+          domains=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${acct}/workers/domains?service=${SCRIPT_NAME}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          echo "$domains"
+          count=$(printf '%s' "$domains" | python3 -c 'import sys,json
+try:
+    d=json.load(sys.stdin)
+    print(len(d.get("result") or []) if d.get("success") else "err")
+except Exception:
+    print("err")')
+          if [ "$count" = "err" ]; then
+            echo "❌ Could not read attached domains — aborting for safety." >&2
+            exit 1
+          fi
+          if [ "$count" != "0" ]; then
+            echo "❌ \"${SCRIPT_NAME}\" has ${count} custom domain(s) attached — it IS routed. Not deleting; detach the domain(s) first." >&2
+            exit 1
+          fi
+          echo "No custom domains attached — safe to delete."
+
           echo "Deleting Worker \"${SCRIPT_NAME}\" in account ${acct}…"
           code=$(curl -s -o /tmp/cf.json -w '%{http_code}' -X DELETE \
             "https://api.cloudflare.com/client/v4/accounts/${acct}/workers/scripts/${SCRIPT_NAME}?force=true" \
