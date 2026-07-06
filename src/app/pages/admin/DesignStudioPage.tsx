@@ -389,8 +389,8 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
                     <button type="button" title="Use on your site" className="text-xs text-white" onClick={() => setUseGen(g)}>
                       ⇡ use
                     </button>
-                    <button type="button" title="Ship to sampling" className="text-xs text-white" onClick={() => setShip(g)}>
-                      ⇢ sample
+                    <button type="button" title="Send to a maker" className="text-xs text-white" onClick={() => setShip(g)}>
+                      ⇢ maker
                     </button>
                     <button
                       type="button"
@@ -431,7 +431,6 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
             existingStyleId={data.styleId}
             onDone={() => {
               setShip(null);
-              toast.success("Sent to sampling", "A style and sample request were created for your factory.");
               void reload();
               onMeta();
             }}
@@ -442,6 +441,11 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
   );
 }
 
+interface ShipResult {
+  shareUrl: string;
+  emailed: boolean;
+  makerName: string | null;
+}
 function ShipForm({
   conceptId,
   generation,
@@ -459,35 +463,74 @@ function ShipForm({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ShipResult | null>(null);
+  const [copied, setCopied] = useState(false);
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/api/admin/ai/concepts/${conceptId}/ship`, {
+      const res = await api.post<ShipResult>(`/api/admin/ai/concepts/${conceptId}/ship`, {
         generationId: generation.id,
         supplierId: supplierId || null,
         styleId: existingStyleId,
         kind,
         notes: notes || null,
       });
-      onDone();
+      setResult(res);
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : "Couldn't ship");
+      setError(e instanceof ApiRequestError ? e.message : "Couldn't send");
       setBusy(false);
     }
+  }
+
+  if (result) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-md bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-medium">
+            {result.emailed
+              ? `Emailed to ${result.makerName ?? "your maker"} ✓`
+              : result.makerName
+                ? `Sample request created for ${result.makerName}.`
+                : "Sample request created."}
+          </p>
+          <p className="mt-1 text-xs">
+            We built a tech pack with this design as the cover and filed the sample. Share this secure link so they can view
+            the design, read the spec, and reply:
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <input readOnly className="input flex-1 !text-xs" value={result.shareUrl} onFocus={(e) => e.target.select()} />
+            <button
+              type="button"
+              className="btn btn-secondary !py-1.5 text-xs"
+              onClick={() => {
+                void navigator.clipboard.writeText(result.shareUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+        <button type="button" className="btn btn-primary w-full" onClick={onDone}>
+          Done
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       {generation.url && <img src={generation.url} alt="" className="aspect-[3/4] w-40 rounded-md object-cover" />}
       <p className="text-sm text-warmgrey">
-        This creates a style from your design {existingStyleId ? "(using the linked style)" : ""} and requests a sample. Add a
-        tech pack from the style afterward if you like.
+        This turns your design into a style, builds a tech pack with it as the cover, files a sample request, and emails your
+        maker a secure link to view it and reply.
       </p>
-      <Labeled label="Factory / supplier">
+      <Labeled label="Send to maker">
         <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-          <option value="">— choose later —</option>
+          <option value="">— file the request, no maker yet —</option>
           {(suppliers ?? []).map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -495,6 +538,11 @@ function ShipForm({
           ))}
         </select>
       </Labeled>
+      {suppliers && suppliers.length === 0 && (
+        <p className="text-xs text-warmgrey">
+          No makers saved yet — add one under Production → Factories, or find one in Find a Maker.
+        </p>
+      )}
       <Labeled label="Sample type">
         <select className="input" value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="proto">Prototype</option>
@@ -503,12 +551,12 @@ function ShipForm({
           <option value="pp">Pre-production</option>
         </select>
       </Labeled>
-      <Labeled label="Note to the factory">
+      <Labeled label="Note to the maker">
         <textarea className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any construction or fabric direction…" />
       </Labeled>
       {error && <ErrorNote message={error} />}
       <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={() => void submit()}>
-        {busy ? "Sending…" : "Create style + request sample"}
+        {busy ? "Sending…" : supplierId ? "Send to maker" : "File sample request"}
       </button>
     </div>
   );

@@ -414,31 +414,49 @@ adminAiRoutes.delete("/concepts/:id/generations/:genId", requireAdminWrite, asyn
   return c.json({ ok: true });
 });
 
-// Ship a chosen design to sampling: ensure a Style, then request a sample from
-// a supplier. Closes the loop idea → image → style → factory.
+// Ship a chosen design straight to a saved maker. Airtight loop:
+//   image → Style → Tech pack (image as cover) → Sample request →
+//   factory-portal share link → the maker is emailed the design + link.
 adminAiRoutes.post("/concepts/:id/ship", requireAdminWrite, async (c) => {
   const { conceptShipSchema } = await import("../services/validators");
   const id = c.req.param("id");
   const body = await parseBody(c, conceptShipSchema);
-  const concept = await first<{ title: string; style_id: string | null }>(
+  const concept = await first<{ title: string; brief: string | null; style_id: string | null }>(
     c.var.db,
-    `SELECT title, style_id FROM ai_concepts WHERE id = ?`,
+    `SELECT title, brief, style_id FROM ai_concepts WHERE id = ?`,
     id,
   );
   if (!concept) return c.json({ error: "Concept not found" }, 404);
 
-  // Resolve or create the style behind this design.
+  // The chosen image.
+  let imageUrl: string | null = null;
+  if (body.generationId) {
+    const gen = await first<{ file_id: string | null }>(
+      c.var.db,
+      `SELECT file_id FROM ai_generations WHERE id = ? AND concept_id = ?`,
+      body.generationId,
+      id,
+    );
+    if (gen?.file_id) imageUrl = `/media/${gen.file_id}`;
+  }
+
+  // 1. Resolve or create the Style behind this design.
   let styleId = body.styleId || concept.style_id;
-  if (!styleId) {
+  let styleCode = "";
+  if (styleId) {
+    const s = await first<{ style_code: string }>(c.var.db, `SELECT style_code FROM styles WHERE id = ?`, styleId);
+    styleCode = s?.style_code ?? "ST";
+  } else {
     styleId = newId("sty");
-    const code = `ST-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    styleCode = `ST-${styleId.slice(-6).toUpperCase()}`;
     await run(
       c.var.db,
-      `INSERT INTO styles (id, style_code, name, category, gender, status)
-       VALUES (?, ?, ?, 'apparel', 'unisex', 'design')`,
+      `INSERT INTO styles (id, style_code, name, category, gender, status, description)
+       VALUES (?, ?, ?, 'apparel', 'unisex', 'design', ?)`,
       styleId,
-      code,
+      styleCode,
       concept.title.slice(0, 120),
+      concept.brief ?? null,
     );
     await run(
       c.var.db,
@@ -447,15 +465,29 @@ adminAiRoutes.post("/concepts/:id/ship", requireAdminWrite, async (c) => {
       id,
     );
   }
-
-  // Re-tag the chosen image to the style so the factory/sample sees it.
-  if (body.generationId) {
+  if (body.generationId && imageUrl) {
     const gen = await first<{ file_id: string | null }>(c.var.db, `SELECT file_id FROM ai_generations WHERE id = ? AND concept_id = ?`, body.generationId, id);
-    if (gen?.file_id) {
-      await run(c.var.db, `UPDATE files SET entity_type = 'style', entity_id = ? WHERE id = ?`, styleId, gen.file_id);
-    }
+    if (gen?.file_id) await run(c.var.db, `UPDATE files SET entity_type = 'style', entity_id = ? WHERE id = ?`, styleId, gen.file_id);
   }
 
+  // 2. Ensure a tech pack (the factory-portal-viewable spec) with the design as cover.
+  let techPackId: string | null = (await first<{ id: string }>(c.var.db, `SELECT id FROM tech_packs WHERE style_id = ? ORDER BY version DESC LIMIT 1`, styleId))?.id ?? null;
+  if (!techPackId) {
+    const { createTechPackForStyle } = await import("../services/techpacks");
+    techPackId = await createTechPackForStyle(c.var.db, {
+      styleId,
+      styleCode,
+      name: `${concept.title} — tech pack`,
+      coverImageUrl: imageUrl,
+      source: "ai_concept",
+      seedOverview: { description: concept.brief },
+      createdBy: c.var.userId,
+    });
+  } else if (imageUrl) {
+    await run(c.var.db, `UPDATE tech_packs SET cover_image_url = COALESCE(cover_image_url, ?) WHERE id = ?`, imageUrl, techPackId);
+  }
+
+  // 3. The sample request.
   const sampleId = newId("smp");
   await run(
     c.var.db,
@@ -467,8 +499,58 @@ adminAiRoutes.post("/concepts/:id/ship", requireAdminWrite, async (c) => {
     body.kind,
     body.notes ?? `Sample requested from the Design Studio for "${concept.title}".`,
   );
-  await writeAudit(c.var.db, c.var.userId, "concept.ship_to_sample", "ai_concept", id, { styleId, sampleId });
-  return c.json({ styleId, sampleId }, 201);
+
+  // 4. A factory-portal share link so the maker can view the design + spec.
+  const { randomToken, sha256Hex } = await import("../utils/id");
+  const token = randomToken(24);
+  const shareId = newId("tps");
+  await run(
+    c.var.db,
+    `INSERT INTO tech_pack_shares (id, tech_pack_id, supplier_id, label, token_hash, language, created_by)
+     VALUES (?, ?, ?, ?, ?, 'en', ?)`,
+    shareId,
+    techPackId,
+    body.supplierId || null,
+    `${concept.title} — sample request`,
+    await sha256Hex(token),
+    c.var.userId,
+  );
+  const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const shareUrl = `${appUrl}/factory/${token}`;
+
+  // 5. Email the maker (if we have an address). Degrades to a copyable link.
+  let emailed = false;
+  let makerName: string | null = null;
+  if (body.supplierId) {
+    const supplier = await first<{ name: string; email: string | null }>(
+      c.var.db,
+      `SELECT name, email FROM suppliers WHERE id = ?`,
+      body.supplierId,
+    );
+    makerName = supplier?.name ?? null;
+    if (supplier?.email) {
+      const { sendBuyerEmail } = await import("../services/buyer-email");
+      const { getBrandName } = await import("../services/brand");
+      const brand = await getBrandName(c.env);
+      const imgAbs = imageUrl ? `${appUrl}${imageUrl}` : "";
+      emailed = await sendBuyerEmail(c.env, {
+        to: supplier.email,
+        fromName: brand,
+        subject: `${brand} — new design to sample: ${concept.title}`,
+        text: `Hi${supplier.name ? ` ${supplier.name}` : ""},
+
+${brand} would like a ${body.kind} sample of a new design: "${concept.title}".
+${body.notes ? `\nNotes: ${body.notes}\n` : ""}
+View the design and the full tech pack (and reply with questions) here:
+${shareUrl}
+${imgAbs ? `\nDesign preview: ${imgAbs}\n` : ""}
+Thank you.`,
+      }).catch(() => false);
+    }
+  }
+
+  await writeAudit(c.var.db, c.var.userId, "concept.ship_to_maker", "ai_concept", id, { styleId, sampleId, techPackId, shareId, emailed });
+  return c.json({ styleId, sampleId, techPackId, shareUrl, emailed, makerName }, 201);
 });
 
 // ---------- External tool exports (Midjourney / Firefly / CLO bridges) ----------

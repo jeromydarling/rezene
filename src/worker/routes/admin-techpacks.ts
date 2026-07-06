@@ -8,31 +8,12 @@ import {
 import { requireAdminWrite } from "../middleware/auth";
 import { getBrandName } from "../services/brand";
 import { renderTechPackHtml } from "../services/techpack-html";
+import { DEFAULT_SECTIONS } from "../services/techpacks";
 import { newId, randomToken, sha256Hex } from "../utils/id";
 import type { AppContext } from "../types/env";
 import type { AdminTechPackDetail, AdminTechPackSummary } from "../../shared/types";
 
 export const adminTechPackRoutes = new Hono<AppContext>();
-
-/** Sections every new tech pack starts with, in factory-reading order. */
-const DEFAULT_SECTIONS: { kind: string; title: string }[] = [
-  { kind: "cover", title: "Cover" },
-  { kind: "style_overview", title: "Style Overview" },
-  { kind: "flat_sketch", title: "Flat Sketch / Reference" },
-  { kind: "bom", title: "Bill of Materials" },
-  { kind: "fabric_details", title: "Fabric Details" },
-  { kind: "trim_details", title: "Trim Details" },
-  { kind: "colorways", title: "Colorways" },
-  { kind: "size_spec", title: "Size Specification" },
-  { kind: "measurement_points", title: "Measurement Points" },
-  { kind: "grading", title: "Grading Rules" },
-  { kind: "construction", title: "Construction Notes" },
-  { kind: "stitch_details", title: "Stitch Details" },
-  { kind: "labels_packaging", title: "Labels & Packaging" },
-  { kind: "care_label", title: "Care Label" },
-  { kind: "qc_checklist", title: "QC Checklist" },
-  { kind: "revision_history", title: "Revision History" },
-];
 
 const TP_SELECT = `
   SELECT tp.*, s.name AS style_name FROM tech_packs tp
