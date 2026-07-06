@@ -546,6 +546,92 @@ function VertoHome() {
 }
 
 // ---------- Pricing ----------
+// The replacement math. Every line is a real product's published list
+// pricing (researched mid-2026) — the honest version of "we save you
+// money" is an itemized receipt, not an adjective.
+const STACK_ITEMS = [
+  { item: "Store platform", tool: "Shopify Basic–Grow", cost: "$29–105" },
+  { item: "Email marketing", tool: "Klaviyo, ~2,500 contacts", cost: "$60" },
+  { item: "SEO apps", tool: "all-in-one + schema + llms.txt apps", cost: "$30–80" },
+  { item: "Translations", tool: "Weglot / Langify", cost: "$17–32" },
+  { item: "Reviews · size charts · pre-orders", tool: "three small apps", cost: "$30–50" },
+  { item: "AI copywriting", tool: "Copy.ai / Jasper", cost: "$29–69" },
+  { item: "Social scheduling", tool: "Buffer / Later", cost: "$15–25" },
+  { item: "Tech packs / PLM", tool: "Techpacker → Backbone, per seat", cost: "$70–398" },
+  { item: "Production & inventory ops", tool: "ApparelMagic / Katana", cost: "$255–299" },
+  { item: "Shipping labels + customs docs", tool: "ShipStation / Shippo", cost: "$15–30" },
+  { item: "Wholesale portal", tool: "SparkLayer → NuORDER", cost: "$49–580" },
+];
+
+function StackYouReplace() {
+  return (
+    <section className="mt-20">
+      <div className="mb-8 text-center">
+        <Reveal>
+          <p className="eyebrow mb-2">The honest math</p>
+        </Reveal>
+        <Reveal delay={100}>
+          <h2 className="font-display text-3xl font-light md:text-4xl">What the patchwork costs</h2>
+        </Reveal>
+        <Reveal delay={200}>
+          <p className="prose-editorial mx-auto mt-3 max-w-2xl">
+            Every Verto module exists as a separate product somewhere. Here's what they charge —
+            published list pricing, researched mid-2026.
+          </p>
+        </Reveal>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-5">
+        {/* The receipt */}
+        <Reveal className="lg:col-span-3">
+          <div className="admin-card h-full p-6">
+            <ul className="divide-y divide-ink/5">
+              {STACK_ITEMS.map((row) => (
+                <li key={row.item} className="flex items-baseline gap-3 py-2 text-sm">
+                  <span className="font-medium">{row.item}</span>
+                  <span className="hidden flex-1 truncate text-xs text-warmgrey sm:block">{row.tool}</span>
+                  <span className="ml-auto whitespace-nowrap text-ink/80">{row.cost}<span className="text-xs text-warmgrey">/mo</span></span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex items-baseline justify-between border-t border-ink/15 pt-3">
+              <span className="text-sm font-semibold">Bought separately</span>
+              <span className="font-display text-2xl font-light text-terracotta">$599–1,700<span className="text-sm text-warmgrey">/mo</span></span>
+            </div>
+            <p className="mt-2 text-xs text-warmgrey">
+              Most labels don't buy every line — they run three or four of them (~$400–900/mo) and
+              do the rest by hand at midnight. Add a freelancer to glue it together and small-brand
+              retainers start around $500/mo for SEO alone.
+            </p>
+          </div>
+        </Reveal>
+        {/* The alternative */}
+        <Reveal delay={150} className="lg:col-span-2">
+          <div className="flex h-full flex-col justify-center rounded-lg bg-navy p-8 text-chalk">
+            <p className="eyebrow !text-chalk/60">All of it, on Verto</p>
+            <p className="mt-3 font-display text-5xl font-light">
+              $19–199<span className="text-lg text-chalk/60">/mo</span>
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-chalk/80">
+              One login, one database, every module above included on every plan. A label on
+              Studio ($79) typically keeps <span className="font-semibold text-chalk">$5,000–10,000 a year</span> that
+              the patchwork would have taken — before counting onboarding fees, per-seat charges,
+              or the hours lost stitching five systems together.
+            </p>
+            <Link to="/signup" className="btn btn-primary verto-sheen mt-6 self-start !bg-terracotta">
+              Keep the difference
+            </Link>
+          </div>
+        </Reveal>
+      </div>
+      <p className="mt-4 text-center text-xs text-warmgrey">
+        Competitor prices are their published list pricing as of mid-2026 — always verify current
+        plans with each vendor. Some tools have free tiers with tight limits; ranges show entry
+        paid tiers for a working label.
+      </p>
+    </section>
+  );
+}
+
 function VertoPricing() {
   const [annual, setAnnual] = useState(true);
   return (
@@ -618,6 +704,7 @@ function VertoPricing() {
         14-day free trial on every plan, no card required. Payment processing (Stripe) is billed
         separately by Stripe at their standard rates.
       </p>
+      <StackYouReplace />
     </div>
   );
 }

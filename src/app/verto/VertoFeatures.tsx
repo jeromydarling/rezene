@@ -475,11 +475,11 @@ const FEATURES: Feature[] = [
     id: "seo",
     eyebrow: "Be found",
     heading: "SEO that Shopify sells you in pieces.",
-    body: "Product rich results, per-page tags and canonicals, social previews, self-updating sitemaps, alt-text tracking, an llms.txt index for AI assistants — and a Search Checkup screen in plain merchant language. On the big platforms this is three or four apps and a freelancer; here it ships in the box and updates itself on every publish.",
+    body: "Product rich results, per-page tags and canonicals, social previews, self-updating sitemaps, alt-text tracking, an llms.txt index for AI assistants — and a Search Checkup screen in plain merchant language. On Shopify this is an SEO app at $30–80/month, a structured-data app at $399/year, an llms.txt app on top, and — when the apps conflict — a freelancer from $500/month. Here it ships in the box and updates itself on every publish.",
     points: [
-      "Product schema with price & availability — rich-result eligible",
-      "Search Checkup: findings + one-tap fixes, AI-drafted descriptions",
-      "Ready for AI search: llms.txt + structured data by default",
+      "Product schema with price & availability — the $399/yr app, included",
+      "Search Checkup: findings + one-tap fixes + AI-drafted descriptions",
+      "AI-search ready by default — llms.txt is a $99/mo tier elsewhere",
     ],
     screen: MiniSeoCheckup,
     url: "verto.style/maison/admin/content/search",
@@ -554,7 +554,7 @@ export function VertoFeatures() {
           </h1>
           <Reveal delay={500}>
             <p className="prose-editorial mx-auto mt-4 max-w-2xl">
-              Twelve modules, one database, zero copy-paste between tools. Every screen below is
+              Thirteen modules, one database, zero copy-paste between tools. Every screen below is
               the real interface, miniaturized — and the{" "}
               <a href={`${DEMO_SHOP_BASE}/admin`} className="link-quiet">demo admin</a> is open if
               you want to drive.
