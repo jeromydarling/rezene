@@ -95,9 +95,40 @@ export function parseModelJson(text: string): unknown {
   const candidate = fenced ? fenced[1] : trimmed;
   const start = candidate.search(/[[{]/);
   if (start === -1) throw new Error("Model response contained no JSON");
+  // Fast path: the whole tail is valid JSON.
   try {
     return JSON.parse(candidate.slice(start));
   } catch {
-    throw new Error("Model response was not valid JSON");
+    /* fall through to balanced extraction */
   }
+  // Balanced-bracket scan: pull out just the first complete JSON value, so
+  // trailing prose (e.g. Perplexity appending notes/sources after the closing
+  // brace) doesn't sink an otherwise-valid object.
+  const open = candidate[start];
+  const close = open === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < candidate.length; i++) {
+    const ch = candidate[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(candidate.slice(start, i + 1));
+        } catch {
+          throw new Error("Model response was not valid JSON");
+        }
+      }
+    }
+  }
+  throw new Error("Model response was not valid JSON");
 }
