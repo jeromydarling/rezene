@@ -413,6 +413,123 @@ function MiniPlatform() {
   );
 }
 
+function MiniDesignStudio() {
+  const looks = [
+    "from-[#2b3a5c] to-[#0f1626]",
+    "from-[#c9b7a0] to-[#8a7358]",
+    "from-[#3a4d47] to-[#1c2622]",
+    "from-[#b98b6e] to-[#7a5340]",
+  ];
+  return (
+    <MiniShell title="Design Studio — SS27 linen set">
+      <div className="mb-1.5 flex items-center gap-1">
+        <span className="flex-1 truncate rounded bg-white px-1.5 py-1 text-[8px] text-ink/70">
+          a wide linen trouser in warm sand, editorial…
+        </span>
+        <span className={badge("bg-navy text-chalk")}>✦ Generate</span>
+      </div>
+      <div className="mb-1.5 flex flex-wrap gap-1">
+        <span className={badge("bg-ink/5 text-ink/60")}>house style</span>
+        <span className={badge("bg-ink/5 text-ink/60")}>2 references</span>
+        <span className={badge("bg-palm/15 text-palm")}>FLUX.2</span>
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        {looks.map((g, i) => (
+          <div key={i} className={`relative aspect-[3/4] rounded bg-gradient-to-b ${g}`}>
+            {i === 0 && <span className="absolute left-0.5 top-0.5 text-[9px]">★</span>}
+            <span className="absolute inset-x-0 bottom-0 truncate bg-black/30 px-0.5 text-[7px] text-white">
+              {["⇡ use", "⇢ maker", "vary", "vary"][i]}
+            </span>
+          </div>
+        ))}
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniSourcing() {
+  const makers = [
+    { n: "Atelier Lima", c: "Porto, PT", tags: ["low-MOQ", "linen"], fit: "Small-batch tailoring, 30-unit minimums." },
+    { n: "Studio Sartor", c: "Los Angeles", tags: ["cut & sew"], fit: "US cut-and-sew, quick protos." },
+  ];
+  return (
+    <MiniShell title="Find a Maker — deep research">
+      <div className="mb-1.5 flex items-center gap-1">
+        <span className="flex-1 truncate rounded bg-white px-1.5 py-1 text-[8px] text-ink/70">
+          tailored linen trousers · 50–100 units · Portugal
+        </span>
+        <span className={badge("bg-palm/15 text-palm")}>Perplexity</span>
+      </div>
+      <div className="space-y-1">
+        {makers.map((m) => (
+          <div key={m.n} className="rounded bg-white p-1.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-[9px] font-medium text-ink">{m.n} <span className="text-warmgrey">· {m.c}</span></p>
+              <span className={badge("bg-navy text-chalk")}>+ add</span>
+            </div>
+            <p className="truncate text-[8px] text-warmgrey">{m.fit}</p>
+            <div className="mt-0.5 flex gap-1">
+              {m.tags.map((t) => (
+                <span key={t} className={badge("bg-ink/5 text-ink/60")}>{t}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[7px] text-warmgrey">Live web sources · citations attached</p>
+    </MiniShell>
+  );
+}
+
+function MiniVideo() {
+  return (
+    <MiniShell title="Promo Video — SS27 launch">
+      <div className="mb-1.5 aspect-video overflow-hidden rounded bg-gradient-to-br from-[#1f2a44] to-[#0e1422]">
+        <div className="flex h-full flex-col justify-end p-2">
+          <span className="text-[7px] uppercase tracking-widest text-terracotta">Maison Atlantique</span>
+          <span className="font-display text-[13px] font-light leading-none text-chalk">Tailored resortwear.</span>
+        </div>
+      </div>
+      <div className="mb-1 flex gap-0.5">
+        {["Open", "Collection", "Pieces", "Story", "Close"].map((s, i) => (
+          <span key={s} className={`flex-1 truncate rounded px-1 py-0.5 text-center text-[7px] ${i === 2 ? "bg-navy text-chalk" : "bg-ink/5 text-ink/60"}`}>{s}</span>
+        ))}
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[8px] text-warmgrey">Live preview = the final cut</span>
+        <span className={badge("bg-palm/15 text-palm")}>pay on delivery</span>
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniImport() {
+  const rows: [string, string][] = [
+    ["Product Title", "→ Name"],
+    ["Retail", "→ Price"],
+    ["Colour", "→ Colour"],
+    ["Size", "→ Size"],
+    ["Stock", "→ Stock"],
+  ];
+  return (
+    <MiniShell title="Import studio — catalog.csv">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[8px] text-warmgrey">142 rows · auto-matched</span>
+        <span className={badge("bg-palm/15 text-palm")}>AI mapping</span>
+      </div>
+      <div className="space-y-0.5">
+        {rows.map(([from, to]) => (
+          <div key={from} className="flex items-center gap-1 rounded bg-white px-1.5 py-1 shadow-sm">
+            <span className="flex-1 truncate text-[8px] text-ink/70">{from}</span>
+            <span className="text-[8px] font-medium text-palm">{to}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-right text-[8px]"><span className={badge("bg-navy text-chalk")}>Import 68 products</span></p>
+    </MiniShell>
+  );
+}
+
 // ---------- The tour ----------
 interface Feature {
   id: string;
@@ -425,6 +542,46 @@ interface Feature {
 }
 
 const FEATURES: Feature[] = [
+  {
+    id: "design-studio",
+    eyebrow: "Design",
+    heading: "An AI design studio for your next line.",
+    body: "Build a prompt from garment, fabric, palette and mood — or drop in reference images and Flux (running natively on Cloudflare, no keys to bring) generates a collection of looks that hold together. Pin favorites, keep a house style for consistency, then use a look on your storefront or send it straight to a maker for a sample.",
+    points: [
+      "Native Flux + FLUX.2 reference-image conditioning for a consistent line",
+      "House style + seed lock across a whole capsule",
+      "One click: use on your site, or ship the design to a factory",
+    ],
+    screen: MiniDesignStudio,
+    url: "verto.style/maison/admin/ai-concepts",
+  },
+  {
+    id: "sourcing",
+    eyebrow: "Source",
+    heading: "Find a maker, even from a standing start.",
+    body: "New line and no factory yet? Describe the piece — garment, materials, order size, location — and Verto runs live deep research to surface real tailors and small studios that can make it, with specialties, MOQs, and citations. Add one to your factories and request a sample without leaving Verto.",
+    points: ["Live web research with real, cited sources", "Filtered for small-batch, emerging-brand-friendly makers", "Leads flow straight into samples and POs"],
+    screen: MiniSourcing,
+    url: "verto.style/maison/admin/sourcing",
+  },
+  {
+    id: "promo-video",
+    eyebrow: "Launch",
+    heading: "Cinematic promo videos from your own products.",
+    body: "Compose a promo from your catalog, watch the finished film play in real time, and export only when you love it. The preview IS the render — so you never pay for a version you hate. Rendered off-platform and charged on delivery.",
+    points: ["What you preview is exactly what renders", "Landscape, vertical & square cuts", "Charge-on-delivery — a failed render never bills"],
+    screen: MiniVideo,
+    url: "verto.style/maison/admin/marketing/video",
+  },
+  {
+    id: "import",
+    eyebrow: "Onboard",
+    heading: "Bring your whole catalog in, in minutes.",
+    body: "Drop a spreadsheet from Shopify, another platform, or your own export. AI maps the columns to your catalog, you confirm, and it bulk-imports products, variants, stock and collections as drafts to review.",
+    points: ["AI column mapping with a heuristic fallback", "Rows group into products with variants automatically", "Everything imports as drafts you approve"],
+    screen: MiniImport,
+    url: "verto.style/maison/admin/import",
+  },
   {
     id: "production",
     eyebrow: "Make",
@@ -658,7 +815,7 @@ export function VertoFeatures() {
           </h1>
           <Reveal delay={500}>
             <p className="prose-editorial mx-auto mt-4 max-w-2xl">
-              Thirteen modules, one database, zero copy-paste between tools. Every screen below is
+              Seventeen modules, one database, zero copy-paste between tools. Every screen below is
               the real interface, miniaturized — and the{" "}
               <a href={`${DEMO_SHOP_BASE}/admin`} className="link-quiet">demo admin</a> is open if
               you want to drive.

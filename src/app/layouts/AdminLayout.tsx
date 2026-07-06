@@ -26,6 +26,7 @@ import {
   LifeBuoy,
   Upload,
   Compass,
+  Globe,
   Layers,
   Newspaper,
   Package,
@@ -123,6 +124,7 @@ const NAV_SECTIONS: {
     title: "System",
     items: [
       { to: "/admin/settings", label: "Settings", icon: Settings },
+      { to: "/admin/domain", label: "Custom Domain", icon: Globe },
       { to: "/admin/team", label: "Team", icon: UsersRound },
       { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },
     ],

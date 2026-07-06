@@ -23,6 +23,7 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { TeamPage } from "./pages/admin/TeamPage";
 import { SupportPage } from "./pages/admin/SupportPage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
+import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { StylesPage, SkusPage } from "./pages/admin/StylesPage";
@@ -156,6 +157,7 @@ export function AppRouter() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="team" element={<TeamPage />} />
+          <Route path="domain" element={<DomainPage />} />
           <Route path="support" element={<SupportPage />} />
           <Route path="platform" element={<PlatformPage />} />
           <Route path="feedback" element={<FeedbackInboxPage />} />

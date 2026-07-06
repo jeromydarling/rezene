@@ -41,6 +41,8 @@ export interface Env {
    * can the EMAIL binding reach arbitrary recipients.
    */
   BUYER_EMAIL_FROM: string;
+  /** The hostname shops point a CNAME at to connect a custom domain. */
+  CUSTOM_DOMAIN_TARGET?: string;
   /** GitHub repo (owner/name) whose Actions render promo videos. */
   RENDER_REPO?: string;
   /** Per-video export price in minor units, as a string var. Default 1900. */

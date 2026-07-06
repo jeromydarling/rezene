@@ -53,6 +53,9 @@ BUYER_EMAIL_FROM = ""
 # Renders stay disabled (free preview still works) until both are set.
 RENDER_REPO = "jeromydarling/rezene"
 VIDEO_EXPORT_PRICE_CENTS = "1900"
+# Hostname a shop points a CNAME record at to connect their own domain.
+# Set to the Cloudflare-for-SaaS fallback origin once configured.
+CUSTOM_DOMAIN_TARGET = "verto.style"
 
 [[d1_databases]]
 binding = "DB"
