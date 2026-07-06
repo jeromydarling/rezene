@@ -58,7 +58,7 @@ function tube(profile: [number, number][], seg = 48): THREE.LatheGeometry {
 
 export function buildMannequin(): THREE.Group {
   const g = new THREE.Group();
-  const skin = new THREE.MeshStandardMaterial({ color: "#d7d3cd", roughness: 0.85, metalness: 0 });
+  const skin = new THREE.MeshStandardMaterial({ color: "#d7d3cd", roughness: 0.9, metalness: 0, flatShading: false });
   const add = (geo: THREE.BufferGeometry, pos?: [number, number, number], rot?: [number, number, number]) => {
     const m = new THREE.Mesh(geo, skin);
     if (pos) m.position.set(...pos);
@@ -66,53 +66,59 @@ export function buildMannequin(): THREE.Group {
     g.add(m);
     return m;
   };
+  const SEG = 64;
 
-  // Head + neck
-  add(new THREE.SphereGeometry(0.1, 24, 20), [0, 1.62, 0]).scale.set(0.82, 1, 0.9);
-  add(new THREE.CylinderGeometry(0.042, 0.05, 0.1, 20), [0, 1.5, 0]);
+  // Head + smooth neck blend
+  add(new THREE.SphereGeometry(0.096, 32, 24), [0, 1.63, 0.005]).scale.set(0.82, 1.04, 0.9);
+  add(tube([[0.03, 1.56], [0.045, 1.52], [0.052, 1.46], [0.07, 1.42]], SEG), [0, 0, 0]).scale.z = 0.85;
 
-  // Torso (shoulders → bust → waist → hips), flattened front-to-back
+  // One continuous torso→waist→hip lathe (no seam), gentle female-croquis S-curve
   const torso = add(
-    tube([
-      [0.02, 1.46],
-      [0.19, 1.4],
-      [0.155, 1.24],
-      [0.112, 1.04],
-      [0.15, 0.9],
-      [0.148, 0.82],
-    ]),
+    tube(
+      [
+        [0.055, 1.45], // neck root
+        [0.15, 1.42], // shoulder (rounded)
+        [0.152, 1.35], // upper chest
+        [0.146, 1.24], // bust
+        [0.126, 1.14], // under-bust
+        [0.111, 1.05], // waist (nip)
+        [0.128, 0.96], // high hip
+        [0.152, 0.86], // hip
+        [0.146, 0.77],
+        [0.075, 0.67], // crotch
+      ],
+      SEG,
+    ),
   );
-  torso.scale.z = 0.66;
+  torso.scale.z = 0.62;
 
-  // Hips → crotch
-  const hips = add(tube([[0.148, 0.82], [0.15, 0.72], [0.07, 0.66]]));
-  hips.scale.z = 0.7;
-
-  // Legs (thigh → knee → ankle)
+  // Legs (thigh → knee → calf → ankle), smoother taper
   const legProfile: [number, number][] = [
-    [0.083, 0.72],
-    [0.075, 0.55],
-    [0.05, 0.34],
-    [0.036, 0.08],
-    [0.032, 0.02],
+    [0.086, 0.7],
+    [0.08, 0.58],
+    [0.058, 0.42],
+    [0.062, 0.36], // calf
+    [0.04, 0.18],
+    [0.034, 0.04],
+    [0.03, 0.015],
   ];
   for (const sx of [-1, 1]) {
-    const leg = add(tube(legProfile), [sx * 0.075, 0, 0]);
-    leg.scale.z = 0.9;
-    // foot
-    add(new THREE.BoxGeometry(0.06, 0.03, 0.14), [sx * 0.075, 0.015, 0.03]);
+    add(tube(legProfile, SEG), [sx * 0.072, 0, 0]).scale.z = 0.92;
+    // rounded foot pointing forward
+    add(new THREE.SphereGeometry(0.05, 20, 14), [sx * 0.072, 0.028, 0.05]).scale.set(0.72, 0.5, 1.7);
   }
 
-  // Arms (shoulder → wrist), angled out ~12° in an A-pose
+  // Arms (shoulder → wrist) with a soft taper, A-pose; small hand at the wrist
   const armProfile: [number, number][] = [
-    [0.052, 0],
-    [0.045, -0.28],
-    [0.035, -0.52],
-    [0.028, -0.62],
+    [0.056, 0], [0.05, -0.16], [0.045, -0.3], [0.047, -0.34], [0.036, -0.5], [0.03, -0.62],
   ];
+  const A = 0.22;
   for (const sx of [-1, 1]) {
-    const arm = add(tube(armProfile), [sx * 0.185, 1.36, 0], [0, 0, sx * 0.22]);
-    arm.scale.z = 0.9;
+    add(tube(armProfile, SEG), [sx * 0.15, 1.4, 0], [0, 0, sx * A]).scale.z = 0.9;
+    // hand at the arm tip
+    const hx = 0.15 * sx + Math.sin(A) * 0.62 * sx;
+    const hy = 1.4 - Math.cos(A) * 0.62;
+    add(new THREE.SphereGeometry(0.036, 16, 12), [hx, hy - 0.03, 0]).scale.set(0.7, 1.3, 0.45);
   }
   return g;
 }
