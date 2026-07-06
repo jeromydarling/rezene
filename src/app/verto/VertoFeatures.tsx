@@ -116,9 +116,17 @@ function MiniTechPack() {
             ))}
           </tbody>
         </table>
+        <p className="mt-1 flex items-center gap-1 text-[8px] text-warmgrey">
+          <span className="font-semibold text-ink/70">Tol ±0.5</span> · graded from base · blank = no rule
+        </p>
         <p className="mt-1.5 truncate text-[8px] italic text-warmgrey">
           Ceinture montée avec entoilage — pressage vapeur uniquement…
         </p>
+        <div className="mt-1.5 flex gap-1">
+          <span className={badge("bg-palm/15 text-palm")}>Excel ↓</span>
+          <span className={badge("bg-palm/15 text-palm")}>PDF ↓</span>
+          <span className={badge("bg-saffron/20 text-bark")}>factory opened ✓</span>
+        </div>
       </div>
     </MiniShell>
   );
@@ -430,8 +438,12 @@ const FEATURES: Feature[] = [
     id: "techpacks",
     eyebrow: "Specify",
     heading: "Tech packs a factory can actually sew from.",
-    body: "Measurement charts with grading rules, BOMs, construction notes in English and French, stitch specs, labels and packaging — versioned, exportable, shareable.",
-    points: ["Size specs with base-size grading", "Bilingual construction notes", "One-click factory share links"],
+    body: "Graded measurement charts with tolerances, BOMs linked to real fabrics and trims, bilingual construction notes, stitch specs with SPI, annotated flats with numbered callouts, labels and care — exported to Excel or PDF and shared as a live link that tells you the moment the factory opens it.",
+    points: [
+      "Point-callout annotations right on the flat",
+      "Graded POM tables with tolerances → Excel & PDF",
+      "Factory link with read receipts and bilingual view",
+    ],
     screen: MiniTechPack,
     url: "verto.style/maison/admin/tech-packs",
   },
@@ -540,6 +552,98 @@ const FEATURES: Feature[] = [
   },
 ];
 
+// ---------- Category killer: tech packs head-to-head ----------
+// Every cell is defensible from public product docs and reviews (mid-2026):
+// Backbone's own FAQ tells users to convert PDFs in Acrobat (no Excel);
+// Techpacker's grading is documented as "Alpha"; Delogue's care-label
+// module is deprecated; none ship bilingual construction notes or live in
+// the same database as the storefront. We concede where they're even.
+const TP_MATRIX: { row: string; verto: string; techpacker: string; backbone: string; delogue: string }[] = [
+  { row: "Graded POM tables with tolerances", verto: "yes", techpacker: "grading in Alpha", backbone: "yes", delogue: "single tolerance, manual grade" },
+  { row: "Annotated flats (numbered callouts)", verto: "yes", techpacker: "yes", backbone: "yes", delogue: "limited" },
+  { row: "Bilingual construction notes (EN/FR)", verto: "yes", techpacker: "no", backbone: "no", delogue: "no" },
+  { row: "Excel export", verto: "included", techpacker: "top tier only", backbone: "no — convert PDF by hand", delogue: "top tier only" },
+  { row: "Live factory link + read receipts", verto: "yes", techpacker: "portal, no receipt", backbone: "read-only portal", delogue: "no open-notification" },
+  { row: "AI tech pack from a photo", verto: "included", techpacker: "marketing claim", backbone: "no", delogue: "support chatbot only" },
+  { row: "Same database as storefront, orders, costing", verto: "yes", techpacker: "no", backbone: "no", delogue: "no" },
+  { row: "Price", verto: "included from $29/mo", techpacker: "$35–125 / seat", backbone: "$199 / seat", delogue: "€145–279 / seat" },
+];
+
+function TPMark({ value, dark = false }: { value: string; dark?: boolean }) {
+  const v = value.toLowerCase();
+  if (v === "yes" || v === "included") {
+    // Brighter green so the affirmative reads on the navy panel.
+    return (
+      <span className="font-semibold text-[#7cc79a]">
+        ✓{value === "included" ? " included" : ""}
+      </span>
+    );
+  }
+  if (v === "no" || v.startsWith("no ") || v.startsWith("no—") || v.startsWith("no —")) {
+    return <span className="text-[#e08b74]">— {value.replace(/^no\s*—?\s*/i, "") || "no"}</span>;
+  }
+  return <span className={dark ? "text-chalk/55" : "text-warmgrey"}>{value}</span>;
+}
+
+function TechPackShowcase() {
+  return (
+    <section id="techpacks-vs" className="mt-24 scroll-mt-24">
+      <div className="rounded-2xl bg-navy px-5 py-12 text-chalk md:px-10 md:py-16">
+        <div className="mx-auto max-w-3xl text-center">
+          <Reveal>
+            <p className="eyebrow !text-terracotta">The category killer</p>
+          </Reveal>
+          <Reveal delay={100}>
+            <h2 className="mt-2 font-display text-3xl font-light md:text-4xl">
+              The best tech packs in fashion — not sold separately.
+            </h2>
+          </Reveal>
+          <Reveal delay={200}>
+            <p className="prose-editorial mx-auto mt-4 !text-chalk/80">
+              Dedicated tech-pack tools cost $35–199 per seat and still make you round-trip to Excel,
+              chase factories for confirmation, and buy a separate system for everything after the
+              spec. Verto's tech packs match or beat them feature for feature — and they're one tab
+              away from the storefront that sells the piece.
+            </p>
+          </Reveal>
+        </div>
+
+        <Reveal delay={250}>
+          <div className="mx-auto mt-10 max-w-4xl overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-chalk/20 text-left">
+                  <th className="py-3 pr-4 font-medium text-chalk/70">Capability</th>
+                  <th className="px-3 py-3 text-center font-semibold">Verto</th>
+                  <th className="px-3 py-3 text-center font-medium text-chalk/60">Techpacker</th>
+                  <th className="px-3 py-3 text-center font-medium text-chalk/60">Backbone</th>
+                  <th className="px-3 py-3 text-center font-medium text-chalk/60">Delogue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TP_MATRIX.map((r) => (
+                  <tr key={r.row} className="border-b border-chalk/10">
+                    <td className="py-2.5 pr-4 text-chalk/90">{r.row}</td>
+                    <td className="px-3 py-2.5 text-center text-[0.8rem] bg-chalk/[0.06]"><TPMark value={r.verto} dark /></td>
+                    <td className="px-3 py-2.5 text-center text-[0.8rem]"><TPMark value={r.techpacker} dark /></td>
+                    <td className="px-3 py-2.5 text-center text-[0.8rem]"><TPMark value={r.backbone} dark /></td>
+                    <td className="px-3 py-2.5 text-center text-[0.8rem]"><TPMark value={r.delogue} dark /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Reveal>
+        <p className="mx-auto mt-4 max-w-4xl text-center text-xs text-chalk/50">
+          Competitor capabilities and pricing from their public product docs and user reviews as of
+          mid-2026 — always verify current plans with each vendor. "Included" means on every Verto
+          plan, per shop, not per seat.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function VertoFeatures() {
   const navigate = useNavigate();
   return (
@@ -611,6 +715,9 @@ export function VertoFeatures() {
             </section>
           ))}
         </div>
+
+        {/* Category killer: tech packs head-to-head */}
+        <TechPackShowcase />
 
         {/* Close */}
         <div className="mt-24 text-center">

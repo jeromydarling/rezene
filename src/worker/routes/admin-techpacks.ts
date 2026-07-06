@@ -336,13 +336,32 @@ adminTechPackRoutes.post("/", requireAdminWrite, async (c) => {
 adminTechPackRoutes.patch("/:id/sections/:kind", requireAdminWrite, async (c) => {
   const { id, kind } = c.req.param();
   const body = await parseBody(c, techPackSectionUpdateSchema);
-  const section = await first<{ id: string }>(
+  let section = await first<{ id: string }>(
     c.var.db,
     `SELECT id FROM tech_pack_sections WHERE tech_pack_id = ? AND kind = ?`,
     id,
     kind,
   );
-  if (!section) return c.json({ error: "Section not found" }, 404);
+  // Create the section on first edit — seeded/older tech packs may not have
+  // every section row (e.g. flat_sketch), and the annotator writes to it.
+  if (!section) {
+    const template = DEFAULT_SECTIONS.find((t) => t.kind === kind);
+    if (!template) return c.json({ error: "Unknown section" }, 404);
+    const pack = await first<{ id: string }>(c.var.db, `SELECT id FROM tech_packs WHERE id = ?`, id);
+    if (!pack) return c.json({ error: "Tech pack not found" }, 404);
+    const newSectionId = newId("tps");
+    await run(
+      c.var.db,
+      `INSERT INTO tech_pack_sections (id, tech_pack_id, kind, title, content_json, sort_order)
+       VALUES (?, ?, ?, ?, '{}', ?)`,
+      newSectionId,
+      id,
+      kind,
+      body.title ?? template.title,
+      DEFAULT_SECTIONS.findIndex((t) => t.kind === kind),
+    );
+    section = { id: newSectionId };
+  }
   const sets: string[] = [`updated_at = datetime('now')`];
   const params: unknown[] = [];
   if (body.title !== undefined) {
@@ -389,4 +408,17 @@ adminTechPackRoutes.patch("/:id", requireAdminWrite, async (c) => {
   if (!result.meta.changes) return c.json({ error: "Tech pack not found" }, 404);
   await writeAudit(c.var.db, c.var.userId, "tech_pack.update", "tech_pack", id, body);
   return c.json({ ok: true });
+});
+
+// ---------- Factory-ready Excel export (always current, never a snapshot) ----------
+adminTechPackRoutes.get("/:id/export.xlsx", async (c) => {
+  const { buildTechPackXlsx } = await import("../services/techpack-xlsx");
+  const result = await buildTechPackXlsx(c.var.db, c.req.param("id"), await getBrandName(c.env));
+  if (!result) return c.json({ error: "Tech pack not found" }, 404);
+  return new Response(result.bytes, {
+    headers: {
+      "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "content-disposition": `attachment; filename="${result.filename}"`,
+    },
+  });
 });

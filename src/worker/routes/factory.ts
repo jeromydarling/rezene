@@ -160,3 +160,24 @@ factoryRoutes.post(
     return c.json({ ok: true, approvedAt: new Date().toISOString() });
   },
 );
+
+// Factories live in spreadsheets: the portal offers the same always-current
+// Excel workbook the brand sees, no login required.
+factoryRoutes.get(
+  "/:token/export.xlsx",
+  rateLimit({ key: "factory-xlsx", limit: 30, windowSeconds: 3600 }),
+  async (c) => {
+    const share = await resolveShare(c.env, c.req.param("token"));
+    if (!share) return c.json({ error: "This link is invalid or has been revoked." }, 404);
+    const { buildTechPackXlsx } = await import("../services/techpack-xlsx");
+    const { getBrandName } = await import("../services/brand");
+    const result = await buildTechPackXlsx(c.var.db, share.tech_pack_id, await getBrandName(c.env));
+    if (!result) return c.json({ error: "Tech pack not found" }, 404);
+    return new Response(result.bytes, {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="${result.filename}"`,
+      },
+    });
+  },
+);
