@@ -335,6 +335,64 @@ export const calendarEventCreateSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+// ---------- Fabrics & trims ----------
+export const fabricCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  supplierId: z.string().max(80).nullable().optional(),
+  composition: z.string().max(200).nullable().optional(),
+  weightGsm: z.number().int().nonnegative().nullable().optional(),
+  originCountry: z.string().max(80).nullable().optional(),
+  pricePerMeterCents: z.number().int().nonnegative().nullable().optional(),
+  currency: z.string().max(8).optional(),
+  leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+  moqMeters: z.number().int().nonnegative().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const fabricUpdateSchema = fabricCreateSchema.partial();
+
+export const trimCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  supplierId: z.string().max(80).nullable().optional(),
+  spec: z.string().max(400).nullable().optional(),
+  pricePerUnitCents: z.number().int().nonnegative().nullable().optional(),
+  currency: z.string().max(8).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const trimUpdateSchema = trimCreateSchema.partial();
+
+// ---------- Purchase / production orders ----------
+const poItemSchema = z.object({
+  description: z.string().min(1).max(300),
+  styleId: z.string().max(80).nullable().optional(),
+  quantity: z.number().int().positive(),
+  unitCostCents: z.number().int().nonnegative().nullable().optional(),
+});
+export const productionOrderCreateSchema = z.object({
+  supplierId: z.string().min(1).max(80),
+  poNumber: z.string().max(60).optional(),
+  currency: z.string().max(8).optional(),
+  status: z
+    .enum(["draft", "sent", "confirmed", "in_production", "qc", "shipped", "received", "cancelled"])
+    .optional(),
+  incoterms: z.string().max(60).nullable().optional(),
+  issueDate: z.string().max(30).nullable().optional(),
+  exFactoryDate: z.string().max(30).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  items: z.array(poItemSchema).max(200).optional(),
+});
+export const productionOrderUpdateSchema = z.object({
+  status: z
+    .enum(["draft", "sent", "confirmed", "in_production", "qc", "shipped", "received", "cancelled"])
+    .optional(),
+  currency: z.string().max(8).optional(),
+  incoterms: z.string().max(60).nullable().optional(),
+  issueDate: z.string().max(30).nullable().optional(),
+  exFactoryDate: z.string().max(30).nullable().optional(),
+  receivedDate: z.string().max(30).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const productionOrderItemSchema = poItemSchema;
+
 export const sampleCreateSchema = z.object({
   styleId: z.string().min(1).max(80),
   supplierId: z.string().max(80).nullable().optional(),

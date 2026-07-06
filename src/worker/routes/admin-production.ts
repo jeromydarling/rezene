@@ -2,11 +2,18 @@ import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
 import {
   calendarEventCreateSchema,
+  fabricCreateSchema,
+  fabricUpdateSchema,
   parseBody,
+  productionOrderCreateSchema,
+  productionOrderItemSchema,
+  productionOrderUpdateSchema,
   sampleCreateSchema,
   sampleUpdateSchema,
   taskCreateSchema,
   taskUpdateSchema,
+  trimCreateSchema,
+  trimUpdateSchema,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
@@ -294,11 +301,132 @@ adminProductionRoutes.get("/materials", async (c) => {
   );
   const trims = await all(
     c.var.db,
-    `SELECT t.id, t.name, t.spec, t.price_per_unit_cents, t.currency, t.notes,
+    `SELECT t.id, t.name, t.supplier_id, t.spec, t.price_per_unit_cents, t.currency, t.notes,
             sup.name AS supplier_name
      FROM trims t LEFT JOIN suppliers sup ON sup.id = t.supplier_id ORDER BY t.name`,
   );
   return c.json({ fabrics, trims });
+});
+
+adminProductionRoutes.post("/materials/fabrics", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, fabricCreateSchema);
+  const id = newId("fab");
+  await run(
+    c.var.db,
+    `INSERT INTO fabrics (id, name, supplier_id, composition, weight_gsm, origin_country,
+       price_per_meter_cents, currency, lead_time_days, moq_meters, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    body.name,
+    body.supplierId ?? null,
+    body.composition ?? null,
+    body.weightGsm ?? null,
+    body.originCountry ?? null,
+    body.pricePerMeterCents ?? null,
+    body.currency ?? "EUR",
+    body.leadTimeDays ?? null,
+    body.moqMeters ?? null,
+    body.notes ?? null,
+  );
+  await writeAudit(c.var.db, c.var.userId, "fabric.create", "fabric", id, { name: body.name });
+  return c.json({ id }, 201);
+});
+
+const FABRIC_COLS: Record<string, string> = {
+  name: "name",
+  supplierId: "supplier_id",
+  composition: "composition",
+  weightGsm: "weight_gsm",
+  originCountry: "origin_country",
+  pricePerMeterCents: "price_per_meter_cents",
+  currency: "currency",
+  leadTimeDays: "lead_time_days",
+  moqMeters: "moq_meters",
+  notes: "notes",
+};
+
+adminProductionRoutes.patch("/materials/fabrics/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, fabricUpdateSchema);
+  const existing = await first(c.var.db, `SELECT id FROM fabrics WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Fabric not found" }, 404);
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [key, col] of Object.entries(FABRIC_COLS)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
+  }
+  if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
+  await run(c.var.db, `UPDATE fabrics SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "fabric.update", "fabric", id, body);
+  return c.json({ ok: true });
+});
+
+adminProductionRoutes.delete("/materials/fabrics/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first<{ name: string }>(c.var.db, `SELECT name FROM fabrics WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Fabric not found" }, 404);
+  await run(c.var.db, `DELETE FROM fabrics WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "fabric.delete", "fabric", id, { name: existing.name });
+  return c.json({ ok: true });
+});
+
+adminProductionRoutes.post("/materials/trims", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, trimCreateSchema);
+  const id = newId("trm");
+  await run(
+    c.var.db,
+    `INSERT INTO trims (id, name, supplier_id, spec, price_per_unit_cents, currency, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    body.name,
+    body.supplierId ?? null,
+    body.spec ?? null,
+    body.pricePerUnitCents ?? null,
+    body.currency ?? "EUR",
+    body.notes ?? null,
+  );
+  await writeAudit(c.var.db, c.var.userId, "trim.create", "trim", id, { name: body.name });
+  return c.json({ id }, 201);
+});
+
+const TRIM_COLS: Record<string, string> = {
+  name: "name",
+  supplierId: "supplier_id",
+  spec: "spec",
+  pricePerUnitCents: "price_per_unit_cents",
+  currency: "currency",
+  notes: "notes",
+};
+
+adminProductionRoutes.patch("/materials/trims/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, trimUpdateSchema);
+  const existing = await first(c.var.db, `SELECT id FROM trims WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Trim not found" }, 404);
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [key, col] of Object.entries(TRIM_COLS)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
+  }
+  if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
+  await run(c.var.db, `UPDATE trims SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "trim.update", "trim", id, body);
+  return c.json({ ok: true });
+});
+
+adminProductionRoutes.delete("/materials/trims/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first<{ name: string }>(c.var.db, `SELECT name FROM trims WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Trim not found" }, 404);
+  await run(c.var.db, `DELETE FROM trims WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "trim.delete", "trim", id, { name: existing.name });
+  return c.json({ ok: true });
 });
 
 // ---------- Production orders ----------
@@ -339,5 +467,182 @@ adminProductionRoutes.get("/orders/:id", async (c) => {
      LEFT JOIN styles s ON s.id = i.style_id WHERE i.production_order_id = ?`,
     row.id,
   );
-  return c.json({ ...row, items });
+  // Header in camelCase (matches AdminProductionOrder); items stay snake_case.
+  return c.json({
+    id: row.id as string,
+    poNumber: row.po_number as string,
+    supplierId: row.supplier_id as string,
+    supplierName: row.supplier_name as string,
+    status: row.status as string,
+    currency: row.currency as string,
+    totalCostCents: (row.total_cost_cents as number) ?? null,
+    exFactoryDate: (row.ex_factory_date as string) ?? null,
+    incoterms: (row.incoterms as string) ?? null,
+    issue_date: (row.issue_date as string) ?? null,
+    received_date: (row.received_date as string) ?? null,
+    notes: (row.notes as string) ?? null,
+    itemCount: items.length,
+    items,
+  });
+});
+
+// Sum line items → total_cost_cents, keeping the PO header total honest.
+async function recomputePoTotal(db: D1Database, poId: string): Promise<void> {
+  const agg = await first<{ total: number | null }>(
+    db,
+    `SELECT SUM(quantity * COALESCE(unit_cost_cents, 0)) AS total
+     FROM production_order_items WHERE production_order_id = ?`,
+    poId,
+  );
+  await run(
+    db,
+    `UPDATE production_orders SET total_cost_cents = ?, updated_at = datetime('now') WHERE id = ?`,
+    agg?.total ?? 0,
+    poId,
+  );
+}
+
+adminProductionRoutes.post("/orders", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, productionOrderCreateSchema);
+  // Auto-number PO-YYYY-NNN when the caller doesn't supply one.
+  let poNumber = body.poNumber?.trim();
+  if (!poNumber) {
+    const year = new Date().getUTCFullYear();
+    const prefix = `PO-${year}-`;
+    const last = await first<{ po_number: string }>(
+      c.var.db,
+      `SELECT po_number FROM production_orders WHERE po_number LIKE ? ORDER BY po_number DESC LIMIT 1`,
+      `${prefix}%`,
+    );
+    const nextSeq = last ? parseInt(last.po_number.slice(prefix.length), 10) + 1 : 1;
+    poNumber = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+  } else {
+    const clash = await first(c.var.db, `SELECT id FROM production_orders WHERE po_number = ?`, poNumber);
+    if (clash) return c.json({ error: `PO number ${poNumber} already exists.` }, 409);
+  }
+
+  const id = newId("po");
+  await run(
+    c.var.db,
+    `INSERT INTO production_orders
+       (id, po_number, supplier_id, status, currency, incoterms, issue_date, ex_factory_date, notes, total_cost_cents)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    id,
+    poNumber,
+    body.supplierId,
+    body.status ?? "draft",
+    body.currency ?? "EUR",
+    body.incoterms ?? null,
+    body.issueDate ?? null,
+    body.exFactoryDate ?? null,
+    body.notes ?? null,
+  );
+  for (const item of body.items ?? []) {
+    await run(
+      c.var.db,
+      `INSERT INTO production_order_items
+         (id, production_order_id, style_id, description, quantity, unit_cost_cents, currency)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      newId("poi"),
+      id,
+      item.styleId ?? null,
+      item.description,
+      item.quantity,
+      item.unitCostCents ?? null,
+      body.currency ?? "EUR",
+    );
+  }
+  await recomputePoTotal(c.var.db, id);
+  await writeAudit(c.var.db, c.var.userId, "production_order.create", "production_order", id, {
+    poNumber,
+  });
+  return c.json({ id, poNumber }, 201);
+});
+
+adminProductionRoutes.patch("/orders/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(c, productionOrderUpdateSchema);
+  const existing = await first(c.var.db, `SELECT id FROM production_orders WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Production order not found" }, 404);
+  const cols: Record<string, string> = {
+    status: "status",
+    currency: "currency",
+    incoterms: "incoterms",
+    issueDate: "issue_date",
+    exFactoryDate: "ex_factory_date",
+    receivedDate: "received_date",
+    notes: "notes",
+  };
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [key, col] of Object.entries(cols)) {
+    if (key in body) {
+      sets.push(`${col} = ?`);
+      params.push((body as Record<string, unknown>)[key] ?? null);
+    }
+  }
+  if (body.status === "received") sets.push(`received_date = COALESCE(received_date, date('now'))`);
+  if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await run(c.var.db, `UPDATE production_orders SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
+  await writeAudit(c.var.db, c.var.userId, "production_order.update", "production_order", id, body);
+  return c.json({ ok: true });
+});
+
+adminProductionRoutes.delete("/orders/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first<{ po_number: string }>(
+    c.var.db,
+    `SELECT po_number FROM production_orders WHERE id = ?`,
+    id,
+  );
+  if (!existing) return c.json({ error: "Production order not found" }, 404);
+  await run(c.var.db, `DELETE FROM production_order_items WHERE production_order_id = ?`, id);
+  await run(c.var.db, `DELETE FROM production_orders WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "production_order.delete", "production_order", id, {
+    poNumber: existing.po_number,
+  });
+  return c.json({ ok: true });
+});
+
+adminProductionRoutes.post("/orders/:id/items", requireAdminWrite, async (c) => {
+  const poId = c.req.param("id");
+  const body = await parseBody(c, productionOrderItemSchema);
+  const po = await first<{ currency: string }>(
+    c.var.db,
+    `SELECT currency FROM production_orders WHERE id = ?`,
+    poId,
+  );
+  if (!po) return c.json({ error: "Production order not found" }, 404);
+  const id = newId("poi");
+  await run(
+    c.var.db,
+    `INSERT INTO production_order_items
+       (id, production_order_id, style_id, description, quantity, unit_cost_cents, currency)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    poId,
+    body.styleId ?? null,
+    body.description,
+    body.quantity,
+    body.unitCostCents ?? null,
+    po.currency,
+  );
+  await recomputePoTotal(c.var.db, poId);
+  return c.json({ id }, 201);
+});
+
+adminProductionRoutes.delete("/orders/:id/items/:itemId", requireAdminWrite, async (c) => {
+  const poId = c.req.param("id");
+  const itemId = c.req.param("itemId");
+  const item = await first(
+    c.var.db,
+    `SELECT id FROM production_order_items WHERE id = ? AND production_order_id = ?`,
+    itemId,
+    poId,
+  );
+  if (!item) return c.json({ error: "Line item not found" }, 404);
+  await run(c.var.db, `DELETE FROM production_order_items WHERE id = ?`, itemId);
+  await recomputePoTotal(c.var.db, poId);
+  return c.json({ ok: true });
 });
