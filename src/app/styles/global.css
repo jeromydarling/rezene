@@ -112,16 +112,16 @@
     @apply rounded-sm border border-ink/10 bg-white/70;
   }
   .admin-table {
-    @apply w-full border-collapse text-left text-sm;
+    @apply w-full border-collapse text-left text-sm [font-variant-numeric:tabular-nums];
   }
   .admin-table thead th {
-    @apply border-b border-ink/15 px-3 py-2.5 text-[0.68rem] font-semibold uppercase tracking-editorial text-warmgrey;
+    @apply border-b border-ink/20 px-3 py-3 text-[0.64rem] font-semibold uppercase tracking-editorial text-warmgrey;
   }
   .admin-table tbody td {
-    @apply border-b border-ink/5 px-3 py-2.5 align-middle text-ink/90;
+    @apply border-b border-ink/8 px-3 py-3.5 align-middle text-ink/90;
   }
   .admin-table tbody tr:hover {
-    @apply bg-cream/40;
+    @apply bg-cream/50;
   }
 
   .input {

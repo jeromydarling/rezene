@@ -158,10 +158,10 @@ export function StatCard({
           ? "text-palm"
           : "text-ink";
   return (
-    <div className="admin-card px-4 py-4">
-      <p className="text-[0.68rem] font-semibold uppercase tracking-wider text-warmgrey">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-light ${valueColor}`}>{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-warmgrey">{hint}</p>}
+    <div className="admin-card px-5 py-5">
+      <p className="text-[0.66rem] font-medium uppercase tracking-editorial text-warmgrey">{label}</p>
+      <p className={`mt-2 font-display text-[2.4rem] font-light leading-none tabular-nums ${valueColor}`}>{value}</p>
+      {hint && <p className="mt-1.5 text-xs text-warmgrey">{hint}</p>}
     </div>
   );
 }
