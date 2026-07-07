@@ -18,16 +18,16 @@ export function PageHeader({
   help?: string;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
-        <h1 className="flex items-center gap-2 font-display text-2xl font-light">
+    <div className="masthead flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+      <div className="min-w-0">
+        <p className="masthead-kicker">{eyebrow || "Verto"}</p>
+        <h1 className="masthead-title flex items-center gap-3">
           {title}
           {help && <HelpDot slug={help} />}
         </h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-warmgrey">{description}</p>}
+        {description && <p className="masthead-lede">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 pb-1">{actions}</div>}
     </div>
   );
 }
@@ -43,7 +43,7 @@ export function EmptyState({
 }) {
   return (
     <div className="admin-card flex flex-col items-center gap-3 px-6 py-16 text-center">
-      <p className="font-display text-lg font-light text-ink/70">{title}</p>
+      <p className="section-head text-ink/70">{title}</p>
       {hint && <p className="max-w-md text-sm text-warmgrey">{hint}</p>}
       {action}
     </div>
@@ -158,10 +158,10 @@ export function StatCard({
           ? "text-palm"
           : "text-ink";
   return (
-    <div className="admin-card px-4 py-4">
-      <p className="text-[0.68rem] font-semibold uppercase tracking-wider text-warmgrey">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-light ${valueColor}`}>{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-warmgrey">{hint}</p>}
+    <div className="admin-card px-5 py-5">
+      <p className="text-[0.66rem] font-medium uppercase tracking-editorial text-warmgrey">{label}</p>
+      <p className={`mt-2 font-display text-[2.4rem] font-light leading-none tabular-nums ${valueColor}`}>{value}</p>
+      {hint && <p className="mt-1.5 text-xs text-warmgrey">{hint}</p>}
     </div>
   );
 }
@@ -189,7 +189,7 @@ export function SlideOver({
       />
       <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-ink/10 px-5 py-4">
-          <h2 className="font-display text-lg font-light">{title}</h2>
+          <h2 className="section-head">{title}</h2>
           <button type="button" onClick={onClose} className="text-sm text-warmgrey hover:text-ink">
             Close
           </button>
