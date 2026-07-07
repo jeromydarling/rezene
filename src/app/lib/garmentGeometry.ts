@@ -236,9 +236,9 @@ export function buildGarment(
     }
   }
 
-  // Sleeves — hang from the shoulder down-and-out, following the arm's A-pose.
+  // Sleeves — hang from the shoulder down the arm (body is in a natural stance).
   if (sleeveLen > 0.02 && garment.silhouette.shoulder > 0) {
-    const angle = 0.34; // radians out from vertical
+    const angle = 0.18; // radians out from vertical (arms hang close to the body)
     const ax = Math.sin(angle);
     const ay = -Math.cos(angle);
     for (const sx of [-1, 1]) {
