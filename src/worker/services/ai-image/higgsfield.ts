@@ -1,17 +1,21 @@
 /**
- * Higgsfield adapter — a stopgap GENERATION engine (Soul) for the Fitting Room
- * until fal is funded. Soul is Higgsfield's photoreal text-to-image model, a
- * clear step up from on-platform FLUX for "generate a garment on a model".
+ * Higgsfield adapter. Two capabilities on one key:
+ *   • generate (text only)   → Soul (documented, stable).
+ *   • referenceGen + tryOn   → nano-banana / Flux-Kontext style image EDITING.
  *
- * Scope note: Higgsfield's public REST API documents text-to-image + async
- * polling, but does NOT document an image-edit / multi-reference endpoint, so
- * we deliberately do NOT claim reference-generation or try-on here — those keep
- * flowing to their proper providers (FLUX for mood boards, fal/FASHN for
- * try-on). Contract per docs.higgsfield.ai (base platform.higgsfield.ai, auth
- * `Authorization: Key <id>:<secret>`, submit → poll status_url → images[0].url).
+ * The edit path is SELF-TUNING. Higgsfield's public docs only publish the Soul
+ * text-to-image model_id; the edit model_id (the one that does try-on) isn't
+ * documented. So on the first edit call we probe a short list of candidate
+ * model_ids, keep whichever the account accepts, and cache it in KV — after
+ * that it's a direct call. If none work, we throw and the router cascades to
+ * the next provider. Images are passed as public URLs (Higgsfield fetches them;
+ * it can't take raw bytes), in the SDK's `input_images:[{type,image_url}]` shape.
+ *
+ * Contract per docs.higgsfield.ai + higgsfield-js SDK: base platform.higgsfield.ai,
+ * auth `Authorization: Key <id>:<secret>`, submit → poll status_url → images[0].url.
  */
 import type { Env } from "../../types/env";
-import type { GenerateInput, ImageProvider, ImageResult } from "./types";
+import type { GenerateInput, ImageInput, ImageProvider, ImageResult, TryOnInput } from "./types";
 import { ProviderError } from "./types";
 
 const BASE = "https://platform.higgsfield.ai";
@@ -19,53 +23,118 @@ const SOUL = "higgsfield-ai/soul/standard";
 const MAX_POLLS = 45;
 const POLL_MS = 1300;
 
+// Candidate edit model_ids, most-likely first. Flux Kontext's path family is
+// confirmed by the SDK (`flux-pro/kontext/max/text-to-image`); the nano-banana
+// / seedream ids are informed guesses. The first that the account accepts wins
+// and is cached, so a miss just costs one extra rejected submit on first use.
+const EDIT_CANDIDATES = [
+  "flux-pro/kontext/max/multi",
+  "flux-pro/kontext/max",
+  "nano-banana/edit",
+  "nano-banana-2/edit",
+  "bytedance/seedream-v4-5",
+  "seedream-v4-5/edit",
+  "google/nano-banana-2",
+];
+const KV_EDIT_MODEL = "hf:edit_model";
+
 export const higgsfieldProvider: ImageProvider = {
   id: "higgsfield",
-  label: "Higgsfield (Soul)",
-  capabilities: { generate: true, referenceGen: false, tryOn: false },
-  // Key is "KEY_ID:KEY_SECRET" — require the colon so a malformed key doesn't
-  // advertise the provider as available.
+  label: "Higgsfield (Soul · nano-banana)",
+  capabilities: { generate: true, referenceGen: true, tryOn: true },
   configured: (env) => Boolean(env.HIGGSFIELD_API_KEY && env.HIGGSFIELD_API_KEY.includes(":")),
 
   async generate(env, input: GenerateInput): Promise<ImageResult[]> {
+    const refs = input.references ?? [];
+    // Mood board → reference-conditioned edit; else plain Soul text-to-image.
+    if (refs.length > 0) {
+      const urls = refs.map(publicUrl);
+      const { url, model } = await runEdit(env, input.prompt, urls);
+      return [{ ...(await fetchImage(url)), providerModel: model }];
+    }
     const count = Math.min(Math.max(input.count ?? 1, 1), 4);
-    const body = {
-      prompt: input.prompt.slice(0, 2000),
-      aspect_ratio: input.aspectRatio || "3:4",
-      resolution: "2K",
-    };
+    const body = { prompt: input.prompt.slice(0, 2000), aspect_ratio: input.aspectRatio || "3:4", resolution: "2K" };
     const out: ImageResult[] = [];
     for (let i = 0; i < count; i++) {
-      const url = await runSoul(env, body);
-      out.push({ ...(await fetchImage(url)), providerModel: SOUL });
+      const statusUrl = await submit(env, SOUL, body);
+      out.push({ ...(await fetchImage(await poll(env, statusUrl))), providerModel: SOUL });
     }
     return out;
   },
+
+  async tryOn(env, input: TryOnInput): Promise<ImageResult> {
+    const model = publicUrl(input.modelImage);
+    const garment = publicUrl(input.garmentImage);
+    const prompt =
+      "Virtual try-on. Photorealistic full-body studio fashion photograph of the exact person in the first " +
+      "reference image, wearing the garment shown in the second reference image. Keep the person's face, hair, " +
+      "body, skin tone and pose identical to the first image; the garment should drape naturally and fit " +
+      "realistically. Seamless studio background, soft even lighting, full body head to feet.";
+    const { url, model: m } = await runEdit(env, prompt, [model, garment]);
+    return { ...(await fetchImage(url)), providerModel: m };
+  },
 };
 
-async function runSoul(env: Env, body: unknown): Promise<string> {
-  const auth = { Authorization: `Key ${env.HIGGSFIELD_API_KEY}` };
-  const submit = await fetch(`${BASE}/${SOUL}`, {
+/** Higgsfield can only fetch a public URL — pull one off the ImageInput or fail. */
+function publicUrl(img: ImageInput): string {
+  if (img.kind === "url") return img.url;
+  if (img.url) return img.url;
+  throw new ProviderError("Higgsfield needs a public image URL (none available).");
+}
+
+/** Run an image-edit generation, discovering + caching the working model_id. */
+async function runEdit(env: Env, prompt: string, imageUrls: string[]): Promise<{ url: string; model: string }> {
+  const body = {
+    prompt: prompt.slice(0, 2000),
+    input_images: imageUrls.map((u) => ({ type: "image_url", image_url: u })),
+  };
+
+  const cached = await env.KV.get(KV_EDIT_MODEL).catch(() => null);
+  const order = cached ? [cached, ...EDIT_CANDIDATES.filter((c) => c !== cached)] : EDIT_CANDIDATES;
+
+  let lastErr: unknown;
+  for (const model of order) {
+    try {
+      const statusUrl = await submit(env, model, body);
+      // Worked → remember it (30-day TTL) and finish.
+      if (model !== cached) console.log(`[higgsfield] edit model locked: ${model}`);
+      await env.KV.put(KV_EDIT_MODEL, model, { expirationTtl: 60 * 60 * 24 * 30 }).catch(() => {});
+      return { url: await poll(env, statusUrl), model };
+    } catch (err) {
+      lastErr = err;
+      // A model-not-found / bad-path answer → try the next candidate. Any other
+      // error (auth, quota) will recur for every candidate and surface below.
+    }
+  }
+  throw lastErr instanceof ProviderError ? lastErr : new ProviderError("Higgsfield edit: no model accepted the request.");
+}
+
+async function submit(env: Env, model: string, body: unknown): Promise<string> {
+  const res = await fetch(`${BASE}/${model}`, {
     method: "POST",
-    headers: { ...auth, "Content-Type": "application/json", Accept: "application/json" },
+    headers: {
+      Authorization: `Key ${env.HIGGSFIELD_API_KEY}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
     body: JSON.stringify(body),
   });
-  if (!submit.ok) {
-    const d = (await submit.text().catch(() => "")).slice(0, 300);
-    throw new ProviderError(`Higgsfield ${submit.status}: ${d}`, submit.status === 429 ? 429 : 502);
+  if (!res.ok) {
+    const d = (await res.text().catch(() => "")).slice(0, 200);
+    throw new ProviderError(`Higgsfield ${model} ${res.status}: ${d}`, res.status === 429 ? 429 : 502);
   }
-  const { status_url } = (await submit.json()) as { status_url?: string };
-  if (!status_url) throw new ProviderError("Higgsfield did not return a status URL.");
+  const { status_url } = (await res.json()) as { status_url?: string };
+  if (!status_url) throw new ProviderError("Higgsfield returned no status URL.");
+  return status_url;
+}
 
+async function poll(env: Env, statusUrl: string): Promise<string> {
+  const auth = { Authorization: `Key ${env.HIGGSFIELD_API_KEY}`, Accept: "application/json" };
   for (let i = 0; i < MAX_POLLS; i++) {
     await sleep(POLL_MS);
-    const st = await fetch(status_url, { headers: { ...auth, Accept: "application/json" } });
+    const st = await fetch(statusUrl, { headers: auth });
     if (!st.ok) continue;
-    const data = (await st.json()) as {
-      status?: string;
-      images?: { url?: string }[];
-      error?: string;
-    };
+    const data = (await st.json()) as { status?: string; images?: { url?: string }[]; error?: string };
     if (data.status === "completed") {
       const url = data.images?.[0]?.url;
       if (!url) throw new ProviderError("Higgsfield completed with no image.");
@@ -73,7 +142,6 @@ async function runSoul(env: Env, body: unknown): Promise<string> {
     }
     if (data.status === "failed") throw new ProviderError(`Higgsfield failed: ${data.error ?? "unknown"}`);
     if (data.status === "nsfw") throw new ProviderError("Higgsfield flagged the request (nsfw).");
-    // queued / in_progress → keep polling.
   }
   throw new ProviderError("Higgsfield job timed out.", 504);
 }

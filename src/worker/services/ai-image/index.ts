@@ -5,8 +5,8 @@
  *
  * Preference order (best first):
  *   generate     : fal → higgsfield → workers-ai
- *   referenceGen : fal → workers-ai   (higgsfield's edit API isn't public)
- *   tryOn        : fal → fashn        (higgsfield has no try-on)
+ *   referenceGen : fal → higgsfield → workers-ai
+ *   tryOn        : fal → fashn → higgsfield  (higgsfield self-tunes its edit model)
  */
 import type { Env } from "../../types/env";
 import type { GenerateInput, ImageProvider, ImageResult, TryOnInput } from "./types";
@@ -16,11 +16,11 @@ import { fashnProvider } from "./fashn";
 import { higgsfieldProvider } from "./higgsfield";
 import { workersAiProvider } from "./workers-ai";
 
-// Higgsfield sits ahead of on-platform FLUX for plain generation (Soul is
-// nicer) but only fal does reference-conditioned generation among the paid
-// options, so it stays out of the referenceGen path.
+// Higgsfield sits ahead of on-platform FLUX for generation and now offers a
+// self-tuning image-edit path, so it also backs reference generation + try-on
+// (after fal/FASHN, which have fully-documented contracts).
 const GENERATE_ORDER: ImageProvider[] = [falProvider, higgsfieldProvider, workersAiProvider];
-const TRYON_ORDER: ImageProvider[] = [falProvider, fashnProvider];
+const TRYON_ORDER: ImageProvider[] = [falProvider, fashnProvider, higgsfieldProvider];
 
 function pick(env: Env, order: ImageProvider[], cap: "generate" | "referenceGen" | "tryOn"): ImageProvider | null {
   return order.find((p) => p.capabilities[cap] && p.configured(env)) ?? null;
