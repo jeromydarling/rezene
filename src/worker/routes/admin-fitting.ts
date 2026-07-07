@@ -5,7 +5,19 @@ import { newId } from "../utils/id";
 import { GARMENT_LIBRARY, SIZE_STEPS } from "../../shared/garments";
 import { FABRIC_LIBRARY } from "../../shared/fabrics";
 import { fittingModel, fittingSetting } from "../../shared/fitting-models";
+import {
+  fittingCapabilities,
+  generateLook,
+  tryOnGarment,
+  NoProviderError,
+  ProviderError,
+  type GarmentCategory,
+  type ImageInput,
+  type ImageResult,
+} from "../services/ai-image";
+import { reserveFittingQuota, fittingQuotaExceededBody } from "../services/ai-quota";
 import type { AppContext } from "../types/env";
+import type { Context } from "hono";
 
 /**
  * 3D Fitting Room — saved looks. A look is a base garment + fabric + colour +
@@ -168,6 +180,8 @@ interface RenderRow {
   model_id: string | null;
   setting_id: string | null;
   prompt: string | null;
+  kind: string | null;
+  provider: string | null;
   created_at: string;
 }
 function mapRender(r: RenderRow) {
@@ -178,6 +192,8 @@ function mapRender(r: RenderRow) {
     modelId: r.model_id,
     settingId: r.setting_id,
     prompt: r.prompt,
+    kind: r.kind ?? "generate",
+    provider: r.provider,
     createdAt: r.created_at,
   };
 }
@@ -191,7 +207,87 @@ adminFittingRoutes.get("/renders", async (c) => {
   }
 });
 
-adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
+// What the Fitting Room can do given the platform's configured keys.
+adminFittingRoutes.get("/capabilities", (c) => c.json(fittingCapabilities(c.env)));
+
+/** Load a stored file (garment photo, model photo, mood-board ref) as an ImageInput. */
+async function imageInputFromFile(c: Context<AppContext>, fileId: string): Promise<ImageInput | null> {
+  const f = await first<{ r2_key: string; content_type: string | null }>(
+    c.var.db,
+    `SELECT r2_key, content_type FROM files WHERE id = ?`,
+    fileId,
+  );
+  if (!f) return null;
+  const obj = await c.env.FILES.get(f.r2_key);
+  if (!obj) return null;
+  return { kind: "bytes", bytes: new Uint8Array(await obj.arrayBuffer()), contentType: f.content_type || "image/jpeg" };
+}
+
+/** Persist a produced image (R2 + files + fitting_renders) and return the render. */
+async function storeRender(
+  c: Context<AppContext>,
+  result: ImageResult,
+  meta: {
+    kind: "generate" | "tryon";
+    garmentId?: string | null;
+    modelId?: string | null;
+    settingId?: string | null;
+    prompt?: string | null;
+    styleId?: string | null;
+    garmentFileId?: string | null;
+    modelFileId?: string | null;
+  },
+) {
+  const ext = result.contentType.includes("png") ? "png" : "jpg";
+  const fileId = newId("file");
+  const key = `uploads/fitting/${meta.garmentId || meta.kind}/${fileId}.${ext}`;
+  await c.env.FILES.put(key, result.bytes, { httpMetadata: { contentType: result.contentType } });
+  await run(
+    c.var.db,
+    `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, 'fitting_render', ?, 1, ?)`,
+    fileId,
+    key,
+    `${meta.garmentId || meta.kind}.${ext}`,
+    result.contentType,
+    result.bytes.length,
+    meta.garmentId || meta.kind,
+    c.var.userId,
+  );
+  const id = newId("render");
+  await run(
+    c.var.db,
+    `INSERT INTO fitting_renders
+       (id, file_id, garment_id, model_id, setting_id, prompt, style_id, kind, garment_file_id, model_file_id, provider)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    fileId,
+    meta.garmentId ?? null,
+    meta.modelId ?? null,
+    meta.settingId ?? null,
+    (meta.prompt ?? "").slice(0, 1000),
+    meta.styleId ?? null,
+    meta.kind,
+    meta.garmentFileId ?? null,
+    meta.modelFileId ?? null,
+    result.providerModel,
+  );
+  const row = await first<RenderRow>(c.var.db, `SELECT * FROM fitting_renders WHERE id = ?`, id);
+  return mapRender(row!);
+}
+
+function providerFail(c: Context<AppContext>, err: unknown) {
+  if (err instanceof NoProviderError) return c.json({ error: err.message, code: "not_configured" }, 501);
+  if (err instanceof ProviderError) return c.json({ error: err.message }, err.status >= 400 ? (err.status as 502) : 502);
+  return c.json({ error: "Render failed — try again." }, 502);
+}
+
+/**
+ * Generate a garment ON A MODEL from words (+ optional mood-board references).
+ * Free-text description wins; else we compose a phrase from the picked garment.
+ * With reference images it becomes "make a garment in the style of these".
+ */
+adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     garmentId?: string;
     fabricId?: string;
@@ -200,67 +296,212 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
     modelId?: string;
     settingId?: string;
     styleId?: string | null;
+    referenceFileIds?: string[];
   };
-
   const garment = GARMENT_LIBRARY.find((g) => g.id === body.garmentId);
   const fabric = FABRIC_LIBRARY.find((f) => f.id === body.fabricId);
   const model = fittingModel(body.modelId);
   const setting = fittingSetting(body.settingId);
 
-  // Build the garment phrase: free-text description wins; otherwise compose one
-  // from the picked garment + fabric + colour so the picker alone is enough.
   const desc = (body.description || "").trim();
   const colorName = (body.colorName || "").trim().slice(0, 40);
+  const refIds = (body.referenceFileIds ?? []).slice(0, 6);
   let garmentPhrase = desc;
   if (!garmentPhrase) {
     if (!garment) return c.json({ error: "Pick a garment or describe one." }, 400);
     const parts = [colorName, garment.name.toLowerCase()].filter(Boolean).join(" ");
     garmentPhrase = fabric ? `${parts} in ${fabric.name.toLowerCase()}` : parts;
   }
-
+  const refClause = refIds.length ? " in the style, silhouette, and mood of the reference images" : "";
   const prompt =
-    `Full-body studio fashion photograph of ${model.descriptor} wearing ${garmentPhrase}. ` +
+    `Full-body studio fashion photograph of ${model.descriptor} wearing ${garmentPhrase}${refClause}. ` +
     `${setting.descriptor}. Standing facing the camera in a natural relaxed pose, ` +
     `full body visible from head to feet, photorealistic, sharp focus, flattering, centered composition, ` +
     `the garment fitting naturally and draping realistically on the body.`;
 
-  const { generateFluxImage, randomSeed, FluxUnavailableError } = await import("../services/flux");
+  const references: ImageInput[] = [];
+  for (const fid of refIds) {
+    const img = await imageInputFromFile(c, fid);
+    if (img) references.push(img);
+  }
+
+  const quota = await reserveFittingQuota(c);
+  if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
   try {
-    const seed = randomSeed();
-    const { bytes } = await generateFluxImage(c.env, { prompt, seed });
+    const [result] = await generateLook(c.env, { prompt, references, aspectRatio: "3:4", count: 1 });
+    if (!result) throw new ProviderError("No image produced.");
+    const render = await storeRender(c, result, {
+      kind: "generate",
+      garmentId: body.garmentId || null,
+      modelId: model.id,
+      settingId: setting.id,
+      prompt,
+      styleId: body.styleId || null,
+    });
+    return c.json(render, 201);
+  } catch (err) {
+    return providerFail(c, err);
+  }
+});
+
+/**
+ * Real virtual try-on: composite a photo of an ACTUAL garment onto a model
+ * photo. Both are stored files (garmentFileId + modelFileId — the model may be
+ * an uploaded photo or one from the shop's model library).
+ */
+adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    garmentFileId?: string;
+    modelFileId?: string;
+    category?: GarmentCategory;
+    garmentId?: string | null;
+    styleId?: string | null;
+  };
+  if (!body.garmentFileId || !body.modelFileId) {
+    return c.json({ error: "A garment photo and a model are both required." }, 400);
+  }
+  const garmentImage = await imageInputFromFile(c, body.garmentFileId);
+  const modelImage = await imageInputFromFile(c, body.modelFileId);
+  if (!garmentImage || !modelImage) return c.json({ error: "Couldn't load the images." }, 404);
+
+  const quota = await reserveFittingQuota(c);
+  if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
+  try {
+    const result = await tryOnGarment(c.env, { garmentImage, modelImage, category: body.category ?? "auto" });
+    const render = await storeRender(c, result, {
+      kind: "tryon",
+      garmentId: body.garmentId || null,
+      styleId: body.styleId || null,
+      garmentFileId: body.garmentFileId,
+      modelFileId: body.modelFileId,
+      prompt: "Virtual try-on",
+    });
+    return c.json(render, 201);
+  } catch (err) {
+    return providerFail(c, err);
+  }
+});
+
+// ---- Model library: base model photos a shop tries garments onto ------------
+
+interface ModelRow {
+  id: string;
+  file_id: string;
+  label: string;
+  preset_id: string | null;
+  source: string;
+  created_at: string;
+}
+const mapModel = (r: ModelRow) => ({
+  id: r.id,
+  fileId: r.file_id,
+  url: `/media/${r.file_id}`,
+  label: r.label,
+  presetId: r.preset_id,
+  source: r.source,
+  createdAt: r.created_at,
+});
+
+adminFittingRoutes.get("/models", async (c) => {
+  try {
+    const rows = await all<ModelRow>(c.var.db, `SELECT * FROM fitting_models ORDER BY created_at DESC`);
+    return c.json(rows.map(mapModel));
+  } catch {
+    return c.json([]);
+  }
+});
+
+/**
+ * Add a base model. Either generate one from a body preset + setting, or adopt
+ * an already-uploaded photo (fileId) as a model.
+ */
+adminFittingRoutes.post("/models", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    presetId?: string;
+    settingId?: string;
+    fileId?: string;
+    label?: string;
+  };
+
+  // Adopt an uploaded photo as a model — no generation, no quota.
+  if (body.fileId) {
+    const f = await first<{ id: string }>(c.var.db, `SELECT id FROM files WHERE id = ?`, body.fileId);
+    if (!f) return c.json({ error: "Uploaded file not found." }, 404);
+    const id = newId("fmodel");
+    await run(
+      c.var.db,
+      `INSERT INTO fitting_models (id, file_id, label, preset_id, source) VALUES (?, ?, ?, ?, 'uploaded')`,
+      id,
+      body.fileId,
+      (body.label || "My model").slice(0, 80),
+      null,
+    );
+    const row = await first<ModelRow>(c.var.db, `SELECT * FROM fitting_models WHERE id = ?`, id);
+    return c.json(mapModel(row!), 201);
+  }
+
+  // Generate a clean full-body model from a preset.
+  const model = fittingModel(body.presetId);
+  const setting = fittingSetting(body.settingId);
+  const prompt =
+    `Full-body studio fashion photograph of ${model.descriptor}, wearing plain simple fitted neutral clothing ` +
+    `(a plain tank top and leggings), no logos. ${setting.descriptor}. Standing straight facing the camera, ` +
+    `arms relaxed slightly away from the body, full body from head to feet, photorealistic, sharp focus, centered.`;
+
+  const quota = await reserveFittingQuota(c);
+  if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
+  try {
+    const [result] = await generateLook(c.env, { prompt, aspectRatio: "3:4", count: 1 });
+    if (!result) throw new ProviderError("No image produced.");
+    const ext = result.contentType.includes("png") ? "png" : "jpg";
     const fileId = newId("file");
-    const key = `uploads/fitting/${body.garmentId || "look"}/${fileId}.jpg`;
-    await c.env.FILES.put(key, bytes, { httpMetadata: { contentType: "image/jpeg" } });
+    const key = `uploads/fitting/models/${fileId}.${ext}`;
+    await c.env.FILES.put(key, result.bytes, { httpMetadata: { contentType: result.contentType } });
     await run(
       c.var.db,
       `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
-       VALUES (?, ?, ?, 'image/jpeg', ?, 'fitting_render', ?, 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, 'fitting_model', ?, 1, ?)`,
       fileId,
       key,
-      `${body.garmentId || "look"}-${seed}.jpg`,
-      bytes.length,
-      body.garmentId || "look",
+      `model-${model.id}.${ext}`,
+      result.contentType,
+      result.bytes.length,
+      model.id,
       c.var.userId,
     );
-    const id = newId("render");
+    const id = newId("fmodel");
     await run(
       c.var.db,
-      `INSERT INTO fitting_renders (id, file_id, garment_id, model_id, setting_id, prompt, style_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO fitting_models (id, file_id, label, preset_id, source) VALUES (?, ?, ?, ?, 'generated')`,
       id,
       fileId,
-      body.garmentId || null,
+      (body.label || model.label).slice(0, 80),
       model.id,
-      setting.id,
-      prompt.slice(0, 1000),
-      body.styleId || null,
     );
-    const row = await first<RenderRow>(c.var.db, `SELECT * FROM fitting_renders WHERE id = ?`, id);
-    return c.json(mapRender(row!), 201);
+    const row = await first<ModelRow>(c.var.db, `SELECT * FROM fitting_models WHERE id = ?`, id);
+    return c.json(mapModel(row!), 201);
   } catch (err) {
-    const msg = err instanceof FluxUnavailableError ? err.message : "Couldn't render the look — try again.";
-    return c.json({ error: msg }, 503);
+    return providerFail(c, err);
   }
+});
+
+adminFittingRoutes.delete("/models/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const row = await first<{ file_id: string; source: string }>(
+    c.var.db,
+    `SELECT file_id, source FROM fitting_models WHERE id = ?`,
+    id,
+  );
+  if (!row) return c.json({ error: "Model not found" }, 404);
+  // Only delete the underlying file for models WE generated; uploaded photos may
+  // be referenced elsewhere, so just detach them from the library.
+  if (row.source === "generated") {
+    const f = await first<{ r2_key: string }>(c.var.db, `SELECT r2_key FROM files WHERE id = ?`, row.file_id);
+    if (f) await c.env.FILES.delete(f.r2_key).catch(() => {});
+    await run(c.var.db, `DELETE FROM files WHERE id = ?`, row.file_id);
+  }
+  await run(c.var.db, `DELETE FROM fitting_models WHERE id = ?`, id);
+  return c.json({ ok: true });
 });
 
 adminFittingRoutes.delete("/renders/:id", requireAdminWrite, async (c) => {

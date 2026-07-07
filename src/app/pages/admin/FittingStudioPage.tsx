@@ -157,7 +157,30 @@ interface FittingRender {
   modelId: string | null;
   settingId: string | null;
   prompt: string | null;
+  kind?: string;
+  provider?: string | null;
   createdAt: string;
+}
+
+interface FittingModelItem {
+  id: string;
+  fileId: string;
+  url: string;
+  label: string;
+  presetId: string | null;
+  source: string;
+  createdAt: string;
+}
+
+interface FittingCaps {
+  generate: { available: boolean; provider: string | null };
+  referenceGen: { available: boolean; provider: string | null };
+  tryOn: { available: boolean; provider: string | null };
+}
+
+interface UploadedImg {
+  id: string;
+  url: string;
 }
 
 // A tiny hex→name map so the "on a model" prompt describes colour in words the
@@ -220,14 +243,60 @@ export function FittingStudioPage() {
   // AI Look Studio ("on a model") state.
   const [modelId, setModelId] = useState(DEFAULT_FITTING_MODEL);
   const [settingId, setSettingId] = useState(DEFAULT_FITTING_SETTING);
+  const [studioMode, setStudioMode] = useState<"generate" | "tryon">("generate");
   const [rendering, setRendering] = useState(false);
   const [activeRender, setActiveRender] = useState<FittingRender | null>(null);
   const renders = useFetch<FittingRender[]>("/api/admin/fitting/renders");
+  const capabilities = useFetch<FittingCaps>("/api/admin/fitting/capabilities");
+  const models = useFetch<FittingModelItem[]>("/api/admin/fitting/models");
 
-  async function renderOnModel() {
+  // Mood board (reference images) + try-on photo + chosen base model.
+  const [moodboard, setMoodboard] = useState<UploadedImg[]>([]);
+  const [garmentPhoto, setGarmentPhoto] = useState<UploadedImg | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
+  const [busyUpload, setBusyUpload] = useState(false);
+  const [addingModel, setAddingModel] = useState(false);
+
+  async function uploadImage(file: File): Promise<UploadedImg> {
+    const form = new FormData();
+    form.set("file", file);
+    form.set("entityType", "general");
+    form.set("isPublic", "1");
+    const res = await api.upload<{ id: string }>("/api/admin/files/upload", form);
+    return { id: res.id, url: `/media/${res.id}` };
+  }
+
+  async function onMoodboardFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setBusyUpload(true);
+    try {
+      const uploaded: UploadedImg[] = [];
+      for (const f of Array.from(files).slice(0, 6)) uploaded.push(await uploadImage(f));
+      setMoodboard((m) => [...m, ...uploaded].slice(0, 6));
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setBusyUpload(false);
+    }
+  }
+
+  async function onGarmentFile(files: FileList | null) {
+    if (!files?.[0]) return;
+    setBusyUpload(true);
+    try {
+      setGarmentPhoto(await uploadImage(files[0]));
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setBusyUpload(false);
+    }
+  }
+
+  async function generateOnModel() {
     setRendering(true);
     try {
-      const res = await api.post<FittingRender>("/api/admin/fitting/tryon", {
+      const res = await api.post<FittingRender>("/api/admin/fitting/generate", {
         garmentId,
         fabricId,
         colorName: colorName(color),
@@ -235,14 +304,74 @@ export function FittingStudioPage() {
         modelId,
         settingId,
         styleId: styleId || null,
+        referenceFileIds: moodboard.map((m) => m.id),
       });
       setActiveRender(res);
       renders.reload();
       toast.success("Look rendered on a model");
-    } catch {
-      toast.error("Couldn't render the look", "The image engine may be busy — try again.");
+    } catch (e) {
+      toast.error("Couldn't render the look", e instanceof Error ? e.message : undefined);
     } finally {
       setRendering(false);
+    }
+  }
+
+  async function runTryOn() {
+    if (!garmentPhoto || !selectedModelId) return;
+    const model = (models.data ?? []).find((m) => m.id === selectedModelId);
+    if (!model) return;
+    setRendering(true);
+    try {
+      const res = await api.post<FittingRender>("/api/admin/fitting/tryon", {
+        garmentFileId: garmentPhoto.id,
+        modelFileId: model.fileId,
+        category,
+        garmentId,
+        styleId: styleId || null,
+      });
+      setActiveRender(res);
+      renders.reload();
+      toast.success("Garment tried on");
+    } catch (e) {
+      toast.error("Try-on failed", e instanceof Error ? e.message : undefined);
+    } finally {
+      setRendering(false);
+    }
+  }
+
+  async function addModelFromPreset() {
+    setAddingModel(true);
+    try {
+      const m = await api.post<FittingModelItem>("/api/admin/fitting/models", {
+        presetId: modelId,
+        settingId: "studio",
+      });
+      models.reload();
+      setSelectedModelId(m.id);
+      toast.success("Model added");
+    } catch (e) {
+      toast.error("Couldn't add model", e instanceof Error ? e.message : undefined);
+    } finally {
+      setAddingModel(false);
+    }
+  }
+
+  async function adoptUploadedModel(files: FileList | null) {
+    if (!files?.[0]) return;
+    setAddingModel(true);
+    try {
+      const img = await uploadImage(files[0]);
+      const m = await api.post<FittingModelItem>("/api/admin/fitting/models", {
+        fileId: img.id,
+        label: "My model",
+      });
+      models.reload();
+      setSelectedModelId(m.id);
+      toast.success("Model added");
+    } catch {
+      toast.error("Couldn't add model");
+    } finally {
+      setAddingModel(false);
     }
   }
 
@@ -423,16 +552,21 @@ export function FittingStudioPage() {
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   <p className="max-w-sm text-sm text-warmgrey">
-                    Render this garment on a photoreal model. Pick a body and setting on the right, then generate —
-                    the look appears here and saves to your gallery.
+                    {studioMode === "tryon"
+                      ? "Photograph your real garment and try it on a model. Add a garment photo and pick a model on the right."
+                      : "Render this garment on a photoreal model. Pick a body and setting on the right — or drop in a mood board — then generate."}
                   </p>
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={renderOnModel}
-                    disabled={rendering}
+                    onClick={studioMode === "tryon" ? runTryOn : generateOnModel}
+                    disabled={rendering || (studioMode === "tryon" && (!garmentPhoto || !selectedModelId))}
                   >
-                    {rendering ? "Rendering…" : "Generate on a model"}
+                    {rendering
+                      ? "Rendering…"
+                      : studioMode === "tryon"
+                        ? "Try it on"
+                        : "Generate on a model"}
                   </button>
                 </div>
               )}
@@ -511,60 +645,235 @@ export function FittingStudioPage() {
           {/* On-a-model controls (AI Look Studio) */}
           {view === "model" && (
             <div className="space-y-3 rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
-                  Model
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {FITTING_MODELS.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setModelId(m.id)}
-                      className={`rounded-full border px-2.5 py-1 text-xs ${
-                        modelId === m.id
-                          ? "border-navy bg-navy text-chalk"
-                          : "border-ink/15 bg-white text-ink/70 hover:text-ink"
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
+              {/* Mode toggle */}
+              <div className="flex overflow-hidden rounded-md border border-ink/15">
+                {(["generate", "tryon"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setStudioMode(m)}
+                    className={`flex-1 px-2 py-1.5 text-xs ${
+                      studioMode === m ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    {m === "generate" ? "Generate" : "Try on my garment"}
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
-                  Setting
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {FITTING_SETTINGS.map((s) => (
+
+              {studioMode === "generate" ? (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                      Model
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FITTING_MODELS.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setModelId(m.id)}
+                          className={`rounded-full border px-2.5 py-1 text-xs ${
+                            modelId === m.id
+                              ? "border-navy bg-navy text-chalk"
+                              : "border-ink/15 bg-white text-ink/70 hover:text-ink"
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                      Setting
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FITTING_SETTINGS.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setSettingId(s.id)}
+                          className={`rounded-full border px-2.5 py-1 text-xs ${
+                            settingId === s.id
+                              ? "border-navy bg-navy text-chalk"
+                              : "border-ink/15 bg-white text-ink/70 hover:text-ink"
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Mood board */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                      Mood board <span className="normal-case text-warmgrey/70">· optional, up to 6</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {moodboard.map((m) => (
+                        <div key={m.id} className="relative">
+                          <img src={m.url} alt="" className="h-12 w-12 rounded border border-ink/15 object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setMoodboard((mb) => mb.filter((x) => x.id !== m.id))}
+                            className="absolute -right-1 -top-1 rounded-full bg-white px-1 text-[10px] text-ink/60 shadow"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      {moodboard.length < 6 && (
+                        <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 text-lg text-warmgrey hover:border-navy hover:text-navy">
+                          +
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => onMoodboardFiles(e.target.files)}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    {moodboard.length > 0 && !capabilities.data?.referenceGen.available && (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        Style-matching from a mood board needs a fal.ai key — without it the references are ignored.
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary w-full"
+                    onClick={generateOnModel}
+                    disabled={rendering}
+                  >
+                    {rendering ? "Rendering…" : activeRender ? "Render another" : "Generate on a model"}
+                  </button>
+                  <p className="text-[11px] leading-snug text-warmgrey">
+                    Uses the garment, fabric, and colour below (or your description above). Add a mood board to match
+                    a Pinterest-style reference. {capabilities.data?.generate.provider ? `Engine: ${capabilities.data.generate.provider}.` : ""}
+                  </p>
+                </>
+              ) : (
+                <>
+                  {capabilities.data && !capabilities.data.tryOn.available && (
+                    <p className="rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-700">
+                      Virtual try-on needs a <strong>fal.ai</strong> or <strong>FASHN</strong> API key. Ask your
+                      platform admin to set <code>FAL_KEY</code> to turn this on.
+                    </p>
+                  )}
+                  {/* Garment photo */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                      Your garment photo
+                    </label>
+                    {garmentPhoto ? (
+                      <div className="relative inline-block">
+                        <img
+                          src={garmentPhoto.url}
+                          alt="Garment"
+                          className="h-24 w-24 rounded border border-ink/15 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setGarmentPhoto(null)}
+                          className="absolute -right-1 -top-1 rounded-full bg-white px-1 text-[10px] text-ink/60 shadow"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex h-24 cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 text-center text-xs text-warmgrey hover:border-navy hover:text-navy">
+                        {busyUpload ? "Uploading…" : "Upload a photo of your garment (flat lay or worn)"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => onGarmentFile(e.target.files)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {/* Category */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                      Garment type
+                    </label>
+                    <div className="flex overflow-hidden rounded-md border border-ink/15 text-xs">
+                      {(["auto", "tops", "bottoms", "one-pieces"] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setCategory(cat)}
+                          className={`flex-1 px-1.5 py-1.5 ${
+                            category === cat ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                          }`}
+                        >
+                          {cat === "one-pieces" ? "dress" : cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Model picker */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                      Model
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {(models.data ?? []).map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setSelectedModelId(m.id)}
+                          className={`relative overflow-hidden rounded border ${
+                            selectedModelId === m.id ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
+                          }`}
+                          title={m.label}
+                        >
+                          <img src={m.url} alt={m.label} className="h-20 w-16 object-cover" />
+                        </button>
+                      ))}
+                      <label className="flex h-20 w-16 cursor-pointer flex-col items-center justify-center rounded border border-dashed border-ink/25 text-center text-[10px] leading-tight text-warmgrey hover:border-navy hover:text-navy">
+                        {addingModel ? "…" : "Upload model"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => adoptUploadedModel(e.target.files)}
+                        />
+                      </label>
+                    </div>
                     <button
-                      key={s.id}
                       type="button"
-                      onClick={() => setSettingId(s.id)}
-                      className={`rounded-full border px-2.5 py-1 text-xs ${
-                        settingId === s.id
-                          ? "border-navy bg-navy text-chalk"
-                          : "border-ink/15 bg-white text-ink/70 hover:text-ink"
-                      }`}
+                      className="btn btn-secondary mt-2 w-full text-xs"
+                      onClick={addModelFromPreset}
+                      disabled={addingModel || !capabilities.data?.generate.available}
                     >
-                      {s.label}
+                      {addingModel
+                        ? "Generating…"
+                        : `+ Generate a ${FITTING_MODELS.find((m) => m.id === modelId)?.label ?? "new"} model`}
                     </button>
-                  ))}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary w-full"
-                onClick={renderOnModel}
-                disabled={rendering}
-              >
-                {rendering ? "Rendering…" : activeRender ? "Render another" : "Generate on a model"}
-              </button>
-              <p className="text-[11px] leading-snug text-warmgrey">
-                Uses the garment, fabric, and colour below (or your description above) and photographs it on the
-                chosen model. Renders save to your gallery.
-              </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary w-full"
+                    onClick={runTryOn}
+                    disabled={
+                      rendering ||
+                      !garmentPhoto ||
+                      !selectedModelId ||
+                      (capabilities.data && !capabilities.data.tryOn.available) === true
+                    }
+                  >
+                    {rendering ? "Trying it on…" : "Try it on"}
+                  </button>
+                  <p className="text-[11px] leading-snug text-warmgrey">
+                    Photoreal virtual try-on of your real garment.{" "}
+                    {capabilities.data?.tryOn.provider ? `Engine: ${capabilities.data.tryOn.provider}.` : ""}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -778,6 +1087,11 @@ export function FittingStudioPage() {
                 >
                   <img src={r.url} alt="Model render" className="aspect-[3/4] w-full object-cover" />
                 </button>
+                {r.kind === "tryon" && (
+                  <span className="absolute left-1.5 top-1.5 rounded-full bg-navy/85 px-1.5 py-0.5 text-[10px] text-chalk">
+                    Try-on
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => removeRender(r.id)}
@@ -835,14 +1149,13 @@ export function FittingStudioPage() {
       </div>
 
       <p className="mt-6 max-w-3xl text-xs text-warmgrey">
-        <strong>Three views, all real work:</strong> <strong>On a model</strong> photographs your garment on a
-        photoreal AI model — pick a body and setting and generate a lookbook shot (powered by on-platform image
-        generation, no external accounts). The <strong>3D preview</strong> is a fast, stylized proportion and
-        fabric study for exploring silhouette and ease early. The <strong>Pattern</strong> view drafts a genuine,
-        manufacturable 2D sewing pattern for your size or measurements (via FreeSewing) to download as SVG for a
-        factory or tech pack. <strong>Describe your garment</strong> and the LLM sets the garment, fit, and fabric
-        across every view. For physics-accurate 3D draping, bring a CLO&nbsp;3D / Browzwear / Style3D file into the
-        Simulation bridge.
+        <strong>On a model</strong> is your AI Look Studio. <strong>Generate</strong> photographs a garment on a
+        photoreal model — pick a body and setting, or drop in a mood board to match a Pinterest-style reference. {" "}
+        <strong>Try on my garment</strong> takes a photo of your actual, tailored piece and composites it onto a
+        model with a best-in-class try-on engine — so a shirt you sewed can be seen on any body in seconds. The {" "}
+        <strong>3D preview</strong> is a fast stylized proportion study, and <strong>Pattern</strong> drafts a
+        genuine, manufacturable 2D sewing pattern (via FreeSewing) to download as SVG. For physics-accurate 3D
+        draping, bring a CLO&nbsp;3D / Browzwear / Style3D file into the Simulation bridge.
       </p>
     </div>
   );

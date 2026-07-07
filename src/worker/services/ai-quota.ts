@@ -48,3 +48,31 @@ export function quotaExceededBody(q: QuotaResult) {
     limit: q.limit,
   };
 }
+
+const DEFAULT_FITTING_LIMIT = 30;
+
+/**
+ * Per-shop daily cap on paid Fitting Room renders (fal/FASHN cost real money).
+ * Same fixed-UTC-day KV counter as research, on its own key. Tune with
+ * FITTING_DAILY_LIMIT. Only reserve right before an actual upstream render.
+ */
+export async function reserveFittingQuota(c: Context<AppContext>): Promise<QuotaResult> {
+  const raw = c.env.FITTING_DAILY_LIMIT;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FITTING_LIMIT;
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `aiq:${c.var.shopId}:fitting:${day}`;
+  const used = parseInt((await c.env.KV.get(key)) ?? "0", 10);
+  if (used >= limit) return { ok: false, used, limit };
+  await c.env.KV.put(key, String(used + 1), { expirationTtl: 172800 });
+  return { ok: true, used: used + 1, limit };
+}
+
+export function fittingQuotaExceededBody(q: QuotaResult) {
+  return {
+    error: `Daily render limit reached (${q.limit}/day for this shop). It resets at 00:00 UTC.`,
+    code: "fitting_quota_exceeded" as const,
+    used: q.used,
+    limit: q.limit,
+  };
+}
