@@ -85,15 +85,37 @@
     @apply border-red-800 bg-red-800 text-chalk hover:bg-red-900;
   }
 
-  /* ---- Admin chrome (premium SaaS) ---- */
+  /* ---- Editorial admin chrome (fashion-magazine, not SaaS) ----
+   * The admin is treated like the working pages of a fashion title: a big
+   * Fraunces masthead, a letter-spaced kicker, a hairline rule, and an
+   * elegant serif standfirst. Cards go flat with warm hairlines instead of
+   * SaaS drop-shadows so the type and whitespace carry the page. */
+  .masthead {
+    @apply mb-8 border-b border-ink/12 pb-5;
+  }
+  .masthead-kicker {
+    @apply mb-2.5 font-sans text-[0.68rem] font-medium uppercase tracking-editorial text-terracotta-deep;
+  }
+  .masthead-title {
+    @apply font-display text-[2rem] font-light leading-[1.03] tracking-[-0.01em] text-ink sm:text-[2.6rem];
+  }
+  .masthead-lede {
+    @apply mt-3 max-w-2xl font-display text-[1.05rem] font-light leading-[1.55] text-warmgrey;
+  }
+  /* A smaller echo of the masthead for section headings inside a page. */
+  .section-head {
+    @apply font-display text-[1.35rem] font-light leading-tight text-ink;
+  }
+
+  /* ---- Admin surfaces (flat + hairline, no SaaS shadow) ---- */
   .admin-card {
-    @apply rounded-md border border-ink/10 bg-white shadow-[0_1px_2px_rgba(35,32,27,0.05)];
+    @apply rounded-sm border border-ink/10 bg-white/70;
   }
   .admin-table {
     @apply w-full border-collapse text-left text-sm;
   }
   .admin-table thead th {
-    @apply border-b border-ink/10 px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wider text-warmgrey;
+    @apply border-b border-ink/15 px-3 py-2.5 text-[0.68rem] font-semibold uppercase tracking-editorial text-warmgrey;
   }
   .admin-table tbody td {
     @apply border-b border-ink/5 px-3 py-2.5 align-middle text-ink/90;

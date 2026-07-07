@@ -222,10 +222,10 @@ export function AdminLayout() {
 
   const sidebar = (
     <>
-      <Link to="/admin" className="block border-b border-chalk/10 px-5 py-5">
-        <p className="font-display text-lg font-light">{brand.brandName}</p>
-        <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/70">
-          Brand Operating System
+      <Link to="/admin" className="block border-b border-chalk/10 px-5 py-6">
+        <p className="font-display text-2xl font-light leading-none tracking-tight">{brand.brandName}</p>
+        <p className="mt-2 text-[0.58rem] uppercase tracking-editorial text-chalk/55">
+          The Fashion Desk
         </p>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -290,7 +290,7 @@ export function AdminLayout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-cream/60">
+    <div className="flex min-h-screen bg-cream">
       {/* Sidebar (desktop, static) */}
       <aside className="fixed inset-y-0 hidden w-60 flex-col border-r border-ink/10 bg-navy text-chalk lg:flex">
         {sidebar}
@@ -344,11 +344,11 @@ export function AdminLayout() {
           >
             {brand.brandName}
           </Link>
-          <nav className="hidden text-xs text-warmgrey md:block">
-            <Link to="/admin" className="hover:text-ink">
-              Admin
+          <nav className="hidden text-[0.65rem] uppercase tracking-editorial text-warmgrey md:block">
+            <Link to="/admin" className="text-ink/45 hover:text-ink">
+              {brand.brandName}
             </Link>
-            <span className="mx-1.5">/</span>
+            <span className="mx-2 text-ink/25">—</span>
             <span className="text-ink">{breadcrumb}</span>
           </nav>
           <div className="relative ml-auto w-full max-w-xs">
@@ -379,7 +379,7 @@ export function AdminLayout() {
             )}
           </div>
         </header>
-        <main className="flex-1 px-5 py-6 lg:px-8">
+        <main className="mx-auto w-full max-w-[1600px] flex-1 px-5 py-8 sm:px-7 lg:px-12 lg:py-10">
           <Outlet />
         </main>
       </div>
