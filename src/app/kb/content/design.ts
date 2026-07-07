@@ -122,4 +122,50 @@ Simulation happens in your 3D tool (CLO 3D, Browzwear, Style3D); the **record** 
 
 Found a fit problem in simulation? **Log a fit issue** and Verto files a **sample-revision task** on the production board automatically — so the fix doesn't get lost between the 3D tool and the factory. Delete a project when it's retired.`,
   },
+  {
+    slug: "look-studio",
+    title: "The Look Studio: your garment on a model",
+    summary: "Try a real garment photo on a model, or generate one from a mood board — plus 3D and patterns.",
+    part: "design",
+    moduleRoute: "/admin/fitting",
+    keywords: "fitting room look studio virtual try on model mood board pinterest generate ai image garment photo drape 3d pattern freesewing",
+    screenshot: "/kb/shots/fitting.png",
+    updated: "2026-07-07",
+    body: `# The Look Studio
+
+The Fitting Room has three views. The headline is **On a model** — see any garment on a photoreal body in seconds — backed by two more that do real production work: a **3D preview** and a downloadable **sewing pattern**.
+
+## On a model
+
+Open the **On a model** tab. It has two modes:
+
+### Generate
+
+Photograph a garment on a photoreal AI model. Pick a **body** (petite, curvy, plus, tall, athletic, menswear…) and a **setting** (studio, runway, street, editorial), then **Generate on a model**. It uses the garment, fabric, and colour you've set below — or type a description in **✨ Describe your garment**.
+
+> [!TIP]
+> Drop images into the **Mood board** to match a Pinterest-style reference — the model wears a garment in the style, silhouette, and mood of your references.
+
+### Try on my garment
+
+This is the one designers love: **take a photo of a garment you actually made** — a shirt you tailored, a sample off the line — and see it on a model.
+
+1. **Upload your garment photo** (a flat lay or a photo of it worn both work).
+2. Choose the **garment type** (top, bottom, dress, or auto).
+3. Pick a **model**: generate one from a body preset, or **upload your own** model/fit photo.
+4. **Try it on.**
+
+Every result saves to **Model renders** at the bottom — click any to reopen it, or delete it. Try-on results are badged **Try-on**.
+
+## 3D preview & Pattern
+
+- **3D preview** — a fast, stylized proportion and fabric study for exploring silhouette and ease early.
+- **Pattern** — drafts a genuine, manufacturable 2D sewing pattern (via FreeSewing) for your size or made-to-measure numbers. **Download SVG** and hand it to a factory or drop it in a tech pack.
+
+For a fully physics-accurate 3D drape, bring a CLO 3D / Browzwear / Style3D file into the [3D simulation bridge](/admin/support/kb/3d-simulation-bridge).
+
+## Turning it on
+
+**Generate** works out of the box on the platform's image engine. **Virtual try-on** and **mood-board style-matching** use a best-in-class engine (fal.ai) that a platform admin enables with an API key — until then, try-on shows a short "needs a key" note and generation still works. There's a daily render cap per shop to keep costs sane.`,
+  },
 ];
