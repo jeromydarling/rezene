@@ -219,6 +219,35 @@ adminFittingRoutes.get("/roster", (c) =>
   ),
 );
 
+/**
+ * Garment sources from the Design Studio — the connection between the two:
+ * every image a shop generated in the Design Studio is a garment they can pull
+ * straight into the Fitting Room and try on a model. Returns favourites first.
+ */
+adminFittingRoutes.get("/garment-sources", async (c) => {
+  try {
+    const rows = await all<{ file_id: string; concept_name: string | null; prompt_text: string | null }>(
+      c.var.db,
+      `SELECT g.file_id, c.name AS concept_name, g.prompt_text
+         FROM ai_generations g
+         JOIN ai_concepts c ON c.id = g.concept_id
+        WHERE g.output_kind = 'image' AND g.file_id IS NOT NULL
+        ORDER BY g.is_favorite DESC, g.created_at DESC
+        LIMIT 48`,
+    );
+    return c.json(
+      rows.map((r) => ({
+        id: r.file_id,
+        url: `/media/${r.file_id}`,
+        label: r.concept_name || "Design",
+        prompt: r.prompt_text,
+      })),
+    );
+  } catch {
+    return c.json([]);
+  }
+});
+
 /** Load a stored file (garment photo, model photo, mood-board ref) as an ImageInput.
  *  Carries the raw bytes AND a public /media URL — providers that inline bytes
  *  (fal) use the former; providers that fetch a URL (Higgsfield) use the latter. */

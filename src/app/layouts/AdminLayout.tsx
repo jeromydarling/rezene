@@ -114,7 +114,7 @@ const NAV_SECTIONS: {
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
-      { to: "/admin/fitting", label: "3D Fitting Room", icon: PersonStanding },
+      { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
     ],
   },
