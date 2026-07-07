@@ -1,0 +1,77 @@
+name: Higgsfield model probe
+
+# One-off diagnostic: POST to a batch of candidate Cloud-API model slugs with the
+# repo's HIGGSFIELD_API_KEY and print each HTTP status, so we can find the exact
+# image-edit (try-on) model_id. Auth is checked before model resolution, so a
+# valid key makes the status meaningful:
+#   404       → that slug doesn't exist
+#   422 / 400 → the slug EXISTS (real model; body just needs adjusting)
+#   200/queued→ it works
+# The key is passed via env and never printed (and GitHub masks registered
+# secrets in logs regardless). Trigger from the Actions tab → "Run workflow".
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe platform.higgsfield.ai model slugs
+        env:
+          HF_KEY: ${{ secrets.HIGGSFIELD_API_KEY }}
+        run: |
+          set -u
+          if [ -z "${HF_KEY:-}" ]; then
+            echo "HIGGSFIELD_API_KEY secret is empty — set it in repo secrets first."
+            exit 1
+          fi
+          case "$HF_KEY" in
+            *:*) : ;;
+            *) echo "note: key has no ':' — Cloud API expects KEY_ID:KEY_SECRET" ;;
+          esac
+
+          probe () {
+            local slug="$1" data="$2" code
+            code=$(curl -sS -o /tmp/body -w '%{http_code}' -m 25 -X POST \
+              "https://platform.higgsfield.ai/${slug}" \
+              -H "Authorization: Key ${HF_KEY}" \
+              -H 'Content-Type: application/json' \
+              -H 'Accept: application/json' \
+              --data "${data}" 2>/dev/null) || code="curl-err"
+            printf '%-46s %-4s %s\n' "$slug" "$code" "$(head -c 220 /tmp/body | tr '\n' ' ')"
+          }
+
+          GEN='{"prompt":"a red apple on a table"}'
+          EDIT='{"prompt":"put the jacket on the person","image_urls":["https://picsum.photos/512","https://picsum.photos/512"]}'
+
+          echo "===================================================================="
+          echo " CONTROL — proves the key authenticates (expect NOT 401, NOT 404)"
+          echo "===================================================================="
+          probe "higgsfield-ai/soul/standard" "$GEN"
+
+          echo
+          echo "===================================================================="
+          echo " FLAT job_set_type ids (from the CLI catalog)"
+          echo "===================================================================="
+          for m in nano_banana_2 nano_banana nano_banana_flash nano_banana_2_lite \
+                   seedream_v4_5 seedream_v5_lite flux_kontext gpt_image_2 image_auto grok_image; do
+            probe "$m" "$EDIT"
+          done
+
+          echo
+          echo "===================================================================="
+          echo " VENDOR namespaces + task-name variants"
+          echo "===================================================================="
+          for m in google/nano-banana-2 google/nano-banana-pro google/nano-banana \
+                   google/nano-banana-2/image-to-image google/nano-banana-2/edit \
+                   higgsfield-ai/nano-banana/standard higgsfield-ai/nano-banana-2/standard \
+                   nano-banana/edit nano-banana-2/image-to-image nano-banana/image-to-image \
+                   bytedance/seedream/v4.5/edit bytedance/seedream/v4/edit \
+                   bytedance/seedream-v4-5/edit reve/image-to-image \
+                   flux-pro/kontext/max/multi flux-pro/kontext/max; do
+            probe "$m" "$EDIT"
+          done
+
+          echo
+          echo "Legend: 404 = no such slug · 422/400 = slug EXISTS (real model) · 200/queued = works"
+          echo "Done."
