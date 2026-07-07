@@ -12,6 +12,12 @@ import {
   type SizeStep,
 } from "../../../shared/garments";
 import { FABRIC_LIBRARY, type FabricRef } from "../../../shared/fabrics";
+import {
+  FITTING_MODELS,
+  FITTING_SETTINGS,
+  DEFAULT_FITTING_MODEL,
+  DEFAULT_FITTING_SETTING,
+} from "../../../shared/fitting-models";
 import { buildGarment, buildMannequin, disposeGroup, fabricAppearance } from "../../lib/garmentGeometry";
 import { draftPatternSvg, patternLabel, type BodyMeasurements } from "../../lib/patterns";
 import { PageHeader, EmptyState } from "../../components/admin/ui";
@@ -144,6 +150,58 @@ interface SavedLook {
   updatedAt: string;
 }
 
+interface FittingRender {
+  id: string;
+  url: string;
+  garmentId: string | null;
+  modelId: string | null;
+  settingId: string | null;
+  prompt: string | null;
+  createdAt: string;
+}
+
+// A tiny hex→name map so the "on a model" prompt describes colour in words the
+// image model understands (a hex string is meaningless to Flux).
+const COLOR_NAMES: [number, number, number, string][] = [
+  [0, 0, 0, "black"],
+  [40, 40, 40, "charcoal"],
+  [128, 128, 128, "grey"],
+  [220, 220, 220, "light grey"],
+  [255, 255, 255, "white"],
+  [245, 240, 225, "cream"],
+  [120, 90, 60, "camel"],
+  [90, 60, 40, "brown"],
+  [40, 55, 95, "navy"],
+  [60, 110, 190, "blue"],
+  [120, 190, 220, "sky blue"],
+  [40, 110, 90, "emerald green"],
+  [120, 150, 90, "olive"],
+  [150, 30, 40, "burgundy"],
+  [200, 60, 60, "red"],
+  [220, 130, 140, "pink"],
+  [230, 150, 70, "rust orange"],
+  [235, 205, 120, "mustard"],
+  [110, 80, 150, "purple"],
+];
+function colorName(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255,
+    g = (n >> 8) & 255,
+    b = n & 255;
+  let best = COLOR_NAMES[0],
+    bestD = Infinity;
+  for (const c of COLOR_NAMES) {
+    const d = (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best[3];
+}
+
 export function FittingStudioPage() {
   const toast = useToast();
   const [garmentId, setGarmentId] = useState(GARMENT_LIBRARY[0].id);
@@ -154,10 +212,49 @@ export function FittingStudioPage() {
   const [fit, setFit] = useState<FitConfig>(DEFAULT_FIT);
   const [spin, setSpin] = useState(true);
   const [showBody, setShowBody] = useState(true);
-  const [view, setView] = useState<"3d" | "pattern">("3d");
+  const [view, setView] = useState<"model" | "3d" | "pattern">("model");
   const [measurements, setMeasurements] = useState<BodyMeasurements>({});
   const [designPrompt, setDesignPrompt] = useState("");
   const [designing, setDesigning] = useState(false);
+
+  // AI Look Studio ("on a model") state.
+  const [modelId, setModelId] = useState(DEFAULT_FITTING_MODEL);
+  const [settingId, setSettingId] = useState(DEFAULT_FITTING_SETTING);
+  const [rendering, setRendering] = useState(false);
+  const [activeRender, setActiveRender] = useState<FittingRender | null>(null);
+  const renders = useFetch<FittingRender[]>("/api/admin/fitting/renders");
+
+  async function renderOnModel() {
+    setRendering(true);
+    try {
+      const res = await api.post<FittingRender>("/api/admin/fitting/tryon", {
+        garmentId,
+        fabricId,
+        colorName: colorName(color),
+        description: designPrompt.trim() || undefined,
+        modelId,
+        settingId,
+        styleId: styleId || null,
+      });
+      setActiveRender(res);
+      renders.reload();
+      toast.success("Look rendered on a model");
+    } catch {
+      toast.error("Couldn't render the look", "The image engine may be busy — try again.");
+    } finally {
+      setRendering(false);
+    }
+  }
+
+  async function removeRender(id: string) {
+    try {
+      await api.delete(`/api/admin/fitting/renders/${id}`);
+      if (activeRender?.id === id) setActiveRender(null);
+      renders.reload();
+    } catch {
+      toast.error("Couldn't delete");
+    }
+  }
 
   const pattern = useMemo(
     () => (view === "pattern" ? draftPatternSvg(garmentId, fit.size, measurements) : null),
@@ -274,17 +371,19 @@ export function FittingStudioPage() {
     <div>
       <PageHeader
         eyebrow="Design & Development"
-        title="3D Fitting Room"
-        description="Preview a base garment in 3D, dial in the fit, and drape it in a fabric. A fast, stylized proportion study — the physics-accurate drape lands in a later release."
+        title="Fitting Room"
+        description="See a garment on a photoreal model, study its proportions in 3D, and draft a real sewing pattern — from one place."
         actions={
-          <>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowBody((b) => !b)}>
-              {showBody ? "Hide body" : "Show body"}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setSpin((s) => !s)}>
-              {spin ? "Stop spin" : "Auto-spin"}
-            </button>
-          </>
+          view === "3d" ? (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowBody((b) => !b)}>
+                {showBody ? "Hide body" : "Show body"}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setSpin((s) => !s)}>
+                {spin ? "Stop spin" : "Auto-spin"}
+              </button>
+            </>
+          ) : undefined
         }
       />
 
@@ -293,7 +392,7 @@ export function FittingStudioPage() {
         <div className="overflow-hidden rounded-lg border border-ink/10 bg-[#f4f2ee]">
           <div className="flex items-center justify-between border-b border-ink/10 bg-white/60 px-3 py-2">
             <div className="flex overflow-hidden rounded-md border border-ink/15">
-              {(["3d", "pattern"] as const).map((v) => (
+              {(["model", "3d", "pattern"] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
@@ -302,7 +401,7 @@ export function FittingStudioPage() {
                     view === v ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
                   }`}
                 >
-                  {v === "3d" ? "3D preview" : "Pattern"}
+                  {v === "model" ? "On a model" : v === "3d" ? "3D preview" : "Pattern"}
                 </button>
               ))}
             </div>
@@ -313,7 +412,37 @@ export function FittingStudioPage() {
             )}
           </div>
 
-          {view === "3d" ? (
+          {view === "model" ? (
+            <div className="relative h-[540px] w-full bg-white">
+              {activeRender ? (
+                <img
+                  src={activeRender.url}
+                  alt="Garment rendered on a model"
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  <p className="max-w-sm text-sm text-warmgrey">
+                    Render this garment on a photoreal model. Pick a body and setting on the right, then generate —
+                    the look appears here and saves to your gallery.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={renderOnModel}
+                    disabled={rendering}
+                  >
+                    {rendering ? "Rendering…" : "Generate on a model"}
+                  </button>
+                </div>
+              )}
+              {rendering && activeRender && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm text-navy">
+                  Rendering a new look…
+                </div>
+              )}
+            </div>
+          ) : view === "3d" ? (
             <div className="h-[540px] w-full">
               <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} showBody={showBody} />
             </div>
@@ -336,11 +465,19 @@ export function FittingStudioPage() {
 
           <div className="flex items-center justify-between border-t border-ink/10 bg-white/60 px-4 py-2 text-xs text-warmgrey">
             <span>
-              {view === "3d"
-                ? `${garment.name} · ${fabric?.name ?? "—"} · size ${fit.size}`
-                : (pattern?.label ?? patternLabel(garmentId) ?? garment.name) + ` · size ${fit.size}`}
+              {view === "model"
+                ? `${garment.name} · ${fabric?.name ?? "—"} on a model`
+                : view === "3d"
+                  ? `${garment.name} · ${fabric?.name ?? "—"} · size ${fit.size}`
+                  : (pattern?.label ?? patternLabel(garmentId) ?? garment.name) + ` · size ${fit.size}`}
             </span>
-            <span>{view === "3d" ? "Drag to orbit · scroll to zoom" : "Real, manufacturable pattern"}</span>
+            <span>
+              {view === "model"
+                ? "Photoreal AI render"
+                : view === "3d"
+                  ? "Drag to orbit · scroll to zoom"
+                  : "Real, manufacturable pattern"}
+            </span>
           </div>
         </div>
 
@@ -366,10 +503,70 @@ export function FittingStudioPage() {
               {designing ? "Drafting…" : "Draft it"}
             </button>
             <p className="text-[11px] leading-snug text-warmgrey">
-              The LLM maps your words to a garment, fit, and fabric — updating both the 3D preview and the real
-              pattern. You can fine-tune everything below.
+              The LLM maps your words to a garment, fit, and fabric — updating all views. You can fine-tune
+              everything below.
             </p>
           </div>
+
+          {/* On-a-model controls (AI Look Studio) */}
+          {view === "model" && (
+            <div className="space-y-3 rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                  Model
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {FITTING_MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setModelId(m.id)}
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        modelId === m.id
+                          ? "border-navy bg-navy text-chalk"
+                          : "border-ink/15 bg-white text-ink/70 hover:text-ink"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                  Setting
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {FITTING_SETTINGS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSettingId(s.id)}
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        settingId === s.id
+                          ? "border-navy bg-navy text-chalk"
+                          : "border-ink/15 bg-white text-ink/70 hover:text-ink"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary w-full"
+                onClick={renderOnModel}
+                disabled={rendering}
+              >
+                {rendering ? "Rendering…" : activeRender ? "Render another" : "Generate on a model"}
+              </button>
+              <p className="text-[11px] leading-snug text-warmgrey">
+                Uses the garment, fabric, and colour below (or your description above) and photographs it on the
+                chosen model. Renders save to your gallery.
+              </p>
+            </div>
+          )}
 
           {/* Garment */}
           <div>
@@ -563,6 +760,38 @@ export function FittingStudioPage() {
         </div>
       </div>
 
+      {/* Model renders (AI Look Studio gallery) */}
+      {(renders.data ?? []).length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-3 font-display text-lg font-light">Model renders</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {(renders.data ?? []).map((r) => (
+              <div key={r.id} className="group relative overflow-hidden rounded-lg border border-ink/10 bg-white">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveRender(r);
+                    setView("model");
+                  }}
+                  className="block w-full"
+                  title="View this render"
+                >
+                  <img src={r.url} alt="Model render" className="aspect-[3/4] w-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeRender(r.id)}
+                  className="absolute right-1.5 top-1.5 rounded-full bg-white/85 px-2 py-0.5 text-xs text-ink/70 opacity-0 transition group-hover:opacity-100 hover:text-red-600"
+                  title="Delete"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Saved looks */}
       <div className="mt-8">
         <h2 className="mb-3 font-display text-lg font-light">Saved looks</h2>
@@ -606,13 +835,13 @@ export function FittingStudioPage() {
       </div>
 
       <p className="mt-6 max-w-3xl text-xs text-warmgrey">
-        <strong>Two views, both real work:</strong> the <strong>3D preview</strong> is a stylized proportion and
-        fabric study — great for exploring silhouette, ease, and fabric feel early (not a physics-accurate drape).
-        The <strong>Pattern</strong> view drafts a genuine, manufacturable 2D sewing pattern for your size or
-        measurements (powered by FreeSewing) that you can download as SVG and hand to a factory or drop into a
-        tech pack. <strong>Describe your garment</strong> and the LLM sets the garment, fit, and fabric for both
-        views — you refine from there. For
-        full physics draping and made-to-measure fit, bring a CLO&nbsp;3D / Browzwear / Style3D file into the 3D
+        <strong>Three views, all real work:</strong> <strong>On a model</strong> photographs your garment on a
+        photoreal AI model — pick a body and setting and generate a lookbook shot (powered by on-platform image
+        generation, no external accounts). The <strong>3D preview</strong> is a fast, stylized proportion and
+        fabric study for exploring silhouette and ease early. The <strong>Pattern</strong> view drafts a genuine,
+        manufacturable 2D sewing pattern for your size or measurements (via FreeSewing) to download as SVG for a
+        factory or tech pack. <strong>Describe your garment</strong> and the LLM sets the garment, fit, and fabric
+        across every view. For physics-accurate 3D draping, bring a CLO&nbsp;3D / Browzwear / Style3D file into the
         Simulation bridge.
       </p>
     </div>
