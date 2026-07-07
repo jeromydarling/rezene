@@ -42,6 +42,24 @@ export const FITTING_SETTINGS: readonly FittingSettingPreset[] = [
 export const DEFAULT_FITTING_MODEL = "straight";
 export const DEFAULT_FITTING_SETTING = "studio";
 
+/**
+ * House style — the locked camera / lighting / posture / quality baseline shared
+ * by ALL Look Studio imagery (the model roster AND every generated look), so the
+ * whole library reads like one photoshoot. The `setting` presets only vary the
+ * backdrop; this fixes everything else. Prepend it to any model/look prompt.
+ */
+export const HOUSE_STYLE =
+  "Photorealistic full-length fashion photograph, shot on an 85mm lens at eye level, " +
+  "soft even diffused studio key light with a gentle fill, natural true-to-life colour and skin, " +
+  "the model standing straight and centred, facing the camera, weight even, arms relaxed slightly " +
+  "away from the torso, feet together, full body framed head to feet with a little headroom, " +
+  "sharp focus, calm neutral expression, high-end e-commerce lookbook quality.";
+
+/** Neutral base outfit for roster/base-model shots so try-on swaps garments cleanly. */
+export const BASE_MODEL_OUTFIT =
+  "wearing plain fitted heather-grey activewear (a simple scoop-neck tank top and mid-length leggings), " +
+  "barefoot, no logos, no jewellery, no accessories";
+
 export function fittingModel(id: string | undefined): FittingModelPreset {
   return FITTING_MODELS.find((m) => m.id === id) ?? FITTING_MODELS[0];
 }

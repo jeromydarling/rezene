@@ -4,7 +4,8 @@ import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
 import { GARMENT_LIBRARY, SIZE_STEPS } from "../../shared/garments";
 import { FABRIC_LIBRARY } from "../../shared/fabrics";
-import { fittingModel, fittingSetting } from "../../shared/fitting-models";
+import { fittingModel, fittingSetting, HOUSE_STYLE, BASE_MODEL_OUTFIT } from "../../shared/fitting-models";
+import { ROSTER, rosterModel } from "../../shared/fitting-roster";
 import {
   fittingCapabilities,
   generateLook,
@@ -210,6 +211,14 @@ adminFittingRoutes.get("/renders", async (c) => {
 // What the Fitting Room can do given the platform's configured keys.
 adminFittingRoutes.get("/capabilities", (c) => c.json(fittingCapabilities(c.env)));
 
+// The shared platform model roster — a curated, diverse cast every shop can try
+// garments onto. Images ship as static assets at /roster/<id>.jpg.
+adminFittingRoutes.get("/roster", (c) =>
+  c.json(
+    ROSTER.map((m) => ({ id: m.id, name: m.name, gender: m.gender, build: m.build, url: `/roster/${m.id}.jpg` })),
+  ),
+);
+
 /** Load a stored file (garment photo, model photo, mood-board ref) as an ImageInput. */
 async function imageInputFromFile(c: Context<AppContext>, fileId: string): Promise<ImageInput | null> {
   const f = await first<{ r2_key: string; content_type: string | null }>(
@@ -313,11 +322,11 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
     garmentPhrase = fabric ? `${parts} in ${fabric.name.toLowerCase()}` : parts;
   }
   const refClause = refIds.length ? " in the style, silhouette, and mood of the reference images" : "";
+  // Lead with the shared HOUSE_STYLE so every generated look matches the roster's
+  // lighting, camera, and posture; the setting only swaps the backdrop.
   const prompt =
-    `Full-body studio fashion photograph of ${model.descriptor} wearing ${garmentPhrase}${refClause}. ` +
-    `${setting.descriptor}. Standing facing the camera in a natural relaxed pose, ` +
-    `full body visible from head to feet, photorealistic, sharp focus, flattering, centered composition, ` +
-    `the garment fitting naturally and draping realistically on the body.`;
+    `${HOUSE_STYLE} The subject is ${model.descriptor} wearing ${garmentPhrase}${refClause}, ` +
+    `the garment fitting naturally and draping realistically on the body. ${setting.descriptor}.`;
 
   const references: ImageInput[] = [];
   for (const fid of refIds) {
@@ -353,15 +362,23 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     garmentFileId?: string;
     modelFileId?: string;
+    modelRosterId?: string;
     category?: GarmentCategory;
     garmentId?: string | null;
     styleId?: string | null;
   };
-  if (!body.garmentFileId || !body.modelFileId) {
+  if (!body.garmentFileId || (!body.modelFileId && !body.modelRosterId)) {
     return c.json({ error: "A garment photo and a model are both required." }, 400);
   }
   const garmentImage = await imageInputFromFile(c, body.garmentFileId);
-  const modelImage = await imageInputFromFile(c, body.modelFileId);
+  // Model is either a shop file or a platform roster asset (served publicly).
+  let modelImage: ImageInput | null = null;
+  if (body.modelRosterId) {
+    const rm = rosterModel(body.modelRosterId);
+    if (rm) modelImage = { kind: "url", url: `${c.env.APP_URL.replace(/\/$/, "")}/roster/${rm.id}.jpg` };
+  } else if (body.modelFileId) {
+    modelImage = await imageInputFromFile(c, body.modelFileId);
+  }
   if (!garmentImage || !modelImage) return c.json({ error: "Couldn't load the images." }, 404);
 
   const quota = await reserveFittingQuota(c);
@@ -371,9 +388,10 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
     const render = await storeRender(c, result, {
       kind: "tryon",
       garmentId: body.garmentId || null,
+      modelId: body.modelRosterId || null,
       styleId: body.styleId || null,
       garmentFileId: body.garmentFileId,
-      modelFileId: body.modelFileId,
+      modelFileId: body.modelFileId || null,
       prompt: "Virtual try-on",
     });
     return c.json(render, 201);
@@ -440,13 +458,12 @@ adminFittingRoutes.post("/models", requireAdminWrite, async (c) => {
     return c.json(mapModel(row!), 201);
   }
 
-  // Generate a clean full-body model from a preset.
+  // Generate a clean full-body model from a preset, in the shared house style so
+  // it matches the roster.
   const model = fittingModel(body.presetId);
-  const setting = fittingSetting(body.settingId);
   const prompt =
-    `Full-body studio fashion photograph of ${model.descriptor}, wearing plain simple fitted neutral clothing ` +
-    `(a plain tank top and leggings), no logos. ${setting.descriptor}. Standing straight facing the camera, ` +
-    `arms relaxed slightly away from the body, full body from head to feet, photorealistic, sharp focus, centered.`;
+    `${HOUSE_STYLE} The subject is ${model.descriptor}, ${BASE_MODEL_OUTFIT}. ` +
+    `Seamless light warm-grey studio background.`;
 
   const quota = await reserveFittingQuota(c);
   if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);

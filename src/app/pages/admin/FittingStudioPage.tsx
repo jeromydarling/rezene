@@ -178,6 +178,14 @@ interface FittingCaps {
   tryOn: { available: boolean; provider: string | null };
 }
 
+interface RosterItem {
+  id: string;
+  name: string;
+  gender: "female" | "male";
+  build: string;
+  url: string;
+}
+
 interface UploadedImg {
   id: string;
   url: string;
@@ -249,11 +257,13 @@ export function FittingStudioPage() {
   const renders = useFetch<FittingRender[]>("/api/admin/fitting/renders");
   const capabilities = useFetch<FittingCaps>("/api/admin/fitting/capabilities");
   const models = useFetch<FittingModelItem[]>("/api/admin/fitting/models");
+  const roster = useFetch<RosterItem[]>("/api/admin/fitting/roster");
 
   // Mood board (reference images) + try-on photo + chosen base model.
   const [moodboard, setMoodboard] = useState<UploadedImg[]>([]);
   const [garmentPhoto, setGarmentPhoto] = useState<UploadedImg | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [modelSel, setModelSel] = useState<{ kind: "roster" | "shop"; id: string } | null>(null);
+  const [rosterGender, setRosterGender] = useState<"female" | "male">("female");
   const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
   const [busyUpload, setBusyUpload] = useState(false);
   const [addingModel, setAddingModel] = useState(false);
@@ -317,18 +327,23 @@ export function FittingStudioPage() {
   }
 
   async function runTryOn() {
-    if (!garmentPhoto || !selectedModelId) return;
-    const model = (models.data ?? []).find((m) => m.id === selectedModelId);
-    if (!model) return;
+    if (!garmentPhoto || !modelSel) return;
+    const payload: Record<string, unknown> = {
+      garmentFileId: garmentPhoto.id,
+      category,
+      garmentId,
+      styleId: styleId || null,
+    };
+    if (modelSel.kind === "roster") {
+      payload.modelRosterId = modelSel.id;
+    } else {
+      const model = (models.data ?? []).find((m) => m.id === modelSel.id);
+      if (!model) return;
+      payload.modelFileId = model.fileId;
+    }
     setRendering(true);
     try {
-      const res = await api.post<FittingRender>("/api/admin/fitting/tryon", {
-        garmentFileId: garmentPhoto.id,
-        modelFileId: model.fileId,
-        category,
-        garmentId,
-        styleId: styleId || null,
-      });
+      const res = await api.post<FittingRender>("/api/admin/fitting/tryon", payload);
       setActiveRender(res);
       renders.reload();
       toast.success("Garment tried on");
@@ -339,22 +354,6 @@ export function FittingStudioPage() {
     }
   }
 
-  async function addModelFromPreset() {
-    setAddingModel(true);
-    try {
-      const m = await api.post<FittingModelItem>("/api/admin/fitting/models", {
-        presetId: modelId,
-        settingId: "studio",
-      });
-      models.reload();
-      setSelectedModelId(m.id);
-      toast.success("Model added");
-    } catch (e) {
-      toast.error("Couldn't add model", e instanceof Error ? e.message : undefined);
-    } finally {
-      setAddingModel(false);
-    }
-  }
 
   async function adoptUploadedModel(files: FileList | null) {
     if (!files?.[0]) return;
@@ -366,7 +365,7 @@ export function FittingStudioPage() {
         label: "My model",
       });
       models.reload();
-      setSelectedModelId(m.id);
+      setModelSel({ kind: "shop", id: m.id });
       toast.success("Model added");
     } catch {
       toast.error("Couldn't add model");
@@ -560,7 +559,7 @@ export function FittingStudioPage() {
                     type="button"
                     className="btn btn-primary"
                     onClick={studioMode === "tryon" ? runTryOn : generateOnModel}
-                    disabled={rendering || (studioMode === "tryon" && (!garmentPhoto || !selectedModelId))}
+                    disabled={rendering || (studioMode === "tryon" && (!garmentPhoto || !modelSel))}
                   >
                     {rendering
                       ? "Rendering…"
@@ -815,45 +814,79 @@ export function FittingStudioPage() {
                       ))}
                     </div>
                   </div>
-                  {/* Model picker */}
+                  {/* Model picker — the shared roster, plus this shop's own models */}
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
-                      Model
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {(models.data ?? []).map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setSelectedModelId(m.id)}
-                          className={`relative overflow-hidden rounded border ${
-                            selectedModelId === m.id ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
-                          }`}
-                          title={m.label}
-                        >
-                          <img src={m.url} alt={m.label} className="h-20 w-16 object-cover" />
-                        </button>
-                      ))}
-                      <label className="flex h-20 w-16 cursor-pointer flex-col items-center justify-center rounded border border-dashed border-ink/25 text-center text-[10px] leading-tight text-warmgrey hover:border-navy hover:text-navy">
-                        {addingModel ? "…" : "Upload model"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => adoptUploadedModel(e.target.files)}
-                        />
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                        Model
                       </label>
+                      <div className="flex overflow-hidden rounded-md border border-ink/15 text-[11px]">
+                        {(["female", "male"] as const).map((g) => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setRosterGender(g)}
+                            className={`px-2 py-0.5 ${
+                              rosterGender === g ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                            }`}
+                          >
+                            {g === "female" ? "Women" : "Men"}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-secondary mt-2 w-full text-xs"
-                      onClick={addModelFromPreset}
-                      disabled={addingModel || !capabilities.data?.generate.available}
-                    >
-                      {addingModel
-                        ? "Generating…"
-                        : `+ Generate a ${FITTING_MODELS.find((m) => m.id === modelId)?.label ?? "new"} model`}
-                    </button>
+                    <div className="grid max-h-56 grid-cols-4 gap-1.5 overflow-y-auto pr-1">
+                      {(roster.data ?? [])
+                        .filter((m) => m.gender === rosterGender)
+                        .map((m) => {
+                          const on = modelSel?.kind === "roster" && modelSel.id === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setModelSel({ kind: "roster", id: m.id })}
+                              className={`relative overflow-hidden rounded border ${
+                                on ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
+                              }`}
+                              title={`${m.name} · ${m.build}`}
+                            >
+                              <img src={m.url} alt={m.name} className="aspect-[3/4] w-full object-cover" />
+                            </button>
+                          );
+                        })}
+                    </div>
+                    {(models.data ?? []).length > 0 && (
+                      <>
+                        <p className="mt-2 text-[11px] uppercase tracking-wider text-warmgrey/70">Your models</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {(models.data ?? []).map((m) => {
+                            const on = modelSel?.kind === "shop" && modelSel.id === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setModelSel({ kind: "shop", id: m.id })}
+                                className={`relative overflow-hidden rounded border ${
+                                  on ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
+                                }`}
+                                title={m.label}
+                              >
+                                <img src={m.url} alt={m.label} className="h-20 w-16 object-cover" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                    <label className="mt-2 flex cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 py-1.5 text-center text-[11px] text-warmgrey hover:border-navy hover:text-navy">
+                      {addingModel ? "Uploading…" : "+ Upload your own model photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => adoptUploadedModel(e.target.files)}
+                      />
+                    </label>
                   </div>
                   <button
                     type="button"
@@ -862,7 +895,7 @@ export function FittingStudioPage() {
                     disabled={
                       rendering ||
                       !garmentPhoto ||
-                      !selectedModelId ||
+                      !modelSel ||
                       (capabilities.data && !capabilities.data.tryOn.available) === true
                     }
                   >
