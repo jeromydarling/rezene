@@ -76,6 +76,13 @@ export interface Env {
   FAL_KEY?: string;
   /** FASHN direct API key (alternative try-on provider if fal is not set). */
   FASHN_API_KEY?: string;
+  /**
+   * Higgsfield REST API key as "KEY_ID:KEY_SECRET". A stopgap generation engine
+   * (nano-banana) for the Fitting Room until fal is funded: powers "generate on
+   * a model" and mood-board style-matching, plus a best-effort image-edit
+   * try-on. Real try-on prefers fal/FASHN when configured.
+   */
+  HIGGSFIELD_API_KEY?: string;
   /** Per-shop daily cap on paid Fitting Room renders (default 30). */
   FITTING_DAILY_LIMIT?: string;
 }
