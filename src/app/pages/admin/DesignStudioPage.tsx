@@ -3,6 +3,7 @@ import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { EmptyState, ErrorNote, LoadingTable, PageHeader, SlideOver, StatusBadge } from "../../components/admin/ui";
+import { FABRIC_GROUPS, DETAIL_GROUPS, type VocabGroup } from "../../../shared/design-vocab";
 
 /**
  * Design Studio — a home for designing the next line, powered natively by
@@ -267,13 +268,13 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
             </select>
           </Labeled>
           <Labeled label="Fabric & texture">
-            <input className="input !py-1.5 text-sm" value={fabric} onChange={(e) => setFabric(e.target.value)} placeholder="sun-washed linen" />
+            <TagPicker value={fabric} onChange={setFabric} groups={FABRIC_GROUPS} placeholder="+ add fabric or finish…" />
           </Labeled>
           <Labeled label="Colour / palette">
             <input className="input !py-1.5 text-sm" value={palette} onChange={(e) => setPalette(e.target.value)} placeholder="warm sand, ecru" />
           </Labeled>
           <Labeled label="Details & trims">
-            <input className="input !py-1.5 text-sm" value={details} onChange={(e) => setDetails(e.target.value)} placeholder="double pleats, horn buttons" />
+            <TagPicker value={details} onChange={setDetails} groups={DETAIL_GROUPS} placeholder="+ add a detail or trim…" />
           </Labeled>
           <Labeled label="Presentation">
             <select className="input !py-1.5 text-sm" value={presentation} onChange={(e) => setPresentation(e.target.value)}>
@@ -690,5 +691,97 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
       <span className="mb-1 block text-xs font-medium text-warmgrey">{label}</span>
       {children}
     </label>
+  );
+}
+
+/**
+ * Controlled multi-select from a large curated vocabulary, plus an "Other"
+ * escape hatch. Value is a comma-joined string (so it drops straight into the
+ * assembled prompt); selected items show as removable chips.
+ */
+function TagPicker({
+  value,
+  onChange,
+  groups,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  groups: readonly VocabGroup[];
+  placeholder: string;
+}) {
+  const selected = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const [other, setOther] = useState("");
+  const commit = (next: string[]) => onChange([...new Set(next)].join(", "));
+  const add = (tag: string) => {
+    const t = tag.trim();
+    if (t && !selected.includes(t)) commit([...selected, t]);
+  };
+  const remove = (tag: string) => commit(selected.filter((s) => s !== tag));
+
+  return (
+    <div className="rounded-md border border-ink/15 bg-white p-1.5">
+      {selected.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          {selected.map((s) => (
+            <span
+              key={s}
+              className="inline-flex items-center gap-1 rounded-full bg-navy/10 px-2 py-0.5 text-[11px] text-navy"
+            >
+              {s}
+              <button type="button" onClick={() => remove(s)} className="text-navy/60 hover:text-navy" aria-label={`Remove ${s}`}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <select
+          className="input !py-1 text-xs"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) add(e.target.value);
+            e.currentTarget.selectedIndex = 0;
+          }}
+        >
+          <option value="">{placeholder}</option>
+          {groups.map((g) => (
+            <optgroup key={g.label} label={g.label}>
+              {g.options.map((o) => (
+                <option key={o} value={o} disabled={selected.includes(o)}>
+                  {o}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+      <div className="mt-1.5 flex gap-1.5">
+        <input
+          className="input !py-1 text-xs"
+          value={other}
+          placeholder="Other… (add your own)"
+          onChange={(e) => setOther(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add(other);
+              setOther("");
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="btn btn-secondary shrink-0 !px-3 !py-1 text-xs"
+          onClick={() => {
+            add(other);
+            setOther("");
+          }}
+        >
+          Add
+        </button>
+      </div>
+    </div>
   );
 }
