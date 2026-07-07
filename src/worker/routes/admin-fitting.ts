@@ -219,17 +219,32 @@ adminFittingRoutes.get("/roster", (c) =>
   ),
 );
 
-/** Load a stored file (garment photo, model photo, mood-board ref) as an ImageInput. */
+/** Load a stored file (garment photo, model photo, mood-board ref) as an ImageInput.
+ *  Carries the raw bytes AND a public /media URL — providers that inline bytes
+ *  (fal) use the former; providers that fetch a URL (Higgsfield) use the latter. */
 async function imageInputFromFile(c: Context<AppContext>, fileId: string): Promise<ImageInput | null> {
-  const f = await first<{ r2_key: string; content_type: string | null }>(
+  const f = await first<{ r2_key: string; content_type: string | null; is_public: number }>(
     c.var.db,
-    `SELECT r2_key, content_type FROM files WHERE id = ?`,
+    `SELECT r2_key, content_type, is_public FROM files WHERE id = ?`,
     fileId,
   );
   if (!f) return null;
   const obj = await c.env.FILES.get(f.r2_key);
   if (!obj) return null;
-  return { kind: "bytes", bytes: new Uint8Array(await obj.arrayBuffer()), contentType: f.content_type || "image/jpeg" };
+  return {
+    kind: "bytes",
+    bytes: new Uint8Array(await obj.arrayBuffer()),
+    contentType: f.content_type || "image/jpeg",
+    url: f.is_public ? publicMediaUrl(c, fileId) : undefined,
+  };
+}
+
+/** Absolute, externally-fetchable URL for a public file, addressed to the shop. */
+function publicMediaUrl(c: Context<AppContext>, fileId: string): string | undefined {
+  const base = (c.env.APP_URL || "").replace(/\/$/, "");
+  if (!base) return undefined;
+  const slug = c.var.shopSlug;
+  return slug ? `${base}/${slug}/media/${fileId}` : `${base}/media/${fileId}`;
 }
 
 /** Persist a produced image (R2 + files + fitting_renders) and return the render. */

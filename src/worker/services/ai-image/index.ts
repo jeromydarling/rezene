@@ -4,18 +4,23 @@
  * the keys allow and never crashes when a key is missing.
  *
  * Preference order (best first):
- *   generate / referenceGen : fal → workers-ai
- *   tryOn                    : fal → fashn
+ *   generate     : fal → higgsfield → workers-ai
+ *   referenceGen : fal → higgsfield → workers-ai
+ *   tryOn        : fal → fashn → higgsfield  (higgsfield self-tunes its edit model)
  */
 import type { Env } from "../../types/env";
 import type { GenerateInput, ImageProvider, ImageResult, TryOnInput } from "./types";
 import { NoProviderError } from "./types";
 import { falProvider } from "./fal";
 import { fashnProvider } from "./fashn";
+import { higgsfieldProvider } from "./higgsfield";
 import { workersAiProvider } from "./workers-ai";
 
-const GENERATE_ORDER: ImageProvider[] = [falProvider, workersAiProvider];
-const TRYON_ORDER: ImageProvider[] = [falProvider, fashnProvider];
+// Higgsfield sits ahead of on-platform FLUX for generation and now offers a
+// self-tuning image-edit path, so it also backs reference generation + try-on
+// (after fal/FASHN, which have fully-documented contracts).
+const GENERATE_ORDER: ImageProvider[] = [falProvider, higgsfieldProvider, workersAiProvider];
+const TRYON_ORDER: ImageProvider[] = [falProvider, fashnProvider, higgsfieldProvider];
 
 function pick(env: Env, order: ImageProvider[], cap: "generate" | "referenceGen" | "tryOn"): ImageProvider | null {
   return order.find((p) => p.capabilities[cap] && p.configured(env)) ?? null;
@@ -39,17 +44,38 @@ export function fittingCapabilities(env: Env): FittingCapabilities {
   };
 }
 
+/**
+ * Run through the eligible providers best-first, falling through to the next on
+ * failure. This is what makes the layer resilient: if a configured provider is
+ * momentarily down — or rejects an input — we still serve the result from the
+ * next one instead of erroring the whole request.
+ */
+async function cascade<T>(
+  env: Env,
+  order: ImageProvider[],
+  cap: "generate" | "referenceGen" | "tryOn",
+  run: (p: ImageProvider) => Promise<T>,
+): Promise<T> {
+  const eligible = order.filter((p) => p.capabilities[cap] && p.configured(env));
+  if (eligible.length === 0) throw new NoProviderError(cap);
+  let lastErr: unknown;
+  for (const p of eligible) {
+    try {
+      return await run(p);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(`All ${cap} providers failed.`);
+}
+
 export async function generateLook(env: Env, input: GenerateInput): Promise<ImageResult[]> {
   const cap = (input.references?.length ?? 0) > 0 ? "referenceGen" : "generate";
-  const provider = pick(env, GENERATE_ORDER, cap);
-  if (!provider?.generate) throw new NoProviderError(cap);
-  return provider.generate(env, input);
+  return cascade(env, GENERATE_ORDER, cap, (p) => p.generate!(env, input));
 }
 
 export async function tryOnGarment(env: Env, input: TryOnInput): Promise<ImageResult> {
-  const provider = pick(env, TRYON_ORDER, "tryOn");
-  if (!provider?.tryOn) throw new NoProviderError("try-on");
-  return provider.tryOn(env, input);
+  return cascade(env, TRYON_ORDER, "tryOn", (p) => p.tryOn!(env, input));
 }
 
 export * from "./types";

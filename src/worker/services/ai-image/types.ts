@@ -10,8 +10,15 @@
  */
 import type { Env } from "../../types/env";
 
-/** An image passed to a provider: either a fetchable URL or raw bytes. */
-export type ImageInput = { kind: "url"; url: string } | { kind: "bytes"; bytes: Uint8Array; contentType: string };
+/**
+ * An image passed to a provider. Either a public URL, or raw bytes with an
+ * OPTIONAL public URL alongside them — some providers (fal) inline the bytes as
+ * a data URI, while others (Higgsfield) can only fetch a public URL, so we
+ * carry both when we have them and let each provider use what it needs.
+ */
+export type ImageInput =
+  | { kind: "url"; url: string }
+  | { kind: "bytes"; bytes: Uint8Array; contentType: string; url?: string };
 
 export interface GenerateInput {
   prompt: string;

@@ -78,11 +78,12 @@ jobs:
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
           FAL_KEY: ${{ secrets.FAL_KEY }}
           FASHN_API_KEY: ${{ secrets.FASHN_API_KEY }}
+          HIGGSFIELD_API_KEY: ${{ secrets.HIGGSFIELD_API_KEY }}
         run: |
           for name in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY \
                       ANTHROPIC_API_KEY SESSION_SECRET ADMIN_EMAIL ADMIN_INITIAL_PASSWORD \
                       RENDER_CALLBACK_SECRET GITHUB_DISPATCH_TOKEN PERPLEXITY_API_KEY \
-                      FAL_KEY FASHN_API_KEY; do
+                      FAL_KEY FASHN_API_KEY HIGGSFIELD_API_KEY; do
             value="${!name}"
             if [ -z "$value" ]; then
               echo "skipped $name (not set as a GitHub secret)"
