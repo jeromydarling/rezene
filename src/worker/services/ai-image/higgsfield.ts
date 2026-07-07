@@ -32,20 +32,31 @@ const SOUL = "higgsfield-ai/soul/standard";
 const MAX_POLLS = 45;
 const POLL_MS = 1300;
 
-// Candidate edit model_ids, best try-on quality first. These are fal.ai's 2026
-// image-edit slugs with the `fal-ai/` prefix stripped (the gateway convention).
-// nano-banana is namespaced `google/` on Higgsfield (per its model catalog);
-// we also try the bare fal-style form in case the gateway keeps it. The first
-// the account accepts wins and is cached, so a miss costs one rejected submit.
+// Candidate edit model_ids, best try-on quality first. Higgsfield's REST slugs
+// name the task in FULL — the confirmed ones are `…/text-to-image` and
+// `…/image-to-video`, never fal's terse `/edit`. So the edit task is almost
+// certainly `…/image-to-image`. The app records nano-banana as `nano_banana_2`,
+// so we try both the hyphenated `nano-banana-2` and the `google/` vendor
+// namespace, plus Seedream (instruction editing) and a fal-style `/edit` tail
+// as a long-shot. The first the account accepts wins and is cached; a miss is a
+// fast 404 (no polling), so a wide list is cheap.
 const EDIT_CANDIDATES = [
-  "google/nano-banana-pro/edit", // Gemini 3 Pro Image — best identity-preserving try-on
-  "google/nano-banana/edit", // Gemini 2.5 Flash Image
-  "nano-banana/edit", // fal-style, prefix dropped
-  "nano-banana-pro/edit",
-  "bytedance/seedream/v4.5/edit", // Seedream 4.5 — strong instruction-based editing
-  "bytedance/seedream/v4/edit",
-  "gemini-3-pro-image-preview/edit",
-  "flux-pro/kontext/max/multi", // Flux Kontext multi-image edit
+  // image-to-image task naming (matches Higgsfield's confirmed convention)
+  "nano-banana-2/image-to-image",
+  "google/nano-banana-2/image-to-image",
+  "higgsfield-ai/nano-banana-2/image-to-image",
+  "nano-banana/image-to-image",
+  "google/nano-banana/image-to-image",
+  "nano-banana-pro/image-to-image",
+  "google/nano-banana-pro/image-to-image",
+  "bytedance/seedream/v4.5/image-to-image",
+  "bytedance/seedream/v4/image-to-image",
+  "reve/image-to-image",
+  // fal-style `/edit` tail — long-shots, in case the gateway mirrors fal exactly
+  "nano-banana/edit",
+  "google/nano-banana-pro/edit",
+  "bytedance/seedream/v4.5/edit",
+  "flux-pro/kontext/max/multi",
 ];
 const KV_EDIT_MODEL = "hf:edit_model";
 
