@@ -258,7 +258,9 @@ export function FittingStudioPage() {
   // AI Look Studio ("on a model") state.
   const [modelId, setModelId] = useState(DEFAULT_FITTING_MODEL);
   const [settingId, setSettingId] = useState(DEFAULT_FITTING_SETTING);
-  const [studioMode, setStudioMode] = useState<"generate" | "tryon">("generate");
+  // The Fitting Studio is for dialing a real garment in, so "on a model" is
+  // try-on only — freeform "generate a garment" lives in the Design Studio.
+  const [studioMode, setStudioMode] = useState<"generate" | "tryon">("tryon");
   const [rendering, setRendering] = useState(false);
   const [activeRender, setActiveRender] = useState<FittingRender | null>(null);
   const renders = useFetch<FittingRender[]>("/api/admin/fitting/renders");
@@ -520,9 +522,9 @@ export function FittingStudioPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Design & Development"
-        title="Fitting Room"
-        description="Bring a garment from the Design Studio (or a photo of a real one), see it on a photoreal model, refine the fit, and draft a real sewing pattern — all in one place."
+        eyebrow="Design & Development · dial it in"
+        title="Fitting Studio"
+        description="Where you dial a garment in. Bring a Design Studio creation (or a photo of a real sample), try it on your consistent model roster, refine the fit, and draft a real sewing pattern. Exploring new ideas? Start in the Design Studio."
         actions={
           view === "3d" ? (
             <>
@@ -551,7 +553,7 @@ export function FittingStudioPage() {
                     view === v ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
                   }`}
                 >
-                  {v === "model" ? "On a model" : v === "3d" ? "Mannequin" : "Pattern"}
+                  {v === "model" ? "Try-on" : v === "3d" ? "Mannequin" : "Pattern"}
                 </button>
               ))}
             </div>
@@ -666,22 +668,6 @@ export function FittingStudioPage() {
           {/* On-a-model controls (AI Look Studio) */}
           {view === "model" && (
             <div className="space-y-3 rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
-              {/* Mode toggle */}
-              <div className="flex overflow-hidden rounded-md border border-ink/15">
-                {(["generate", "tryon"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setStudioMode(m)}
-                    className={`flex-1 px-2 py-1.5 text-xs ${
-                      studioMode === m ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
-                    }`}
-                  >
-                    {m === "generate" ? "Generate" : "Try on my garment"}
-                  </button>
-                ))}
-              </div>
-
               {studioMode === "generate" ? (
                 <>
                   <div>
@@ -1247,13 +1233,13 @@ export function FittingStudioPage() {
       </div>
 
       <p className="mt-6 max-w-3xl text-xs text-warmgrey">
-        <strong>On a model</strong> is your AI Look Studio. <strong>Generate</strong> photographs a garment on a
-        photoreal model — pick a body and setting, or drop in a mood board to match a Pinterest-style reference. {" "}
-        <strong>Try on my garment</strong> takes a photo of your actual, tailored piece and composites it onto a
-        model with a best-in-class try-on engine — so a shirt you sewed can be seen on any body in seconds. The {" "}
-        <strong>Mannequin</strong> is a fast stylized proportion study, and <strong>Pattern</strong> drafts a
-        genuine, manufacturable 2D sewing pattern (via FreeSewing) to download as SVG. For full physics draping,
-        bring a CLO&nbsp;3D / Browzwear / Style3D file into the Simulation bridge.
+        <strong>Design Studio</strong> is where you dream garments up; the <strong>Fitting Studio</strong> is where
+        you dial them in. <strong>Try-on</strong> takes a real garment — a Design Studio creation or a photo of a
+        sample — and puts it on your <strong>consistent model roster</strong>, so you can judge fit on the same
+        bodies across every style. <strong>Mannequin</strong> is a fast proportion + fabric study for silhouette and
+        ease, and <strong>Pattern</strong> drafts a genuine, manufacturable 2D sewing pattern (via FreeSewing) you
+        can download as SVG. For full physics draping, bring a CLO&nbsp;3D / Browzwear / Style3D file into the
+        Simulation bridge.
       </p>
     </div>
   );
