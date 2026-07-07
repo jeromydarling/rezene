@@ -5,8 +5,9 @@ name: E2E · Look Studio
 # a real virtual try-on. Screenshots are uploaded as a build artifact.
 #
 # One-time repository setup (Settings → Secrets and variables → Actions):
-#   LS_EMAIL     — an admin login for the shop to test
-#   LS_PASSWORD  — that account's password
+#   LS_EMAIL / LS_PASSWORD — an admin login for the shop to test.
+#   (Falls back to KB_EMAIL / KB_PASSWORD — the same secrets the KB screenshot
+#    workflow uses — so if those are already set, this needs no new secrets.)
 # Optional variable (Settings → Variables → Actions):
 #   LS_BASE      — target site (default https://verto.style)
 #
@@ -46,9 +47,9 @@ jobs:
 
       - name: Run Look Studio E2E
         env:
-          LS_EMAIL: ${{ secrets.LS_EMAIL }}
-          LS_PASSWORD: ${{ secrets.LS_PASSWORD }}
-          LS_BASE: ${{ github.event.inputs.base || vars.LS_BASE }}
+          LS_EMAIL: ${{ secrets.LS_EMAIL || secrets.KB_EMAIL }}
+          LS_PASSWORD: ${{ secrets.LS_PASSWORD || secrets.KB_PASSWORD }}
+          LS_BASE: ${{ github.event.inputs.base || vars.LS_BASE || vars.KB_BASE }}
         run: node scripts/e2e-look-studio.mjs
 
       - name: Upload screenshots
