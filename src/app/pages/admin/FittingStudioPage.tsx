@@ -172,6 +172,13 @@ interface FittingModelItem {
   createdAt: string;
 }
 
+interface GarmentSource {
+  id: string;
+  url: string;
+  label: string;
+  prompt: string | null;
+}
+
 interface FittingCaps {
   generate: { available: boolean; provider: string | null };
   referenceGen: { available: boolean; provider: string | null };
@@ -258,15 +265,30 @@ export function FittingStudioPage() {
   const capabilities = useFetch<FittingCaps>("/api/admin/fitting/capabilities");
   const models = useFetch<FittingModelItem[]>("/api/admin/fitting/models");
   const roster = useFetch<RosterItem[]>("/api/admin/fitting/roster");
+  const garmentSources = useFetch<GarmentSource[]>("/api/admin/fitting/garment-sources");
 
   // Mood board (reference images) + try-on photo + chosen base model.
   const [moodboard, setMoodboard] = useState<UploadedImg[]>([]);
   const [garmentPhoto, setGarmentPhoto] = useState<UploadedImg | null>(null);
+  const [garmentSource, setGarmentSource] = useState<"studio" | "upload">("studio");
   const [modelSel, setModelSel] = useState<{ kind: "roster" | "shop"; id: string } | null>(null);
   const [rosterGender, setRosterGender] = useState<"female" | "male">("female");
   const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
   const [busyUpload, setBusyUpload] = useState(false);
   const [addingModel, setAddingModel] = useState(false);
+
+  // Deep link from the Design Studio: /admin/fitting?garment=<fileId> preselects
+  // that design as the garment and drops you straight into try-on.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const g = params.get("garment");
+    if (g) {
+      setGarmentPhoto({ id: g, url: `/media/${g}` });
+      setGarmentSource("studio");
+      setStudioMode("tryon");
+      setView("model");
+    }
+  }, []);
 
   async function uploadImage(file: File): Promise<UploadedImg> {
     const form = new FormData();
@@ -500,7 +522,7 @@ export function FittingStudioPage() {
       <PageHeader
         eyebrow="Design & Development"
         title="Fitting Room"
-        description="See a garment on a photoreal model, study its proportions in 3D, and draft a real sewing pattern — from one place."
+        description="Bring a garment from the Design Studio (or a photo of a real one), see it on a photoreal model, refine the fit, and draft a real sewing pattern — all in one place."
         actions={
           view === "3d" ? (
             <>
@@ -529,7 +551,7 @@ export function FittingStudioPage() {
                     view === v ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
                   }`}
                 >
-                  {v === "model" ? "On a model" : v === "3d" ? "3D preview" : "Pattern"}
+                  {v === "model" ? "On a model" : v === "3d" ? "Mannequin" : "Pattern"}
                 </button>
               ))}
             </div>
@@ -762,36 +784,79 @@ export function FittingStudioPage() {
                       platform admin to set <code>FAL_KEY</code> to turn this on.
                     </p>
                   )}
-                  {/* Garment photo */}
+                  {/* Step 1 — the garment: a Design Studio creation or a photo */}
                   <div>
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
-                      Your garment photo
+                      1 · Your garment
                     </label>
                     {garmentPhoto ? (
                       <div className="relative inline-block">
                         <img
                           src={garmentPhoto.url}
                           alt="Garment"
-                          className="h-24 w-24 rounded border border-ink/15 object-cover"
+                          className="h-28 w-28 rounded border border-ink/15 object-cover"
                         />
                         <button
                           type="button"
                           onClick={() => setGarmentPhoto(null)}
                           className="absolute -right-1 -top-1 rounded-full bg-white px-1 text-[10px] text-ink/60 shadow"
+                          title="Choose a different garment"
                         >
                           ✕
                         </button>
                       </div>
                     ) : (
-                      <label className="flex h-24 cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 text-center text-xs text-warmgrey hover:border-navy hover:text-navy">
-                        {busyUpload ? "Uploading…" : "Upload a photo of your garment (flat lay or worn)"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => onGarmentFile(e.target.files)}
-                        />
-                      </label>
+                      <>
+                        <div className="mb-2 flex overflow-hidden rounded-md border border-ink/15 text-[11px]">
+                          {(["studio", "upload"] as const).map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setGarmentSource(s)}
+                              className={`flex-1 px-2 py-1.5 ${
+                                garmentSource === s ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                              }`}
+                            >
+                              {s === "studio" ? "From Design Studio" : "Upload a photo"}
+                            </button>
+                          ))}
+                        </div>
+                        {garmentSource === "studio" ? (
+                          (garmentSources.data ?? []).length > 0 ? (
+                            <div className="grid max-h-48 grid-cols-3 gap-1.5 overflow-y-auto pr-1">
+                              {(garmentSources.data ?? []).map((g) => (
+                                <button
+                                  key={g.id}
+                                  type="button"
+                                  onClick={() => setGarmentPhoto({ id: g.id, url: g.url })}
+                                  className="overflow-hidden rounded border border-ink/15 hover:border-navy"
+                                  title={g.label}
+                                >
+                                  <img src={g.url} alt={g.label} className="aspect-square w-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="rounded border border-dashed border-ink/20 px-3 py-4 text-center text-[11px] text-warmgrey">
+                              No Design Studio images yet. Create one in{" "}
+                              <a href="/admin/ai-concepts" className="link-quiet">
+                                Design Studio
+                              </a>
+                              , or upload a photo.
+                            </p>
+                          )
+                        ) : (
+                          <label className="flex h-24 cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 text-center text-xs text-warmgrey hover:border-navy hover:text-navy">
+                            {busyUpload ? "Uploading…" : "Upload a photo of your garment (flat lay or worn)"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => onGarmentFile(e.target.files)}
+                            />
+                          </label>
+                        )}
+                      </>
                     )}
                   </div>
                   {/* Category */}
@@ -818,7 +883,7 @@ export function FittingStudioPage() {
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
                       <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
-                        Model
+                        2 · Choose a model
                       </label>
                       <div className="flex overflow-hidden rounded-md border border-ink/15 text-[11px]">
                         {(["female", "male"] as const).map((g) => (
@@ -1186,9 +1251,9 @@ export function FittingStudioPage() {
         photoreal model — pick a body and setting, or drop in a mood board to match a Pinterest-style reference. {" "}
         <strong>Try on my garment</strong> takes a photo of your actual, tailored piece and composites it onto a
         model with a best-in-class try-on engine — so a shirt you sewed can be seen on any body in seconds. The {" "}
-        <strong>3D preview</strong> is a fast stylized proportion study, and <strong>Pattern</strong> drafts a
-        genuine, manufacturable 2D sewing pattern (via FreeSewing) to download as SVG. For physics-accurate 3D
-        draping, bring a CLO&nbsp;3D / Browzwear / Style3D file into the Simulation bridge.
+        <strong>Mannequin</strong> is a fast stylized proportion study, and <strong>Pattern</strong> drafts a
+        genuine, manufacturable 2D sewing pattern (via FreeSewing) to download as SVG. For full physics draping,
+        bring a CLO&nbsp;3D / Browzwear / Style3D file into the Simulation bridge.
       </p>
     </div>
   );

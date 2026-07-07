@@ -387,6 +387,13 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
                     >
                       {g.is_favorite ? "★" : "☆"}
                     </button>
+                    <a
+                      href={`/admin/fitting?garment=${g.url!.split("/media/")[1] ?? ""}`}
+                      title="Try this on a model in the Fitting Room"
+                      className="text-xs text-white"
+                    >
+                      ▦ try on
+                    </a>
                     <button type="button" title="Use on your site" className="text-xs text-white" onClick={() => setUseGen(g)}>
                       ⇡ use
                     </button>
