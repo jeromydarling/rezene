@@ -4,6 +4,8 @@ import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { EmptyState, ErrorNote, LoadingTable, PageHeader, SlideOver, StatusBadge } from "../../components/admin/ui";
 import { FABRIC_GROUPS, DETAIL_GROUPS, type VocabGroup } from "../../../shared/design-vocab";
+import { SIZE_STEPS, type SizeStep } from "../../../shared/garments";
+import { draftPatternSvg, PATTERN_BLOCKS, type BodyMeasurements } from "../../lib/patterns";
 
 /**
  * Design Studio — a home for designing the next line, powered natively by
@@ -208,7 +210,13 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
   );
 
   // Assemble a prompt from the builder unless the user has hand-edited it.
-  const assembled = [garment && `a ${garment}`, fabric && `in ${fabric}`, palette, details, presentation && `presented ${presentation}`]
+  const assembled = [
+    garment ? `A ${garment}` : "",
+    fabric ? `in ${fabric}` : "",
+    palette ? `in a ${palette} palette` : "",
+    details ? `with ${details}` : "",
+    presentation, // already reads as a directive, e.g. "on a model, editorial crop"
+  ]
     .filter(Boolean)
     .join(", ");
   useEffect(() => {
@@ -287,7 +295,7 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
           </Labeled>
         </div>
 
-        <Labeled label="Prompt (edit freely)">
+        <Labeled label="Final prompt — this is what the AI generates from">
           <textarea
             className="input text-sm"
             rows={2}
@@ -297,6 +305,25 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
               setPromptDirty(true);
             }}
           />
+          <p className="mt-1 flex items-center justify-between gap-2 text-[11px] text-warmgrey">
+            <span>
+              {promptDirty
+                ? "You've edited this — the fields above no longer change it."
+                : "Auto-composed from the fields above. Type here to take over and refine."}
+            </span>
+            {promptDirty && (
+              <button
+                type="button"
+                className="shrink-0 text-navy hover:underline"
+                onClick={() => {
+                  setPromptDirty(false);
+                  setPrompt(assembled);
+                }}
+              >
+                Reset to fields
+              </button>
+            )}
+          </p>
         </Labeled>
 
         {/* Reference images (FLUX.2 conditioning) */}
@@ -390,7 +417,7 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
                     </button>
                     <a
                       href={`/admin/fitting?garment=${g.url!.split("/media/")[1] ?? ""}`}
-                      title="Try this on a model in the Fitting Room"
+                      title="Try this on a model in the Fitting Studio"
                       className="text-xs text-white"
                     >
                       ▦ try on
@@ -418,6 +445,9 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
           </div>
         </div>
       )}
+
+      {/* Sewing pattern — draft a real, manufacturable block for this design */}
+      <PatternPanel />
 
       <SlideOver open={Boolean(useGen)} title="Use on your site" onClose={() => setUseGen(null)}>
         {useGen && (
@@ -681,6 +711,144 @@ function HouseStyleEditor({ onClose }: { onClose: () => void }) {
       <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={() => void save()}>
         {busy ? "Saving…" : "Save house style"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Sewing-pattern drafter. Melded in from the Fitting Studio: a garment is a
+ * design artifact, so drafting a real, manufacturable 2D block (via FreeSewing,
+ * pure client-side) lives here next to the looks it belongs to. Pick a block,
+ * grade to a size, optionally enter made-to-measure girths, and download the SVG.
+ */
+function PatternPanel() {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [blockId, setBlockId] = useState(PATTERN_BLOCKS[0].id);
+  const [size, setSize] = useState<SizeStep>("M");
+  const [m, setM] = useState<BodyMeasurements>({});
+  const [drafted, setDrafted] = useState<{ svg: string; label: string } | null>(null);
+
+  const setMeasure = (key: keyof BodyMeasurements, value: string) => {
+    const n = Number(value);
+    setM((prev) => ({ ...prev, [key]: value === "" || !Number.isFinite(n) ? undefined : n }));
+  };
+
+  function draft() {
+    const res = draftPatternSvg(blockId, size, m);
+    if (!res) {
+      toast.error("Couldn't draft that block", "Try a different garment block.");
+      return;
+    }
+    setDrafted(res);
+  }
+
+  function download() {
+    if (!drafted) return;
+    const blob = new Blob([drafted.svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${blockId}-${size}-pattern.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="admin-card p-5">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-left"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div>
+          <h3 className="font-display text-base font-light">Sewing pattern</h3>
+          <p className="text-[11px] text-warmgrey">
+            Draft a real, manufacturable 2D block for this design and download it as SVG.
+          </p>
+        </div>
+        <span className="text-warmgrey">{open ? "–" : "+"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
+          <div className="space-y-3">
+            <Labeled label="Garment block">
+              <select className="input !py-1.5 text-sm" value={blockId} onChange={(e) => setBlockId(e.target.value)}>
+                {PATTERN_BLOCKS.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </Labeled>
+            <Labeled label="Size">
+              <div className="flex overflow-hidden rounded-md border border-ink/15">
+                {SIZE_STEPS.map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => setSize(sz)}
+                    className={`flex-1 px-2 py-1.5 text-xs ${
+                      size === sz ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    {sz}
+                  </button>
+                ))}
+              </div>
+            </Labeled>
+            <div>
+              <span className="mb-1 block text-xs font-medium text-warmgrey">
+                Measurements <span className="font-normal text-warmgrey/70">· cm, optional</span>
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["chestCm", "Chest"],
+                  ["waistCm", "Waist"],
+                  ["hipsCm", "Hips"],
+                  ["heightCm", "Height"],
+                ] as const).map(([key, label]) => (
+                  <input
+                    key={key}
+                    type="number"
+                    className="input !py-1.5 text-sm"
+                    placeholder={label}
+                    value={m[key] ?? ""}
+                    onChange={(e) => setMeasure(key, e.target.value)}
+                  />
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-warmgrey">Leave blank to grade from the standard size.</p>
+            </div>
+            <button type="button" className="btn btn-primary w-full !py-1.5 text-sm" onClick={draft}>
+              Draft pattern
+            </button>
+          </div>
+
+          <div className="min-h-[240px] overflow-auto rounded-md border border-ink/10 bg-white p-3">
+            {drafted ? (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] text-warmgrey">{drafted.label}</span>
+                  <button type="button" className="btn btn-secondary !py-1 text-xs" onClick={download}>
+                    Download SVG
+                  </button>
+                </div>
+                <div
+                  className="[&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
+                  // FreeSewing renders a self-contained SVG string (its own styles).
+                  dangerouslySetInnerHTML={{ __html: drafted.svg }}
+                />
+              </>
+            ) : (
+              <div className="flex h-full min-h-[220px] items-center justify-center px-6 text-center text-sm text-warmgrey">
+                Pick a block and draft to see a real, manufacturable pattern you can download as SVG.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
