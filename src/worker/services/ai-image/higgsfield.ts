@@ -1,18 +1,27 @@
 /**
  * Higgsfield adapter. Two capabilities on one key:
  *   • generate (text only)   → Soul (documented, stable).
- *   • referenceGen + tryOn   → nano-banana / Flux-Kontext style image EDITING.
+ *   • referenceGen + tryOn   → nano-banana / Seedream style image EDITING.
  *
- * The edit path is SELF-TUNING. Higgsfield's public docs only publish the Soul
- * text-to-image model_id; the edit model_id (the one that does try-on) isn't
- * documented. So on the first edit call we probe a short list of candidate
- * model_ids, keep whichever the account accepts, and cache it in KV — after
- * that it's a direct call. If none work, we throw and the router cascades to
- * the next provider. Images are passed as public URLs (Higgsfield fetches them;
- * it can't take raw bytes), in the SDK's `input_images:[{type,image_url}]` shape.
+ * The edit path is SELF-TUNING. Higgsfield's public docs only publish a handful
+ * of model_ids (Soul t2i, DoP video); the image-EDIT model_id that does try-on
+ * isn't documented. But the platform is a fal.ai-compatible gateway — its slugs
+ * mirror fal's exactly, minus the `fal-ai/` namespace prefix (confirmed by the
+ * docs: `bytedance/seedance/v1/pro/image-to-video`, `kling-video/v2.1/pro/…`,
+ * `reve/text-to-image` are all fal slugs with `fal-ai/` stripped). So the edit
+ * models are fal's edit slugs (`fal-ai/nano-banana/edit`, `…/seedream/v4.5/edit`)
+ * with the prefix dropped and the vendor namespace kept. On the first edit call
+ * we probe the candidate list, keep whichever the account accepts, cache it in
+ * KV, and after that it's a direct call. A 404 means "wrong path, try the next";
+ * any other status means we hit a real model (so the error is about the body,
+ * auth, or quota) and we surface it immediately instead of masking it.
  *
- * Contract per docs.higgsfield.ai + higgsfield-js SDK: base platform.higgsfield.ai,
- * auth `Authorization: Key <id>:<secret>`, submit → poll status_url → images[0].url.
+ * Body shape follows fal's edit contract (mirrored by the gateway): a top-level
+ * `prompt` plus an `image_urls` array of public URLs. Higgsfield fetches the
+ * URLs itself; it can't take raw bytes.
+ *
+ * Contract per docs.higgsfield.ai: base platform.higgsfield.ai, auth
+ * `Authorization: Key <id>:<secret>`, submit → poll status_url → images[0].url.
  */
 import type { Env } from "../../types/env";
 import type { GenerateInput, ImageInput, ImageProvider, ImageResult, TryOnInput } from "./types";
@@ -23,20 +32,34 @@ const SOUL = "higgsfield-ai/soul/standard";
 const MAX_POLLS = 45;
 const POLL_MS = 1300;
 
-// Candidate edit model_ids, most-likely first. Flux Kontext's path family is
-// confirmed by the SDK (`flux-pro/kontext/max/text-to-image`); the nano-banana
-// / seedream ids are informed guesses. The first that the account accepts wins
-// and is cached, so a miss just costs one extra rejected submit on first use.
+// Candidate edit model_ids, best try-on quality first. These are fal.ai's 2026
+// image-edit slugs with the `fal-ai/` prefix stripped (the gateway convention).
+// nano-banana is namespaced `google/` on Higgsfield (per its model catalog);
+// we also try the bare fal-style form in case the gateway keeps it. The first
+// the account accepts wins and is cached, so a miss costs one rejected submit.
 const EDIT_CANDIDATES = [
-  "flux-pro/kontext/max/multi",
-  "flux-pro/kontext/max",
-  "nano-banana/edit",
-  "nano-banana-2/edit",
-  "bytedance/seedream-v4-5",
-  "seedream-v4-5/edit",
-  "google/nano-banana-2",
+  "google/nano-banana-pro/edit", // Gemini 3 Pro Image — best identity-preserving try-on
+  "google/nano-banana/edit", // Gemini 2.5 Flash Image
+  "nano-banana/edit", // fal-style, prefix dropped
+  "nano-banana-pro/edit",
+  "bytedance/seedream/v4.5/edit", // Seedream 4.5 — strong instruction-based editing
+  "bytedance/seedream/v4/edit",
+  "gemini-3-pro-image-preview/edit",
+  "flux-pro/kontext/max/multi", // Flux Kontext multi-image edit
 ];
 const KV_EDIT_MODEL = "hf:edit_model";
+
+/** Carries the raw HTTP status so runEdit can tell "wrong path" (404) from a
+ *  real model rejecting the request (422/400/etc.). */
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+    readonly model: string,
+  ) {
+    super(`Higgsfield ${model} ${status}: ${detail}`);
+  }
+}
 
 export const higgsfieldProvider: ImageProvider = {
   id: "higgsfield",
@@ -56,7 +79,7 @@ export const higgsfieldProvider: ImageProvider = {
     const body = { prompt: input.prompt.slice(0, 2000), aspect_ratio: input.aspectRatio || "3:4", resolution: "2K" };
     const out: ImageResult[] = [];
     for (let i = 0; i < count; i++) {
-      const statusUrl = await submit(env, SOUL, body);
+      const statusUrl = await submitOrThrow(env, SOUL, body);
       out.push({ ...(await fetchImage(await poll(env, statusUrl))), providerModel: SOUL });
     }
     return out;
@@ -84,15 +107,12 @@ function publicUrl(img: ImageInput): string {
 
 /** Run an image-edit generation, discovering + caching the working model_id. */
 async function runEdit(env: Env, prompt: string, imageUrls: string[]): Promise<{ url: string; model: string }> {
-  const body = {
-    prompt: prompt.slice(0, 2000),
-    input_images: imageUrls.map((u) => ({ type: "image_url", image_url: u })),
-  };
+  const body = { prompt: prompt.slice(0, 2000), image_urls: imageUrls };
 
   const cached = await env.KV.get(KV_EDIT_MODEL).catch(() => null);
   const order = cached ? [cached, ...EDIT_CANDIDATES.filter((c) => c !== cached)] : EDIT_CANDIDATES;
 
-  let lastErr: unknown;
+  let notFound = 0;
   for (const model of order) {
     try {
       const statusUrl = await submit(env, model, body);
@@ -101,12 +121,25 @@ async function runEdit(env: Env, prompt: string, imageUrls: string[]): Promise<{
       await env.KV.put(KV_EDIT_MODEL, model, { expirationTtl: 60 * 60 * 24 * 30 }).catch(() => {});
       return { url: await poll(env, statusUrl), model };
     } catch (err) {
-      lastErr = err;
-      // A model-not-found / bad-path answer → try the next candidate. Any other
-      // error (auth, quota) will recur for every candidate and surface below.
+      if (err instanceof HttpError && err.status === 404) {
+        // Wrong path — this model_id doesn't exist. Try the next candidate.
+        notFound++;
+        // A stale KV entry (model retired) shouldn't wedge us — clear and continue.
+        if (model === cached) await env.KV.delete(KV_EDIT_MODEL).catch(() => {});
+        continue;
+      }
+      // Anything else (422 bad body, 401 auth, 429 quota, 5xx) means we reached a
+      // real model. Surface it — masking it would just retry the same failure.
+      if (err instanceof HttpError) {
+        throw new ProviderError(err.message, err.status === 429 ? 429 : 502);
+      }
+      throw err;
     }
   }
-  throw lastErr instanceof ProviderError ? lastErr : new ProviderError("Higgsfield edit: no model accepted the request.");
+  throw new ProviderError(
+    `Higgsfield edit: none of ${notFound} candidate model_ids exist on this account.`,
+    502,
+  );
 }
 
 async function submit(env: Env, model: string, body: unknown): Promise<string> {
@@ -121,11 +154,21 @@ async function submit(env: Env, model: string, body: unknown): Promise<string> {
   });
   if (!res.ok) {
     const d = (await res.text().catch(() => "")).slice(0, 200);
-    throw new ProviderError(`Higgsfield ${model} ${res.status}: ${d}`, res.status === 429 ? 429 : 502);
+    throw new HttpError(res.status, d, model);
   }
   const { status_url } = (await res.json()) as { status_url?: string };
   if (!status_url) throw new ProviderError("Higgsfield returned no status URL.");
   return status_url;
+}
+
+/** submit() for the single-model paths (Soul), normalising HttpError → ProviderError. */
+async function submitOrThrow(env: Env, model: string, body: unknown): Promise<string> {
+  try {
+    return await submit(env, model, body);
+  } catch (err) {
+    if (err instanceof HttpError) throw new ProviderError(err.message, err.status === 429 ? 429 : 502);
+    throw err;
+  }
 }
 
 async function poll(env: Env, statusUrl: string): Promise<string> {

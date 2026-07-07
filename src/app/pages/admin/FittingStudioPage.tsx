@@ -240,6 +240,13 @@ function colorName(hex: string): string {
   return best[3];
 }
 
+// The Mannequin (3D proportion study) and Pattern (sewing-pattern drafter) views
+// are hidden for now — the Fitting Studio is focused purely on virtual try-on.
+// Both are still fully built (this file's Viewer/pattern code + the shared
+// geometry and pattern modules); flip this to bring the two tabs back when we
+// return to them. Kept as a flag rather than deleted so re-enabling is one line.
+const SHOW_STUDY_TABS = false;
+
 export function FittingStudioPage() {
   const toast = useToast();
   const [garmentId, setGarmentId] = useState(GARMENT_LIBRARY[0].id);
@@ -524,7 +531,7 @@ export function FittingStudioPage() {
       <PageHeader
         eyebrow="Design & Development · dial it in"
         title="Fitting Studio"
-        description="Where you dial a garment in. Bring a Design Studio creation (or a photo of a real sample), try it on your consistent model roster, refine the fit, and draft a real sewing pattern. Exploring new ideas? Start in the Design Studio."
+        description="Where you dial a garment in. Bring a Design Studio creation (or a photo of a real sample) and try it on your consistent model roster — the same bodies across every style — so you can judge fit and styling for real. Exploring new ideas? Start in the Design Studio."
         actions={
           view === "3d" ? (
             <>
@@ -542,27 +549,29 @@ export function FittingStudioPage() {
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         {/* Viewer */}
         <div className="overflow-hidden rounded-lg border border-ink/10 bg-[#f4f2ee]">
-          <div className="flex items-center justify-between border-b border-ink/10 bg-white/60 px-3 py-2">
-            <div className="flex overflow-hidden rounded-md border border-ink/15">
-              {(["model", "3d", "pattern"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setView(v)}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-wider ${
-                    view === v ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
-                  }`}
-                >
-                  {v === "model" ? "Try-on" : v === "3d" ? "Mannequin" : "Pattern"}
+          {SHOW_STUDY_TABS && (
+            <div className="flex items-center justify-between border-b border-ink/10 bg-white/60 px-3 py-2">
+              <div className="flex overflow-hidden rounded-md border border-ink/15">
+                {(["model", "3d", "pattern"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    className={`px-3 py-1.5 text-xs uppercase tracking-wider ${
+                      view === v ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    {v === "model" ? "Try-on" : v === "3d" ? "Mannequin" : "Pattern"}
+                  </button>
+                ))}
+              </div>
+              {view === "pattern" && pattern && (
+                <button type="button" className="btn btn-secondary text-xs" onClick={downloadPattern}>
+                  Download SVG
                 </button>
-              ))}
+              )}
             </div>
-            {view === "pattern" && pattern && (
-              <button type="button" className="btn btn-secondary text-xs" onClick={downloadPattern}>
-                Download SVG
-              </button>
-            )}
-          </div>
+          )}
 
           {view === "model" ? (
             <div className="relative h-[540px] w-full bg-white">
@@ -1055,7 +1064,7 @@ export function FittingStudioPage() {
               ))}
             </div>
             <p className="mt-1 text-[11px] text-warmgrey">
-              Leave blank to grade from the standard size. Drives the Pattern view.
+              Leave blank to grade from the standard size. Saved with the look for reference.
             </p>
           </div>
 
@@ -1236,10 +1245,8 @@ export function FittingStudioPage() {
         <strong>Design Studio</strong> is where you dream garments up; the <strong>Fitting Studio</strong> is where
         you dial them in. <strong>Try-on</strong> takes a real garment — a Design Studio creation or a photo of a
         sample — and puts it on your <strong>consistent model roster</strong>, so you can judge fit on the same
-        bodies across every style. <strong>Mannequin</strong> is a fast proportion + fabric study for silhouette and
-        ease, and <strong>Pattern</strong> drafts a genuine, manufacturable 2D sewing pattern (via FreeSewing) you
-        can download as SVG. For full physics draping, bring a CLO&nbsp;3D / Browzwear / Style3D file into the
-        Simulation bridge.
+        bodies across every style. The 3D mannequin study and the sewing-pattern drafter are taking a back seat for
+        now while we keep honing them.
       </p>
     </div>
   );
