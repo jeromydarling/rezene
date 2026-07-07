@@ -50,6 +50,16 @@ export function hasPattern(garmentId: string): boolean {
   return garmentId in DESIGN_MAP;
 }
 
+/** The garment blocks that can be drafted into a real pattern — for a picker
+ *  in the Design Studio, where the AI concept has no fixed silhouette. */
+export const PATTERN_BLOCKS: readonly { id: string; name: string }[] = [
+  { id: "classic-tee", name: "T-shirt" },
+  { id: "relaxed-hoodie", name: "Hoodie / sweatshirt" },
+  { id: "slip-dress", name: "Slip dress" },
+  { id: "wide-trouser", name: "Trouser" },
+  { id: "pleated-skirt", name: "Skirt" },
+];
+
 export function patternLabel(garmentId: string): string | null {
   return DESIGN_MAP[garmentId]?.label ?? null;
 }
