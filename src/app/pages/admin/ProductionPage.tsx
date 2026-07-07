@@ -58,6 +58,7 @@ export function ProductionPage() {
       <PageHeader
         eyebrow="Production"
         title="Production Calendar"
+        help="production"
         description="The season plan: brand identity → concepts → tech packs → Casablanca briefings → sampling → bulk → QC → launch."
         actions={
           <>

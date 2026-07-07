@@ -57,6 +57,7 @@ export function InventoryPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Inventory"
+        help="inventory"
         description="SKU-level stock with a full movement ledger. Available = on hand − reserved."
       />
       {error && <ErrorNote message={error} />}

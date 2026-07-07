@@ -1,0 +1,61 @@
+name: E2E · Look Studio
+
+# Drives the live Fitting Room "On a model" flow with headless Chromium: logs
+# in, runs a Generate render, and — when a try-on provider is configured —
+# a real virtual try-on. Screenshots are uploaded as a build artifact.
+#
+# One-time repository setup (Settings → Secrets and variables → Actions):
+#   LS_EMAIL / LS_PASSWORD — an admin login for the shop to test.
+#   (Falls back to KB_EMAIL / KB_PASSWORD — the same secrets the KB screenshot
+#    workflow uses — so if those are already set, this needs no new secrets.)
+# Optional variable (Settings → Variables → Actions):
+#   LS_BASE      — target site (default https://verto.style)
+#
+# Run it: Actions → "E2E · Look Studio" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Target site (overrides LS_BASE variable)"
+        required: false
+        default: ""
+
+concurrency:
+  group: e2e-look-studio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Match the browser to the playwright-core the script imports (1.55.0).
+      - name: Install Playwright + Chromium
+        run: |
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+
+      - name: Run Look Studio E2E
+        env:
+          LS_EMAIL: ${{ secrets.LS_EMAIL || secrets.KB_EMAIL }}
+          LS_PASSWORD: ${{ secrets.LS_PASSWORD || secrets.KB_PASSWORD }}
+          LS_BASE: ${{ github.event.inputs.base || vars.LS_BASE || vars.KB_BASE }}
+        run: node scripts/e2e-look-studio.mjs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: look-studio-screenshots
+          path: artifacts/look-studio/
+          if-no-files-found: warn

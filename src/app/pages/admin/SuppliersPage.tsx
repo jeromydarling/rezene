@@ -35,7 +35,8 @@ export function SuppliersPage() {
       <PageHeader
         eyebrow="Production"
         title="Factories & Suppliers"
-        description="Your maker network. Leads marked 'unverified' are AI-researched — confirm details before committing production."
+        help="suppliers"
+        description="Your maker network. Leads marked 'unverified' are LLM-researched — confirm details before committing production."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
             + New supplier
@@ -747,7 +748,7 @@ function ExportIntelPanel({ suppliers }: { suppliers: AdminSupplier[] }) {
                   </ul>
                 </details>
               )}
-              <p className="text-[11px] text-warmgrey">AI-researched — sanity-check duty rates against an official source before you commit.</p>
+              <p className="text-[11px] text-warmgrey">LLM-researched — sanity-check duty rates against an official source before you commit.</p>
             </div>
           )}
         </div>

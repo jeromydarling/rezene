@@ -4,7 +4,7 @@ import { useBrand } from "./brand";
 /**
  * Storefront language choice. Lightweight by design: the site chrome stays
  * in the default language; CMS content (pages, journal) is fetched with a
- * ?lang= param and machine-translated server-side (Workers AI, cached).
+ * ?lang= param and machine-translated server-side (Workers LLM, cached).
  */
 const LangContext = createContext<{ lang: string; setLang: (lang: string) => void }>({
   lang: "",

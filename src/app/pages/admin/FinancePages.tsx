@@ -141,6 +141,7 @@ export function CostingPage() {
       <PageHeader
         eyebrow="Finance"
         title="Costing & Margins"
+        help="costing"
         description="What every style really costs to land, market by market — and the margin left at your price. Duty figures are estimates, not customs advice."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -400,7 +401,7 @@ function AiCostAssist({ sheet, onApplied }: { sheet: AdminCostSheet; onApplied: 
       });
       setResult(res);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "AI costing failed");
+      setError(err instanceof ApiRequestError ? err.message : "LLM costing failed");
     } finally {
       setBusy(false);
     }
@@ -431,7 +432,7 @@ function AiCostAssist({ sheet, onApplied }: { sheet: AdminCostSheet; onApplied: 
   return (
     <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3 text-sm">
       <button type="button" className="flex w-full items-center justify-between" onClick={() => setOpen(!open)}>
-        <span className="text-xs font-semibold uppercase tracking-wider text-warmgrey">🔍 Fill with AI benchmarks</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-warmgrey">🔍 Fill with LLM benchmarks</span>
         <span className="text-warmgrey">{open ? "–" : "+"}</span>
       </button>
       {open && (
@@ -685,6 +686,7 @@ export function DutiesPage() {
       <PageHeader
         eyebrow="Finance"
         title="Duties & Landed Cost"
+        help="duties"
         description="An editable rules engine, not a customs authority. Every figure is an estimate requiring trade/legal review."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setRuleFormOpen(true)}>
@@ -858,7 +860,7 @@ function DutyRuleForm({
   const [error, setError] = useState<string | null>(null);
 
   async function runAi() {
-    if (!ai.garment.trim()) return setError("Describe the garment for the AI lookup.");
+    if (!ai.garment.trim()) return setError("Describe the garment for the LLM lookup.");
     setAiBusy(true);
     setError(null);
     setAiNote(null);
@@ -881,7 +883,7 @@ function DutyRuleForm({
       setAiNote(res.note);
       setCitations(res.citations ?? []);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "AI lookup failed");
+      setError(err instanceof ApiRequestError ? err.message : "LLM lookup failed");
     } finally {
       setAiBusy(false);
     }
@@ -918,7 +920,7 @@ function DutyRuleForm({
       {aiEnabled && (
         <div className="rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-warmgrey">
-            🔍 Research with AI
+            🔍 Research with LLM
           </p>
           <div className="space-y-2">
             <input className="input" placeholder="Garment (e.g. woven cotton shirt)" value={ai.garment} onChange={(e) => setAi({ ...ai, garment: e.target.value })} />
@@ -1116,6 +1118,7 @@ export function AnalyticsPage() {
       <PageHeader
         eyebrow="Insights"
         title="Analytics"
+        help="analytics"
         description="How the shop is doing — sales, traffic, what's selling, and where your buyers come from."
         actions={
           <div className="flex gap-1">
@@ -1594,6 +1597,7 @@ export function SettingsPage() {
       <PageHeader
         eyebrow="System"
         title="Settings"
+        help="settings"
         description="Your brand's name, tagline, and identity — change them here and they update everywhere, from the storefront to your tech packs."
       />
       {error && <ErrorNote message={error} />}
@@ -1647,7 +1651,7 @@ export function SettingsPage() {
                 </span>
               </li>
               <li className="flex items-center justify-between">
-                <span>AI assistance</span>
+                <span>LLM assistance</span>
                 <span
                   className={`badge ${data.secretStatus.anthropic ? "badge-success" : "badge-neutral"}`}
                 >

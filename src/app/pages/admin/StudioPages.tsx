@@ -17,7 +17,7 @@ import type {
   AdminFile,
 } from "../../../shared/types";
 
-// ---------------- AI Concept Lab ----------------
+// ---------------- LLM Concept Lab ----------------
 
 export function AiConceptsPage() {
   const prompts = useFetch<AdminAiPrompt[]>("/api/admin/ai/prompts");
@@ -35,7 +35,7 @@ export function AiConceptsPage() {
     <div>
       <PageHeader
         eyebrow="Studio"
-        title="AI Concept Lab"
+        title="LLM Concept Lab"
         description="The concepting bridge: brand prompt presets for Midjourney/Firefly, stored outputs, and concept-to-style conversion."
         actions={
           <>
@@ -439,6 +439,7 @@ export function ThreeDPage() {
       <PageHeader
         eyebrow="Studio"
         title="3D Simulation Bridge"
+        help="three-d"
         description="CLO 3D / Browzwear / Style3D project tracking — files, renders, measurements, and fit status. Simulation happens in the external tool; the record lives here."
       />
       {error && <ErrorNote message={error} />}

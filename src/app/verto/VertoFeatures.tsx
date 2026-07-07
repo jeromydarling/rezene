@@ -248,7 +248,7 @@ function MiniSeoCheckup() {
         {[
           { ok: true, t: "Product rich results published", sub: "price + availability schema on every piece" },
           { ok: true, t: "Sitemap current", sub: "rebuilt on every publish, submitted once" },
-          { ok: true, t: "AI assistants indexed", sub: "llms.txt generated from your pages" },
+          { ok: true, t: "LLM assistants indexed", sub: "llms.txt generated from your pages" },
           { ok: false, t: "2 pages missing a search description", sub: "✨ draft them in your voice" },
         ].map((r) => (
           <div key={r.t} className="flex items-start gap-2 rounded bg-white p-2 shadow-sm">
@@ -407,7 +407,7 @@ function MiniPlatform() {
       <p><span className="text-palm">$</span> verto open-shop "atlas-knits"</p>
       <p className="text-chalk/60">→ database provisioned · schema migrated</p>
       <p className="text-chalk/60">→ storefront live at verto.style/atlas-knits</p>
-      <p className="text-chalk/60">→ admin credentials emailed · AI site starter ready</p>
+      <p className="text-chalk/60">→ admin credentials emailed · LLM site starter ready</p>
       <p><span className="text-palm">✓</span> live in 4.2s — isolated database, custom domain ready</p>
     </div>
   );
@@ -515,7 +515,7 @@ function MiniImport() {
     <MiniShell title="Import studio — catalog.csv">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-[8px] text-warmgrey">142 rows · auto-matched</span>
-        <span className={badge("bg-palm/15 text-palm")}>AI mapping</span>
+        <span className={badge("bg-palm/15 text-palm")}>LLM mapping</span>
       </div>
       <div className="space-y-0.5">
         {rows.map(([from, to]) => (
@@ -545,7 +545,7 @@ const FEATURES: Feature[] = [
   {
     id: "design-studio",
     eyebrow: "Design",
-    heading: "An AI design studio for your next line.",
+    heading: "An LLM design studio for your next line.",
     body: "Build a prompt from garment, fabric, palette and mood — or drop in reference images and Flux (running natively on Cloudflare, no keys to bring) generates a collection of looks that hold together. Pin favorites, keep a house style for consistency, then use a look on your storefront or send it straight to a maker for a sample.",
     points: [
       "Native Flux + FLUX.2 reference-image conditioning for a consistent line",
@@ -577,8 +577,8 @@ const FEATURES: Feature[] = [
     id: "import",
     eyebrow: "Onboard",
     heading: "Bring your whole catalog in, in minutes.",
-    body: "Drop a spreadsheet from Shopify, another platform, or your own export. AI maps the columns to your catalog, you confirm, and it bulk-imports products, variants, stock and collections as drafts to review.",
-    points: ["AI column mapping with a heuristic fallback", "Rows group into products with variants automatically", "Everything imports as drafts you approve"],
+    body: "Drop a spreadsheet from Shopify, another platform, or your own export. LLM maps the columns to your catalog, you confirm, and it bulk-imports products, variants, stock and collections as drafts to review.",
+    points: ["LLM column mapping with a heuristic fallback", "Rows group into products with variants automatically", "Everything imports as drafts you approve"],
     screen: MiniImport,
     url: "verto.style/maison/admin/import",
   },
@@ -644,11 +644,11 @@ const FEATURES: Feature[] = [
     id: "seo",
     eyebrow: "Be found",
     heading: "SEO that Shopify sells you in pieces.",
-    body: "Product rich results, per-page tags and canonicals, social previews, self-updating sitemaps, alt-text tracking, an llms.txt index for AI assistants — and a Search Checkup screen in plain merchant language. On Shopify this is an SEO app at $30–80/month, a structured-data app at $399/year, an llms.txt app on top, and — when the apps conflict — a freelancer from $500/month. Here it ships in the box and updates itself on every publish.",
+    body: "Product rich results, per-page tags and canonicals, social previews, self-updating sitemaps, alt-text tracking, an llms.txt index for LLM assistants — and a Search Checkup screen in plain merchant language. On Shopify this is an SEO app at $30–80/month, a structured-data app at $399/year, an llms.txt app on top, and — when the apps conflict — a freelancer from $500/month. Here it ships in the box and updates itself on every publish.",
     points: [
       "Product schema with price & availability — the $399/yr app, included",
-      "Search Checkup: findings + one-tap fixes + AI-drafted descriptions",
-      "AI-search ready by default — llms.txt is a $99/mo tier elsewhere",
+      "Search Checkup: findings + one-tap fixes + LLM-drafted descriptions",
+      "LLM-search ready by default — llms.txt is a $99/mo tier elsewhere",
     ],
     screen: MiniSeoCheckup,
     url: "verto.style/maison/admin/content/search",
@@ -666,7 +666,7 @@ const FEATURES: Feature[] = [
     id: "marketing",
     eyebrow: "Tell",
     heading: "A marketing team in the software.",
-    body: "Describe a campaign once; Verto writes the kit in your voice — social, email, press release, ad copy, blog draft — onto a content calendar you approve. Bring your own AI key or use the built-in model.",
+    body: "Describe a campaign once; Verto writes the kit in your voice — social, email, press release, ad copy, blog draft — onto a content calendar you approve. Bring your own LLM key or use the built-in model.",
     points: ["Whole-kit generation in your brand voice", "Content calendar + email sends", "Your Anthropic key, or built-in Llama"],
     screen: MiniMarketing,
     url: "verto.style/maison/admin/marketing",
@@ -676,7 +676,7 @@ const FEATURES: Feature[] = [
     eyebrow: "Translate",
     heading: "A second language without a localization project.",
     body: "Flip on French (or any language) and the storefront translates itself on demand, caches the result, and lets you correct anything by hand.",
-    points: ["On-demand AI translation, cached", "Hand-editable overrides", "Per-shop language list"],
+    points: ["On-demand LLM translation, cached", "Hand-editable overrides", "Per-shop language list"],
     screen: MiniTranslations,
     url: "verto.style/maison?lang=fr",
   },
@@ -721,7 +721,7 @@ const TP_MATRIX: { row: string; verto: string; techpacker: string; backbone: str
   { row: "Bilingual construction notes (EN/FR)", verto: "yes", techpacker: "no", backbone: "no", delogue: "no" },
   { row: "Excel export", verto: "included", techpacker: "top tier only", backbone: "no — convert PDF by hand", delogue: "top tier only" },
   { row: "Live factory link + read receipts", verto: "yes", techpacker: "portal, no receipt", backbone: "read-only portal", delogue: "no open-notification" },
-  { row: "AI tech pack from a photo", verto: "included", techpacker: "marketing claim", backbone: "no", delogue: "support chatbot only" },
+  { row: "LLM tech pack from a photo", verto: "included", techpacker: "marketing claim", backbone: "no", delogue: "support chatbot only" },
   { row: "Same database as storefront, orders, costing", verto: "yes", techpacker: "no", backbone: "no", delogue: "no" },
   { row: "Price", verto: "included from $29/mo", techpacker: "$35–125 / seat", backbone: "$199 / seat", delogue: "€145–279 / seat" },
 ];

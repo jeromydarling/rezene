@@ -20,6 +20,7 @@ import { adminCommerceRoutes } from "./routes/admin-commerce";
 import { adminCostingRoutes } from "./routes/admin-costing";
 import { adminAiRoutes } from "./routes/admin-ai";
 import { admin3dRoutes } from "./routes/admin-3d";
+import { adminFittingRoutes } from "./routes/admin-fitting";
 import { adminFileRoutes } from "./routes/admin-files";
 import { adminSettingsRoutes } from "./routes/admin-settings";
 import { adminShippingRoutes } from "./routes/admin-shipping";
@@ -31,7 +32,9 @@ import { adminImportRoutes } from "./routes/admin-import";
 import { adminPlatformRoutes } from "./routes/admin-platform";
 import { adminCrmRoutes } from "./routes/admin-crm";
 import { adminUsersRoutes } from "./routes/admin-users";
+import { adminBrainRoutes } from "./routes/admin-brain";
 import { adminFeedbackRoutes } from "./routes/admin-feedback";
+import { adminKbRoutes } from "./routes/admin-kb";
 import { adminSourcingRoutes } from "./routes/admin-sourcing";
 import { adminDomainRoutes } from "./routes/admin-domain";
 import { tenantMiddleware } from "./middleware/tenant";
@@ -241,7 +244,7 @@ app.get("/llms.txt", async (c) => {
   const body = [
     `# Verto`,
     ``,
-    `> Verto is the operating system for independent clothing labels: storefront, CMS, production (tech packs, samples, factory portals), multi-carrier shipping with customs paperwork, landed-cost and duties tooling, wholesale line sheets, pre-orders, and an AI marketing suite — one platform, one database, from first sample to sold out. Shops live at verto.style/<shop-name> or on their own domain.`,
+    `> Verto is the operating system for independent clothing labels: storefront, CMS, production (tech packs, samples, factory portals), multi-carrier shipping with customs paperwork, landed-cost and duties tooling, wholesale line sheets, pre-orders, and an LLM marketing suite — one platform, one database, from first sample to sold out. Shops live at verto.style/<shop-name> or on their own domain.`,
     ``,
     `## Pages`,
     ``,
@@ -301,6 +304,7 @@ admin.route("/commerce", adminCommerceRoutes);
 admin.route("/costing", adminCostingRoutes);
 admin.route("/ai", adminAiRoutes);
 admin.route("/3d", admin3dRoutes);
+admin.route("/fitting", adminFittingRoutes);
 admin.route("/files", adminFileRoutes);
 admin.route("/settings", adminSettingsRoutes);
 admin.route("/shipping", adminShippingRoutes);
@@ -315,6 +319,8 @@ admin.route("/feedback", adminFeedbackRoutes);
 admin.route("/sourcing", adminSourcingRoutes);
 admin.route("/domain", adminDomainRoutes);
 admin.route("/import", adminImportRoutes);
+admin.route("/kb", adminKbRoutes);
+admin.route("/brain", adminBrainRoutes);
 app.route("/api/admin", admin);
 
 // Everything else that's a GET is a document: Verto pages, shop

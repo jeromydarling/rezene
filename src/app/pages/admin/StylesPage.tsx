@@ -38,6 +38,7 @@ export function StylesPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Styles"
+        help="styles-vs-products"
         description="The design master list — every silhouette from concept through production."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -254,6 +255,7 @@ export function SkusPage() {
       <PageHeader
         eyebrow="Catalog"
         title="SKUs"
+        help="variants"
         description="The design-pipeline unit master — style × colorway × size. (Sellable colours & sizes live on each product.)"
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>

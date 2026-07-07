@@ -107,6 +107,7 @@ export function SourcingPage() {
       <PageHeader
         eyebrow="Production"
         title="Find a maker"
+        help="sourcing"
         description="New line and no factory yet? Describe the piece and we'll research real tailors and small studios that can make it."
       />
 
@@ -248,7 +249,7 @@ export function SourcingPage() {
             </details>
           )}
           <p className="text-center text-[11px] text-warmgrey">
-            Leads are AI-researched and unverified — always confirm capabilities and terms before committing.
+            Leads are LLM-researched and unverified — always confirm capabilities and terms before committing.
           </p>
         </div>
       )}

@@ -197,7 +197,7 @@ Respond as ONE JSON object:
       draft = parseModelJson(raw.text) as Record<string, unknown>;
     } catch (err) {
       if (err instanceof AnthropicNotConfiguredError) {
-        return c.json({ error: "AI needs ANTHROPIC_API_KEY configured." }, 503);
+        return c.json({ error: "LLM assist needs ANTHROPIC_API_KEY configured." }, 503);
       }
       throw err;
     }
@@ -215,12 +215,12 @@ Respond as ONE JSON object:
       body.styleId ?? null,
       code,
       name.slice(0, 200),
-      `Drafted by AI from ${fileRow.filename}. Review before sending to a factory.`,
+      `Drafted by LLM from ${fileRow.filename}. Review before sending to a factory.`,
       c.var.userId,
     );
 
     const sectionSeeds: { kind: string; title: string; content: unknown }[] = [
-      { kind: "cover", title: "Cover", content: { style_name: name, brand: "", date: new Date().toISOString().slice(0, 10), source: "AI draft from photo" } },
+      { kind: "cover", title: "Cover", content: { style_name: name, brand: "", date: new Date().toISOString().slice(0, 10), source: "LLM draft from photo" } },
       { kind: "style_overview", title: "Style Overview", content: draft.overview ?? {} },
       { kind: "bom", title: "Bill of Materials", content: draft.bom ?? {} },
       { kind: "measurement_points", title: "Measurement Points", content: draft.measurement_points ?? {} },
@@ -294,7 +294,7 @@ adminTechPackAiRoutes.post(
     } catch (err) {
       if (err instanceof AnthropicNotConfiguredError) {
         return c.json(
-          { error: "AI assist needs ANTHROPIC_API_KEY (wrangler secret put ANTHROPIC_API_KEY)." },
+          { error: "LLM assist needs ANTHROPIC_API_KEY (wrangler secret put ANTHROPIC_API_KEY)." },
           503,
         );
       }

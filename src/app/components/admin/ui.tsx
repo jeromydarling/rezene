@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HelpDot } from "../HelpDot";
 
 /** Shared admin chrome: headers, tables, badges, empty/loading states. */
 
@@ -7,17 +8,23 @@ export function PageHeader({
   eyebrow,
   actions,
   description,
+  help,
 }: {
   title: string;
   eyebrow?: string;
   actions?: ReactNode;
   description?: string;
+  /** KB chapter slug — renders a help-dot next to the title. */
+  help?: string;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
         {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
-        <h1 className="font-display text-2xl font-light">{title}</h1>
+        <h1 className="flex items-center gap-2 font-display text-2xl font-light">
+          {title}
+          {help && <HelpDot slug={help} />}
+        </h1>
         {description && <p className="mt-1 max-w-2xl text-sm text-warmgrey">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

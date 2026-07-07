@@ -67,6 +67,7 @@ export function TeamPage() {
     <div>
       <PageHeader
         title="Team"
+        help="team"
         eyebrow="Settings"
         description="Invite teammates and choose what each person can do. Everyone sets their own password from an invite link."
       />

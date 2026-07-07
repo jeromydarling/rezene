@@ -18,9 +18,14 @@ export const SESSION_COOKIE = "ma_session";
 /**
  * Verto HQ (the platform CRM + shop registry) is SuperAdmin-only. The primary
  * shop (Rezene) happens to share the platform's D1, so being a Rezene admin is
- * NOT enough — HQ requires a SuperAdmin identity. A user qualifies via the
- * 'superadmin' role, the SUPERADMIN_EMAILS allowlist, or by being the
- * bootstrap founder (ADMIN_EMAIL) so the operator is never locked out of HQ.
+ * NOT enough — HQ requires a SuperAdmin identity.
+ *
+ * HQ access is driven by the explicit `superadmin` role held in the DB, so the
+ * platform owner is a real, auditable identity (gardener@thecros.app) rather
+ * than whoever the bootstrap ADMIN_EMAIL secret happens to be. We deliberately
+ * do NOT auto-grant HQ to ADMIN_EMAIL: that quietly elevated the shop's founder
+ * account to platform owner. SUPERADMIN_EMAILS remains as an operator-controlled
+ * break-glass allowlist (leave it empty in normal operation).
  */
 export function isSuperAdmin(env: Env, email: string | null, roles: string[]): boolean {
   if (roles.includes("superadmin")) return true;
@@ -31,9 +36,7 @@ export function isSuperAdmin(env: Env, email: string | null, roles: string[]): b
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (allow.includes(e)) return true;
-  if (env.ADMIN_EMAIL && e === env.ADMIN_EMAIL.trim().toLowerCase()) return true;
-  return false;
+  return allow.includes(e);
 }
 
 export async function hashPassword(password: string): Promise<string> {

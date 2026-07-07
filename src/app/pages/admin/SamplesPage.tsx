@@ -52,6 +52,7 @@ export function SamplesPage() {
       <PageHeader
         eyebrow="Production"
         title="Samples"
+        help="samples"
         description="Proto → fit → SMS → PP → TOP. Every round tracked against its style and atelier."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -276,6 +277,7 @@ export function PurchaseOrdersPage() {
       <PageHeader
         eyebrow="Production"
         title="Purchase Orders"
+        help="purchase-orders"
         description="Production orders to factories — pilot runs first, scale later."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
@@ -669,6 +671,7 @@ export function MaterialsPage() {
       <PageHeader
         eyebrow="Production"
         title="Fabrics & Materials"
+        help="materials"
         description="Cloth and trims. Origin country matters — it drives duty qualification."
       />
       {error && <ErrorNote message={error} />}

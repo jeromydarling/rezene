@@ -29,7 +29,8 @@ export function TechPacksPage() {
       <PageHeader
         eyebrow="Studio"
         title="Tech Packs"
-        description="Factory-ready specifications — printable, versioned, shareable with your atelier as a live link, and AI-assisted from a photo or sketch."
+        help="tech-packs"
+        description="Factory-ready specifications — printable, versioned, shareable with your atelier as a live link, and LLM-assisted from a photo or sketch."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
             New tech pack
@@ -148,7 +149,7 @@ function TechPackCreateForm({ onCreated }: { onCreated: () => void }) {
       <form onSubmit={submit} className="space-y-4">
         <ModeToggle mode={mode} setMode={setMode} />
         <p className="text-xs text-warmgrey">
-          Upload a garment photo or a sketch — AI drafts the overview, BOM, measurement points,
+          Upload a garment photo or a sketch — LLM drafts the overview, BOM, measurement points,
           construction notes, and QC checklist. Everything is marked as a draft for your review.
         </p>
         <div>
@@ -161,7 +162,7 @@ function TechPackCreateForm({ onCreated }: { onCreated: () => void }) {
           />
         </div>
         <div>
-          <label className="label">Name (optional — AI suggests one)</label>
+          <label className="label">Name (optional — LLM suggests one)</label>
           <input
             className="input"
             value={form.name}
@@ -511,7 +512,7 @@ export function TechPackDetailPage() {
             <>
               <StatusBadge status={data.status} />
               <Link to={`/admin/tech-packs/${data.id}/ai-assist`} className="btn btn-terracotta">
-                AI Assist
+                LLM Assist
               </Link>
               <button
                 type="button"

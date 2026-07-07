@@ -67,6 +67,17 @@ export interface Env {
   RENDER_CALLBACK_SECRET?: string;
   /** GitHub token (repo scope) used to trigger the render workflow. */
   GITHUB_DISPATCH_TOKEN?: string;
+  /**
+   * fal.ai key — the primary gateway for the Fitting Room's best-in-class image
+   * work: virtual try-on (FASHN/Kolors) and reference-conditioned generation
+   * (nano-banana / FLUX.2 pro). Absent → the Fitting Room falls back to
+   * on-platform Workers AI FLUX for generation and disables try-on.
+   */
+  FAL_KEY?: string;
+  /** FASHN direct API key (alternative try-on provider if fal is not set). */
+  FASHN_API_KEY?: string;
+  /** Per-shop daily cap on paid Fitting Room renders (default 30). */
+  FITTING_DAILY_LIMIT?: string;
 }
 
 /** Hono context variables set by middleware. */

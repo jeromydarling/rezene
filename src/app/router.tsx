@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes, Link, useParams } from "react-router";
 import { AuthProvider } from "./lib/auth";
 import { ToastProvider } from "./lib/toast";
@@ -21,7 +22,8 @@ import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { TeamPage } from "./pages/admin/TeamPage";
-import { SupportPage } from "./pages/admin/SupportPage";
+import { KnowledgeBasePage } from "./pages/admin/KnowledgeBasePage";
+import { LaunchPlaybookPage } from "./pages/admin/LaunchPlaybookPage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
@@ -40,6 +42,10 @@ import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
 import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
 import { ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { DesignStudioPage } from "./pages/admin/DesignStudioPage";
+// Lazy-loaded: pulls in three.js / react-three-fiber, kept out of the main bundle.
+const FittingStudioPage = lazy(() =>
+  import("./pages/admin/FittingStudioPage").then((m) => ({ default: m.FittingStudioPage })),
+);
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
@@ -125,6 +131,7 @@ export function AppRouter() {
         {/* Admin OS */}
         <Route path="admin" element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="launch" element={<LaunchPlaybookPage />} />
           <Route path="products" element={<ProductsAdminPage />} />
           <Route path="products/new" element={<ProductEditorPage />} />
           <Route path="products/:id" element={<ProductEditorPage />} />
@@ -151,6 +158,14 @@ export function AppRouter() {
           <Route path="tech-packs/:id/ai-assist" element={<TechPackAiPage />} />
           <Route path="ai-concepts" element={<DesignStudioPage />} />
           <Route path="3d" element={<ThreeDPage />} />
+          <Route
+            path="fitting"
+            element={
+              <Suspense fallback={<div className="p-8 text-sm text-warmgrey">Loading the 3D Fitting Room…</div>}>
+                <FittingStudioPage />
+              </Suspense>
+            }
+          />
           <Route path="files" element={<FilesPage />} />
           <Route path="costing" element={<CostingPage />} />
           <Route path="duties" element={<DutiesPage />} />
@@ -158,7 +173,8 @@ export function AppRouter() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="domain" element={<DomainPage />} />
-          <Route path="support" element={<SupportPage />} />
+          <Route path="support" element={<KnowledgeBasePage />} />
+          <Route path="support/kb/:slug" element={<KnowledgeBasePage />} />
           <Route path="platform" element={<PlatformPage />} />
           <Route path="feedback" element={<FeedbackInboxPage />} />
           <Route path="crm" element={<CrmPage />} />

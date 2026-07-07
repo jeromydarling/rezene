@@ -613,7 +613,7 @@ function EmailComposer({ contactId, email, onDone }: { contactId: string; email:
       setSubject(res.subject);
       setText(res.body);
     } catch {
-      setResult("AI drafting is unavailable right now — write it by hand");
+      setResult("LLM drafting is unavailable right now — write it by hand");
     } finally {
       setDrafting(false);
     }

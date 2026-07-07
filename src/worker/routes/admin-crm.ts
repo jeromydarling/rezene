@@ -339,6 +339,6 @@ adminCrmRoutes.post("/contacts/:id/draft-checkin", async (c) => {
     const body = (match?.[2] ?? result.text).trim();
     return c.json({ subject, body, provider: result.provider });
   } catch {
-    return c.json({ error: "AI drafting is unavailable right now — write it by hand" }, 503);
+    return c.json({ error: "LLM drafting is unavailable right now — write it by hand" }, 503);
   }
 });

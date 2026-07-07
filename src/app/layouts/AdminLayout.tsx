@@ -30,6 +30,8 @@ import {
   Layers,
   Newspaper,
   Package,
+  PersonStanding,
+  Rocket,
   Rotate3d,
   Scissors,
   SearchCheck,
@@ -53,7 +55,10 @@ const NAV_SECTIONS: {
 }[] = [
   {
     title: "Overview",
-    items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
+    items: [
+      { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/admin/launch", label: "Launch Playbook", icon: Rocket },
+    ],
   },
   {
     title: "Catalog",
@@ -109,6 +114,7 @@ const NAV_SECTIONS: {
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
+      { to: "/admin/fitting", label: "3D Fitting Room", icon: PersonStanding },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
     ],
   },

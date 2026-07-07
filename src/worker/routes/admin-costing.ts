@@ -119,7 +119,7 @@ adminCostingRoutes.post("/cost-sheets", requireAdminWrite, async (c) => {
 adminCostingRoutes.post("/cost-sheets/ai-suggest", requireAdminWrite, async (c) => {
   const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
   if (!perplexityConfigured(c.env)) {
-    return c.json({ error: "AI research isn't switched on for this store yet.", code: "unconfigured" }, 503);
+    return c.json({ error: "LLM research isn't switched on for this store yet.", code: "unconfigured" }, 503);
   }
   const quota = await reserveResearchQuota(c);
   if (!quota.ok) return c.json(quotaExceededBody(quota), 429);
@@ -378,7 +378,7 @@ adminCostingRoutes.delete("/duty-rules/:id", requireAdminWrite, async (c) => {
 adminCostingRoutes.post("/duty-rules/ai-lookup", requireAdminWrite, async (c) => {
   const { perplexityConfigured, perplexityResearch } = await import("../services/perplexity");
   if (!perplexityConfigured(c.env)) {
-    return c.json({ error: "AI research isn't switched on for this store yet.", code: "unconfigured" }, 503);
+    return c.json({ error: "LLM research isn't switched on for this store yet.", code: "unconfigured" }, 503);
   }
   const quota = await reserveResearchQuota(c);
   if (!quota.ok) return c.json(quotaExceededBody(quota), 429);

@@ -298,7 +298,7 @@ adminContentRoutes.put("/navigation", requireAdminWrite, async (c) => {
 });
 
 // ============================================================
-// Brand voice (consumed by every AI writing feature)
+// Brand voice (consumed by every LLM writing feature)
 // ============================================================
 async function loadBrandVoice(db: D1Database): Promise<string> {
   const row = await first<{ value: string }>(
@@ -317,7 +317,7 @@ adminContentRoutes.put("/brand-voice", requireAdminWrite, async (c) => {
   await run(
     c.var.db,
     `INSERT INTO settings (key, value, description)
-     VALUES ('brand_voice', ?, 'How the brand sounds — consumed by every AI writing feature')
+     VALUES ('brand_voice', ?, 'How the brand sounds — consumed by every LLM writing feature')
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
     body.voice,
   );
@@ -326,7 +326,7 @@ adminContentRoutes.put("/brand-voice", requireAdminWrite, async (c) => {
 });
 
 /**
- * Shared system prompt for every AI writing feature: brand identity plus
+ * Shared system prompt for every LLM writing feature: brand identity plus
  * the shop's configurable voice. A shop that hasn't written a voice yet
  * gets a sane editorial default.
  */
@@ -410,7 +410,7 @@ adminContentRoutes.post("/ai-draft", requireAdminWrite, async (c) => {
   } catch (err) {
     if (err instanceof AnthropicNotConfiguredError) {
       return c.json(
-        { error: "AI drafting needs an Anthropic API key — add ANTHROPIC_API_KEY in Settings" },
+        { error: "LLM drafting needs an Anthropic API key — add ANTHROPIC_API_KEY in Settings" },
         503,
       );
     }
@@ -437,7 +437,7 @@ adminContentRoutes.post("/ai-rewrite", requireAdminWrite, async (c) => {
     return c.json({ text });
   } catch (err) {
     if (err instanceof AnthropicNotConfiguredError) {
-      return c.json({ error: "AI editing needs an Anthropic API key" }, 503);
+      return c.json({ error: "LLM editing needs an Anthropic API key" }, 503);
     }
     throw err;
   }
@@ -469,7 +469,7 @@ adminContentRoutes.post("/ai-meta", requireAdminWrite, async (c) => {
     });
   } catch (err) {
     if (err instanceof AnthropicNotConfiguredError) {
-      return c.json({ error: "AI metadata needs an Anthropic API key" }, 503);
+      return c.json({ error: "LLM metadata needs an Anthropic API key" }, 503);
     }
     throw err;
   }
@@ -538,7 +538,7 @@ adminContentRoutes.post("/ai-site-starter", requireAdminWrite, async (c) => {
     await run(
       c.var.db,
       `INSERT INTO settings (key, value, description)
-       VALUES ('brand_voice', ?, 'How the brand sounds — consumed by every AI writing feature')
+       VALUES ('brand_voice', ?, 'How the brand sounds — consumed by every LLM writing feature')
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
       bundle.brandVoice.trim(),
     );

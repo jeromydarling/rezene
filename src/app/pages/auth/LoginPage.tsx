@@ -78,7 +78,7 @@ export function LoginPage() {
             <p className="mt-2 font-display text-2xl font-light">Step inside the admin</p>
             <p className="mx-auto mt-3 max-w-xs text-sm text-chalk/70">
               {brand.brandName} is a fictional label running on Verto — real catalog, production
-              calendar, tech packs, and AI marketing. Leave your email and look around.
+              calendar, tech packs, and LLM marketing. Leave your email and look around.
             </p>
           </div>
           <form onSubmit={submitDemo} className="admin-card space-y-4 p-6">

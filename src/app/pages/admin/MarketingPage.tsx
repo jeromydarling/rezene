@@ -14,7 +14,7 @@ import { MarketingGraphic } from "../../components/admin/MarketingGraphic";
 import type { AdminProduct } from "../../../shared/types";
 
 /**
- * Marketing suite: campaigns → AI-written multi-channel kits (social,
+ * Marketing suite: campaigns → LLM-written multi-channel kits (social,
  * email, blog, press, ads), a lightweight posting calendar, brand-styled
  * graphics, subscriber email sends, and SEO content ideas.
  */
@@ -69,7 +69,8 @@ export function MarketingPage() {
       <PageHeader
         eyebrow="Marketing"
         title="Campaigns"
-        description="Describe a campaign once — AI writes the whole kit in your brand voice: social posts, email, blog draft, press release, ad copy. Edit, schedule, send. Uses your Anthropic key when set, otherwise built-in Llama."
+        help="campaigns"
+        description="Describe a campaign once — LLM writes the whole kit in your brand voice: social posts, email, blog draft, press release, ad copy. Edit, schedule, send. Uses your Anthropic key when set, otherwise built-in Llama."
         actions={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setIdeasOpen(true)}>
