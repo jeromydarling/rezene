@@ -4,17 +4,22 @@
  * the keys allow and never crashes when a key is missing.
  *
  * Preference order (best first):
- *   generate / referenceGen : fal → workers-ai
- *   tryOn                    : fal → fashn
+ *   generate     : fal → higgsfield → workers-ai
+ *   referenceGen : fal → workers-ai   (higgsfield's edit API isn't public)
+ *   tryOn        : fal → fashn        (higgsfield has no try-on)
  */
 import type { Env } from "../../types/env";
 import type { GenerateInput, ImageProvider, ImageResult, TryOnInput } from "./types";
 import { NoProviderError } from "./types";
 import { falProvider } from "./fal";
 import { fashnProvider } from "./fashn";
+import { higgsfieldProvider } from "./higgsfield";
 import { workersAiProvider } from "./workers-ai";
 
-const GENERATE_ORDER: ImageProvider[] = [falProvider, workersAiProvider];
+// Higgsfield sits ahead of on-platform FLUX for plain generation (Soul is
+// nicer) but only fal does reference-conditioned generation among the paid
+// options, so it stays out of the referenceGen path.
+const GENERATE_ORDER: ImageProvider[] = [falProvider, higgsfieldProvider, workersAiProvider];
 const TRYON_ORDER: ImageProvider[] = [falProvider, fashnProvider];
 
 function pick(env: Env, order: ImageProvider[], cap: "generate" | "referenceGen" | "tryOn"): ImageProvider | null {
