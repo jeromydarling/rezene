@@ -208,7 +208,13 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
   );
 
   // Assemble a prompt from the builder unless the user has hand-edited it.
-  const assembled = [garment && `a ${garment}`, fabric && `in ${fabric}`, palette, details, presentation && `presented ${presentation}`]
+  const assembled = [
+    garment ? `A ${garment}` : "",
+    fabric ? `in ${fabric}` : "",
+    palette ? `in a ${palette} palette` : "",
+    details ? `with ${details}` : "",
+    presentation, // already reads as a directive, e.g. "on a model, editorial crop"
+  ]
     .filter(Boolean)
     .join(", ");
   useEffect(() => {
@@ -287,7 +293,7 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
           </Labeled>
         </div>
 
-        <Labeled label="Prompt (edit freely)">
+        <Labeled label="Final prompt — this is what the AI generates from">
           <textarea
             className="input text-sm"
             rows={2}
@@ -297,6 +303,25 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
               setPromptDirty(true);
             }}
           />
+          <p className="mt-1 flex items-center justify-between gap-2 text-[11px] text-warmgrey">
+            <span>
+              {promptDirty
+                ? "You've edited this — the fields above no longer change it."
+                : "Auto-composed from the fields above. Type here to take over and refine."}
+            </span>
+            {promptDirty && (
+              <button
+                type="button"
+                className="shrink-0 text-navy hover:underline"
+                onClick={() => {
+                  setPromptDirty(false);
+                  setPrompt(assembled);
+                }}
+              >
+                Reset to fields
+              </button>
+            )}
+          </p>
         </Labeled>
 
         {/* Reference images (FLUX.2 conditioning) */}
