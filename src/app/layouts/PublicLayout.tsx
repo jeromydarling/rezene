@@ -22,6 +22,7 @@ const DEFAULT_FOOTER = [
   { href: "/size-guide", label: "Size Guide" },
   { href: "/shipping-returns", label: "Shipping & Returns" },
   { href: "/stockists", label: "Stockists" },
+  { href: "/wholesale", label: "Wholesale" },
   { href: "/contact", label: "Contact" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },

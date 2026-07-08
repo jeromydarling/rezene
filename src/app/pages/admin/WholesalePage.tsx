@@ -43,6 +43,10 @@ export function LineSheetsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [buyersOpen, setBuyersOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const buyers = useFetch<{ accounts: BuyerRow[]; pending: number }>("/api/admin/wholesale/accounts");
+  const wOrders = useFetch<{ orders: WOrderRow[]; open: number }>("/api/admin/wholesale/orders");
 
   async function revoke(id: string) {
     await api.post(`/api/admin/wholesale/line-sheets/${id}/revoke`);
@@ -54,11 +58,19 @@ export function LineSheetsPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Line Sheets"
-        description="Curated wholesale selections for boutique buyers — share a link, they browse wholesale pricing and send an inquiry with quantities."
+        description="Curated wholesale selections for boutique buyers. Approved buyers sign in to the trade portal and order at their own pricing; you manage those orders with net terms."
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-            New line sheet
-          </button>
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setBuyersOpen(true)}>
+              Buyers{buyers.data?.pending ? ` (${buyers.data.pending})` : ""}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setOrdersOpen(true)}>
+              Orders{wOrders.data?.open ? ` (${wOrders.data.open})` : ""}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+              New line sheet
+            </button>
+          </>
         }
       />
       {shareUrl && (
@@ -162,6 +174,12 @@ export function LineSheetsPage() {
         onClose={() => setOpenId(null)}
       >
         {openId && <LineSheetDetailPanel id={openId} />}
+      </SlideOver>
+      <SlideOver open={buyersOpen} title="Wholesale buyers" onClose={() => setBuyersOpen(false)}>
+        <BuyersPanel accounts={buyers.data?.accounts ?? []} onChanged={() => buyers.reload()} />
+      </SlideOver>
+      <SlideOver open={ordersOpen} title="Wholesale orders" onClose={() => setOrdersOpen(false)}>
+        <WholesaleOrdersPanel orders={wOrders.data?.orders ?? []} onChanged={() => wOrders.reload()} />
       </SlideOver>
     </div>
   );
@@ -361,4 +379,164 @@ function LineSheetDetailPanel({ id }: { id: string }) {
       </p>
     </div>
   );
+}
+
+// ---------- Wholesale buyers & orders ----------
+interface BuyerRow {
+  id: string;
+  email: string;
+  company: string | null;
+  contactName: string | null;
+  status: string;
+  discountPct: number;
+  termsDays: number;
+  note: string | null;
+  createdAt: string;
+  orderCount: number;
+}
+interface WOrderRow {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalCents: number;
+  currency: string;
+  dueDate: string | null;
+  createdAt: string;
+  company: string | null;
+  email: string;
+}
+
+function BuyersPanel({ accounts, onChanged }: { accounts: BuyerRow[]; onChanged: () => void }) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [discount, setDiscount] = useState("0");
+  const [terms, setTerms] = useState("0");
+
+  async function approve(id: string) {
+    await api.post(`/api/admin/wholesale/accounts/${id}/approve`, {
+      discountPct: Number(discount) || 0,
+      termsDays: Number(terms) || 0,
+    });
+    setEditing(null);
+    onChanged();
+  }
+  async function reject(id: string) {
+    await api.post(`/api/admin/wholesale/accounts/${id}/reject`);
+    onChanged();
+  }
+
+  if (accounts.length === 0)
+    return <p className="py-8 text-center text-sm text-warmgrey">No wholesale applications yet.</p>;
+
+  return (
+    <div className="space-y-3 text-sm">
+      {accounts.map((a) => (
+        <div key={a.id} className="rounded-lg border border-ink/10 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-medium">{a.company || a.email}</p>
+              <p className="text-xs text-warmgrey">
+                {a.contactName ? `${a.contactName} · ` : ""}
+                {a.email}
+              </p>
+              {a.status === "approved" && (
+                <p className="mt-0.5 text-xs text-warmgrey">
+                  {a.discountPct > 0 ? `${a.discountPct}% off · ` : ""}
+                  {a.termsDays > 0 ? `Net ${a.termsDays}` : "Due on receipt"} · {a.orderCount} orders
+                </p>
+              )}
+            </div>
+            <StatusBadge status={a.status} />
+          </div>
+
+          {a.status === "pending" && (
+            <div className="mt-2">
+              {editing === a.id ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block">
+                      <span className="text-xs text-warmgrey">Trade discount %</span>
+                      <input className="input text-sm" inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs text-warmgrey">Net terms (days)</span>
+                      <input className="input text-sm" inputMode="numeric" value={terms} onChange={(e) => setTerms(e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn btn-primary flex-1 !py-1.5 text-xs" onClick={() => void approve(a.id)}>
+                      Approve buyer
+                    </button>
+                    <button type="button" className="btn btn-secondary !py-1.5 text-xs" onClick={() => setEditing(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary !py-1.5 text-xs"
+                    onClick={() => {
+                      setEditing(a.id);
+                      setDiscount("0");
+                      setTerms("30");
+                    }}
+                  >
+                    Review & approve
+                  </button>
+                  <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void reject(a.id)}>
+                    Decline
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const WO_STATUSES = ["submitted", "confirmed", "invoiced", "paid", "cancelled"];
+
+function WholesaleOrdersPanel({ orders, onChanged }: { orders: WOrderRow[]; onChanged: () => void }) {
+  async function setStatus(id: string, status: string) {
+    await api.post(`/api/admin/wholesale/orders/${id}/status`, { status });
+    onChanged();
+  }
+  if (orders.length === 0)
+    return <p className="py-8 text-center text-sm text-warmgrey">No wholesale orders yet.</p>;
+  return (
+    <div className="space-y-2 text-sm">
+      {orders.map((o) => (
+        <div key={o.id} className="rounded-lg border border-ink/10 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-mono font-medium">{o.orderNumber}</p>
+              <p className="text-xs text-warmgrey">
+                {o.company || o.email} · {formatDate(o.createdAt)}
+                {o.dueDate ? ` · due ${o.dueDate}` : ""}
+              </p>
+            </div>
+            <span className="font-medium">{formatMoney(o.totalCents, o.currency)}</span>
+          </div>
+          <select
+            className="input mt-2 !py-1 text-xs"
+            value={o.status}
+            onChange={(e) => void setStatus(o.id, e.target.value)}
+          >
+            {WO_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {titleCaseWord(s)}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function titleCaseWord(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

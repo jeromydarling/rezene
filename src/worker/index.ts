@@ -5,6 +5,7 @@ import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 import { commerceRoutes } from "./routes/commerce";
 import { accountRoutes } from "./routes/account";
+import { wholesalePortalRoutes } from "./routes/wholesale-portal";
 import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
 import { shippingWebhookRoutes } from "./routes/shipping-webhooks";
 import { renderCallbackRoutes } from "./routes/render-callbacks";
@@ -272,6 +273,7 @@ app.get("/llms.txt", async (c) => {
 app.route("/api/public", publicRoutes);
 app.route("/api/public", commerceRoutes);
 app.route("/api/public/account", accountRoutes);
+app.route("/api/wholesale", wholesalePortalRoutes);
 
 // Verto platform — shop signup + slug availability (public).
 import { vertoRoutes } from "./routes/verto";
