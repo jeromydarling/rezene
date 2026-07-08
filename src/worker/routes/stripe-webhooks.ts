@@ -4,7 +4,6 @@ import { all, first, run } from "../services/db";
 import { getStripe, webhookCryptoProvider } from "../services/stripe";
 import { orderPaidNotification, sendNotification } from "../services/email";
 import { orderConfirmationEmail, sendBuyerEmail } from "../services/buyer-email";
-import { getBrandName } from "../services/brand";
 import { newId } from "../utils/id";
 import type { AppContext, Env } from "../types/env";
 
@@ -149,10 +148,12 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
     }),
   );
   if (order.email) {
+    const { getEmailBrand } = await import("../services/email-template");
+    const brand = await getEmailBrand(env, env.DB);
     await sendBuyerEmail(env, {
       to: order.email,
       ...orderConfirmationEmail({
-        brandName: await getBrandName(env),
+        brandName: brand.name,
         orderNumber: order.order_number,
         totalCents: order.total_cents,
         currency: order.currency,
@@ -161,6 +162,7 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
           quantity: i.quantity,
           isPreOrder: Boolean(i.is_pre_order),
         })),
+        brand,
       }),
     });
   }
