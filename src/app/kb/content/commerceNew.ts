@@ -192,6 +192,30 @@ The same panel has two accounting exports: a **Sales CSV** (one row per paid ord
 You'll also find **reorder suggestions** at the top of **Inventory**: every piece at or below its low-stock threshold with nothing incoming, shown with its 90-day sales pace and a suggested reorder quantity.`,
   },
   {
+    slug: "cash-flow",
+    title: "Cash flow & open-to-buy",
+    summary: "See money in vs. out, and how much of your buy budget is left.",
+    part: "finance",
+    moduleRoute: "/admin/cash-flow",
+    keywords: "cash flow open to buy otb budget payable receivable forecast runway",
+    updated: "2026-07-08",
+    body: `# Cash flow & open-to-buy
+
+**Costing & finance → Cash Flow** is the planning layer a costing sheet can't give — all computed from what you already track.
+
+## Position at a glance
+
+Tiles show money **coming in** (invoiced wholesale orders), **going out** (open purchase orders), your **net position**, and your retail **revenue run-rate** (last 30 / 90 days).
+
+## Open-to-buy
+
+Set a **season buy budget**. Verto tracks what you've already **committed** on open POs against it and shows how much is **left to spend** — so you don't over-commit production before the season's sales are in.
+
+## Payables & receivables
+
+Two lists show the actual documents: open POs with their ex-factory dates (money out) and invoiced wholesale orders with their due dates (money in), soonest first.`,
+  },
+  {
     slug: "product-passport",
     title: "Digital Product Passport",
     summary: "A public, printable passport per piece — composition, care, origin.",
