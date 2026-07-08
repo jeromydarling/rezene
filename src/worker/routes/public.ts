@@ -73,6 +73,9 @@ publicRoutes.get("/unsubscribe", async (c) => {
     `UPDATE leads SET unsubscribed_at = datetime('now') WHERE lower(email) = ? AND unsubscribed_at IS NULL`,
     email,
   );
+  // Suppression list is the single source of truth honored by every send
+  // (newsletter leads and customer broadcasts alike).
+  await run(db, `INSERT OR IGNORE INTO email_suppressions (email) VALUES (?)`, email);
   return c.text("You're unsubscribed. You won't hear from us again unless you sign back up.");
 });
 

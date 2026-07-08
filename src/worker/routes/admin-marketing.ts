@@ -637,6 +637,122 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
   return c.json({ ok: true, recipients: recipients.length });
 });
 
+// ---------- Email your customers (standalone broadcast) ----------
+// The marketing suite's campaign email talks to newsletter LEADS. This talks to
+// the people who've actually bought — the highest-value list a shop owns — plus
+// newsletter subscribers, with a single suppression list honoring unsubscribes.
+
+type Segment = "customers" | "repeat" | "newsletter";
+
+async function segmentRecipients(db: D1Database, segment: Segment): Promise<{ email: string }[]> {
+  if (segment === "newsletter") {
+    return all<{ email: string }>(
+      db,
+      `SELECT DISTINCT l.email FROM leads l
+       WHERE l.kind = 'newsletter' AND l.unsubscribed_at IS NULL
+         AND l.email NOT IN (SELECT email FROM email_suppressions)
+       LIMIT 1000`,
+    );
+  }
+  const having = segment === "repeat"
+    ? `HAVING COUNT(o.id) >= 2`
+    : "";
+  return all<{ email: string }>(
+    db,
+    `SELECT c.email FROM customers c
+     LEFT JOIN orders o ON o.customer_id = c.id AND o.payment_status IN ('paid','partially_refunded')
+     WHERE c.email IS NOT NULL AND c.email NOT IN (SELECT email FROM email_suppressions)
+     GROUP BY c.id ${having}
+     LIMIT 1000`,
+  );
+}
+
+adminMarketingRoutes.get("/broadcast-audience", async (c) => {
+  const [customers, repeat, newsletter] = await Promise.all([
+    segmentRecipients(c.var.db, "customers"),
+    segmentRecipients(c.var.db, "repeat"),
+    segmentRecipients(c.var.db, "newsletter"),
+  ]);
+  return c.json({
+    configured: buyerEmailConfigured(c.env),
+    counts: { customers: customers.length, repeat: repeat.length, newsletter: newsletter.length },
+  });
+});
+
+const broadcastSchema = z.object({
+  subject: z.string().min(2).max(140),
+  body: z.string().min(2).max(8000),
+  segment: z.enum(["customers", "repeat", "newsletter"]),
+});
+
+adminMarketingRoutes.post("/broadcast", requireAdminWrite, async (c) => {
+  if (!buyerEmailConfigured(c.env)) {
+    return c.json({ error: "Email sending isn't switched on yet (BUYER_EMAIL_FROM + onboarded domain)." }, 503);
+  }
+  const body = await parseBody(c, broadcastSchema);
+  const recipients = await segmentRecipients(c.var.db, body.segment);
+  if (recipients.length === 0) return c.json({ error: "No one in that audience yet." }, 409);
+
+  const { getPrimaryShopBase } = await import("../services/shops");
+  const { getEmailBrand, renderBrandedEmail } = await import("../services/email-template");
+  const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
+  const shopUrl = `${appUrl}${shopBase}/products`;
+  const secret = c.env.SESSION_SECRET ?? "";
+  const shopParam = c.var.shopSlug ? `&shop=${encodeURIComponent(c.var.shopSlug)}` : "";
+  const brand = await getEmailBrand(c.env, c.var.db);
+  const bodyText = body.body.replaceAll("{{SHOP_URL}}", shopUrl);
+
+  const sendId = newId("mks");
+  await run(
+    c.var.db,
+    `INSERT INTO marketing_sends (id, subject, audience, recipient_count) VALUES (?, ?, ?, ?)`,
+    sendId,
+    body.subject,
+    body.segment,
+    recipients.length,
+  );
+  await writeAudit(c.var.db, c.var.userId, "marketing.broadcast", "marketing_send", sendId, {
+    segment: body.segment,
+    recipients: recipients.length,
+  });
+
+  const env = c.env;
+  c.executionCtx.waitUntil(
+    (async () => {
+      for (const r of recipients) {
+        const token = (await sha256Hex(`${r.email.toLowerCase()}${secret}`)).slice(0, 32);
+        const unsubscribe = `${appUrl}/api/public/unsubscribe?email=${encodeURIComponent(r.email)}&token=${token}${shopParam}`;
+        const paragraphs = bodyText
+          .split(/\n{2,}/)
+          .map((p) => `<p style="margin:0 0 14px;">${escapeText(p).replace(/\n/g, "<br>")}</p>`)
+          .join("");
+        const html = renderBrandedEmail({
+          brand,
+          preheader: body.subject,
+          heading: body.subject,
+          bodyHtml:
+            paragraphs +
+            `<p style="margin:16px 0 0;"><a href="${shopUrl}" style="display:inline-block;background:#1c2b3a;color:#fff;padding:11px 20px;border-radius:6px;text-decoration:none;">Visit the shop</a></p>`,
+          footerNote: `You're receiving this from ${brand.name}. Unsubscribe any time: ${unsubscribe}`,
+        });
+        await sendBuyerEmail(env, {
+          to: r.email,
+          fromName: brand.name,
+          subject: body.subject,
+          text: `${bodyText}\n\n—\nUnsubscribe: ${unsubscribe}`,
+          html,
+        });
+      }
+    })(),
+  );
+  return c.json({ ok: true, recipients: recipients.length });
+});
+
+function escapeText(s: string): string {
+  return s.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]!));
+}
+
 // ---------- Sends history ----------
 adminMarketingRoutes.get("/sends", async (c) => {
   const rows = await all(
