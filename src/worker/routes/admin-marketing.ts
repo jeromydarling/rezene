@@ -658,10 +658,18 @@ async function buildVideoSpec(c: Context<AppContext>, sceneOverride?: Partial<im
   const { defaultSpecFromShop } = await import("../services/video-composition");
   const settings = await all<{ key: string; value: string }>(
     c.var.db,
-    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline')`,
+    `SELECT key, value FROM settings WHERE key IN ('brand_name','brand_tagline','brand_palette')`,
   );
   const s = Object.fromEntries(settings.map((r) => [r.key, r.value]));
   const brandName = s.brand_name || c.env.BRAND_NAME || "Your label";
+  // The promo film is palette-aware — feed it the brand's colours when set.
+  let palette: { navy?: string; terra?: string; chalk?: string } | undefined;
+  try {
+    const p = JSON.parse(s.brand_palette || "null") as { primary?: string; accent?: string; bg?: string } | null;
+    if (p?.primary) palette = { navy: p.primary, terra: p.accent, chalk: p.bg };
+  } catch {
+    /* no palette set — the film uses its defaults */
+  }
   const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
   const base = c.var.shopSlug ? `/${c.var.shopSlug}` : "";
   const rows = await all<{ name: string; base_price_cents: number; currency: string; slug: string; url: string | null }>(
@@ -686,6 +694,7 @@ async function buildVideoSpec(c: Context<AppContext>, sceneOverride?: Partial<im
     heroImg: hero,
     editorialImg: editorial,
   });
+  if (palette) spec.palette = palette;
   if (sceneOverride) spec.scenes = { ...spec.scenes, ...sceneOverride };
   if (titleOut) titleOut.v = brandName;
   return spec;

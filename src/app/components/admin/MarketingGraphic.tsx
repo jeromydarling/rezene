@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useBrand } from "../../lib/brand";
 import { ImageField } from "./cms";
 
@@ -30,8 +30,19 @@ export function MarketingGraphic({
 }) {
   const brand = useBrand();
   const svgRef = useRef<SVGSVGElement>(null);
+  // Prepend the shop's own palette as two schemes so graphics can be composed
+  // in the brand's exact colours; the fixed schemes stay as alternatives.
+  const schemes = useMemo(() => {
+    if (!brand.palette) return [...SCHEMES];
+    const p = brand.palette;
+    return [
+      { key: "brand-dark", label: "Brand", bg: p.primary, fg: "#faf7f0", accent: p.accent },
+      { key: "brand-light", label: "Brand light", bg: p.bg, fg: p.ink, accent: p.accent },
+      ...SCHEMES,
+    ];
+  }, [brand.palette]);
   const [sizeKey, setSizeKey] = useState<(typeof SIZES)[number]["key"]>("square");
-  const [schemeKey, setSchemeKey] = useState<(typeof SCHEMES)[number]["key"]>("navy");
+  const [schemeKey, setSchemeKey] = useState<string>(brand.palette ? "brand-dark" : "navy");
   const [eyebrow, setEyebrow] = useState(initialEyebrow);
   const [headline, setHeadline] = useState(initialHeadline || "Say the one thing.");
   const [subline, setSubline] = useState("");
@@ -39,7 +50,7 @@ export function MarketingGraphic({
   const [downloading, setDownloading] = useState(false);
 
   const size = SIZES.find((s) => s.key === sizeKey)!;
-  const scheme = SCHEMES.find((s) => s.key === schemeKey)!;
+  const scheme = schemes.find((s) => s.key === schemeKey) ?? schemes[0];
   const { width, height } = size;
   const isStory = sizeKey === "story";
   const pad = Math.round(width * 0.08);
@@ -122,14 +133,14 @@ export function MarketingGraphic({
         </div>
         <div>
           <label className="label">Color scheme</label>
-          <div className="flex gap-2">
-            {SCHEMES.map((s) => (
+          <div className="flex flex-wrap gap-2">
+            {schemes.map((s) => (
               <button
                 key={s.key}
                 type="button"
                 title={s.label}
                 aria-label={s.label}
-                className={`h-8 w-8 rounded-full border-2 ${schemeKey === s.key ? "border-ink" : "border-ink/15"}`}
+                className={`h-8 w-8 rounded-full border-2 ${schemeKey === s.key ? "border-ink" : "border-ink/15"} ${s.key.startsWith("brand") ? "ring-1 ring-navy/30 ring-offset-1" : ""}`}
                 style={{ backgroundColor: s.bg }}
                 onClick={() => setSchemeKey(s.key)}
               />
