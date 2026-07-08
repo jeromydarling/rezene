@@ -242,6 +242,17 @@ commerceRoutes.post(
     const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
     const appUrl =
       (c.env.APP_ENV === "development" ? origin : (c.env.APP_URL || origin)) + shopBase;
+
+    // Sales tax is collected by Stripe Tax only when the shop has switched it on
+    // (Commerce → Discounts & Tax). With dynamic prices, Stripe needs each line
+    // to declare whether the price already includes tax; we treat prices as
+    // tax-exclusive, the norm for US/most B2C storefronts.
+    const taxRow = await first<{ value: string }>(
+      c.var.db,
+      `SELECT value FROM settings WHERE key = 'store_tax_enabled'`,
+    );
+    const taxEnabled = taxRow?.value === "true";
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       client_reference_id: orderId,
@@ -251,6 +262,7 @@ commerceRoutes.post(
         price_data: {
           currency: r.currency.toLowerCase(),
           unit_amount: r.unitPriceCents,
+          ...(taxEnabled ? { tax_behavior: "exclusive" as const } : {}),
           product_data: {
             name: r.productName,
             description: `${r.variantLabel}${r.isPreOrder ? " · Pre-order" : ""}`,
@@ -261,8 +273,7 @@ commerceRoutes.post(
       allow_promotion_codes: true,
       shipping_address_collection: { allowed_countries: SHIPPING_COUNTRIES },
       ...(shippingOptions.length > 0 ? { shipping_options: shippingOptions } : {}),
-      // Enable once Stripe Tax is activated on the account:
-      // automatic_tax: { enabled: true },
+      ...(taxEnabled ? { automatic_tax: { enabled: true } } : {}),
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: resolved.length === 1 ? `${appUrl}/products/${resolved[0].slug}` : `${appUrl}/cart`,
     });
