@@ -68,6 +68,16 @@ export async function reserveFittingQuota(c: Context<AppContext>): Promise<Quota
   return { ok: true, used: used + 1, limit };
 }
 
+/** Read today's fitting usage WITHOUT reserving — for showing "N renders left". */
+export async function peekFittingQuota(c: Context<AppContext>): Promise<QuotaResult> {
+  const raw = c.env.FITTING_DAILY_LIMIT;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FITTING_LIMIT;
+  const day = new Date().toISOString().slice(0, 10);
+  const used = parseInt((await c.env.KV.get(`aiq:${c.var.shopId}:fitting:${day}`)) ?? "0", 10);
+  return { ok: used < limit, used, limit };
+}
+
 export function fittingQuotaExceededBody(q: QuotaResult) {
   return {
     error: `Daily render limit reached (${q.limit}/day for this shop). It resets at 00:00 UTC.`,

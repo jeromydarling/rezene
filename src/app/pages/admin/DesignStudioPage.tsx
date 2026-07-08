@@ -70,10 +70,14 @@ export function DesignStudioPage() {
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [styleOpen, setStyleOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const visible = (data ?? []).filter((c) => showArchived || c.status !== "archived");
+  const archivedCount = (data ?? []).filter((c) => c.status === "archived").length;
 
   useEffect(() => {
-    if (!selectedId && data && data.length > 0) setSelectedId(data[0].id);
-  }, [data, selectedId]);
+    if (!selectedId && visible.length > 0) setSelectedId(visible[0].id);
+  }, [visible, selectedId]);
 
   const create = useCallback(async () => {
     if (!newTitle.trim()) return;
@@ -140,7 +144,7 @@ export function DesignStudioPage() {
                 </div>
               </div>
             )}
-            {(data ?? []).map((concept) => (
+            {visible.map((concept) => (
               <button
                 key={concept.id}
                 type="button"
@@ -155,9 +159,30 @@ export function DesignStudioPage() {
                 </div>
               </button>
             ))}
+            {archivedCount > 0 && (
+              <button
+                type="button"
+                className="w-full px-3 py-1 text-left text-[11px] text-warmgrey hover:text-navy"
+                onClick={() => setShowArchived((s) => !s)}
+              >
+                {showArchived ? "Hide archived" : `Show ${archivedCount} archived`}
+              </button>
+            )}
           </aside>
 
-          <div>{selectedId ? <DesignWorkspace key={selectedId} conceptId={selectedId} onMeta={reload} /> : null}</div>
+          <div>
+            {selectedId ? (
+              <DesignWorkspace
+                key={selectedId}
+                conceptId={selectedId}
+                onMeta={reload}
+                onGone={() => {
+                  setSelectedId(null);
+                  void reload();
+                }}
+              />
+            ) : null}
+          </div>
         </div>
       )}
 
@@ -168,9 +193,19 @@ export function DesignStudioPage() {
   );
 }
 
-function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () => void }) {
+function DesignWorkspace({
+  conceptId,
+  onMeta,
+  onGone,
+}: {
+  conceptId: string;
+  onMeta: () => void;
+  onGone: () => void;
+}) {
   const toast = useToast();
   const { data, loading, reload } = useFetch<ConceptDetail>(`/api/admin/ai/concepts/${conceptId}`);
+  const [renaming, setRenaming] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [garment, setGarment] = useState("");
   const [fabric, setFabric] = useState("");
   const [palette, setPalette] = useState("");
@@ -258,13 +293,84 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
     }
   }, [prompt, conceptId, useHouseStyle, lockSeed, reload]);
 
+  async function renameConcept() {
+    const t = titleDraft.trim();
+    setRenaming(false);
+    if (!t || t === data?.title) return;
+    try {
+      await api.patch(`/api/admin/ai/concepts/${conceptId}`, { title: t });
+      await reload();
+      onMeta();
+    } catch {
+      toast.error("Couldn't rename");
+    }
+  }
+
+  async function toggleArchive() {
+    if (!data) return;
+    const next = data.status === "archived" ? "exploring" : "archived";
+    try {
+      await api.patch(`/api/admin/ai/concepts/${conceptId}`, { status: next });
+      await reload();
+      onMeta();
+      toast.success(next === "archived" ? "Design archived" : "Design restored");
+    } catch {
+      toast.error("Couldn't update");
+    }
+  }
+
+  async function deleteConcept() {
+    if (!window.confirm("Delete this design and all its generated looks? This can't be undone.")) return;
+    try {
+      await api.delete(`/api/admin/ai/concepts/${conceptId}`);
+      toast.success("Design deleted");
+      onGone();
+    } catch {
+      toast.error("Couldn't delete");
+    }
+  }
+
   if (loading || !data) return <LoadingTable rows={4} />;
 
   return (
     <div className="space-y-5">
       {/* Prompt builder */}
       <div className="admin-card space-y-3 p-5">
-        <h2 className="font-display text-lg font-light">{data.title}</h2>
+        <div className="flex items-center justify-between gap-3">
+          {renaming ? (
+            <input
+              className="input !py-1 flex-1 text-sm"
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => void renameConcept()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void renameConcept();
+                if (e.key === "Escape") setRenaming(false);
+              }}
+            />
+          ) : (
+            <h2 className="font-display text-lg font-light">{data.title}</h2>
+          )}
+          <div className="flex shrink-0 items-center gap-2 text-[11px]">
+            <button
+              type="button"
+              className="text-warmgrey hover:text-navy"
+              onClick={() => {
+                setTitleDraft(data.title);
+                setRenaming(true);
+              }}
+            >
+              Rename
+            </button>
+            <button type="button" className="text-warmgrey hover:text-navy" onClick={() => void toggleArchive()}>
+              {data.status === "archived" ? "Restore" : "Archive"}
+            </button>
+            <button type="button" className="text-warmgrey hover:text-red-600" onClick={() => void deleteConcept()}>
+              Delete
+            </button>
+          </div>
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <Labeled label="Garment">
             <select className="input !py-1.5 text-sm" value={garment} onChange={(e) => setGarment(e.target.value)}>
@@ -421,6 +527,9 @@ function DesignWorkspace({ conceptId, onMeta }: { conceptId: string; onMeta: () 
                       className="text-xs text-white"
                     >
                       ▦ try on
+                    </a>
+                    <a href={g.url!} download title="Download image" className="text-xs text-white">
+                      ⤓
                     </a>
                     <button type="button" title="Use on your site" className="text-xs text-white" onClick={() => setUseGen(g)}>
                       ⇡ use

@@ -190,6 +190,31 @@ adminAiRoutes.patch("/concepts/:id", requireAdminWrite, async (c) => {
   return c.json({ ok: true });
 });
 
+/**
+ * Delete a design outright: its generated images' files (R2 + rows) go too, so
+ * storage doesn't accumulate orphans. Generations and references cascade with
+ * the concept row. Reference uploads stay in the media library — they may be
+ * real swatch/model photos reused elsewhere.
+ */
+adminAiRoutes.delete("/concepts/:id", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const existing = await first(c.var.db, `SELECT id FROM ai_concepts WHERE id = ?`, id);
+  if (!existing) return c.json({ error: "Concept not found" }, 404);
+  const files = await all<{ file_id: string; r2_key: string }>(
+    c.var.db,
+    `SELECT g.file_id, f.r2_key FROM ai_generations g JOIN files f ON f.id = g.file_id
+      WHERE g.concept_id = ? AND g.file_id IS NOT NULL`,
+    id,
+  );
+  for (const f of files) {
+    await c.env.FILES.delete(f.r2_key).catch(() => {});
+    await run(c.var.db, `DELETE FROM files WHERE id = ?`, f.file_id);
+  }
+  await run(c.var.db, `DELETE FROM ai_concepts WHERE id = ?`, id);
+  await writeAudit(c.var.db, c.var.userId, "ai_concept.delete", "ai_concept", id, {});
+  return c.json({ ok: true });
+});
+
 // ============================================================
 // Design Studio — native Flux generation, house style, ship-to-sample.
 // ============================================================
