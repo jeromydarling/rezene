@@ -141,3 +141,97 @@ adminWholesaleRoutes.post("/line-sheets/:id/revoke", requireAdminWrite, async (c
   if (!result.meta.changes) return c.json({ error: "Line sheet not found or already revoked" }, 404);
   return c.json({ ok: true });
 });
+
+// ---------- Wholesale buyer accounts ----------
+adminWholesaleRoutes.get("/accounts", async (c) => {
+  const rows = await all(
+    c.var.db,
+    `SELECT a.id, a.email, a.company, a.contact_name AS contactName, a.status,
+            a.discount_pct AS discountPct, a.terms_days AS termsDays, a.note, a.created_at AS createdAt,
+            (SELECT COUNT(*) FROM wholesale_orders o WHERE o.account_id = a.id) AS orderCount
+     FROM wholesale_accounts a ORDER BY
+       CASE a.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, a.created_at DESC`,
+  );
+  const pending = rows.filter((r) => (r as { status: string }).status === "pending").length;
+  return c.json({ accounts: rows, pending });
+});
+
+adminWholesaleRoutes.post("/accounts/:id/approve", requireAdminWrite, async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { discountPct?: number; termsDays?: number; note?: string };
+  await run(
+    c.var.db,
+    `UPDATE wholesale_accounts SET status = 'approved', discount_pct = ?, terms_days = ?,
+            note = COALESCE(?, note), approved_at = datetime('now') WHERE id = ?`,
+    Math.max(0, Math.min(90, Number(b.discountPct) || 0)),
+    Math.max(0, Number(b.termsDays) || 0),
+    b.note ?? null,
+    c.req.param("id"),
+  );
+  await writeAudit(c.var.db, c.var.userId, "wholesale.account.approve", "wholesale_account", c.req.param("id"), b);
+  return c.json({ ok: true });
+});
+
+adminWholesaleRoutes.post("/accounts/:id/reject", requireAdminWrite, async (c) => {
+  await run(c.var.db, `UPDATE wholesale_accounts SET status = 'rejected' WHERE id = ?`, c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+// ---------- Wholesale orders ----------
+adminWholesaleRoutes.get("/orders", async (c) => {
+  const rows = await all(
+    c.var.db,
+    `SELECT o.id, o.order_number AS orderNumber, o.status, o.total_cents AS totalCents, o.currency,
+            o.due_date AS dueDate, o.created_at AS createdAt, a.company, a.email
+     FROM wholesale_orders o JOIN wholesale_accounts a ON a.id = o.account_id
+     ORDER BY o.created_at DESC LIMIT 300`,
+  );
+  const open = rows.filter((r) => (r as { status: string }).status === "submitted").length;
+  return c.json({ orders: rows, open });
+});
+
+adminWholesaleRoutes.get("/orders/:id", async (c) => {
+  const order = await first<Record<string, unknown>>(
+    c.var.db,
+    `SELECT o.*, a.company, a.email, a.contact_name AS contactName, a.terms_days AS termsDays
+     FROM wholesale_orders o JOIN wholesale_accounts a ON a.id = o.account_id WHERE o.id = ?`,
+    c.req.param("id"),
+  );
+  if (!order) return c.json({ error: "Order not found" }, 404);
+  const items = await all(
+    c.var.db,
+    `SELECT description, quantity, unit_price_cents AS unitPriceCents, currency
+     FROM wholesale_order_items WHERE order_id = ?`,
+    order.id,
+  );
+  return c.json({ order, items });
+});
+
+adminWholesaleRoutes.post("/orders/:id/status", requireAdminWrite, async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { status?: string };
+  const valid = ["submitted", "confirmed", "invoiced", "paid", "cancelled"];
+  if (!b.status || !valid.includes(b.status)) return c.json({ error: "Invalid status" }, 400);
+  // Invoicing stamps the due date from the buyer's net terms.
+  if (b.status === "invoiced") {
+    const o = await first<{ terms_days: number }>(
+      c.var.db,
+      `SELECT a.terms_days FROM wholesale_orders o JOIN wholesale_accounts a ON a.id = o.account_id WHERE o.id = ?`,
+      c.req.param("id"),
+    );
+    await run(
+      c.var.db,
+      `UPDATE wholesale_orders SET status = 'invoiced',
+              due_date = date('now', '+' || ? || ' days'), updated_at = datetime('now') WHERE id = ?`,
+      o?.terms_days ?? 0,
+      c.req.param("id"),
+    );
+  } else {
+    await run(
+      c.var.db,
+      `UPDATE wholesale_orders SET status = ?, updated_at = datetime('now') WHERE id = ?`,
+      b.status,
+      c.req.param("id"),
+    );
+  }
+  await writeAudit(c.var.db, c.var.userId, "wholesale.order.status", "wholesale_order", c.req.param("id"), b);
+  return c.json({ ok: true });
+});
