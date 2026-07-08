@@ -181,6 +181,7 @@ A finished look shouldn't be a dead end. Under the refit chips:
 
 - **Download** the image for a deck or a client message.
 - **Use on your site** — add it straight to a product's photo gallery or a lookbook, live immediately.
+- **Fit notes → Pattern Studio** — after refits, carry the session's fit decisions into the Pattern Studio as drafting adjustments on a real sewing pattern.
 
 ## Renders and the daily budget
 
@@ -204,14 +205,20 @@ For the shops with a tailor or seamstress in the room: the Pattern Studio drafts
 
 ## Draft one
 
-1. Pick a **pattern block** — T-shirt, hoodie/sweatshirt, slip dress, trouser, or skirt.
+1. Pick a **pattern block** — the full FreeSewing apparel catalogue is in, over thirty blocks across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear (coats, jacket block, waistcoat, corset), foundation bodice blocks, underwear and swim.
 2. Choose a **size** (XS–XXL), or go **made-to-measure**: enter a person's chest, waist, hips, and height and the pattern drafts to their body.
 3. **Adjust the cut.** The sliders drive the block's own drafting options — extra ease through the body, hem length (cropped to longline), sleeve length — so the pattern pieces genuinely redraft, seams and all.
 4. Choose your output: a drawn **1 cm seam allowance**, and **dimensions printed on the pattern** (paperless mode — measure and mark directly instead of printing at scale).
 5. **Download SVG** — hand it to your machinist, or open it in any vector tool to refine. **Save to library** keeps a copy with your shop files.
+6. **Print PDF** — a tiled, true-scale PDF (A4 or Letter). Print at 100%, check the **5 cm bar** on each page, tape the pages along the dashed glue guides, and cut. Overlaps and row/column labels are printed on every page.
 
 > [!TIP]
 > In a hurry? **✨ Describe the garment** — *"a boxy cropped tee"* — and the studio picks the block, size, and adjustments for you. Fine-tune from there.
+
+## Both directions: picture ↔ pattern
+
+- **Fitting → Pattern.** After refitting a look in the Fitting Studio (tighter, cropped, shorter sleeves…), tap **Fit notes → Pattern Studio** and those decisions arrive here as drafting adjustments, already on the sliders.
+- **Pattern → Model.** Working pattern-first, the traditional way? **Render this cut on a model** turns the block and your adjustments into a photoreal look in the Fitting Studio's gallery — flat pattern to a body in one click.
 
 ## A made-to-measure client book
 
@@ -219,6 +226,6 @@ For the shops with a tailor or seamstress in the room: the Pattern Studio drafts
 
 ## Honest limits
 
-Grading from a standard size is a proportional first pass — good enough to start cutting a toile, not an industrial graded nest. Made-to-measure drafts use your numbers directly and are correspondingly better. The five blocks are foundations to build on; more are coming.`,
+Grading from a standard size is a proportional first pass — good enough to start cutting a toile, not an industrial graded nest. Made-to-measure drafts use your numbers directly and are correspondingly better. Foundation blocks (Brian, Bella, Breanna, Noble) are drafting bases for pattern-makers rather than finished garments.`,
   },
 ];
