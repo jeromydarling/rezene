@@ -130,7 +130,7 @@ Found a fit problem in simulation? **Log a fit issue** and Verto files a **sampl
     moduleRoute: "/admin/fitting",
     keywords: "fitting room look studio virtual try on model mood board pinterest generate ai image garment photo drape 3d pattern freesewing",
     screenshot: "/kb/shots/fitting.png",
-    updated: "2026-07-07",
+    updated: "2026-07-08",
     body: `# The Look Studio
 
 The Fitting Room has three views. The headline is **On a model** — see any garment on a photoreal body in seconds — backed by two more that do real production work: a **3D preview** and a downloadable **sewing pattern**.
@@ -154,6 +154,12 @@ This is the one designers love: **take a photo of a garment you actually made** 
 2. Choose the **garment type** (top, bottom, dress, or auto).
 3. Pick a **model**: generate one from a body preset, or **upload your own** model/fit photo.
 4. **Try it on.**
+
+> [!TIP]
+> Verto **evens out the lighting** on your garment photo before the try-on, so a window
+> shadow raking across a flat lay doesn't come back as a two-tone garment. It's on by
+> default; if a colour ever looks off in the result, untick **Even out the photo's
+> lighting** and try again with the untouched photo.
 
 Every result saves to **Model renders** at the bottom — click any to reopen it, or delete it. Try-on results are badged **Try-on**.
 

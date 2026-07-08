@@ -421,6 +421,17 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
   return stored.ok ? c.json(stored.render, 201) : stored.response;
 });
 
+/** Try-on engines read lighting as fabric: a window shadow raking across a
+ *  flat lay comes back as a two-tone garment. So by default we re-light the
+ *  garment photo first (reference-conditioned edit — same garment, even studio
+ *  light) and hand the try-on the cleaned version. */
+const GARMENT_CLEAN_PROMPT =
+  "Re-light this garment product photo: remove every cast shadow, light streak and lighting gradient " +
+  "falling across the fabric, so the garment is evenly lit by soft diffuse studio light on a plain, " +
+  "pale, seamless background. Keep the garment itself exactly as it is — same silhouette, same true " +
+  "fabric colour everywhere (shadowed areas are the SAME colour as brightly lit areas), same texture, " +
+  "buttons, stitching, pockets and proportions. Do not redesign, recolour, crop or add anything.";
+
 /**
  * Real virtual try-on: composite a photo of an ACTUAL garment onto a model
  * photo. Both are stored files (garmentFileId + modelFileId — the model may be
@@ -434,6 +445,7 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
     category?: GarmentCategory;
     garmentId?: string | null;
     styleId?: string | null;
+    cleanGarment?: boolean;
   };
   if (!body.garmentFileId || (!body.modelFileId && !body.modelRosterId)) {
     return c.json({ error: "A garment photo and a model are both required." }, 400);
@@ -451,9 +463,31 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
 
   const quota = await reserveFittingQuota(c);
   if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
+
+  // Re-light the garment photo (default on). Best-effort: if the clean-up
+  // engine is missing or fails, the try-on still runs on the original photo.
+  let garmentForTryOn = garmentImage;
+  if (body.cleanGarment !== false) {
+    try {
+      const [cleaned] = await generateLook(c.env, {
+        prompt: GARMENT_CLEAN_PROMPT,
+        references: [garmentImage],
+        count: 1,
+      });
+      if (cleaned) {
+        garmentForTryOn = { kind: "bytes", bytes: cleaned.bytes, contentType: cleaned.contentType };
+      }
+    } catch (err) {
+      console.error(
+        "[fitting] garment re-light failed, trying on the original photo:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   let result: ImageResult;
   try {
-    result = await tryOnGarment(c.env, { garmentImage, modelImage, category: body.category ?? "auto" });
+    result = await tryOnGarment(c.env, { garmentImage: garmentForTryOn, modelImage, category: body.category ?? "auto" });
   } catch (err) {
     return providerFail(c, err);
   }
