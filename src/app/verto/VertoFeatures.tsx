@@ -990,6 +990,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Returns in a click", "Shoppers start a return; you approve to refund and restock in one step."],
       ["Win-back automations", "Real back-in-stock waitlists and abandoned-cart recovery, on brand."],
       ["Email your customers", "Broadcast to buyers or repeat customers in your colours, unsubscribes honoured."],
+      ["Loyalty & referrals", "Store credit on every order and for referring friends, redeemed at checkout."],
     ],
   },
   {

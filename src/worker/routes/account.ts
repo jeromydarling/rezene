@@ -35,6 +35,11 @@ async function currentCustomer(c: { req: Request; var: { db: D1Database } } & an
   return row ?? null;
 }
 
+async function settingValue(db: D1Database, key: string): Promise<string | null> {
+  const row = await first<{ value: string }>(db, `SELECT value FROM settings WHERE key = ?`, key);
+  return row?.value ?? null;
+}
+
 async function shopBaseUrl(c: any): Promise<string> {
   const origin = new URL(c.req.url).origin;
   const { getPrimaryShopBase } = await import("../services/shops");
@@ -326,6 +331,147 @@ accountRoutes.get("/orders/:id/reorder", async (c) => {
       imageUrl: (r.imageUrl as string) ?? null,
     }));
   return c.json({ items, dropped: rows.length - items.length });
+});
+
+// ---- Loyalty & referral (store credit) ----
+accountRoutes.get("/loyalty", async (c) => {
+  const me = await currentCustomer(c);
+  if (!me) return c.json({ error: "Not signed in" }, 401);
+  if ((await settingValue(c.var.db, "loyalty_enabled")) !== "true")
+    return c.json({ enabled: false });
+
+  const { creditBalanceCents, ledgerFor } = await import("../services/loyalty");
+  const balanceCents = await creditBalanceCents(c.var.db, me.customer_id);
+  const ledger = await ledgerFor(c.var.db, me.customer_id);
+
+  // A stable referral code, created on first view.
+  let ref = await first<{ code: string }>(
+    c.var.db,
+    `SELECT code FROM referral_codes WHERE customer_id = ?`,
+    me.customer_id,
+  );
+  if (!ref) {
+    const code = `REF-${randomToken(4).toUpperCase()}`;
+    await run(
+      c.var.db,
+      `INSERT OR IGNORE INTO referral_codes (customer_id, code) VALUES (?, ?)`,
+      me.customer_id,
+      code,
+    );
+    ref = { code };
+  }
+
+  return c.json({
+    enabled: true,
+    balanceCents,
+    earnPct: Number(await settingValue(c.var.db, "loyalty_earn_pct")) || 0,
+    referralCode: ref.code,
+    referralRewardCents: Number(await settingValue(c.var.db, "referral_reward_cents")) || 0,
+    referralFriendPct: Number(await settingValue(c.var.db, "referral_friend_pct")) || 0,
+    ledger,
+  });
+});
+
+// Turn credit into a one-time discount code (works with the normal checkout).
+accountRoutes.post("/loyalty/redeem", async (c) => {
+  const me = await currentCustomer(c);
+  if (!me) return c.json({ error: "Not signed in" }, 401);
+  const { creditBalanceCents } = await import("../services/loyalty");
+  const balance = await creditBalanceCents(c.var.db, me.customer_id);
+  const b = (await c.req.json().catch(() => ({}))) as { amountCents?: number };
+  const amount = Math.min(Math.max(0, Math.round(Number(b.amountCents) || 0)), balance);
+  if (amount < 100) return c.json({ error: "Redeem at least 1.00 of credit." }, 400);
+
+  const { getStripe } = await import("../services/stripe");
+  const stripe = getStripe(c.env);
+  if (!stripe) return c.json({ error: "Store credit isn't available right now." }, 503);
+  const currency = (await settingValue(c.var.db, "default_currency")) || "EUR";
+  const code = `CREDIT-${randomToken(4).toUpperCase()}`;
+  try {
+    const coupon = await stripe.coupons.create({
+      amount_off: amount,
+      currency: currency.toLowerCase(),
+      duration: "once",
+      max_redemptions: 1,
+      name: "Store credit",
+    });
+    await stripe.promotionCodes.create({ coupon: coupon.id, code, max_redemptions: 1 });
+  } catch (err) {
+    return c.json({ error: `Couldn't create the credit code: ${(err as Error).message}` }, 502);
+  }
+  await run(
+    c.var.db,
+    `INSERT INTO customer_credit_ledger (id, customer_id, delta_cents, kind, reason)
+     VALUES (?, ?, ?, 'redeemed', ?)`,
+    newId("cl"),
+    me.customer_id,
+    -amount,
+    `Redeemed as code ${code}`,
+  );
+  return c.json({ code, amountCents: amount, currency });
+});
+
+// Claim a friend's referral code → a first-order discount for me; the referrer
+// is rewarded when I place my first paid order.
+accountRoutes.post("/loyalty/claim-referral", async (c) => {
+  const me = await currentCustomer(c);
+  if (!me) return c.json({ error: "Not signed in" }, 401);
+  const b = (await c.req.json().catch(() => ({}))) as { code?: string };
+  const code = (b.code ?? "").trim().toUpperCase();
+  if (!code) return c.json({ error: "Enter a code." }, 400);
+
+  const owner = await first<{ customer_id: string }>(
+    c.var.db,
+    `SELECT customer_id FROM referral_codes WHERE code = ?`,
+    code,
+  );
+  if (!owner) return c.json({ error: "That referral code isn't valid." }, 404);
+  if (owner.customer_id === me.customer_id) return c.json({ error: "You can't refer yourself." }, 400);
+
+  const already = await first<{ id: string }>(
+    c.var.db,
+    `SELECT id FROM referrals WHERE referred_customer_id = ?`,
+    me.customer_id,
+  );
+  if (already) return c.json({ error: "You've already used a referral." }, 409);
+  // Only new customers (no paid orders) can claim.
+  const paid = await first<{ n: number }>(
+    c.var.db,
+    `SELECT COUNT(*) AS n FROM orders WHERE customer_id = ? AND payment_status IN ('paid','partially_refunded')`,
+    me.customer_id,
+  );
+  if ((paid?.n ?? 0) > 0) return c.json({ error: "Referrals are for your first order." }, 400);
+
+  const friendPct = Number(await settingValue(c.var.db, "referral_friend_pct")) || 10;
+  const rewardCents = Number(await settingValue(c.var.db, "referral_reward_cents")) || 0;
+  const { getStripe } = await import("../services/stripe");
+  const stripe = getStripe(c.env);
+  if (!stripe) return c.json({ error: "Referrals aren't available right now." }, 503);
+  const friendCode = `WELCOME-${randomToken(4).toUpperCase()}`;
+  try {
+    const coupon = await stripe.coupons.create({
+      percent_off: friendPct,
+      duration: "once",
+      max_redemptions: 1,
+      name: "Referral welcome",
+    });
+    await stripe.promotionCodes.create({ coupon: coupon.id, code: friendCode, max_redemptions: 1 });
+  } catch (err) {
+    return c.json({ error: `Couldn't create your code: ${(err as Error).message}` }, 502);
+  }
+  await run(
+    c.var.db,
+    `INSERT INTO referrals (id, referrer_customer_id, code, referred_customer_id, referred_email, reward_cents, discount_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    newId("rf"),
+    owner.customer_id,
+    code,
+    me.customer_id,
+    me.email.toLowerCase(),
+    rewardCents,
+    friendCode,
+  );
+  return c.json({ friendCode, friendPct });
 });
 
 // ---- Reviews (verified buyer only) ----

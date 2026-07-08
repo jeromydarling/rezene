@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Heart, MapPin, Package, LogOut } from "lucide-react";
+import { Heart, MapPin, Package, LogOut, Gift } from "lucide-react";
 import { api, ApiRequestError } from "../../lib/api";
 import { useCart, type CartItem } from "../../lib/cart";
 import { useToast } from "../../lib/toast";
@@ -18,7 +18,7 @@ interface OrderRow {
   createdAt: string;
   itemCount: number;
 }
-type Tab = "orders" | "wishlist" | "addresses";
+type Tab = "orders" | "rewards" | "wishlist" | "addresses";
 
 const fmtDate = (s: string | null) =>
   s ? new Date(s.replace(" ", "T") + "Z").toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
@@ -85,6 +85,7 @@ export function AccountPage() {
         {(
           [
             ["orders", "Orders", Package],
+            ["rewards", "Rewards", Gift],
             ["wishlist", "Wishlist", Heart],
             ["addresses", "Addresses", MapPin],
           ] as const
@@ -103,6 +104,7 @@ export function AccountPage() {
       </div>
 
       {tab === "orders" && <Orders />}
+      {tab === "rewards" && <Rewards />}
       {tab === "wishlist" && <Wishlist />}
       {tab === "addresses" && <Addresses />}
     </div>
@@ -661,6 +663,149 @@ function Addresses() {
         <button type="button" className="btn btn-secondary !py-1.5 text-sm" onClick={() => setAdding(true)}>
           + Add an address
         </button>
+      )}
+    </div>
+  );
+}
+
+interface Loyalty {
+  enabled: boolean;
+  balanceCents?: number;
+  earnPct?: number;
+  referralCode?: string;
+  referralFriendPct?: number;
+  ledger?: { deltaCents: number; kind: string; reason: string | null; createdAt: string }[];
+}
+
+function Rewards() {
+  const toast = useToast();
+  const [data, setData] = useState<Loyalty | null>(null);
+  const [redeemAmt, setRedeemAmt] = useState("");
+  const [claimCode, setClaimCode] = useState("");
+  const [issued, setIssued] = useState<{ label: string; code: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    api.get<Loyalty>("/api/public/account/loyalty").then(setData).catch(() => setData({ enabled: false }));
+  }, []);
+  useEffect(load, [load]);
+
+  if (!data) return <p className="py-8 text-sm text-ink/50">Loading…</p>;
+  if (!data.enabled)
+    return (
+      <div className="rounded-lg border border-dashed border-ink/15 py-12 text-center text-sm text-ink/60">
+        This shop doesn't have a rewards programme yet.
+      </div>
+    );
+
+  const balance = (data.balanceCents ?? 0) / 100;
+  const money = (c: number) => c.toLocaleString(undefined, { style: "currency", currency: "EUR" });
+
+  async function redeem() {
+    setBusy(true);
+    try {
+      const res = await api.post<{ code: string; amountCents: number }>("/api/public/account/loyalty/redeem", {
+        amountCents: Math.round((Number(redeemAmt) || 0) * 100),
+      });
+      setIssued({ label: `${money(res.amountCents / 100)} store credit`, code: res.code });
+      setRedeemAmt("");
+      load();
+    } catch (e) {
+      toast.error("Couldn't redeem", e instanceof ApiRequestError ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function claim() {
+    setBusy(true);
+    try {
+      const res = await api.post<{ friendCode: string; friendPct: number }>("/api/public/account/loyalty/claim-referral", {
+        code: claimCode.trim(),
+      });
+      setIssued({ label: `${res.friendPct}% off your first order`, code: res.friendCode });
+      setClaimCode("");
+    } catch (e) {
+      toast.error("Couldn't apply", e instanceof ApiRequestError ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg bg-cream/60 p-5 text-center">
+        <p className="text-xs uppercase tracking-wide text-ink/50">Store credit</p>
+        <p className="mt-1 font-display text-3xl font-light">{money(balance)}</p>
+        {data.earnPct ? <p className="mt-1 text-xs text-ink/50">You earn {data.earnPct}% back on every order.</p> : null}
+      </div>
+
+      {issued && (
+        <div className="rounded-lg border border-palm/40 bg-palm/10 p-4 text-center text-sm">
+          <p className="font-medium">{issued.label} — your code:</p>
+          <p className="mt-1 font-mono text-lg">{issued.code}</p>
+          <p className="mt-1 text-xs text-ink/55">Enter it at checkout. It works once.</p>
+        </div>
+      )}
+
+      {balance >= 1 && (
+        <div className="rounded-lg border border-ink/10 p-4">
+          <p className="mb-2 text-sm font-medium">Redeem credit as a checkout code</p>
+          <div className="flex gap-2">
+            <input className="input flex-1 text-sm" inputMode="decimal" placeholder={`Up to ${money(balance)}`} value={redeemAmt} onChange={(e) => setRedeemAmt(e.target.value)} />
+            <button type="button" className="btn btn-primary !py-1.5 text-sm" disabled={busy} onClick={() => void redeem()}>
+              Redeem
+            </button>
+          </div>
+        </div>
+      )}
+
+      {data.referralCode && (
+        <div className="rounded-lg border border-ink/10 p-4">
+          <p className="text-sm font-medium">Refer a friend</p>
+          <p className="mt-0.5 text-xs text-ink/60">
+            Share your code. They get {data.referralFriendPct || 10}% off their first order, and you earn credit when they buy.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 rounded bg-cream px-3 py-2 text-center font-mono text-sm">{data.referralCode}</code>
+            <button
+              type="button"
+              className="btn btn-secondary !py-1.5 text-sm"
+              onClick={() => {
+                void navigator.clipboard.writeText(data.referralCode!);
+                toast.success("Copied");
+              }}
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-ink/10 p-4">
+        <p className="mb-2 text-sm font-medium">Have a referral code?</p>
+        <div className="flex gap-2">
+          <input className="input flex-1 text-sm" placeholder="Friend's code" value={claimCode} onChange={(e) => setClaimCode(e.target.value.toUpperCase())} />
+          <button type="button" className="btn btn-secondary !py-1.5 text-sm" disabled={busy} onClick={() => void claim()}>
+            Apply
+          </button>
+        </div>
+      </div>
+
+      {data.ledger && data.ledger.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-wide text-ink/50">History</p>
+          <ul className="space-y-1 text-sm">
+            {data.ledger.map((l, i) => (
+              <li key={i} className="flex justify-between border-b border-ink/8 py-1.5">
+                <span className="text-ink/70">{l.reason || l.kind}</span>
+                <span className={l.deltaCents >= 0 ? "text-palm" : "text-ink/60"}>
+                  {l.deltaCents >= 0 ? "+" : ""}
+                  {money(l.deltaCents / 100)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

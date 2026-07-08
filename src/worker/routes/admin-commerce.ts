@@ -314,6 +314,49 @@ adminCommerceRoutes.get("/tax-settings", async (c) => {
   return c.json({ enabled: row?.value === "true", stripeReady: Boolean(c.env.STRIPE_SECRET_KEY) });
 });
 
+// ---------- Loyalty & referral settings ----------
+adminCommerceRoutes.get("/loyalty-settings", async (c) => {
+  const rows = await all<{ key: string; value: string }>(
+    c.var.db,
+    `SELECT key, value FROM settings WHERE key IN
+       ('loyalty_enabled','loyalty_earn_pct','referral_reward_cents','referral_friend_pct')`,
+  );
+  const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  return c.json({
+    enabled: m.loyalty_enabled === "true",
+    earnPct: Number(m.loyalty_earn_pct) || 0,
+    referralRewardCents: Number(m.referral_reward_cents) || 0,
+    friendPct: Number(m.referral_friend_pct) || 0,
+    stripeReady: Boolean(c.env.STRIPE_SECRET_KEY),
+  });
+});
+
+adminCommerceRoutes.put("/loyalty-settings", requireAdminWrite, async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as {
+    enabled?: boolean;
+    earnPct?: number;
+    referralRewardCents?: number;
+    friendPct?: number;
+  };
+  const pairs: [string, string][] = [
+    ["loyalty_enabled", b.enabled ? "true" : "false"],
+    ["loyalty_earn_pct", String(Math.max(0, Math.min(50, Number(b.earnPct) || 0)))],
+    ["referral_reward_cents", String(Math.max(0, Math.round(Number(b.referralRewardCents) || 0)))],
+    ["referral_friend_pct", String(Math.max(0, Math.min(100, Number(b.friendPct) || 0)))],
+  ];
+  for (const [key, value] of pairs) {
+    await run(
+      c.var.db,
+      `INSERT INTO settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+      key,
+      value,
+    );
+  }
+  await writeAudit(c.var.db, c.var.userId, "settings.update", "settings", "loyalty", b);
+  return c.json({ ok: true });
+});
+
 adminCommerceRoutes.put("/tax-settings", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { enabled?: boolean };
   const value = body.enabled ? "true" : "false";
