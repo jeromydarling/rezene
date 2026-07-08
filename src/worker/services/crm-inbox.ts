@@ -23,6 +23,8 @@ export async function handleInboundEmail(
   const from = message.from.toLowerCase();
   let subject = message.headers.get("subject") ?? "(no subject)";
   let text = "";
+  let fromName: string | null = null;
+  const recipients: string[] = [message.to];
   try {
     const parsed = await PostalMime.parse(message.raw);
     subject = parsed.subject ?? subject;
@@ -30,8 +32,42 @@ export async function handleInboundEmail(
     if (!text && parsed.html) {
       text = parsed.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     }
+    fromName = parsed.from?.name || null;
+    for (const t of parsed.to ?? []) if (t.address) recipients.push(t.address);
   } catch (err) {
     console.error("[inbox] parse failed:", String(err).slice(0, 200));
+  }
+
+  // Maker Messages: a reply to a threaded m-<token>@… address routes into that
+  // shop's supplier conversation, not the founder's shared inbox.
+  try {
+    const { parseMakerToken, appendSupplierReply } = await import("./supplier-messaging");
+    const token = parseMakerToken(recipients, env);
+    if (token) {
+      const route = await first<{ shop_id: string; supplier_id: string }>(
+        env.DB,
+        `SELECT shop_id, supplier_id FROM thread_addresses WHERE token = ?`,
+        token,
+      );
+      if (route) {
+        await appendSupplierReply(
+          env,
+          { shopId: route.shop_id, supplierId: route.supplier_id },
+          { body: stripQuoted(text), authorName: fromName ?? from, subject },
+        );
+        // Also drop the raw mail in the shop owner's real inbox so it isn't
+        // trapped in the app — the app is a copy, not a cage.
+        const owner = await first<{ owner_email: string | null }>(
+          env.DB,
+          `SELECT owner_email FROM shops WHERE id = ?`,
+          route.shop_id,
+        );
+        if (owner?.owner_email) await message.forward(owner.owner_email).catch(() => {});
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("[inbox] maker routing failed:", String(err).slice(0, 200));
   }
 
   try {
@@ -68,4 +104,18 @@ export async function handleInboundEmail(
       console.error("[inbox] forward failed:", String(err).slice(0, 200));
     }
   }
+}
+
+/** Trim the quoted history/signature off an email reply — keep the fresh part. */
+function stripQuoted(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const out: string[] = [];
+  for (const line of lines) {
+    if (/^>/.test(line)) break;
+    if (/^On .+ wrote:$/.test(line.trim())) break;
+    if (/^-{2,}\s*Original Message\s*-{2,}/i.test(line.trim())) break;
+    if (/^_{5,}$/.test(line.trim())) break; // Outlook divider
+    out.push(line);
+  }
+  return out.join("\n").trim() || text.trim();
 }

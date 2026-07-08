@@ -37,6 +37,7 @@ import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/Commerce
 import { LineSheetsPage } from "./pages/admin/WholesalePage";
 import { ProductionPage } from "./pages/admin/ProductionPage";
 import { SuppliersPage } from "./pages/admin/SuppliersPage";
+import { MessagesPage } from "./pages/admin/MessagesPage";
 import { SamplesPage, PurchaseOrdersPage, MaterialsPage } from "./pages/admin/SamplesPage";
 import { TechPacksPage, TechPackDetailPage } from "./pages/admin/TechPacksPage";
 import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
@@ -152,6 +153,7 @@ export function AppRouter() {
           <Route path="marketing/video" element={<VideoStudioPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="messages" element={<MessagesPage />} />
           <Route path="sourcing" element={<SourcingPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />

@@ -41,6 +41,14 @@ export interface Env {
    * can the EMAIL binding reach arbitrary recipients.
    */
   BUYER_EMAIL_FROM: string;
+  /**
+   * Domain used for maker-message reply addresses, e.g. "makers.verto.style".
+   * Its MX must route to this Worker via Cloudflare Email Routing (catch-all →
+   * Send to Worker) so factory replies come back in, and it must be onboarded
+   * to Email Sending so the outbound `m-<token>@…` messages deliver. Until set,
+   * messages are still recorded in-app; the email just doesn't send.
+   */
+  MAKER_INBOUND_DOMAIN?: string;
   /** The hostname shops point a CNAME at to connect a custom domain. */
   CUSTOM_DOMAIN_TARGET?: string;
   /** GitHub repo (owner/name) whose Actions render promo videos. */
