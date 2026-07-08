@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { ShoppingBag } from "lucide-react";
 import { track } from "../lib/analytics";
 import { useBrand } from "../lib/brand";
+import { BrandMark, paletteVars } from "../components/BrandMark";
 import { useCart } from "../lib/cart";
 import { useLang } from "../lib/lang";
 import { NewsletterForm } from "../components/LeadForm";
@@ -59,11 +60,11 @@ export function PublicLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col" style={paletteVars(brand.palette)}>
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-chalk/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link to="/" className="font-display text-xl font-light tracking-wide">
-            {brand.brandName}
+          <Link to="/" aria-label={brand.brandName}>
+            <BrandMark logo={brand.logo} palette={brand.palette} brandName={brand.brandName} height={26} />
           </Link>
           <nav className="hidden items-center gap-7 md:flex">
             {nav.map((item) => (
@@ -126,7 +127,7 @@ export function PublicLayout() {
       <footer className="border-t border-ink/10 bg-navy text-chalk">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-3">
           <div className="space-y-3">
-            <p className="font-display text-lg font-light">{brand.brandName}</p>
+            <BrandMark logo={brand.logo} palette={brand.palette} brandName={brand.brandName} onDark height={26} />
             <p className="text-sm leading-relaxed text-chalk/70">
               {brand.tagline} Old-world craft, Atlantic light, modern ease.
             </p>

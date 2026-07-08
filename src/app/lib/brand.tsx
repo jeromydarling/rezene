@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
 import type { BrandSettings } from "../../shared/types";
+import { faviconDataUri } from "../../shared/brand-identity";
 
 /**
  * Brand identity is data (admin Settings → brand), not code. This context
@@ -24,7 +25,20 @@ const DEFAULT_BRAND: BrandSettings = {
   },
   navigation: null,
   languages: ["en"],
+  logo: null,
+  palette: null,
 };
+
+/** Point the browser tab's icon at the brand's favicon (or a derived one). */
+function setFavicon(href: string) {
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  link.href = href;
+}
 
 const BrandContext = createContext<BrandSettings>(DEFAULT_BRAND);
 
@@ -43,8 +57,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           navigation: settings.navigation ?? null,
           languages:
             settings.languages && settings.languages.length > 0 ? settings.languages : ["en"],
+          logo: settings.logo ?? null,
+          palette: settings.palette ?? null,
         });
         if (settings.brandName) document.title = settings.brandName;
+        // Favicon: an explicit one if set, else derive initials-on-accent from
+        // the palette so every shop has a distinct tab icon out of the box.
+        const fav = settings.logo?.faviconUrl;
+        if (fav) setFavicon(fav);
+        else if (settings.palette && settings.brandName)
+          setFavicon(faviconDataUri(settings.brandName, settings.palette));
       })
       .catch(() => {
         // Fallback brand already rendered; never block the page on this.

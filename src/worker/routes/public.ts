@@ -26,7 +26,7 @@ publicRoutes.get("/settings", async (c) => {
   const rows = await all<{ key: string; value: string }>(
     c.var.db,
     `SELECT key, value FROM settings
-     WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero','nav_menus','supported_languages')`,
+     WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero','nav_menus','supported_languages','brand_logo','brand_palette')`,
   );
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   const parse = <T>(value: string | undefined): T | null => {
@@ -44,6 +44,8 @@ publicRoutes.get("/settings", async (c) => {
     homeHero: parse<BrandSettings["homeHero"]>(map.home_hero),
     navigation: parse<BrandSettings["navigation"]>(map.nav_menus),
     languages: Array.isArray(languages) && languages.length > 0 ? languages : ["en"],
+    logo: parse<BrandSettings["logo"]>(map.brand_logo),
+    palette: parse<BrandSettings["palette"]>(map.brand_palette),
   };
   return c.json(settings);
 });

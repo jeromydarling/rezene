@@ -167,6 +167,47 @@ export interface HomeHero {
   imageUrl?: string | null;
 }
 
+/** A brand's colour system — four roles that theme the whole shop. */
+export interface BrandPalette {
+  /** Structural / dark UI (nav, headings, footer). */
+  primary: string;
+  /** Calls to action, links, highlights. */
+  accent: string;
+  /** Body text. */
+  ink: string;
+  /** Page background. */
+  bg: string;
+}
+
+/** A typeset (vector) logo composed from the brand name. */
+export interface BrandWordmark {
+  text: string;
+  /** Key into BRAND_FONTS (shared/brand-identity). */
+  font: string;
+  case: "as-is" | "upper" | "lower";
+  /** Letter-spacing, em. */
+  tracking: number;
+  weight: number;
+  /** Show an initials monogram alongside the name. */
+  monogram: boolean;
+  /** A hairline rule under the name. */
+  divider: boolean;
+}
+
+export interface BrandLogo {
+  /** "wordmark" = typeset from BrandWordmark; "image" = uploaded / generated. */
+  kind: "wordmark" | "image";
+  /** Primary logo image (for light backgrounds). */
+  imageUrl?: string | null;
+  /** Optional light-on-dark variant (nav, footer, dark surfaces). */
+  darkImageUrl?: string | null;
+  wordmark?: BrandWordmark | null;
+  /** Optional pictorial mark / emblem (AI-generated or a monogram). */
+  markUrl?: string | null;
+  /** Favicon (data URI or uploaded); derived from the logo when absent. */
+  faviconUrl?: string | null;
+}
+
 export interface BrandSettings {
   brandName: string;
   tagline: string;
@@ -175,6 +216,9 @@ export interface BrandSettings {
   navigation?: NavMenus | null;
   /** Storefront languages, first entry is the default. */
   languages?: string[];
+  /** Visual identity — logo + colour system. Null until the shop sets one. */
+  logo?: BrandLogo | null;
+  palette?: BrandPalette | null;
 }
 
 export type LeadKind =
