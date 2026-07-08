@@ -185,6 +185,21 @@ export function AdminLayout() {
   }, [menuOpen]);
 
   const superAdmin = Boolean(user?.superAdmin);
+  // Unread maker replies — a badge on the nav so new mail is visible anywhere.
+  // Refetch on every route change (opening a thread marks it read server-side).
+  const [makerUnread, setMakerUnread] = useState(0);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/admin/messages/unread", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((d: { count?: number }) => {
+        if (live) setMakerUnread(Number(d?.count) || 0);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [location.pathname]);
   // Collapsible nav — closed by default, active section auto-opens, choices persist.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
@@ -273,7 +288,12 @@ export function AdminLayout() {
                         }
                       >
                         <item.icon size={15} strokeWidth={1.7} />
-                        {item.label}
+                        <span className="flex-1">{item.label}</span>
+                        {item.to === "/admin/messages" && makerUnread > 0 && (
+                          <span className="rounded-full bg-terracotta px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none text-chalk">
+                            {makerUnread > 99 ? "99+" : makerUnread}
+                          </span>
+                        )}
                       </NavLink>
                     </li>
                   ))}

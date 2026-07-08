@@ -5,9 +5,12 @@ import { api } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 
 interface ThreadRow {
+  threadId: string;
   supplierId: string;
   supplierName: string;
   supplierKind: string;
+  contextType: string | null;
+  contextLabel: string | null;
   unread: number;
   lastAt: string | null;
   snippet: string | null;
@@ -24,45 +27,81 @@ interface Msg {
 }
 interface ThreadDetail {
   supplier: { id: string; name: string; email: string | null; kind: string };
+  context: { type: string; label: string | null } | null;
   messages: Msg[];
   configured: boolean;
 }
+interface Ctx {
+  type: string;
+  id: string;
+  label: string;
+}
+type View =
+  | { kind: "thread"; threadId: string }
+  | { kind: "compose"; supplierId: string; supplierName: string; context: Ctx | null }
+  | null;
 
 const fmt = (s: string | null) => (s ? new Date(s.replace(" ", "T") + "Z").toLocaleString() : "");
 
 export function MessagesPage() {
   const toast = useToast();
-  const inbox = useFetch<{ threads: ThreadRow[]; totalUnread: number }>("/api/admin/messages");
+  const inbox = useFetch<{ threads: ThreadRow[]; configured: boolean }>("/api/admin/messages");
   const suppliers = useFetch<{ id: string; name: string }[]>("/api/admin/suppliers");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [view, setView] = useState<View>(null);
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [picking, setPicking] = useState(false);
 
-  const loadThread = useCallback(async (supplierId: string) => {
+  // Deep link from a sample / PO / tech pack: open a context-scoped compose.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const supplierId = p.get("supplier");
+    if (!supplierId) return;
+    const type = p.get("ctxType");
+    setView({
+      kind: "compose",
+      supplierId,
+      supplierName: p.get("supplierName") || "Supplier",
+      context: type ? { type, id: p.get("ctxId") || "", label: p.get("ctxLabel") || "" } : null,
+    });
+    if (p.get("draft")) setDraft(p.get("draft")!);
+  }, []);
+
+  const loadThread = useCallback(async (threadId: string) => {
     setLoadingThread(true);
     try {
-      setThread(await api.get<ThreadDetail>(`/api/admin/messages/${supplierId}`));
+      setThread(await api.get<ThreadDetail>(`/api/admin/messages/${threadId}`));
     } finally {
       setLoadingThread(false);
     }
   }, []);
 
   useEffect(() => {
-    if (selected) void loadThread(selected);
-  }, [selected, loadThread]);
+    if (view?.kind === "thread") void loadThread(view.threadId);
+    else setThread(null);
+  }, [view, loadThread]);
 
   async function send() {
-    if (!selected || !draft.trim()) return;
+    if (!view || !draft.trim()) return;
     setSending(true);
     try {
-      const res = await api.post<{ emailed: boolean; hasEmail: boolean }>(`/api/admin/messages/${selected}`, {
-        body: draft.trim(),
-      });
+      let res: { emailed: boolean; hasEmail: boolean; threadId?: string };
+      if (view.kind === "thread") {
+        res = await api.post(`/api/admin/messages/${view.threadId}`, { body: draft.trim() });
+      } else {
+        res = await api.post(`/api/admin/messages/start`, {
+          supplierId: view.supplierId,
+          contextType: view.context?.type,
+          contextId: view.context?.id,
+          contextLabel: view.context?.label,
+          body: draft.trim(),
+        });
+        if (res.threadId) setView({ kind: "thread", threadId: res.threadId });
+      }
       setDraft("");
-      await loadThread(selected);
+      if (view.kind === "thread") await loadThread(view.threadId);
       inbox.reload();
       toast.success(
         res.emailed ? "Sent" : "Saved",
@@ -80,15 +119,16 @@ export function MessagesPage() {
   }
 
   const threads = inbox.data?.threads ?? [];
+  const supplierName = suppliers.data?.find((s) => view?.kind === "compose" && s.id === view.supplierId)?.name;
 
   return (
     <div>
       <PageHeader
         eyebrow="Production"
         title="Maker Messages"
-        description="One logged conversation with each factory and supplier. You work here; they just reply to email. Every message — both ways — is kept on the record."
+        description="One logged conversation per factory or supplier — and one per sample, PO, or tech pack when you need it. You work here; they just reply to email."
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setPicking((p) => !p)}>
+          <button type="button" className="btn btn-primary" onClick={() => setPicking((v) => !v)}>
             New message
           </button>
         }
@@ -104,7 +144,7 @@ export function MessagesPage() {
                 type="button"
                 className="rounded-full border border-ink/15 px-3 py-1 text-sm hover:border-navy"
                 onClick={() => {
-                  setSelected(s.id);
+                  setView({ kind: "compose", supplierId: s.id, supplierName: s.name, context: null });
                   setPicking(false);
                 }}
               >
@@ -112,16 +152,14 @@ export function MessagesPage() {
               </button>
             ))}
             {(suppliers.data ?? []).length === 0 && (
-              <p className="text-sm text-warmgrey">
-                No suppliers yet — add one under Production → Factories & Suppliers.
-              </p>
+              <p className="text-sm text-warmgrey">Add a supplier under Production → Factories & Suppliers first.</p>
             )}
           </div>
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-        {/* Inbox list */}
+      <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
+        {/* Inbox */}
         <div className="space-y-2">
           {inbox.loading && <LoadingTable rows={4} />}
           {!inbox.loading && threads.length === 0 && (
@@ -129,11 +167,11 @@ export function MessagesPage() {
           )}
           {threads.map((t) => (
             <button
-              key={t.supplierId}
+              key={t.threadId}
               type="button"
-              onClick={() => setSelected(t.supplierId)}
+              onClick={() => setView({ kind: "thread", threadId: t.threadId })}
               className={`admin-card block w-full px-3 py-2.5 text-left transition ${
-                selected === t.supplierId ? "!border-navy ring-1 ring-navy" : "hover:border-ink/25"
+                view?.kind === "thread" && view.threadId === t.threadId ? "!border-navy ring-1 ring-navy" : "hover:border-ink/25"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -144,6 +182,11 @@ export function MessagesPage() {
                   </span>
                 )}
               </div>
+              {t.contextLabel && (
+                <span className="mt-0.5 inline-block rounded bg-navy/8 px-1.5 py-0.5 text-[10px] text-navy">
+                  {t.contextLabel}
+                </span>
+              )}
               <p className="truncate text-xs text-warmgrey">
                 {t.lastFrom === "supplier" ? "↩ " : ""}
                 {t.snippet ?? "—"}
@@ -152,25 +195,49 @@ export function MessagesPage() {
           ))}
         </div>
 
-        {/* Thread */}
+        {/* Conversation */}
         <div className="admin-card flex min-h-[520px] flex-col p-0">
-          {!selected ? (
+          {!view ? (
             <div className="flex flex-1 items-center justify-center text-sm text-warmgrey">
               Pick a conversation, or start a new one.
             </div>
+          ) : view.kind === "compose" ? (
+            <>
+              <div className="border-b border-ink/10 px-5 py-3">
+                <p className="font-display text-lg font-light">{supplierName ?? view.supplierName}</p>
+                {view.context?.label ? (
+                  <span className="inline-block rounded bg-navy/8 px-1.5 py-0.5 text-[11px] text-navy">
+                    {view.context.label}
+                  </span>
+                ) : (
+                  <p className="text-xs text-warmgrey">New conversation</p>
+                )}
+              </div>
+              <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-warmgrey">
+                Write the first message below.
+              </div>
+              <Composer
+                draft={draft}
+                setDraft={setDraft}
+                sending={sending}
+                onSend={send}
+                placeholder={`Message ${supplierName ?? view.supplierName}…`}
+              />
+            </>
           ) : loadingThread && !thread ? (
             <div className="p-5">
               <LoadingTable rows={4} />
             </div>
           ) : thread ? (
             <>
-              <div className="flex items-center justify-between border-b border-ink/10 px-5 py-3">
-                <div>
-                  <p className="font-display text-lg font-light">{thread.supplier.name}</p>
-                  <p className="text-xs text-warmgrey">
-                    {thread.supplier.email ?? "no email on file"} · {thread.supplier.kind.replace("_", " ")}
-                  </p>
-                </div>
+              <div className="border-b border-ink/10 px-5 py-3">
+                <p className="font-display text-lg font-light">{thread.supplier.name}</p>
+                <p className="text-xs text-warmgrey">
+                  {thread.context?.label ? (
+                    <span className="mr-2 rounded bg-navy/8 px-1.5 py-0.5 text-navy">{thread.context.label}</span>
+                  ) : null}
+                  {thread.supplier.email ?? "no email on file"} · {thread.supplier.kind.replace("_", " ")}
+                </p>
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
@@ -186,11 +253,6 @@ export function MessagesPage() {
                           mine ? "bg-navy text-chalk" : "border border-ink/10 bg-cream/60"
                         }`}
                       >
-                        {m.context && (
-                          <p className={`mb-1 text-[10px] uppercase tracking-wider ${mine ? "text-chalk/60" : "text-warmgrey"}`}>
-                            {m.context}
-                          </p>
-                        )}
                         <p className="whitespace-pre-wrap">{m.body}</p>
                         <p className={`mt-1 text-[10px] ${mine ? "text-chalk/55" : "text-warmgrey/70"}`}>
                           {m.authorName ?? (mine ? "You" : thread.supplier.name)} · {fmt(m.createdAt)}
@@ -204,31 +266,54 @@ export function MessagesPage() {
 
               {!thread.configured && (
                 <p className="border-t border-amber-200 bg-amber-50 px-5 py-2 text-[11px] text-amber-700">
-                  Two-way email isn't switched on yet — messages are recorded, and the maker's replies will flow in
-                  once <code>MAKER_INBOUND_DOMAIN</code> is configured. Ask your platform admin.
+                  Two-way email isn't switched on yet — messages are recorded, and maker replies flow in once{" "}
+                  <code>MAKER_INBOUND_DOMAIN</code> is configured.
                 </p>
               )}
-
-              <div className="border-t border-ink/10 p-3">
-                <textarea
-                  className="input min-h-[70px] w-full text-sm"
-                  placeholder={`Message ${thread.supplier.name}…`}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
-                  }}
-                />
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[11px] text-warmgrey">⌘/Ctrl + Enter to send</span>
-                  <button type="button" className="btn btn-primary" disabled={sending || !draft.trim()} onClick={() => void send()}>
-                    {sending ? "Sending…" : "Send"}
-                  </button>
-                </div>
-              </div>
+              <Composer
+                draft={draft}
+                setDraft={setDraft}
+                sending={sending}
+                onSend={send}
+                placeholder={`Message ${thread.supplier.name}…`}
+              />
             </>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function Composer({
+  draft,
+  setDraft,
+  sending,
+  onSend,
+  placeholder,
+}: {
+  draft: string;
+  setDraft: (v: string) => void;
+  sending: boolean;
+  onSend: () => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="border-t border-ink/10 p-3">
+      <textarea
+        className="input min-h-[70px] w-full text-sm"
+        placeholder={placeholder}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSend();
+        }}
+      />
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[11px] text-warmgrey">⌘/Ctrl + Enter to send</span>
+        <button type="button" className="btn btn-primary" disabled={sending || !draft.trim()} onClick={onSend}>
+          {sending ? "Sending…" : "Send"}
+        </button>
       </div>
     </div>
   );
