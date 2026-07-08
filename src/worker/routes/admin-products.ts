@@ -466,5 +466,27 @@ adminProductRoutes.post("/inventory/adjust", requireAdminWrite, async (c) => {
     ).bind(newId("mov"), item.id, body.kind, q, body.note ?? null, c.var.userId),
   ]);
   await writeAudit(c.var.db, c.var.userId, "inventory.adjust", "inventory_item", item.id, body);
+
+  // Back-in-stock: if this variant just went from zero to available, email the
+  // waitlist for its product. Best-effort — never blocks the inventory write.
+  if (item.on_hand === 0 && newOnHand > 0) {
+    try {
+      const prod = await first<{ product_id: string }>(
+        c.var.db,
+        `SELECT v.product_id FROM inventory_items i JOIN product_variants v ON v.id = i.variant_id WHERE i.id = ?`,
+        item.id,
+      );
+      if (prod?.product_id) {
+        const { notifyRestock } = await import("../services/restock");
+        const origin = new URL(c.req.url).origin;
+        const { getPrimaryShopBase } = await import("../services/shops");
+        const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
+        const base = (c.env.APP_ENV === "development" ? origin : c.env.APP_URL || origin) + shopBase;
+        c.executionCtx.waitUntil(notifyRestock(c.env, c.var.db, prod.product_id, base));
+      }
+    } catch (err) {
+      console.error("[inventory] restock notify skipped:", String(err).slice(0, 160));
+    }
+  }
   return c.json({ ok: true, onHand: newOnHand, reserved: newReserved, incoming: newIncoming });
 });

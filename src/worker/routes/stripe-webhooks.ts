@@ -77,6 +77,9 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
       case "charge.refunded":
         await handleChargeRefunded(c.env.DB, event.data.object);
         break;
+      case "checkout.session.expired":
+        c.executionCtx.waitUntil(handleCheckoutExpired(c.env, event.data.object));
+        break;
       case "customer.created":
       case "customer.updated":
         await upsertCustomer(c.env.DB, event.data.object);
@@ -495,6 +498,65 @@ async function handleChargeRefunded(db: D1Database, charge: Stripe.Charge): Prom
       order.id,
     );
   }
+}
+
+/**
+ * Abandoned-cart recovery. When a Checkout session expires without payment and
+ * the shopper had reached the email step, we send one friendly nudge back to
+ * the pieces they left behind. Best-effort and gated on buyer email being set.
+ */
+async function handleCheckoutExpired(env: Env, session: Stripe.Checkout.Session): Promise<void> {
+  const email = session.customer_details?.email;
+  if (!email) return;
+  const order = await first<{ id: string; order_number: string; payment_status: string }>(
+    env.DB,
+    `SELECT id, order_number, payment_status FROM orders WHERE stripe_checkout_session_id = ?`,
+    session.id,
+  );
+  if (!order || order.payment_status !== "pending") return;
+
+  const items = await all<{ description: string; quantity: number; product_id: string | null }>(
+    env.DB,
+    `SELECT oi.description, oi.quantity, oi.product_id FROM order_items oi WHERE oi.order_id = ?`,
+    order.id,
+  );
+  if (items.length === 0) return;
+
+  const { getPrimaryShopBase } = await import("../services/shops");
+  const shopBase = await getPrimaryShopBase(env.DB);
+  const base = (env.APP_URL || "") + shopBase;
+  const firstSlug = items[0].product_id
+    ? (await first<{ slug: string }>(env.DB, `SELECT slug FROM products WHERE id = ?`, items[0].product_id))?.slug
+    : null;
+  const link = firstSlug ? `${base}/products/${firstSlug}` : `${base}/products`;
+
+  const { getEmailBrand, renderBrandedEmail, itemsTableHtml } = await import("../services/email-template");
+  let brand;
+  try {
+    brand = await getEmailBrand(env, env.DB);
+  } catch {
+    brand = null;
+  }
+  const lines = items.map((i) => `  ${i.quantity} × ${i.description}`).join("\n");
+  const html = brand
+    ? renderBrandedEmail({
+        brand,
+        preheader: "You left something behind",
+        heading: "Still thinking it over?",
+        bodyHtml:
+          `<p style="margin:0 0 14px;">The pieces you were looking at are still here — we saved them for you.</p>` +
+          itemsTableHtml(items.map((i) => ({ label: `${i.quantity} × ${i.description}` })), "#1c2b3a") +
+          `<p style="margin:18px 0 0;"><a href="${link}" style="display:inline-block;background:#1c2b3a;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;">Pick up where you left off</a></p>`,
+        footerNote: "You received this because you started a checkout with us.",
+      })
+    : undefined;
+
+  await sendBuyerEmail(env, {
+    to: email,
+    subject: `You left something behind`,
+    text: `Still thinking it over? The pieces you were looking at are still here:\n\n${lines}\n\nPick up where you left off:\n${link}`,
+    html,
+  });
 }
 
 async function upsertCustomer(db: D1Database, customer: Stripe.Customer): Promise<void> {
