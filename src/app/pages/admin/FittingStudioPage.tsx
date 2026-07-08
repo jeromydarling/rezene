@@ -129,7 +129,12 @@ export function FittingStudioPage() {
 
   const [garmentPhoto, setGarmentPhoto] = useState<UploadedImg | null>(null);
   const [garmentSource, setGarmentSource] = useState<"studio" | "upload">("studio");
-  const [modelSel, setModelSel] = useState<{ kind: "roster" | "shop"; id: string } | null>(null);
+  // Up to three models — one try-on each, so a garment can be judged across
+  // different bodies in a single pass (a mini line review).
+  const [modelSels, setModelSels] = useState<{ kind: "roster" | "shop"; id: string }[]>([]);
+  const [progress, setProgress] = useState("");
+  const [compareWith, setCompareWith] = useState<FittingRender | null>(null);
+  const [colorwayText, setColorwayText] = useState("");
   const [rosterGender, setRosterGender] = useState<"female" | "male">("female");
   const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
   const [evenLighting, setEvenLighting] = useState(true);
@@ -179,31 +184,80 @@ export function FittingStudioPage() {
     }
   }
 
+  function toggleModel(sel: { kind: "roster" | "shop"; id: string }) {
+    setModelSels((s) => {
+      const on = s.some((m) => m.kind === sel.kind && m.id === sel.id);
+      if (on) return s.filter((m) => !(m.kind === sel.kind && m.id === sel.id));
+      return [...s, sel].slice(-3);
+    });
+  }
+
   async function runTryOn() {
-    if (!garmentPhoto || !modelSel) return;
-    const payload: Record<string, unknown> = {
-      garmentFileId: garmentPhoto.id,
-      category,
-      cleanGarment: evenLighting,
-    };
-    if (modelSel.kind === "roster") {
-      payload.modelRosterId = modelSel.id;
-    } else {
-      const model = (models.data ?? []).find((m) => m.id === modelSel.id);
-      if (!model) return;
-      payload.modelFileId = model.fileId;
-    }
+    if (!garmentPhoto || modelSels.length === 0) return;
     setRendering(true);
+    let done = 0;
     try {
-      const res = await api.post<FittingRender>("/api/admin/fitting/tryon", payload);
-      setActiveRender(res);
+      for (let i = 0; i < modelSels.length; i++) {
+        const sel = modelSels[i];
+        if (modelSels.length > 1) setProgress(`Fitting model ${i + 1} of ${modelSels.length}…`);
+        const payload: Record<string, unknown> = {
+          garmentFileId: garmentPhoto.id,
+          category,
+          cleanGarment: evenLighting,
+        };
+        if (sel.kind === "roster") {
+          payload.modelRosterId = sel.id;
+        } else {
+          const model = (models.data ?? []).find((m) => m.id === sel.id);
+          if (!model) continue;
+          payload.modelFileId = model.fileId;
+        }
+        const res = await api.post<FittingRender>("/api/admin/fitting/tryon", payload);
+        setActiveRender(res);
+        done++;
+      }
+      toast.success(done > 1 ? `Tried on ${done} models` : "Garment tried on");
+    } catch (e) {
+      toast.error(
+        done > 0 ? `Try-on stopped after ${done} of ${modelSels.length}` : "Try-on failed",
+        e instanceof Error ? e.message : undefined,
+      );
+    } finally {
+      setProgress("");
+      setRendering(false);
       renders.reload();
       quota.reload();
-      toast.success("Garment tried on");
+    }
+  }
+
+  async function runColorways() {
+    if (!activeRender) return;
+    const colors = colorwayText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    if (colors.length === 0) return;
+    setRendering(true);
+    setProgress(`Dyeing ${colors.length} colorway${colors.length > 1 ? "s" : ""}…`);
+    try {
+      const res = await api.post<{ renders: FittingRender[]; requested: number }>(
+        `/api/admin/fitting/renders/${activeRender.id}/colorways`,
+        { colors },
+      );
+      setColorwayText("");
+      if (res.renders[0]) setActiveRender(res.renders[0]);
+      toast.success(
+        `${res.renders.length} colorway${res.renders.length > 1 ? "s" : ""} added`,
+        res.renders.length < colors.length ? "Some colours didn't come out — try them again." : undefined,
+      );
     } catch (e) {
-      toast.error("Try-on failed", e instanceof Error ? e.message : undefined);
+      toast.error("Couldn't dye the colorways", e instanceof Error ? e.message : undefined);
     } finally {
+      setProgress("");
       setRendering(false);
+      renders.reload();
+      quota.reload();
     }
   }
 
@@ -238,7 +292,7 @@ export function FittingStudioPage() {
         label: "My model",
       });
       models.reload();
-      setModelSel({ kind: "shop", id: m.id });
+      toggleModel({ kind: "shop", id: m.id });
       toast.success("Model added");
     } catch {
       toast.error("Couldn't add model");
@@ -294,11 +348,34 @@ export function FittingStudioPage() {
           <div className="relative h-[540px] w-full bg-white">
             {activeRender ? (
               <>
-                <img
-                  src={activeRender.url}
-                  alt="Garment rendered on a model"
-                  className="h-full w-full object-contain"
-                />
+                {compareWith ? (
+                  <div className="grid h-full w-full grid-cols-2">
+                    <div className="relative border-r border-ink/10">
+                      <img src={activeRender.url} alt="Current render" className="h-full w-full object-contain" />
+                      <span className="absolute left-2 top-2 rounded-full bg-navy/85 px-2 py-0.5 text-[10px] text-chalk">
+                        Current
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <img src={compareWith.url} alt="Comparison render" className="h-full w-full object-contain" />
+                      <span className="absolute left-2 top-2 rounded-full bg-ink/60 px-2 py-0.5 text-[10px] text-chalk">
+                        {compareWith.kind === "refit"
+                          ? "Refit"
+                          : compareWith.kind === "colorway"
+                            ? "Colorway"
+                            : compareWith.kind === "tryon"
+                              ? "Try-on"
+                              : "Render"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={activeRender.url}
+                    alt="Garment rendered on a model"
+                    className="h-full w-full object-contain"
+                  />
+                )}
                 {showGrid && (
                   <div
                     aria-hidden
@@ -311,18 +388,39 @@ export function FittingStudioPage() {
                     }}
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={() => setShowGrid((g) => !g)}
-                  title="Proportion grid — the lines stay put between renders, so you can verify a refit actually moved a hem or sleeve"
-                  className={`absolute right-2 top-2 rounded-full border px-2.5 py-1 text-[11px] backdrop-blur transition ${
-                    showGrid
-                      ? "border-navy bg-navy text-chalk"
-                      : "border-ink/20 bg-white/85 text-ink/70 hover:border-navy hover:text-navy"
-                  }`}
-                >
-                  {showGrid ? "Grid on" : "Grid"}
-                </button>
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (compareWith) {
+                        setCompareWith(null);
+                      } else {
+                        const other = (renders.data ?? []).find((r) => r.id !== activeRender.id);
+                        if (other) setCompareWith(other);
+                      }
+                    }}
+                    title="Side-by-side — click any render in the gallery below to compare it against the current one"
+                    className={`rounded-full border px-2.5 py-1 text-[11px] backdrop-blur transition ${
+                      compareWith
+                        ? "border-navy bg-navy text-chalk"
+                        : "border-ink/20 bg-white/85 text-ink/70 hover:border-navy hover:text-navy"
+                    }`}
+                  >
+                    {compareWith ? "Exit compare" : "Compare"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGrid((g) => !g)}
+                    title="Proportion grid — the lines stay put between renders, so you can verify a refit actually moved a hem or sleeve"
+                    className={`rounded-full border px-2.5 py-1 text-[11px] backdrop-blur transition ${
+                      showGrid
+                        ? "border-navy bg-navy text-chalk"
+                        : "border-ink/20 bg-white/85 text-ink/70 hover:border-navy hover:text-navy"
+                    }`}
+                  >
+                    {showGrid ? "Grid on" : "Grid"}
+                  </button>
+                </div>
               </>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
@@ -334,15 +432,15 @@ export function FittingStudioPage() {
                   type="button"
                   className="btn btn-primary"
                   onClick={runTryOn}
-                  disabled={rendering || !garmentPhoto || !modelSel}
+                  disabled={rendering || !garmentPhoto || modelSels.length === 0}
                 >
-                  {rendering ? "Rendering…" : "Try it on"}
+                  {rendering ? progress || "Rendering…" : "Try it on"}
                 </button>
               </div>
             )}
             {rendering && activeRender && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm text-navy">
-                Rendering a new look…
+                {progress || "Rendering a new look…"}
               </div>
             )}
           </div>
@@ -470,6 +568,32 @@ export function FittingStudioPage() {
                   </button>
                 </div>
               )}
+
+              {/* Colorways — the same look, re-dyed. Line planning in one pass. */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-warmgrey/70">Colorways</span>
+                <input
+                  className="input min-w-40 flex-1 text-xs"
+                  placeholder="sage, rust, cream — up to 3 colours"
+                  value={colorwayText}
+                  onChange={(e) => setColorwayText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") runColorways();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary text-xs"
+                  onClick={runColorways}
+                  disabled={
+                    rendering ||
+                    !colorwayText.trim() ||
+                    (capabilities.data && !capabilities.data.referenceGen.available) === true
+                  }
+                >
+                  {rendering ? "Dyeing…" : "Recolour"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -595,7 +719,7 @@ export function FittingStudioPage() {
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
-                  2 · Choose a model
+                  2 · Choose models <span className="normal-case text-warmgrey/70">· up to 3</span>
                 </label>
                 <div className="flex overflow-hidden rounded-md border border-ink/15 text-[11px]">
                   {(["female", "male"] as const).map((g) => (
@@ -616,12 +740,12 @@ export function FittingStudioPage() {
                 {(roster.data ?? [])
                   .filter((m) => m.gender === rosterGender)
                   .map((m) => {
-                    const on = modelSel?.kind === "roster" && modelSel.id === m.id;
+                    const on = modelSels.some((s) => s.kind === "roster" && s.id === m.id);
                     return (
                       <button
                         key={m.id}
                         type="button"
-                        onClick={() => setModelSel({ kind: "roster", id: m.id })}
+                        onClick={() => toggleModel({ kind: "roster", id: m.id })}
                         className={`relative overflow-hidden rounded border ${
                           on ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
                         }`}
@@ -637,12 +761,12 @@ export function FittingStudioPage() {
                   <p className="mt-2 text-[11px] uppercase tracking-wider text-warmgrey/70">Your models</p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {(models.data ?? []).map((m) => {
-                      const on = modelSel?.kind === "shop" && modelSel.id === m.id;
+                      const on = modelSels.some((s) => s.kind === "shop" && s.id === m.id);
                       return (
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => setModelSel({ kind: "shop", id: m.id })}
+                          onClick={() => toggleModel({ kind: "shop", id: m.id })}
                           className={`relative overflow-hidden rounded border ${
                             on ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
                           }`}
@@ -685,11 +809,15 @@ export function FittingStudioPage() {
               disabled={
                 rendering ||
                 !garmentPhoto ||
-                !modelSel ||
+                modelSels.length === 0 ||
                 (capabilities.data && !capabilities.data.tryOn.available) === true
               }
             >
-              {rendering ? "Trying it on…" : "Try it on"}
+              {rendering
+                ? progress || "Trying it on…"
+                : modelSels.length > 1
+                  ? `Try it on ${modelSels.length} models`
+                  : "Try it on"}
             </button>
             <p className="text-[11px] leading-snug text-warmgrey">
               Photoreal virtual try-on of your real garment.{" "}
@@ -709,15 +837,15 @@ export function FittingStudioPage() {
               <div key={r.id} className="group relative overflow-hidden rounded-lg border border-ink/10 bg-white">
                 <button
                   type="button"
-                  onClick={() => setActiveRender(r)}
+                  onClick={() => (compareWith && activeRender && r.id !== activeRender.id ? setCompareWith(r) : setActiveRender(r))}
                   className="block w-full"
-                  title="View this render"
+                  title={compareWith ? "Compare against this render" : "View this render"}
                 >
                   <img src={r.url} alt="Model render" className="aspect-[3/4] w-full object-cover" />
                 </button>
-                {(r.kind === "tryon" || r.kind === "refit") && (
+                {(r.kind === "tryon" || r.kind === "refit" || r.kind === "colorway") && (
                   <span className="absolute left-1.5 top-1.5 rounded-full bg-navy/85 px-1.5 py-0.5 text-[10px] text-chalk">
-                    {r.kind === "tryon" ? "Try-on" : "Refit"}
+                    {r.kind === "tryon" ? "Try-on" : r.kind === "refit" ? "Refit" : "Colorway"}
                   </span>
                 )}
                 <button

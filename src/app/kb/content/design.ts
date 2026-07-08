@@ -143,7 +143,7 @@ One job, done properly: **see a real garment on a real body before you cut, buy,
 
 1. **Your garment** — pull an image straight from the Design Studio, or upload a photo (a flat lay or a photo of it worn both work).
 2. Choose the **garment type** (top, bottom, dress, or auto).
-3. **Choose a model** — the shared roster spans shapes, sizes, and skin tones (the same bodies every season, so styles are comparable), or upload your own model/fit photo.
+3. **Choose models** — the shared roster spans shapes, sizes, and skin tones (the same bodies every season, so styles are comparable), or upload your own model/fit photo. Pick **up to three at once** and the same garment is fitted on each body in one pass — a mini line review.
 4. **Try it on.**
 
 > [!TIP]
@@ -166,6 +166,14 @@ Each refit saves as a new render beside the original, so your gallery reads as a
 **Checking a refit really moved:** toggle the **Grid** button in the corner of the viewer. The proportion grid is a fixed overlay (never part of the image), and refits keep the same framing — so you can read exactly which line a hem or sleeve sits on, before and after.
 
 **Basics vs a full outfit:** models wear fitted neutral basics on purpose — like a real fit model, the body line stays visible so ease and hem positions read true. When you want the look presentation-ready instead (line reviews, client decks), tap **Complete the outfit** and the model gets quiet grey trousers and clean white sneakers — or a plain white tee when your featured piece is the bottoms — without touching your garment.
+
+## Colorways
+
+Line planning's favourite trick: with a render open, type up to three colour names — *sage, rust, cream* — and **Recolour**. The same look comes back re-dyed in each colour, with every detail, the model, and the lighting untouched. Each colorway is a normal render (and one render from the daily budget).
+
+## Compare side by side
+
+Tap **Compare** in the viewer corner and the view splits: your current render on the left, any render you click in the gallery on the right. Toggle the **Grid** on top to read hems and sleeve lines across both. Perfect for before/after refits and colorway calls.
 
 ## Send it somewhere
 

@@ -288,7 +288,7 @@ async function storeRender(
   c: Context<AppContext>,
   result: ImageResult,
   meta: {
-    kind: "generate" | "tryon" | "refit";
+    kind: "generate" | "tryon" | "refit" | "colorway";
     garmentId?: string | null;
     modelId?: string | null;
     settingId?: string | null;
@@ -765,6 +765,73 @@ adminFittingRoutes.delete("/models/:id", requireAdminWrite, async (c) => {
   }
   await run(c.var.db, `DELETE FROM fitting_models WHERE id = ?`, id);
   return c.json({ ok: true });
+});
+
+/** Recolour ONLY the garment; everything else is pinned to the reference. */
+function colorwayPrompt(color: string): string {
+  return (
+    `Recolour the featured garment in this photograph to ${color}. The change affects ONLY the garment's ` +
+    `fabric colour — every design detail (seams, buttons, stitching, texture, weave), the person (face, hair, ` +
+    `body, pose), any other clothing, the background, framing and lighting stay exactly as in the reference. ` +
+    `The new colour must read as a true, natural ${color} under the same lighting.`
+  );
+}
+
+/**
+ * Colorways: one click, the same look re-dyed in up to three named colours.
+ * Line-planning in a contact sheet — each colorway is a normal render (and a
+ * normal quota unit), generated in parallel so the sheet lands in one wait.
+ */
+adminFittingRoutes.post("/renders/:id/colorways", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { colors?: string[] };
+  const colors = (body.colors ?? [])
+    .map((s) => String(s).trim().slice(0, 40))
+    .filter(Boolean)
+    .slice(0, 3);
+  if (colors.length === 0) return c.json({ error: "Name at least one colour." }, 400);
+
+  const row = await first<RenderRow>(c.var.db, `SELECT * FROM fitting_renders WHERE id = ?`, c.req.param("id"));
+  if (!row) return c.json({ error: "Render not found" }, 404);
+  const source = await imageInputFromFile(c, row.file_id);
+  if (!source) return c.json({ error: "Couldn't load the render image." }, 404);
+
+  // Reserve one quota unit per colorway up front; trim the batch if the day
+  // runs out midway rather than failing the whole sheet.
+  let allowed = 0;
+  let quotaFail: Awaited<ReturnType<typeof reserveFittingQuota>> | null = null;
+  for (let i = 0; i < colors.length; i++) {
+    const q = await reserveFittingQuota(c);
+    if (!q.ok) {
+      quotaFail = q;
+      break;
+    }
+    allowed++;
+  }
+  if (allowed === 0 && quotaFail) return c.json(fittingQuotaExceededBody(quotaFail), 429);
+  const batch = colors.slice(0, allowed);
+
+  const results = await Promise.all(
+    batch.map(async (color) => {
+      try {
+        const [img] = await generateLook(c.env, { prompt: colorwayPrompt(color), references: [source], count: 1 });
+        if (!img) return null;
+        return await storeRender(c, img, {
+          kind: "colorway",
+          garmentId: row.garment_id,
+          modelId: row.model_id,
+          settingId: row.setting_id,
+          styleId: row.style_id,
+          prompt: `Colorway: ${color}`,
+        });
+      } catch (err) {
+        console.error(`[fitting] colorway "${color}" failed:`, err instanceof Error ? err.message : err);
+        return null;
+      }
+    }),
+  );
+  const made = results.filter((r): r is NonNullable<typeof r> => Boolean(r));
+  if (made.length === 0) return c.json({ error: "Couldn't produce any colorways — try again." }, 502);
+  return c.json({ renders: made, requested: batch.length }, 201);
 });
 
 /**
