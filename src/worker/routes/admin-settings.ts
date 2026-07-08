@@ -32,6 +32,9 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
     "brand_tagline",
     "default_currency",
     "production_home",
+    // Visual identity (managed from the Brand Studio) — JSON blobs.
+    "brand_logo",
+    "brand_palette",
     // Search & sharing (managed from the Search Checkup screen)
     "search_visibility",
     "default_og_image",

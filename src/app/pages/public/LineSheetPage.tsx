@@ -22,6 +22,7 @@ interface LineSheetItem {
 
 interface LineSheetResponse {
   brandName: string;
+  brandLogoUrl?: string | null;
   title: string;
   season: string | null;
   currency: string;
@@ -100,7 +101,11 @@ export function LineSheetPage() {
             <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/60 print:text-warmgrey">
               Wholesale line sheet{data.season ? ` · ${data.season}` : ""}
             </p>
-            <h1 className="font-display text-3xl font-light">{data.brandName}</h1>
+            {data.brandLogoUrl ? (
+              <img src={data.brandLogoUrl} alt={data.brandName} className="mt-1 max-h-14 w-auto object-contain" />
+            ) : (
+              <h1 className="font-display text-3xl font-light">{data.brandName}</h1>
+            )}
             <p className="mt-1 text-sm text-chalk/70 print:text-warmgrey">{data.title}</p>
           </div>
           <button

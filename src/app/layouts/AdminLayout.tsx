@@ -30,6 +30,7 @@ import {
   Layers,
   Newspaper,
   Package,
+  Palette,
   PersonStanding,
   Rocket,
   Rotate3d,
@@ -46,6 +47,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
+import { BrandMark } from "../components/BrandMark";
 import { isDemoShop } from "../lib/shop";
 
 const NAV_SECTIONS: {
@@ -112,6 +114,7 @@ const NAV_SECTIONS: {
     title: "Studio",
     items: [
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
+      { to: "/admin/brand", label: "Brand Studio", icon: Palette },
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
       { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },
@@ -223,7 +226,7 @@ export function AdminLayout() {
   const sidebar = (
     <>
       <Link to="/admin" className="block border-b border-chalk/10 px-5 py-6">
-        <p className="font-display text-2xl font-light leading-none tracking-tight">{brand.brandName}</p>
+        <BrandMark logo={brand.logo} palette={brand.palette} brandName={brand.brandName} onDark height={30} />
         <p className="mt-2 text-[0.58rem] uppercase tracking-editorial text-chalk/55">
           The Fashion Desk
         </p>

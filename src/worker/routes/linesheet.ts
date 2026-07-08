@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { all, first, run } from "../services/db";
-import { getBrandName } from "../services/brand";
+import { getBrandName, getBrandLogoUrl } from "../services/brand";
 import { leadNotification, sendNotification } from "../services/email";
 import { parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
@@ -50,6 +50,7 @@ lineSheetRoutes.get(
     );
     return c.json({
       brandName: await getBrandName(c.env),
+      brandLogoUrl: await getBrandLogoUrl(c.var.db),
       title: sheet.title,
       season: sheet.season,
       currency: sheet.currency,
