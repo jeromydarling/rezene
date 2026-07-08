@@ -122,12 +122,12 @@ export const TEMPLATES: readonly CollateralTemplate[] = [
     blurb: "2 × 3.5 in · with punch hole",
     fields: ["message"],
     render: (b, f) => `
-      <div style="width:100%;height:100%;background:${b.palette.bg};color:${b.palette.ink};font-family:${b.bodyFamily};display:flex;flex-direction:column;align-items:center;text-align:center;padding:0.5in 0.28in 0.3in;position:relative;">
+      <div style="width:100%;height:100%;background:${b.palette.bg};color:${b.palette.ink};font-family:${b.bodyFamily};display:flex;flex-direction:column;align-items:center;text-align:center;padding:0.5in 0.24in 0.3in;position:relative;">
         <div style="position:absolute;top:0.16in;left:50%;transform:translateX(-50%);width:0.16in;height:0.16in;border:1.5px solid ${b.palette.ink};border-radius:50%;opacity:0.5;"></div>
-        <div style="margin-top:0.2in;margin-bottom:auto;">${logoHtml(b, false, 30)}</div>
-        <div style="width:0.5in;height:2px;background:${b.palette.accent};margin:0.18in 0;"></div>
-        <div style="font-family:${b.headingFamily};font-size:11pt;line-height:1.35;">${esc(f.message || b.tagline || "Made with care.")}</div>
-        <div style="margin-top:auto;font-size:7.5pt;letter-spacing:0.14em;text-transform:uppercase;opacity:0.6;">${esc(b.website)}</div>
+        <div style="margin-top:0.2in;margin-bottom:auto;width:100%;">${logoHtml(b, false, 20)}</div>
+        <div style="width:0.5in;height:2px;background:${b.palette.accent};margin:0.18in 0;flex:none;"></div>
+        <div style="width:100%;font-family:${b.headingFamily};font-size:10.5pt;line-height:1.35;">${esc(f.message || b.tagline || "Made with care.")}</div>
+        <div style="margin-top:auto;width:100%;font-size:7pt;letter-spacing:0.12em;text-transform:uppercase;opacity:0.6;">${esc(b.website)}</div>
       </div>`,
   },
   {
@@ -217,8 +217,10 @@ export function buildPrintDoc(t: CollateralTemplate, brand: CollateralBrand, f: 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(brand.name)} — ${esc(t.label)}</title>${links}
 <style>
   @page { size: ${t.w}in ${t.h}in; margin: 0; }
+  * { box-sizing: border-box; }
   html,body { margin:0; padding:0; }
   #art { width:${t.w}in; height:${t.h}in; overflow:hidden; }
+  #art * { max-width:100%; overflow-wrap:break-word; }
   @media screen { body { background:#eee; display:flex; align-items:center; justify-content:center; min-height:100vh; } #art { box-shadow:0 10px 40px rgba(0,0,0,0.25); } }
 </style></head>
 <body><div id="art">${t.render(brand, f)}</div>

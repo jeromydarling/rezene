@@ -28,6 +28,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "hono": "^4.6.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "mimetext": "^3.0.28",
     "pdfjs-dist": "^4.10.38",

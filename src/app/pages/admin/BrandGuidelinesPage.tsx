@@ -9,6 +9,7 @@ import { collateralBrand } from "../../lib/collateral";
 import {
   buildGuidelinesDoc,
   download,
+  downloadKitZip,
   faviconSvg,
   hexToRgb,
   paletteText,
@@ -143,6 +144,23 @@ export function BrandGuidelinesPage() {
         <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <div className="admin-card p-5">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-warmgrey">Brand kit</h3>
+            <button
+              type="button"
+              className="btn btn-primary mb-3 w-full"
+              disabled={busy === "zip"}
+              onClick={async () => {
+                setBusy("zip");
+                try {
+                  await downloadKitZip(brand, voiceRes.data?.voice ?? "");
+                } catch {
+                  toast.error("Couldn't build the kit");
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              {busy === "zip" ? "Packing…" : "↓ Download full brand kit (.zip)"}
+            </button>
             <div className="space-y-2">
               {isWordmark && (
                 <KitButton label="Wordmark logo (SVG)" onClick={() => download(`${slug}-logo.svg`, wordmarkSvg(brand), "image/svg+xml")} />

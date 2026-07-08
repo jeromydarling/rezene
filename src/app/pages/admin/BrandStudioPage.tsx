@@ -4,6 +4,7 @@ import { BrandMark, paletteVars } from "../../components/BrandMark";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { extractPalette } from "../../lib/color-extract";
 import type { BrandLogo, BrandPalette, BrandSettings, BrandTypography, BrandWordmark } from "../../../shared/types";
 import {
   BRAND_FONTS,
@@ -27,7 +28,7 @@ export function BrandStudioPage() {
   const [typography, setTypography] = useState<BrandTypography>(DEFAULT_TYPOGRAPHY);
   const [tab, setTab] = useState<LogoTab>("wordmark");
   const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState<"upload" | "upload-dark" | "emblem" | "palette" | "generate" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "upload-dark" | "emblem" | "palette" | "generate" | "extract" | null>(null);
   const [vibe, setVibe] = useState("");
   // Brand-in-a-box (AI full-identity generator).
   const [makes, setMakes] = useState("");
@@ -151,6 +152,25 @@ export function BrandStudioPage() {
       toast.success("Tagline saved");
     } catch {
       toast.error("Couldn't save the tagline");
+    }
+  }
+
+  async function extractFromPhoto(file: File | undefined) {
+    if (!file) return;
+    setBusy("extract");
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      setPalette(await extractPalette(dataUrl));
+      toast.success("Palette pulled from your image", "Fine-tune any colour by hand.");
+    } catch {
+      toast.error("Couldn't read colours from that image");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -519,6 +539,15 @@ export function BrandStudioPage() {
                 {busy === "palette" ? "Thinking…" : "Suggest"}
               </button>
             </div>
+            <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ink/25 px-3 py-2 text-xs text-warmgrey hover:border-navy hover:text-navy">
+              {busy === "extract" ? "Reading colours…" : "🎨 Extract a palette from a photo or moodboard"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void extractFromPhoto(e.target.files?.[0])}
+              />
+            </label>
           </div>
 
           {/* Typography */}

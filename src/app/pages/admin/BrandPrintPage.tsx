@@ -145,6 +145,7 @@ export function BrandPrintPage() {
               className="overflow-hidden rounded shadow-[0_10px_40px_-12px_rgba(0,0,0,0.4)]"
             >
               <div
+                className="[&_*]:max-w-full [&_*]:[overflow-wrap:break-word]"
                 style={{
                   width: `${t.w}in`,
                   height: `${t.h}in`,
