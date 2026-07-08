@@ -24,12 +24,14 @@ export function ProductDetailPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [added, setAdded] = useState(false);
+  const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
     if (product) {
       track("product_view", { entityType: "product", entityId: product.id });
       setColorway(product.variants[0]?.colorwayName ?? "");
       setSize("");
+      setActiveImage(0);
       setCheckoutError(null);
     }
   }, [product]);
@@ -136,20 +138,29 @@ export function ProductDetailPage() {
             scroll inside their own container instead of stretching the page */}
         <div className="min-w-0 space-y-4">
           <EditorialImage
-            src={product.images[0]?.url ?? null}
-            alt={product.images[0]?.altText ?? product.name}
+            src={product.images[activeImage]?.url ?? product.images[0]?.url ?? null}
+            alt={product.images[activeImage]?.altText ?? product.name}
             label={product.name}
           />
           {product.images.length > 1 && (
-            <div className="grid grid-cols-3 gap-3">
-              {product.images.slice(1, 4).map((img, i) => (
-                <EditorialImage
+            <div className="grid grid-cols-4 gap-3">
+              {product.images.map((img, i) => (
+                <button
                   key={i}
-                  src={img.url}
-                  alt={img.altText ?? product.name}
-                  label={img.colorwayName ?? product.name}
-                  aspect="aspect-square"
-                />
+                  type="button"
+                  onClick={() => setActiveImage(i)}
+                  aria-label={`View image ${i + 1}`}
+                  className={`overflow-hidden rounded transition ${
+                    i === activeImage ? "ring-2 ring-navy ring-offset-1" : "opacity-80 hover:opacity-100"
+                  }`}
+                >
+                  <EditorialImage
+                    src={img.url}
+                    alt={img.altText ?? product.name}
+                    label={img.colorwayName ?? product.name}
+                    aspect="aspect-square"
+                  />
+                </button>
               ))}
             </div>
           )}
@@ -256,6 +267,11 @@ export function ProductDetailPage() {
                   </button>
                 ))}
               </div>
+              {selectedVariant && !isPreOrder && selectedVariant.availableQty > 0 && selectedVariant.availableQty <= 5 && (
+                <p className="mt-2 text-xs font-medium text-terracotta">
+                  Only {selectedVariant.availableQty} left in {selectedVariant.size} — order soon.
+                </p>
+              )}
             </div>
           )}
 
