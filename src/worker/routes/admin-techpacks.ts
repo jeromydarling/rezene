@@ -169,7 +169,7 @@ adminTechPackRoutes.get("/:id/shares", async (c) => {
     c.var.db,
     `SELECT s.id, s.label, s.language, s.status, s.approved_at, s.approved_by_name,
             s.approval_note, s.last_viewed_at, s.view_count, s.created_at,
-            sup.name AS supplier_name
+            s.supplier_id, sup.name AS supplier_name
      FROM tech_pack_shares s LEFT JOIN suppliers sup ON sup.id = s.supplier_id
      WHERE s.tech_pack_id = ? ORDER BY s.created_at DESC`,
     c.req.param("id"),

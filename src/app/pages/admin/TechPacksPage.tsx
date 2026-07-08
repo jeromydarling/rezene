@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
+import { MessagesSquare } from "lucide-react";
 import { useFetch } from "../../lib/useFetch";
 import { useBrand } from "../../lib/brand";
 import { api, ApiRequestError } from "../../lib/api";
+import { makerMessageHref } from "../../lib/maker-link";
 import { formatDate, titleCase } from "../../lib/format";
 import { SectionContent, type SketchAnnotation } from "../../components/TechPackContent";
 import { SketchAnnotator } from "../../components/admin/SketchAnnotator";
@@ -294,11 +296,12 @@ interface ShareRow {
   approved_by_name: string | null;
   last_viewed_at: string | null;
   view_count: number;
+  supplier_id: string | null;
   supplier_name: string | null;
   created_at: string;
 }
 
-function FactorySharesPanel({ techPackId }: { techPackId: string }) {
+function FactorySharesPanel({ techPackId, techPackName }: { techPackId: string; techPackName: string }) {
   const shares = useFetch<ShareRow[]>(`/api/admin/tech-packs/${techPackId}/shares`);
   const suppliers = useFetch<{ id: string; name: string }[]>("/api/admin/suppliers");
   const [form, setForm] = useState({ label: "", supplierId: "", language: "fr" });
@@ -439,17 +442,33 @@ function FactorySharesPanel({ techPackId }: { techPackId: string }) {
                       <span className="badge badge-neutral">pending</span>
                     )}
                   </td>
-                  <td>
+                  <td className="whitespace-nowrap text-right text-xs">
+                    {share.supplier_id && (
+                      <Link
+                        to={makerMessageHref({
+                          supplierId: share.supplier_id,
+                          supplierName: share.supplier_name,
+                          contextType: "tech_pack",
+                          contextId: techPackId,
+                          contextLabel: `Tech pack: ${techPackName}${share.label ? ` · ${share.label}` : ""}`,
+                        })}
+                        className="link-quiet inline-flex items-center gap-1"
+                        title={`Message ${share.supplier_name} about this tech pack`}
+                      >
+                        <MessagesSquare size={13} strokeWidth={1.8} />
+                        Message
+                      </Link>
+                    )}
                     {share.status === "active" ? (
                       <button
                         type="button"
-                        className="text-xs text-red-700 hover:underline"
+                        className="ml-3 text-red-700 hover:underline"
                         onClick={() => void revoke(share.id)}
                       >
                         Revoke
                       </button>
                     ) : (
-                      <span className="text-xs text-warmgrey">revoked</span>
+                      <span className="ml-3 text-warmgrey">revoked</span>
                     )}
                   </td>
                 </tr>
@@ -691,7 +710,7 @@ export function TechPackDetailPage() {
         </footer>
       </div>
 
-      {id && <FactorySharesPanel techPackId={id} />}
+      {id && <FactorySharesPanel techPackId={id} techPackName={data.name} />}
 
       {/* Export history */}
       {exports.data && exports.data.length > 0 && (
