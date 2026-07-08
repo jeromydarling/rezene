@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, UserRound } from "lucide-react";
 import { track } from "../lib/analytics";
 import { useBrand } from "../lib/brand";
 import { BrandMark, paletteVars, typographyVars } from "../components/BrandMark";
@@ -83,6 +83,9 @@ export function PublicLayout() {
           </nav>
           <div className="flex items-center gap-4">
             <LanguageSwitcher className="hidden md:block" />
+            <Link to="/account" className="text-ink/70 hover:text-ink" aria-label="Account">
+              <UserRound size={19} strokeWidth={1.6} />
+            </Link>
             <Link to="/cart" className="relative text-ink/70 hover:text-ink" aria-label="Cart">
               <ShoppingBag size={19} strokeWidth={1.6} />
               {cart.count > 0 && (
