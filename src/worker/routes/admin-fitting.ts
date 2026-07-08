@@ -166,6 +166,80 @@ adminFittingRoutes.post("/design", requireAdminWrite, async (c) => {
 });
 
 /**
+ * Pattern assistant: plain language → the selected block's NATIVE drafting
+ * options. The client sends the block's introspected option catalogue (names,
+ * types, ranges, choices), so the model can only pick from what the design
+ * actually defines — and the client re-validates every value on receipt. AI as
+ * concierge: the result lands on the visible manual controls.
+ */
+adminFittingRoutes.post("/pattern-assist", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    prompt?: string;
+    block?: { id?: string; name?: string };
+    options?: { key: string; type: string; min?: number; max?: number; choices?: string[] }[];
+  };
+  const prompt = (body.prompt || "").trim().slice(0, 500);
+  const blockName = (body.block?.name || "garment").slice(0, 60);
+  const options = (body.options ?? []).slice(0, 150);
+  if (!prompt) return c.json({ error: "Describe what you want first." }, 400);
+  if (options.length === 0) return c.json({ error: "No drafting options provided." }, 400);
+
+  const catalogue = options
+    .map((o) => {
+      if (o.type === "list") return `${o.key} (choice: ${(o.choices ?? []).join("|")})`;
+      if (o.type === "bool") return `${o.key} (true/false)`;
+      return `${o.key} (${o.type}, ${o.min ?? 0}..${o.max ?? 100})`;
+    })
+    .join("; ");
+  const system =
+    `You configure a parametric sewing pattern (a ${blockName}) by choosing values for its drafting options. ` +
+    `Only use option names from the catalogue, only values of the right type and within range — percent options ` +
+    `are plain numbers (e.g. 12 for 12%). Change ONLY what the request calls for; leave everything else out. ` +
+    `Respond with ONLY JSON: {"options": {"<optionName>": value, ...}, "rationale": "one short sentence"}. ` +
+    `Catalogue: ${catalogue}.`;
+  try {
+    const { aiComplete } = await import("../services/ai");
+    const { parseModelJson } = await import("../services/anthropic");
+    const out = await aiComplete(c.env, { system, prompt, maxTokens: 700 });
+    const parsed = (parseModelJson(out.text) ?? {}) as { options?: Record<string, unknown>; rationale?: string };
+    if (!parsed.options || typeof parsed.options !== "object") {
+      return c.json({ error: "Couldn't interpret that — try describing it differently." }, 502);
+    }
+    return c.json({
+      options: parsed.options,
+      rationale: typeof parsed.rationale === "string" ? parsed.rationale.slice(0, 240) : "",
+    });
+  } catch {
+    return c.json({ error: "The assistant is unavailable right now — the manual controls do everything it does." }, 502);
+  }
+});
+
+/**
+ * Plain-language guidance for the drafted pattern — what each piece is, how to
+ * cut, what to watch for. For the shop whose seamstress is learning.
+ */
+adminFittingRoutes.post("/pattern-explain", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { block?: string; summary?: string };
+  const block = (body.block || "garment").slice(0, 60);
+  const summary = (body.summary || "").slice(0, 600);
+  try {
+    const { aiComplete } = await import("../services/ai");
+    const out = await aiComplete(c.env, {
+      system:
+        "You are a patient sewing teacher. Given a garment pattern and its settings, write a short, practical " +
+        "guide for someone about to cut and sew it: the pattern pieces they'll see and what each is, how many of " +
+        "each to cut (note 'cut on fold' and 'cut 2' conventions), grain-line and seam-allowance reminders, and " +
+        "2-3 things beginners get wrong on this garment type. Plain warm language, short bullet lines, no preamble.",
+      prompt: `The pattern: a ${block}. Settings: ${summary || "standard"}.`,
+      maxTokens: 700,
+    });
+    return c.json({ text: out.text.slice(0, 4000) });
+  } catch {
+    return c.json({ error: "Guidance is unavailable right now." }, 502);
+  }
+});
+
+/**
  * AI Look Studio — render a garment ON A MODEL as a photoreal image. This is
  * the honest, easy path to "impressive garment on a body": image generation
  * (Cloudflare Workers AI, FLUX.2) beats a home-grown cloth simulation for
