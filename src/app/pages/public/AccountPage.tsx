@@ -235,17 +235,46 @@ function Orders() {
   );
 }
 
-function OrderDetail({ id, onReorder }: { id: string; onReorder: () => void }) {
-  const [data, setData] = useState<{
-    items: { description: string; quantity: number; unitPriceCents: number; currency: string }[];
-    shipments: { carrier: string | null; service: string | null; trackingNumber: string | null; trackingUrl: string | null; status: string }[];
-  } | null>(null);
+interface OrderItemWithId {
+  id: string;
+  variantId: string | null;
+  description: string;
+  quantity: number;
+  unitPriceCents: number;
+  currency: string;
+}
+interface OrderDetailData {
+  items: { description: string; quantity: number; unitPriceCents: number; currency: string }[];
+  itemsWithIds: OrderItemWithId[];
+  shipments: { carrier: string | null; service: string | null; trackingNumber: string | null; trackingUrl: string | null; status: string }[];
+  returns: { id: string; status: string; createdAt: string; refundAmountCents: number | null; currency: string | null }[];
+  returnable: boolean;
+}
 
-  useEffect(() => {
-    api.get(`/api/public/account/orders/${id}`).then(setData as never).catch(() => setData({ items: [], shipments: [] }));
+const RETURN_REASONS = [
+  ["size", "Wrong size / fit"],
+  ["quality", "Quality issue"],
+  ["changed_mind", "Changed my mind"],
+  ["faulty", "Arrived faulty"],
+  ["other", "Other"],
+] as const;
+
+function OrderDetail({ id, onReorder }: { id: string; onReorder: () => void }) {
+  const toast = useToast();
+  const [data, setData] = useState<OrderDetailData | null>(null);
+  const [returning, setReturning] = useState(false);
+
+  const load = useCallback(() => {
+    api
+      .get<OrderDetailData>(`/api/public/account/orders/${id}`)
+      .then(setData)
+      .catch(() => setData({ items: [], itemsWithIds: [], shipments: [], returns: [], returnable: false }));
   }, [id]);
+  useEffect(load, [load]);
 
   if (!data) return <div className="border-t border-ink/10 px-4 py-3 text-xs text-ink/40">Loading…</div>;
+
+  const activeReturn = data.returns.find((r) => r.status !== "rejected" && r.status !== "cancelled");
 
   return (
     <div className="space-y-3 border-t border-ink/10 px-4 py-3">
@@ -280,9 +309,124 @@ function OrderDetail({ id, onReorder }: { id: string; onReorder: () => void }) {
         </div>
       )}
 
-      <button type="button" className="btn btn-secondary !py-1.5 text-xs" onClick={onReorder}>
-        Reorder these
-      </button>
+      {activeReturn && (
+        <div className="rounded bg-cream/60 p-3 text-sm">
+          <span className="text-ink/70">Return </span>
+          <span className="font-medium">{activeReturn.status}</span>
+          {activeReturn.status === "refunded" && activeReturn.refundAmountCents != null && (
+            <> — {formatMoney(activeReturn.refundAmountCents, activeReturn.currency || "EUR")} refunded</>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn btn-secondary !py-1.5 text-xs" onClick={onReorder}>
+          Reorder these
+        </button>
+        {data.returnable && !activeReturn && !returning && (
+          <button type="button" className="btn btn-secondary !py-1.5 text-xs" onClick={() => setReturning(true)}>
+            Start a return
+          </button>
+        )}
+      </div>
+
+      {returning && (
+        <ReturnForm
+          items={data.itemsWithIds}
+          onCancel={() => setReturning(false)}
+          onDone={() => {
+            setReturning(false);
+            toast.success("Return requested", "We'll review it and email you.");
+            load();
+          }}
+          orderId={id}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReturnForm({
+  items,
+  orderId,
+  onCancel,
+  onDone,
+}: {
+  items: OrderItemWithId[];
+  orderId: string;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const toast = useToast();
+  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [reason, setReason] = useState<string>("size");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (it: OrderItemWithId) =>
+    setPicked((p) => {
+      const next = { ...p };
+      if (next[it.id]) delete next[it.id];
+      else next[it.id] = it.quantity;
+      return next;
+    });
+
+  async function submit() {
+    const chosen = Object.entries(picked).map(([orderItemId, quantity]) => ({ orderItemId, quantity }));
+    if (chosen.length === 0) {
+      toast.error("Pick at least one item");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/api/public/account/orders/${orderId}/returns`, { reason, note: note || undefined, items: chosen });
+      onDone();
+    } catch (e) {
+      toast.error("Couldn't start the return", e instanceof ApiRequestError ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-ink/10 bg-white p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-ink/50">What are you sending back?</p>
+      <ul className="space-y-1">
+        {items.map((it) => (
+          <li key={it.id}>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={Boolean(picked[it.id])} onChange={() => toggle(it)} />
+              <span className="flex-1">{it.description}</span>
+              <span className="text-ink/50">{formatMoney(it.unitPriceCents, it.currency)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div>
+        <label className="mb-1 block text-xs text-ink/50">Reason</label>
+        <select className="input w-full text-sm" value={reason} onChange={(e) => setReason(e.target.value)}>
+          {RETURN_REASONS.map(([v, l]) => (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </div>
+      <textarea
+        className="input w-full text-sm"
+        rows={2}
+        placeholder="Anything we should know? (optional)"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <div className="flex gap-2">
+        <button type="button" className="btn btn-primary flex-1 !py-1.5 text-sm" disabled={busy} onClick={() => void submit()}>
+          {busy ? "Sending…" : "Request return"}
+        </button>
+        <button type="button" className="btn btn-secondary !py-1.5 text-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

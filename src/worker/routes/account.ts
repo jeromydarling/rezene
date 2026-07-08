@@ -198,7 +198,90 @@ accountRoutes.get("/orders/:id", async (c) => {
      FROM order_shipments WHERE order_id = ? ORDER BY created_at DESC`,
     order.id,
   );
-  return c.json({ order, items, shipments });
+  const itemsWithIds = await all(
+    c.var.db,
+    `SELECT id, variant_id AS variantId, description, quantity, unit_price_cents AS unitPriceCents, currency
+     FROM order_items WHERE order_id = ?`,
+    order.id,
+  );
+  const returns = await all(
+    c.var.db,
+    `SELECT id, status, created_at AS createdAt, refund_amount_cents AS refundAmountCents, currency
+     FROM returns WHERE order_id = ? ORDER BY created_at DESC`,
+    order.id,
+  );
+  const returnable = order.payment_status === "paid" || order.payment_status === "partially_refunded";
+  return c.json({ order, items, itemsWithIds, shipments, returns, returnable });
+});
+
+// Start a return against a paid order — the shop reviews it from admin.
+accountRoutes.post("/orders/:id/returns", async (c) => {
+  const me = await currentCustomer(c);
+  if (!me) return c.json({ error: "Not signed in" }, 401);
+  const order = await first<{ id: string; currency: string; payment_status: string }>(
+    c.var.db,
+    `SELECT id, currency, payment_status FROM orders WHERE id = ? AND (customer_id = ? OR lower(email) = ?)`,
+    c.req.param("id"),
+    me.customer_id,
+    me.email.toLowerCase(),
+  );
+  if (!order) return c.json({ error: "Order not found" }, 404);
+  if (order.payment_status !== "paid" && order.payment_status !== "partially_refunded")
+    return c.json({ error: "Only paid orders can be returned." }, 400);
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    reason?: string;
+    note?: string;
+    items?: { orderItemId: string; quantity: number }[];
+  };
+  const picks = (body.items ?? []).filter((i) => i.orderItemId && i.quantity > 0);
+  if (picks.length === 0) return c.json({ error: "Choose at least one item to return." }, 400);
+
+  const returnId = newId("ret");
+  let total = 0;
+  const rows: [string, string, string, string, number, number, string][] = [];
+  for (const p of picks) {
+    const oi = await first<{ id: string; variant_id: string | null; description: string; quantity: number; unit_price_cents: number; currency: string }>(
+      c.var.db,
+      `SELECT id, variant_id, description, quantity, unit_price_cents, currency FROM order_items WHERE id = ? AND order_id = ?`,
+      p.orderItemId,
+      order.id,
+    );
+    if (!oi) continue;
+    const qty = Math.min(p.quantity, oi.quantity);
+    total += oi.unit_price_cents * qty;
+    rows.push([newId("ri"), returnId, oi.id, oi.variant_id ?? "", qty, oi.unit_price_cents, oi.currency]);
+  }
+  if (rows.length === 0) return c.json({ error: "Those items aren't on this order." }, 400);
+
+  await run(
+    c.var.db,
+    `INSERT INTO returns (id, order_id, customer_id, status, reason, customer_note, refund_amount_cents, currency)
+     VALUES (?, ?, ?, 'requested', ?, ?, ?, ?)`,
+    returnId,
+    order.id,
+    me.customer_id,
+    body.reason ?? null,
+    body.note ?? null,
+    total,
+    order.currency,
+  );
+  for (const r of rows) {
+    await run(
+      c.var.db,
+      `INSERT INTO return_items (id, return_id, order_item_id, variant_id, description, quantity, unit_price_cents, currency)
+       VALUES (?, ?, ?, ?, (SELECT description FROM order_items WHERE id = ?), ?, ?, ?)`,
+      r[0],
+      r[1],
+      r[2],
+      r[3] || null,
+      r[2],
+      r[4],
+      r[5],
+      r[6],
+    );
+  }
+  return c.json({ id: returnId }, 201);
 });
 
 // ---- Reorder: hand the SPA the still-buyable lines to drop in the cart ----
