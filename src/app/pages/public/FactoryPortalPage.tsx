@@ -16,6 +16,7 @@ interface FactoryComment {
 
 interface FactoryShareResponse {
   brandName: string;
+  brandLogoUrl?: string | null;
   label: string | null;
   supplierName: string | null;
   language: "en" | "fr";
@@ -150,7 +151,11 @@ export function FactoryPortalPage() {
       <header className="border-b border-ink/10 bg-navy px-5 py-4 text-chalk">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
           <div>
-            <p className="font-display text-lg font-light">{data.brandName}</p>
+            {data.brandLogoUrl ? (
+              <img src={data.brandLogoUrl} alt={data.brandName} className="max-h-9 w-auto object-contain" />
+            ) : (
+              <p className="font-display text-lg font-light">{data.brandName}</p>
+            )}
             <p className="text-[0.65rem] uppercase tracking-editorial text-chalk/60">
               {t.subtitle}
               {data.supplierName ? ` · ${data.supplierName}` : ""}

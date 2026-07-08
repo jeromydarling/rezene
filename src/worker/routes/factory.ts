@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { all, first, run } from "../services/db";
-import { getBrandName } from "../services/brand";
+import { getBrandName, getBrandLogoUrl } from "../services/brand";
 import { sendNotification } from "../services/email";
 import { parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
@@ -77,6 +77,7 @@ factoryRoutes.get(
 
     return c.json({
       brandName,
+      brandLogoUrl: await getBrandLogoUrl(c.var.db),
       label: share.label,
       supplierName: supplier?.name ?? null,
       language: share.language,
