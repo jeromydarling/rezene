@@ -535,16 +535,27 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
 // ---- Refit: adjust the fit of a finished render ------------------------------
 
 /** The quick-pick adjustments the UI offers. Server-side map so the model only
- *  ever sees vetted instructions (the free-text note rides alongside). */
+ *  ever sees vetted instructions (the free-text note rides alongside).
+ *  Image editors act unreliably on relative words alone ("shorter" often
+ *  regresses to the garment's canonical form), so every instruction pairs the
+ *  comparison against the reference with an ABSOLUTE anatomical target. */
 const REFIT_PRESETS: Record<string, string> = {
-  tighter: "make the garment fit tighter and closer to the body",
-  looser: "make the garment fit looser, with more ease and relaxed volume",
-  cropped: "shorten the garment's hem to a cropped length",
-  longer: "lengthen the garment's hem to a longer line",
-  "sleeves-shorter": "shorten the sleeves",
-  "sleeves-longer": "lengthen the sleeves",
-  tucked: "tuck the garment in neatly",
-  untucked: "let the garment hang untucked",
+  tighter:
+    "take the garment in so it fits visibly slimmer and closer to the body than in the reference photo, " +
+    "with clearly less fabric volume through the chest, waist and sleeves",
+  looser:
+    "let the garment out so it is visibly roomier and more relaxed than in the reference photo, " +
+    "with clearly more fabric volume and drape",
+  cropped: "shorten the hem so it ends at the natural waist — visibly higher than in the reference photo",
+  longer: "lengthen the hem so it falls below the hips — visibly lower than in the reference photo",
+  "sleeves-shorter":
+    "shorten the sleeves so they end distinctly HIGHER on the arm than in the reference photo " +
+    "(a short sleeve ends up at mid-bicep; a long sleeve ends at or above the elbow)",
+  "sleeves-longer":
+    "lengthen the sleeves so they end distinctly LOWER on the arm than in the reference photo " +
+    "(a short sleeve reaches past the elbow; a long sleeve reaches the wrist)",
+  tucked: "tuck the garment's hem neatly into the waistband",
+  untucked: "let the garment hang fully untucked over the waistband",
 };
 
 /**
@@ -571,10 +582,12 @@ adminFittingRoutes.post("/renders/:id/refit", requireAdminWrite, async (c) => {
   if (!source) return c.json({ error: "Couldn't load the render image." }, 404);
 
   const prompt =
-    `Adjust the fit of the garment in this photograph: ${instructions.join("; ")}. ` +
-    `Keep everything else exactly the same — the same person (face, hair, body, skin tone, pose), the same ` +
-    `garment design, fabric, colour and details, the same background and lighting. The fabric should drape ` +
-    `naturally and realistically in the adjusted fit. Change nothing except the requested fit adjustments.`;
+    `The reference photo shows a garment's CURRENT fit. Recreate the exact same photograph with only the fit ` +
+    `adjusted as follows: ${instructions.join("; ")}. The adjustment must be clearly visible in a side-by-side ` +
+    `comparison with the reference. Everything else stays identical: the same person (face, hair, body, skin ` +
+    `tone, pose), the same garment design (same collar, placket, buttons, pockets, cuff style), the same fabric ` +
+    `colour and texture, the same background, framing and lighting. The fabric drapes naturally and ` +
+    `realistically in the new fit. Change nothing except the requested fit adjustments.`;
 
   const quota = await reserveFittingQuota(c);
   if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
