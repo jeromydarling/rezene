@@ -432,16 +432,62 @@ function MiniDesignStudio() {
         <span className={badge("bg-ink/5 text-ink/60")}>house style</span>
         <span className={badge("bg-ink/5 text-ink/60")}>2 references</span>
         <span className={badge("bg-palm/15 text-palm")}>FLUX.2</span>
+        <span className={badge("bg-ink/5 text-ink/60")}>✂ pattern</span>
       </div>
       <div className="grid grid-cols-4 gap-1">
         {looks.map((g, i) => (
           <div key={i} className={`relative aspect-[3/4] rounded bg-gradient-to-b ${g}`}>
             {i === 0 && <span className="absolute left-0.5 top-0.5 text-[9px]">★</span>}
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/30 px-0.5 text-[7px] text-white">
-              {["⇡ use", "⇢ maker", "vary", "vary"][i]}
+              {["⇡ use", "▦ try on", "vary", "⇢ maker"][i]}
             </span>
           </div>
         ))}
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniFittingStudio() {
+  const roster = [
+    "from-[#f0e0cc] to-[#caa77f]",
+    "from-[#d9b48f] to-[#7a5334]",
+    "from-[#c9a98a] to-[#5c4230]",
+    "from-[#e7d3ba] to-[#b78a63]",
+    "from-[#b98f6c] to-[#4f3826]",
+  ];
+  return (
+    <MiniShell title="Fitting Studio — try it on">
+      <div className="mb-2 flex items-center justify-center gap-1.5">
+        <div className="text-center">
+          <div className="aspect-square w-11 rounded bg-gradient-to-br from-[#c9b7a0] to-[#8a7358] shadow-sm" />
+          <p className="mt-0.5 text-[7px] text-warmgrey">garment</p>
+        </div>
+        <span className="text-[11px] text-ink/40">+</span>
+        <div className="text-center">
+          <div className="aspect-[3/4] w-9 rounded bg-gradient-to-b from-[#e7d8c4] to-[#b98b6e] shadow-sm ring-1 ring-navy" />
+          <p className="mt-0.5 text-[7px] text-warmgrey">model</p>
+        </div>
+        <span className="text-[11px] text-ink/40">=</span>
+        <div className="text-center">
+          <div className="relative aspect-[3/4] w-14 overflow-hidden rounded bg-gradient-to-b from-[#b98b6e] to-[#4f3a2c] shadow-sm">
+            <span className="absolute left-0.5 top-0.5 rounded-full bg-navy/85 px-1 text-[6px] text-chalk">Try-on</span>
+          </div>
+          <p className="mt-0.5 text-[7px] text-warmgrey">photoreal</p>
+        </div>
+      </div>
+      <div className="mb-1.5 flex items-center gap-1">
+        <p className="text-[7px] uppercase tracking-wide text-warmgrey">roster</p>
+        <div className="flex gap-0.5">
+          {roster.map((g, i) => (
+            <span key={i} className={`h-5 w-4 rounded bg-gradient-to-b ${g} ${i === 1 ? "ring-1 ring-navy" : ""}`} />
+          ))}
+        </div>
+        <span className="text-[7px] text-warmgrey">women · men · every shape</span>
+      </div>
+      <div className="flex gap-1">
+        <span className={badge("bg-ink/5 text-ink/60")}>from Design Studio or a photo</span>
+        <span className={badge("bg-palm/15 text-palm")}>consistent bodies</span>
       </div>
     </MiniShell>
   );
@@ -546,14 +592,28 @@ const FEATURES: Feature[] = [
     id: "design-studio",
     eyebrow: "Design",
     heading: "An LLM design studio for your next line.",
-    body: "Build a prompt from garment, fabric, palette and mood — or drop in reference images and Flux (running natively on Cloudflare, no keys to bring) generates a collection of looks that hold together. Pin favorites, keep a house style for consistency, then use a look on your storefront or send it straight to a maker for a sample.",
+    body: "Build a prompt from garment, fabric, palette and mood — or drop in reference images and Flux (running natively on Cloudflare, no keys to bring) generates a collection of looks that hold together. Pin favorites, keep a house style for consistency, draft a real sewing pattern for the piece, then use a look on your storefront, try it on a model, or send it straight to a maker for a sample.",
     points: [
       "Native Flux + FLUX.2 reference-image conditioning for a consistent line",
       "House style + seed lock across a whole capsule",
-      "One click: use on your site, or ship the design to a factory",
+      "Draft a real, manufacturable sewing pattern (FreeSewing) — one click",
+      "Use on your site, try it on a model, or ship the design to a factory",
     ],
     screen: MiniDesignStudio,
     url: "verto.style/maison/admin/ai-concepts",
+  },
+  {
+    id: "fitting-studio",
+    eyebrow: "Fit",
+    heading: "See it on a real body before you cut it.",
+    body: "Take a Design Studio look — or a photo of a real sample — and try it on a consistent roster of photoreal models spanning shapes, sizes, and skin tones. Judge fit and styling on the same bodies across every style, so the whole line hangs together before a single metre of fabric is cut.",
+    points: [
+      "A fixed model roster — the same bodies, every style, every season",
+      "Try on a Design Studio creation or a photo of a real sample",
+      "Photoreal virtual try-on from best-in-class image models",
+    ],
+    screen: MiniFittingStudio,
+    url: "verto.style/maison/admin/fitting",
   },
   {
     id: "sourcing",
@@ -815,7 +875,7 @@ export function VertoFeatures() {
           </h1>
           <Reveal delay={500}>
             <p className="prose-editorial mx-auto mt-4 max-w-2xl">
-              Seventeen modules, one database, zero copy-paste between tools. Every screen below is
+              Eighteen modules, one database, zero copy-paste between tools. Every screen below is
               the real interface, miniaturized — and the{" "}
               <a href={`${DEMO_SHOP_BASE}/admin`} className="link-quiet">demo admin</a> is open if
               you want to drive.

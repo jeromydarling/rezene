@@ -353,21 +353,30 @@ function Manifesto() {
 const SCENES = [
   {
     number: "01",
+    image: "/verto/wall.jpg",
+    alt: "A model in high-waisted navy trousers against a sun-washed Essaouira wall",
+    eyebrow: "Design",
+    heading: "Design the line — then see it worn.",
+    body: "An LLM design studio generates looks that hold together and drafts a real sewing pattern for each. The Fitting Studio then tries any piece on a consistent roster of photoreal models — so you judge fit and styling before you cut a single sample.",
+    side: "left",
+  },
+  {
+    number: "02",
     image: "/verto/atelier.jpg",
     alt: "A tailor pressing a seam on cream linen trousers in a Moroccan riad",
     eyebrow: "Make",
     heading: "Production, not just products.",
     body: "Styles, tech packs, samples, purchase orders, bilingual factory portals, a production calendar. Verto starts where your clothes actually start — in the workshop.",
-    side: "left",
+    side: "right",
   },
   {
-    number: "02",
-    image: "/verto/wall.jpg",
-    alt: "A model in high-waisted navy trousers against a sun-washed Essaouira wall",
+    number: "03",
+    image: "/verto/hero.jpg",
+    alt: "Three friends in linen resortwear walking Morocco's Atlantic ramparts at golden hour",
     eyebrow: "Sell",
     heading: "A storefront that reads like a magazine.",
     body: "Block-composed pages, editorial layouts, lookbooks, a journal — with drafts, scheduling, revision history, and per-page SEO injected at the edge. Wholesale line sheets and pre-order campaigns included.",
-    side: "right",
+    side: "left",
   },
 ] as const;
 
@@ -466,6 +475,8 @@ function AiMoment() {
 // ---------- Act V: proof + pricing teaser ----------
 function CapabilityIndex() {
   const items = [
+    "AI design studio & sewing patterns",
+    "Virtual try-on on a model roster",
     "Block CMS & editorial layouts",
     "LLM campaign kits, 11 channels",
     "Site starter interview",

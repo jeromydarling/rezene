@@ -211,6 +211,7 @@ export function VertoWhy() {
 const MATRIX_ROWS: { label: string; verto: boolean; shopify: boolean; erp: boolean; patchwork: boolean }[] = [
   { label: "Storefront + checkout", verto: true, shopify: true, erp: false, patchwork: true },
   { label: "Editorial CMS (blocks, lookbooks, journal)", verto: true, shopify: false, erp: false, patchwork: false },
+  { label: "AI design studio, sewing patterns & virtual try-on", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "Tech packs, samples, production calendar", verto: true, shopify: false, erp: true, patchwork: false },
   { label: "Factory portals (bilingual, tokenized)", verto: true, shopify: false, erp: false, patchwork: false },
   { label: "Multi-carrier shipping + customs docs", verto: true, shopify: false, erp: true, patchwork: false },
