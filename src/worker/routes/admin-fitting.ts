@@ -330,9 +330,32 @@ async function storeRender(
 }
 
 function providerFail(c: Context<AppContext>, err: unknown) {
+  console.error("[fitting] render failed:", err instanceof Error ? `${err.name}: ${err.message}` : err);
   if (err instanceof NoProviderError) return c.json({ error: err.message, code: "not_configured" }, 501);
   if (err instanceof ProviderError) return c.json({ error: err.message }, err.status >= 400 ? (err.status as 502) : 502);
-  return c.json({ error: "Render failed — try again." }, 502);
+  // Untyped errors carry the only clue there is — surface it rather than a blind
+  // "try again" (this is the shop's own admin tool; the detail is theirs to see).
+  const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 200)})` : "";
+  return c.json({ error: `Render failed${detail} — try again.` }, 502);
+}
+
+/** Persist the produced image, but never let a SAVE failure read as a render
+ *  failure — the distinction is the whole diagnosis. */
+async function storeRenderOrFail(
+  c: Context<AppContext>,
+  result: ImageResult,
+  meta: Parameters<typeof storeRender>[2],
+) {
+  try {
+    return { ok: true as const, render: await storeRender(c, result, meta) };
+  } catch (err) {
+    console.error("[fitting] render SAVED FAILED (image was produced):", err instanceof Error ? `${err.name}: ${err.message}` : err);
+    const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 200)})` : "";
+    return {
+      ok: false as const,
+      response: c.json({ error: `The image rendered, but saving it to your library failed${detail} — try again.` }, 500),
+    };
+  }
 }
 
 /**
@@ -380,21 +403,22 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
 
   const quota = await reserveFittingQuota(c);
   if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
+  let result: ImageResult | undefined;
   try {
-    const [result] = await generateLook(c.env, { prompt, references, aspectRatio: "3:4", count: 1 });
+    [result] = await generateLook(c.env, { prompt, references, aspectRatio: "3:4", count: 1 });
     if (!result) throw new ProviderError("No image produced.");
-    const render = await storeRender(c, result, {
-      kind: "generate",
-      garmentId: body.garmentId || null,
-      modelId: model.id,
-      settingId: setting.id,
-      prompt,
-      styleId: body.styleId || null,
-    });
-    return c.json(render, 201);
   } catch (err) {
     return providerFail(c, err);
   }
+  const stored = await storeRenderOrFail(c, result, {
+    kind: "generate",
+    garmentId: body.garmentId || null,
+    modelId: model.id,
+    settingId: setting.id,
+    prompt,
+    styleId: body.styleId || null,
+  });
+  return stored.ok ? c.json(stored.render, 201) : stored.response;
 });
 
 /**
@@ -427,21 +451,22 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
 
   const quota = await reserveFittingQuota(c);
   if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
+  let result: ImageResult;
   try {
-    const result = await tryOnGarment(c.env, { garmentImage, modelImage, category: body.category ?? "auto" });
-    const render = await storeRender(c, result, {
-      kind: "tryon",
-      garmentId: body.garmentId || null,
-      modelId: body.modelRosterId || null,
-      styleId: body.styleId || null,
-      garmentFileId: body.garmentFileId,
-      modelFileId: body.modelFileId || null,
-      prompt: "Virtual try-on",
-    });
-    return c.json(render, 201);
+    result = await tryOnGarment(c.env, { garmentImage, modelImage, category: body.category ?? "auto" });
   } catch (err) {
     return providerFail(c, err);
   }
+  const stored = await storeRenderOrFail(c, result, {
+    kind: "tryon",
+    garmentId: body.garmentId || null,
+    modelId: body.modelRosterId || null,
+    styleId: body.styleId || null,
+    garmentFileId: body.garmentFileId,
+    modelFileId: body.modelFileId || null,
+    prompt: "Virtual try-on",
+  });
+  return stored.ok ? c.json(stored.render, 201) : stored.response;
 });
 
 // ---- Model library: base model photos a shop tries garments onto ------------

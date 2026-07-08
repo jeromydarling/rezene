@@ -10,7 +10,7 @@
  */
 import type { Env } from "../../types/env";
 import type { GenerateInput, ImageProvider, ImageResult, TryOnInput } from "./types";
-import { NoProviderError } from "./types";
+import { NoProviderError, ProviderError } from "./types";
 import { falProvider } from "./fal";
 import { fashnProvider } from "./fashn";
 import { higgsfieldProvider } from "./higgsfield";
@@ -58,15 +58,24 @@ async function cascade<T>(
 ): Promise<T> {
   const eligible = order.filter((p) => p.capabilities[cap] && p.configured(env));
   if (eligible.length === 0) throw new NoProviderError(cap);
-  let lastErr: unknown;
+  const failures: { id: string; err: unknown }[] = [];
   for (const p of eligible) {
     try {
       return await run(p);
     } catch (err) {
-      lastErr = err;
+      // Every provider failure goes to Workers Logs — without this, a cascade
+      // that ends in a fallback's error leaves no trace of the primary's.
+      console.error(`[ai-image] ${p.id} ${cap} failed:`, err instanceof Error ? `${err.name}: ${err.message}` : err);
+      failures.push({ id: p.id, err });
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(`All ${cap} providers failed.`);
+  // Rethrowing only the LAST error hides the primary provider's (usually the
+  // informative) failure behind whatever a fallback said — combine them all.
+  const detail = failures
+    .map(({ id, err }) => `${id}: ${err instanceof Error ? err.message : String(err)}`)
+    .join(" · ");
+  const firstTyped = failures.find((f) => f.err instanceof ProviderError)?.err as ProviderError | undefined;
+  throw new ProviderError(detail || `All ${cap} providers failed.`, firstTyped?.status ?? 502);
 }
 
 export async function generateLook(env: Env, input: GenerateInput): Promise<ImageResult[]> {
