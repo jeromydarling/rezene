@@ -50,6 +50,42 @@ function MiniShell({ title, children }: { title: string; children: ReactNode }) 
 
 const badge = (tone: string) => `inline-block rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide ${tone}`;
 
+function MiniPatternStudio() {
+  return (
+    <MiniShell title="Pattern Studio — Button-down shirt · made-to-measure">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-white p-2 shadow-sm">
+          <div className="flex h-24 items-end justify-center gap-1.5">
+            {/* Stylized pattern pieces: front, back, sleeve, cuff */}
+            <div className="h-20 w-9 rounded-t-[40%] border border-dashed border-ink/40 bg-cream" />
+            <div className="h-20 w-9 rounded-t-[40%] border border-dashed border-ink/40 bg-cream" />
+            <div className="h-16 w-7 rounded-t-full border border-dashed border-ink/40 bg-cream" />
+            <div className="h-5 w-10 self-end rounded border border-dashed border-ink/40 bg-cream" />
+          </div>
+          <p className="mt-1 text-center text-[8px] text-warmgrey">front · back · sleeve · cuff — real seams, 5 cm scale check</p>
+        </div>
+        <div className="w-28 space-y-1">
+          {[
+            ["Cuff", "Rounded French"],
+            ["Collar angle", "70°"],
+            ["Buttons", "8"],
+            ["Neck", "43.0 cm"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between rounded bg-white px-1.5 py-1 shadow-sm">
+              <span className="text-[8px] text-warmgrey">{k}</span>
+              <span className="text-[8px] font-medium text-ink">{v}</span>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            <span className={badge("bg-navy/10 text-navy")}>31 blocks</span>
+            <span className={badge("bg-palm/15 text-palm")}>PDF ↓ 100%</span>
+          </div>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
 // ---------- Mini screens, one per module ----------
 
 function MiniProduction() {
@@ -614,10 +650,23 @@ const FEATURES: Feature[] = [
       "Photoreal virtual try-on from best-in-class image models",
       "Refit any look in a click — tighter, looser, cropped, different sleeves",
       "Colorways on demand, and side-by-side compare across bodies",
-      "A real Pattern Studio: manufacturable sewing patterns, graded or made-to-measure",
     ],
     screen: MiniFittingStudio,
     url: "verto.style/maison/admin/fitting",
+  },
+  {
+    id: "pattern-studio",
+    eyebrow: "Cut",
+    heading: "From picture to pattern you can actually cut.",
+    body: "Real, manufacturable sewing patterns drafted in the browser — over thirty blocks from tees to coats, graded to a size or drafted to a person's exact measurements. Open every drafting option the block defines (six cuff styles on the button-down, collar geometry, plackets), set your seam allowance, and print a true-scale tiled PDF with a scale-check bar on every page. Fit decisions from the Fitting Studio carry straight onto the sliders.",
+    points: [
+      "31 pattern blocks — tops, shirts, dresses, trousers, coats, foundation blocks",
+      "True made-to-measure: every measurement point the block drafts from, cm or inches",
+      "Every native drafting option, plus an AI assistant that sets them from plain words",
+      "Print-at-scale tiled PDF, SVG download, and a per-client pattern book",
+    ],
+    screen: MiniPatternStudio,
+    url: "verto.style/maison/admin/patterns",
   },
   {
     id: "sourcing",
