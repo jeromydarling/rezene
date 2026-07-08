@@ -369,6 +369,12 @@ export function ProductDetailPage() {
                 </div>
               ))}
           </dl>
+          <Link
+            to={`/passport/${product.slug}`}
+            className="mt-3 inline-block text-xs uppercase tracking-editorial text-ink/50 hover:text-ink"
+          >
+            Digital Product Passport →
+          </Link>
         </div>
       </div>
 

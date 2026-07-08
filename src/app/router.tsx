@@ -19,6 +19,7 @@ import { CheckoutSuccessPage } from "./pages/public/CheckoutSuccessPage";
 import { CartPage } from "./pages/public/CartPage";
 import { AccountPage } from "./pages/public/AccountPage";
 import { WholesalePortalPage } from "./pages/public/WholesalePortalPage";
+import { PassportPage } from "./pages/public/PassportPage";
 import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
 import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
@@ -124,6 +125,7 @@ export function AppRouter() {
           <Route path="cart" element={<CartPage />} />
           <Route path="account" element={<AccountPage />} />
           <Route path="wholesale" element={<WholesalePortalPage />} />
+          <Route path="passport/:slug" element={<PassportPage />} />
           <Route path="checkout/success" element={<CheckoutSuccessPage />} />
           <Route path="p/:slug" element={<DynamicPage />} />
           <Route path="*" element={<NotFoundPage />} />
