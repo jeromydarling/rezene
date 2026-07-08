@@ -44,17 +44,17 @@ export async function handleInboundEmail(
     const { parseMakerToken, appendSupplierReply } = await import("./supplier-messaging");
     const token = parseMakerToken(recipients, env);
     if (token) {
-      const route = await first<{ shop_id: string; supplier_id: string }>(
+      const route = await first<{ shop_id: string }>(
         env.DB,
-        `SELECT shop_id, supplier_id FROM thread_addresses WHERE token = ?`,
+        `SELECT shop_id FROM thread_addresses WHERE token = ?`,
         token,
       );
       if (route) {
-        await appendSupplierReply(
-          env,
-          { shopId: route.shop_id, supplierId: route.supplier_id },
-          { body: stripQuoted(text), authorName: fromName ?? from, subject },
-        );
+        await appendSupplierReply(env, route.shop_id, token, {
+          body: stripQuoted(text),
+          authorName: fromName ?? from,
+          subject,
+        });
         // Also drop the raw mail in the shop owner's real inbox so it isn't
         // trapped in the app — the app is a copy, not a cage.
         const owner = await first<{ owner_email: string | null }>(
