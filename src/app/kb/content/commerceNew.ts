@@ -185,6 +185,10 @@ Under **Buyers'** sibling, **Orders**, move each wholesale order through *submit
 
 Your data is yours. On **Analytics** there's an **Export your data** panel with one-click CSV downloads for **products**, **customers**, and **orders** — open them in a spreadsheet or hand them to your accountant.
 
+## For your accountant (QuickBooks / Xero)
+
+The same panel has two accounting exports: a **Sales CSV** (one row per paid order, split into net sales, discount, shipping, tax, and total — imports as invoices/sales receipts) and a **Journal CSV** (a monthly summary as debit/credit lines you can import as a manual journal). A live sync to QuickBooks/Xero is a future add-on; these CSVs cover the import path today.
+
 You'll also find **reorder suggestions** at the top of **Inventory**: every piece at or below its low-stock threshold with nothing incoming, shown with its 90-day sales pace and a suggested reorder quantity.`,
   },
   {
