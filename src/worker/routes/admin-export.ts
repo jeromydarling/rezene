@@ -109,6 +109,82 @@ adminExportRoutes.get("/orders.csv", async (c) => {
   return csvResponse(c, "orders.csv", csv);
 });
 
+// ---- Accounting: a sales CSV your accountant / QuickBooks / Xero can import ----
+// One row per paid order, with the figures split the way accounting software
+// expects (net sales, discount, shipping, tax, total). Optional ?from=&to= dates.
+adminExportRoutes.get("/accounting.csv", async (c) => {
+  const from = c.req.query("from");
+  const to = c.req.query("to");
+  const params: unknown[] = [];
+  let range = "";
+  if (from) {
+    range += ` AND o.created_at >= ?`;
+    params.push(from);
+  }
+  if (to) {
+    range += ` AND o.created_at < date(?, '+1 day')`;
+    params.push(to);
+  }
+  const rows = await all<Record<string, unknown>>(
+    c.var.db,
+    `SELECT o.order_number, o.created_at, o.email, o.currency,
+            o.subtotal_cents, o.discount_cents, o.shipping_cents, o.tax_cents, o.total_cents,
+            (SELECT COALESCE(SUM(r.amount_cents),0) FROM refunds r WHERE r.order_id = o.id) AS refund_cents
+     FROM orders o WHERE o.payment_status IN ('paid','partially_refunded','refunded') ${range}
+     ORDER BY o.created_at`,
+    ...params,
+  );
+  const m = (v: unknown) => ((Number(v) || 0) / 100).toFixed(2);
+  const csv = toCsv(
+    ["Date", "InvoiceNo", "Customer", "NetSales", "Discount", "Shipping", "Tax", "Total", "Refunds", "Currency"],
+    rows.map((r) => [
+      String(r.created_at).slice(0, 10),
+      r.order_number,
+      r.email,
+      m((Number(r.subtotal_cents) || 0) - (Number(r.discount_cents) || 0)),
+      m(r.discount_cents),
+      m(r.shipping_cents),
+      m(r.tax_cents),
+      m(r.total_cents),
+      m(r.refund_cents),
+      r.currency,
+    ]),
+  );
+  return csvResponse(c, "accounting-sales.csv", csv);
+});
+
+// ---- Journal: a monthly summary as debit/credit lines (manual-journal import) ----
+adminExportRoutes.get("/journal.csv", async (c) => {
+  const rows = await all<Record<string, number | string>>(
+    c.var.db,
+    `SELECT substr(o.created_at,1,7) AS month, o.currency,
+            SUM(o.subtotal_cents - o.discount_cents) AS sales,
+            SUM(o.shipping_cents) AS shipping,
+            SUM(o.tax_cents) AS tax,
+            SUM(o.total_cents) AS total,
+            (SELECT COALESCE(SUM(r.amount_cents),0) FROM refunds r
+               JOIN orders o2 ON o2.id = r.order_id
+               WHERE substr(o2.created_at,1,7) = substr(o.created_at,1,7)) AS refunds
+     FROM orders o WHERE o.payment_status IN ('paid','partially_refunded','refunded')
+     GROUP BY month, o.currency ORDER BY month`,
+  );
+  const m = (v: unknown) => ((Number(v) || 0) / 100).toFixed(2);
+  const lines: unknown[][] = [];
+  for (const r of rows) {
+    const date = `${r.month}-01`;
+    // Debits (money in / expense), Credits (income / liability). Roughly:
+    //   Bank = Sales + Shipping + Tax − Refunds
+    lines.push([date, "Bank / Undeposited funds", m(Number(r.total) - Number(r.refunds)), "", "Net cash collected", r.month, r.currency]);
+    lines.push([date, "Sales revenue", "", m(r.sales), "Net sales (after discounts)", r.month, r.currency]);
+    lines.push([date, "Shipping income", "", m(r.shipping), "Shipping collected", r.month, r.currency]);
+    lines.push([date, "Sales tax payable", "", m(r.tax), "Tax collected", r.month, r.currency]);
+    if (Number(r.refunds) > 0)
+      lines.push([date, "Refunds", m(r.refunds), "", "Refunds issued", r.month, r.currency]);
+  }
+  const csv = toCsv(["Date", "Account", "Debit", "Credit", "Description", "Period", "Currency"], lines);
+  return csvResponse(c, "accounting-journal.csv", csv);
+});
+
 // ---- Reorder suggestions: variants at or below their low-stock threshold ----
 adminExportRoutes.get("/reorder", async (c) => {
   const rows = await all(
