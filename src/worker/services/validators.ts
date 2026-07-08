@@ -366,6 +366,8 @@ const poItemSchema = z.object({
   styleId: z.string().max(80).nullable().optional(),
   quantity: z.number().int().positive(),
   unitCostCents: z.number().int().nonnegative().nullable().optional(),
+  // Optional size run, e.g. {"S":10,"M":20}. When present, quantity is its sum.
+  sizeBreakdown: z.record(z.string().max(20), z.number().int().nonnegative()).nullable().optional(),
 });
 export const productionOrderCreateSchema = z.object({
   supplierId: z.string().min(1).max(80),

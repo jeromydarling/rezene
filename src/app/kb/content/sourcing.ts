@@ -128,7 +128,7 @@ A **Purchase Order (PO)** is a production order to a factory — pilot runs firs
 
 ## Creating a PO
 
-Click **+ New PO**, choose the **supplier**, set currency and (optionally) incoterms and ex-factory date, then add **line items** — a description, an optional style link, a quantity, and a unit cost. Verto:
+Click **+ New PO**, choose the **supplier**, set currency and (optionally) incoterms and ex-factory date, then add **line items** — a description, an optional style link, a quantity, and a unit cost. For a graded run, type a **size run** like \`S:10, M:20, L:15\` instead of a lump quantity and the total is worked out for you. Verto:
 
 - **Auto-numbers** the PO (\`PO-YYYY-NNN\`),
 - Sums the line items into a **running total**.
