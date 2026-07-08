@@ -238,10 +238,13 @@ function Orders() {
 interface OrderItemWithId {
   id: string;
   variantId: string | null;
+  productId: string | null;
+  productSlug: string | null;
   description: string;
   quantity: number;
   unitPriceCents: number;
   currency: string;
+  reviewed: number;
 }
 interface OrderDetailData {
   items: { description: string; quantity: number; unitPriceCents: number; currency: string }[];
@@ -341,6 +344,92 @@ function OrderDetail({ id, onReorder }: { id: string; onReorder: () => void }) {
           }}
           orderId={id}
         />
+      )}
+
+      {/* Reviews — one per purchased piece */}
+      {data.itemsWithIds.some((it) => it.productId && !it.reviewed) && (
+        <div className="rounded-lg border border-ink/10 p-3">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/50">Rate your pieces</p>
+          <div className="space-y-2">
+            {data.itemsWithIds
+              .filter((it) => it.productId && !it.reviewed)
+              .map((it) => (
+                <ReviewRow key={it.id} orderId={id} item={it} onDone={load} />
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewRow({ orderId, item, onDone }: { orderId: string; item: OrderItemWithId; onDone: () => void }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (rating < 1) {
+      toast.error("Pick a star rating");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/api/public/account/orders/${orderId}/review`, {
+        productId: item.productId,
+        rating,
+        title: title || undefined,
+        body: body || undefined,
+      });
+      toast.success("Thanks for the review!");
+      onDone();
+    } catch (e) {
+      toast.error("Couldn't post", e instanceof ApiRequestError ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded border border-ink/8 px-3 py-2 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate">{item.description}</span>
+        {!open && (
+          <button type="button" className="shrink-0 text-terracotta hover:underline" onClick={() => setOpen(true)}>
+            Write a review
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setRating(n)}
+                className={`text-xl leading-none ${n <= rating ? "text-saffron" : "text-ink/25"}`}
+                aria-label={`${n} star${n === 1 ? "" : "s"}`}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+          <input className="input w-full text-sm" placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <textarea
+            className="input w-full text-sm"
+            rows={2}
+            placeholder="How was it? (optional)"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+          <button type="button" className="btn btn-primary !py-1.5 text-sm" disabled={busy} onClick={() => void submit()}>
+            {busy ? "Posting…" : "Post review"}
+          </button>
+        </div>
       )}
     </div>
   );

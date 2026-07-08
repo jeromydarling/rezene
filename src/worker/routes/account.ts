@@ -200,8 +200,11 @@ accountRoutes.get("/orders/:id", async (c) => {
   );
   const itemsWithIds = await all(
     c.var.db,
-    `SELECT id, variant_id AS variantId, description, quantity, unit_price_cents AS unitPriceCents, currency
-     FROM order_items WHERE order_id = ?`,
+    `SELECT oi.id, oi.variant_id AS variantId, oi.product_id AS productId, p.slug AS productSlug,
+            oi.description, oi.quantity, oi.unit_price_cents AS unitPriceCents, oi.currency,
+            (SELECT COUNT(*) FROM product_reviews r WHERE r.order_id = oi.order_id AND r.product_id = oi.product_id) AS reviewed
+     FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+     WHERE oi.order_id = ?`,
     order.id,
   );
   const returns = await all(
@@ -323,6 +326,58 @@ accountRoutes.get("/orders/:id/reorder", async (c) => {
       imageUrl: (r.imageUrl as string) ?? null,
     }));
   return c.json({ items, dropped: rows.length - items.length });
+});
+
+// ---- Reviews (verified buyer only) ----
+accountRoutes.post("/orders/:id/review", async (c) => {
+  const me = await currentCustomer(c);
+  if (!me) return c.json({ error: "Not signed in" }, 401);
+  const order = await first<{ id: string }>(
+    c.var.db,
+    `SELECT id FROM orders WHERE id = ? AND (customer_id = ? OR lower(email) = ?) AND payment_status IN ('paid','partially_refunded')`,
+    c.req.param("id"),
+    me.customer_id,
+    me.email.toLowerCase(),
+  );
+  if (!order) return c.json({ error: "Order not found" }, 404);
+
+  const b = (await c.req.json().catch(() => ({}))) as {
+    productId?: string;
+    rating?: number;
+    title?: string;
+    body?: string;
+  };
+  const rating = Math.round(Number(b.rating));
+  if (!b.productId || !(rating >= 1 && rating <= 5))
+    return c.json({ error: "Pick a rating from 1 to 5." }, 400);
+
+  // Verified buyer: the product must be on this order.
+  const line = await first<{ id: string }>(
+    c.var.db,
+    `SELECT id FROM order_items WHERE order_id = ? AND product_id = ?`,
+    order.id,
+    b.productId,
+  );
+  if (!line) return c.json({ error: "You can only review pieces from this order." }, 400);
+
+  try {
+    await run(
+      c.var.db,
+      `INSERT INTO product_reviews (id, product_id, customer_id, order_id, rating, title, body, author_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      newId("rev"),
+      b.productId,
+      me.customer_id,
+      order.id,
+      rating,
+      (b.title ?? "").slice(0, 120) || null,
+      (b.body ?? "").slice(0, 4000) || null,
+      me.name ?? null,
+    );
+  } catch {
+    return c.json({ error: "You've already reviewed this piece." }, 409);
+  }
+  return c.json({ ok: true }, 201);
 });
 
 // ---- Saved addresses ----
