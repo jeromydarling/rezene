@@ -161,7 +161,21 @@ This is the one designers love: **take a photo of a garment you actually made** 
 > default; if a colour ever looks off in the result, untick **Even out the photo's
 > lighting** and try again with the untouched photo.
 
-Every result saves to **Model renders** at the bottom — click any to reopen it, or delete it. Try-on results are badged **Try-on**.
+Every result saves to **Model renders** at the bottom — click any to reopen it, or delete it. Try-on results are badged **Try-on**, refits **Refit**.
+
+## Refit a look
+
+Fittings spark changes — tighter here, shorter sleeves there. With any render open, use **Refit this look** under the image:
+
+- Tap quick adjustments — **Tighter · Looser · Crop it · Longer hem · Shorter/Longer sleeves · Tucked · Untucked** — you can combine several.
+- Or just describe it: *"sleeves to the elbow, a touch boxier."*
+
+**Refit** re-renders the same person, garment, and scene with only the fit changed, saved as a new render beside the original — so your gallery reads as a fit progression you can compare and share.
+
+The **fit controls below** (ease presets, body length, sleeve length) also shape photoreal generation now, not just the 3D preview — set Oversized and the generated model actually wears it oversized. And remember the sliders' real superpower: they redraft the **sewing pattern**, so once you've settled a fit visually you can pull a production-ready pattern at the same numbers.
+
+> [!NOTE]
+> Refits are generative — perfect for direction and client conversations, not millimetre-true tailoring. For exact numbers, set the fit sliders and download the pattern; for physics-true drape, use the 3D simulation bridge.
 
 ## 3D preview & Pattern
 

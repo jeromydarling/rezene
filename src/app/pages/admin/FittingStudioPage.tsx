@@ -150,6 +150,19 @@ interface SavedLook {
   updatedAt: string;
 }
 
+/** Quick fit adjustments for refitting a finished render — ids match the
+ *  server's vetted REFIT_PRESETS map. */
+const REFIT_CHIPS: { id: string; label: string }[] = [
+  { id: "tighter", label: "Tighter" },
+  { id: "looser", label: "Looser" },
+  { id: "cropped", label: "Crop it" },
+  { id: "longer", label: "Longer hem" },
+  { id: "sleeves-shorter", label: "Shorter sleeves" },
+  { id: "sleeves-longer", label: "Longer sleeves" },
+  { id: "tucked", label: "Tucked" },
+  { id: "untucked", label: "Untucked" },
+];
+
 interface FittingRender {
   id: string;
   url: string;
@@ -284,6 +297,8 @@ export function FittingStudioPage() {
   const [rosterGender, setRosterGender] = useState<"female" | "male">("female");
   const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
   const [evenLighting, setEvenLighting] = useState(true);
+  const [refitSel, setRefitSel] = useState<string[]>([]);
+  const [refitNote, setRefitNote] = useState("");
   const [busyUpload, setBusyUpload] = useState(false);
   const [addingModel, setAddingModel] = useState(false);
 
@@ -347,6 +362,7 @@ export function FittingStudioPage() {
         settingId,
         styleId: styleId || null,
         referenceFileIds: moodboard.map((m) => m.id),
+        fit: { ease: fit.ease, length: fit.length, sleeve: hasSleeve ? fit.sleeve : undefined },
       });
       setActiveRender(res);
       renders.reload();
@@ -387,6 +403,26 @@ export function FittingStudioPage() {
     }
   }
 
+
+  async function runRefit() {
+    if (!activeRender || (refitSel.length === 0 && !refitNote.trim())) return;
+    setRendering(true);
+    try {
+      const res = await api.post<FittingRender>(`/api/admin/fitting/renders/${activeRender.id}/refit`, {
+        adjustments: refitSel,
+        note: refitNote.trim() || undefined,
+      });
+      setActiveRender(res);
+      renders.reload();
+      setRefitSel([]);
+      setRefitNote("");
+      toast.success("Look refitted");
+    } catch (e) {
+      toast.error("Couldn't refit the look", e instanceof Error ? e.message : undefined);
+    } finally {
+      setRendering(false);
+    }
+  }
 
   async function adoptUploadedModel(files: FileList | null) {
     if (!files?.[0]) return;
@@ -576,6 +612,7 @@ export function FittingStudioPage() {
           )}
 
           {view === "model" ? (
+            <>
             <div className="relative h-[540px] w-full bg-white">
               {activeRender ? (
                 <img
@@ -610,6 +647,58 @@ export function FittingStudioPage() {
                 </div>
               )}
             </div>
+            {activeRender && (
+                <div className="border-t border-ink/10 bg-white/70 px-4 py-2.5">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-warmgrey">
+                    Refit this look
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {REFIT_CHIPS.map((chip) => {
+                      const on = refitSel.includes(chip.id);
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          onClick={() =>
+                            setRefitSel((s) => (on ? s.filter((x) => x !== chip.id) : [...s, chip.id]))
+                          }
+                          className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${
+                            on
+                              ? "border-navy bg-navy text-chalk"
+                              : "border-ink/20 bg-white text-ink/70 hover:border-navy hover:text-navy"
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      className="input flex-1 text-xs"
+                      placeholder="Or describe it — e.g. “sleeves to the elbow, a touch boxier”"
+                      value={refitNote}
+                      onChange={(e) => setRefitNote(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") runRefit();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary whitespace-nowrap text-xs"
+                      onClick={runRefit}
+                      disabled={
+                        rendering ||
+                        (refitSel.length === 0 && !refitNote.trim()) ||
+                        (capabilities.data && !capabilities.data.referenceGen.available) === true
+                      }
+                    >
+                      {rendering ? "Refitting…" : "Refit"}
+                    </button>
+                  </div>
+                </div>
+            )}
+            </>
           ) : view === "3d" ? (
             <div className="h-[540px] w-full">
               <Viewer garment={garment} fit={fit} fabric={fabric} color={color} spin={spin} showBody={showBody} />
@@ -1195,9 +1284,9 @@ export function FittingStudioPage() {
                 >
                   <img src={r.url} alt="Model render" className="aspect-[3/4] w-full object-cover" />
                 </button>
-                {r.kind === "tryon" && (
+                {(r.kind === "tryon" || r.kind === "refit") && (
                   <span className="absolute left-1.5 top-1.5 rounded-full bg-navy/85 px-1.5 py-0.5 text-[10px] text-chalk">
-                    Try-on
+                    {r.kind === "tryon" ? "Try-on" : "Refit"}
                   </span>
                 )}
                 <button
