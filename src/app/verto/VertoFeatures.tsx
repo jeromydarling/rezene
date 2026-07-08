@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { MagneticButton, Reveal, StaggerWords } from "./cinema";
 import { DEMO_SHOP_BASE } from "../lib/shop";
@@ -914,8 +914,55 @@ function TechPackShowcase() {
   );
 }
 
+// The tabs mirror the admin app's own sidebar groups — same names, same
+// order — so the tour doubles as a map of the product you'll actually run.
+// Only groups with tour content appear.
+const FEATURE_TABS: { group: string; blurb: string; ids: string[] }[] = [
+  { group: "Catalog", blurb: "Products, styles, SKUs, inventory — and an AI import studio that does the data entry.", ids: ["import"] },
+  { group: "Content", blurb: "Pages, journal, lookbooks, SEO, translations — a storefront you actually edit.", ids: ["storefront", "seo", "lookbooks", "translations"] },
+  { group: "Marketing", blurb: "Campaign kits, a content calendar, and a promo-video studio.", ids: ["marketing", "promo-video"] },
+  { group: "Commerce", blurb: "Orders, shipping, wholesale — and the whole modern shop around them.", ids: ["shipping", "wholesale"] },
+  { group: "Production", blurb: "The calendar, your factories, samples — and finding your next maker.", ids: ["production", "sourcing", "factory"] },
+  { group: "Studio", blurb: "Design it, fit it, cut it — the three studios, and tech packs a factory can build from.", ids: ["design-studio", "fitting-studio", "pattern-studio", "techpacks"] },
+  { group: "Finance", blurb: "Costing, duties, analytics — the money picture from real data.", ids: ["costing", "analytics"] },
+  { group: "System", blurb: "Your own domain, your team, your data — a real platform underneath.", ids: ["platform"] },
+];
+
+function tabForHash(hash: string): string | null {
+  const h = hash.replace("#", "");
+  const byFeature = FEATURE_TABS.find((t) => t.ids.includes(h));
+  if (byFeature) return byFeature.group;
+  const byGroup = FEATURE_TABS.find((t) => `g-${t.group.toLowerCase()}` === h);
+  return byGroup ? byGroup.group : null;
+}
+
 export function VertoFeatures() {
   const navigate = useNavigate();
+  // Lead with the Studio — the differentiator — unless a deep link says otherwise.
+  const [tab, setTab] = useState<string>(
+    () => tabForHash(typeof window !== "undefined" ? window.location.hash : "") ?? "Studio",
+  );
+
+  // Deep links to a specific feature (#pattern-studio) open its tab, then scroll.
+  useEffect(() => {
+    const h = window.location.hash.replace("#", "");
+    if (h && FEATURE_TABS.some((t) => t.ids.includes(h))) {
+      const el = document.getElementById(h);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const active = FEATURE_TABS.find((t) => t.group === tab) ?? FEATURE_TABS[5];
+  const features = active.ids
+    .map((id) => FEATURES.find((f) => f.id === id))
+    .filter((f): f is (typeof FEATURES)[number] => Boolean(f));
+
+  function pickTab(group: string) {
+    setTab(group);
+    window.history.replaceState(null, "", `#g-${group.toLowerCase()}`);
+  }
+
   return (
     <div className="pt-24 md:pt-28">
       <div className="mx-auto max-w-6xl px-5 pb-24">
@@ -928,33 +975,39 @@ export function VertoFeatures() {
           </h1>
           <Reveal delay={500}>
             <p className="prose-editorial mx-auto mt-4 max-w-2xl">
-              Eighteen modules, one database, zero copy-paste between tools. Every screen below is
-              the real interface, miniaturized — and the{" "}
-              <a href={`${DEMO_SHOP_BASE}/admin`} className="link-quiet">demo admin</a> is open if
-              you want to drive.
+              One database, zero copy-paste between tools — organised below exactly like the app
+              you'll run: same rooms, same names. Every screen is the real interface, miniaturized —
+              and the <a href={`${DEMO_SHOP_BASE}/admin`} className="link-quiet">demo admin</a> is
+              open if you want to drive.
             </p>
           </Reveal>
         </div>
 
-        {/* Index: jump chips */}
+        {/* Tabs — the app's own sidebar groups */}
         <Reveal delay={200}>
-          <div className="mb-16 flex flex-wrap justify-center gap-2">
-            {FEATURES.map((f) => (
-              <a
-                key={f.id}
-                href={`#${f.id}`}
-                className="rounded-full border border-ink/15 px-3 py-1 text-[0.68rem] font-medium uppercase tracking-wider text-ink/70 transition-colors hover:border-navy hover:text-navy"
-              >
-                {f.eyebrow}
-              </a>
-            ))}
+          <div className="sticky top-16 z-20 -mx-5 mb-3 overflow-x-auto px-5 py-2 md:top-20">
+            <div className="mx-auto flex w-max gap-1 rounded-full border border-ink/10 bg-white/95 p-1 shadow-sm backdrop-blur">
+              {FEATURE_TABS.map((t) => (
+                <button
+                  key={t.group}
+                  type="button"
+                  onClick={() => pickTab(t.group)}
+                  className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[0.68rem] font-medium uppercase tracking-wider transition-colors ${
+                    tab === t.group ? "bg-navy text-chalk" : "text-ink/60 hover:text-navy"
+                  }`}
+                >
+                  {t.group}
+                </button>
+              ))}
+            </div>
           </div>
         </Reveal>
+        <p className="mb-12 text-center text-sm text-warmgrey">{active.blurb}</p>
 
-        {/* The tour */}
-        <div className="space-y-20 md:space-y-28">
-          {FEATURES.map((f, i) => (
-            <section key={f.id} id={f.id} className="grid scroll-mt-24 items-center gap-8 md:grid-cols-2 md:gap-12">
+        {/* The tour — one room at a time */}
+        <div key={tab} className="space-y-20 md:space-y-28">
+          {features.map((f, i) => (
+            <section key={f.id} id={f.id} className="grid scroll-mt-36 items-center gap-8 md:grid-cols-2 md:gap-12">
               <div className={i % 2 === 1 ? "md:order-2" : ""}>
                 <Reveal>
                   <p className="font-display text-4xl font-light text-ink/10">{String(i + 1).padStart(2, "0")}</p>
@@ -984,13 +1037,11 @@ export function VertoFeatures() {
               </Reveal>
             </section>
           ))}
+
+          {/* Group-specific showcases live inside their room. */}
+          {tab === "Commerce" && <ModernShopGrid />}
+          {tab === "Studio" && <TechPackShowcase />}
         </div>
-
-        {/* A modern shop, out of the box */}
-        <ModernShopGrid />
-
-        {/* Category killer: tech packs head-to-head */}
-        <TechPackShowcase />
 
         {/* Close */}
         <div className="mt-24 text-center">
