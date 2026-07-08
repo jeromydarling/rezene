@@ -87,6 +87,7 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/brand", label: "Brand Studio", icon: Palette },
       { to: "/admin/brand/print", label: "Print Shop", icon: FileText },
+      { to: "/admin/brand/guidelines", label: "Guidelines & Kit", icon: BookOpen },
     ],
   },
   {
