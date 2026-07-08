@@ -208,6 +208,11 @@ export interface BrandLogo {
   faviconUrl?: string | null;
 }
 
+/** The shop's typography — a heading/body pairing keyed into TYPE_PAIRINGS. */
+export interface BrandTypography {
+  pairing: string;
+}
+
 export interface BrandSettings {
   brandName: string;
   tagline: string;
@@ -219,6 +224,7 @@ export interface BrandSettings {
   /** Visual identity — logo + colour system. Null until the shop sets one. */
   logo?: BrandLogo | null;
   palette?: BrandPalette | null;
+  typography?: BrandTypography | null;
 }
 
 export type LeadKind =

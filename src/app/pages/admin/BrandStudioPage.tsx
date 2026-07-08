@@ -4,12 +4,15 @@ import { BrandMark, paletteVars } from "../../components/BrandMark";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
 import { useToast } from "../../lib/toast";
-import type { BrandLogo, BrandPalette, BrandSettings, BrandWordmark } from "../../../shared/types";
+import type { BrandLogo, BrandPalette, BrandSettings, BrandTypography, BrandWordmark } from "../../../shared/types";
 import {
   BRAND_FONTS,
   DEFAULT_PALETTE,
+  DEFAULT_TYPOGRAPHY,
   DEFAULT_WORDMARK,
   PALETTE_PRESETS,
+  TYPE_PAIRINGS,
+  typePairing,
 } from "../../../shared/brand-identity";
 
 type LogoTab = "wordmark" | "upload" | "emblem";
@@ -21,10 +24,15 @@ export function BrandStudioPage() {
 
   const [logo, setLogo] = useState<BrandLogo | null>(null);
   const [palette, setPalette] = useState<BrandPalette>(DEFAULT_PALETTE);
+  const [typography, setTypography] = useState<BrandTypography>(DEFAULT_TYPOGRAPHY);
   const [tab, setTab] = useState<LogoTab>("wordmark");
   const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState<"upload" | "upload-dark" | "emblem" | "palette" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "upload-dark" | "emblem" | "palette" | "generate" | null>(null);
   const [vibe, setVibe] = useState("");
+  // Brand-in-a-box (AI full-identity generator).
+  const [makes, setMakes] = useState("");
+  const [genVibe, setGenVibe] = useState("");
+  const [suggestion, setSuggestion] = useState<{ tagline: string; voice: string } | null>(null);
   const [emblemPrompt, setEmblemPrompt] = useState("");
   const [emblemUrl, setEmblemUrl] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -33,6 +41,7 @@ export function BrandStudioPage() {
   useEffect(() => {
     if (!settings.data || hydrated) return;
     setPalette(settings.data.palette ?? DEFAULT_PALETTE);
+    setTypography(settings.data.typography ?? DEFAULT_TYPOGRAPHY);
     if (settings.data.logo) {
       setLogo(settings.data.logo);
       setTab(settings.data.logo.kind === "image" ? "upload" : "wordmark");
@@ -41,6 +50,19 @@ export function BrandStudioPage() {
     }
     setHydrated(true);
   }, [settings.data, hydrated]);
+
+  // Load the selected pairing's web fonts so the preview is truthful.
+  useEffect(() => {
+    const p = typePairing(typography.pairing);
+    if (!p.googleUrl) return;
+    const id = `brand-font-${p.key}`;
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = p.googleUrl;
+    document.head.appendChild(link);
+  }, [typography.pairing]);
 
   const wordmark: BrandWordmark = logo?.wordmark ?? DEFAULT_WORDMARK(brandName);
   const setWordmark = (patch: Partial<BrandWordmark>) =>
@@ -95,6 +117,43 @@ export function BrandStudioPage() {
     }
   }
 
+  async function generateIdentity() {
+    setBusy("generate");
+    try {
+      const res = await api.post<{
+        palette: BrandPalette;
+        typography: BrandTypography;
+        wordmark: BrandWordmark;
+        tagline: string;
+        voice: string;
+      }>("/api/admin/brand/generate", {
+        brandName,
+        makes: makes.trim() || undefined,
+        vibe: genVibe.trim() || undefined,
+      });
+      setPalette(res.palette);
+      setTypography(res.typography);
+      setLogo({ kind: "wordmark", wordmark: { ...res.wordmark, text: brandName } });
+      setTab("wordmark");
+      setSuggestion({ tagline: res.tagline, voice: res.voice });
+      toast.success("Identity generated", "Tweak anything, then save.");
+    } catch (e) {
+      toast.error("Couldn't generate an identity", e instanceof Error ? e.message : undefined);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function applyTagline() {
+    if (!suggestion?.tagline) return;
+    try {
+      await api.patch("/api/admin/settings", { brand_tagline: suggestion.tagline });
+      toast.success("Tagline saved");
+    } catch {
+      toast.error("Couldn't save the tagline");
+    }
+  }
+
   async function suggestPalette() {
     setBusy("palette");
     try {
@@ -127,6 +186,7 @@ export function BrandStudioPage() {
       await api.patch("/api/admin/settings", {
         brand_logo: JSON.stringify(toSave),
         brand_palette: JSON.stringify(palette),
+        brand_typography: JSON.stringify(typography),
       });
       toast.success("Brand identity saved", "It's live across your storefront.");
       settings.reload();
@@ -150,6 +210,62 @@ export function BrandStudioPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         {/* Controls */}
         <div className="space-y-5">
+          {/* Brand in a box — AI full-identity generator */}
+          <div className="admin-card space-y-3 border-navy/20 bg-navy/[0.03] p-5">
+            <div>
+              <h2 className="font-display text-lg font-light">✦ Brand in a box</h2>
+              <p className="text-[11px] text-warmgrey">
+                New label? Answer two questions and generate a full identity — palette, type, logo, and a
+                tagline — then tweak anything.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                className="input !py-1.5 text-sm"
+                value={makes}
+                onChange={(e) => setMakes(e.target.value)}
+                placeholder="What you make (e.g. linen resortwear)"
+              />
+              <input
+                className="input !py-1.5 text-sm"
+                value={genVibe}
+                onChange={(e) => setGenVibe(e.target.value)}
+                placeholder="Vibe (e.g. warm, coastal, refined)"
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary w-full"
+              disabled={busy === "generate"}
+              onClick={() => void generateIdentity()}
+            >
+              {busy === "generate" ? "Designing your brand…" : `Generate an identity for ${brandName}`}
+            </button>
+            {suggestion && (
+              <div className="space-y-2 rounded-md border border-ink/10 bg-white p-3">
+                {suggestion.tagline && (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm">
+                      <span className="text-warmgrey">Tagline:</span>{" "}
+                      <span className="font-medium">{suggestion.tagline}</span>
+                    </p>
+                    <button type="button" className="btn btn-secondary !py-1 text-xs" onClick={() => void applyTagline()}>
+                      Use tagline
+                    </button>
+                  </div>
+                )}
+                {suggestion.voice && (
+                  <p className="text-[11px] leading-snug text-warmgrey">
+                    <span className="font-semibold text-ink/70">Voice:</span> {suggestion.voice}{" "}
+                    <a href="/admin/content/pages" className="link-quiet">
+                      set it in Brand voice →
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Logo */}
           <div className="admin-card p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-warmgrey">Logo</h2>
@@ -405,6 +521,35 @@ export function BrandStudioPage() {
             </div>
           </div>
 
+          {/* Typography */}
+          <div className="admin-card p-5">
+            <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-warmgrey">Typography</h2>
+            <p className="mb-3 text-[11px] text-warmgrey">
+              The heading + body pairing your whole storefront is set in.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {TYPE_PAIRINGS.map((p) => {
+                const on = typography.pairing === p.key;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setTypography({ pairing: p.key })}
+                    className={`rounded-md border p-2.5 text-left ${on ? "border-navy ring-1 ring-navy" : "border-ink/15 hover:border-ink/40"}`}
+                    title={p.mood}
+                  >
+                    <span style={{ fontFamily: p.headingFamily }} className="block text-lg leading-tight">
+                      {brandName}
+                    </span>
+                    <span style={{ fontFamily: p.bodyFamily }} className="block text-[11px] text-warmgrey">
+                      {p.label} · Aa Bb Cc 123
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>
             {saving ? "Saving…" : "Save brand identity"}
           </button>
@@ -424,8 +569,19 @@ export function BrandStudioPage() {
               </div>
             </div>
             {/* storefront body */}
-            <div className="px-5 py-6" style={{ background: palette.bg, color: palette.ink }}>
-              <BrandMark logo={effectiveLogo} palette={palette} brandName={brandName} height={40} />
+            <div
+              className="px-5 py-6"
+              style={{ background: palette.bg, color: palette.ink, fontFamily: typePairing(typography.pairing).bodyFamily }}
+            >
+              <p
+                className="text-2xl"
+                style={{ fontFamily: typePairing(typography.pairing).headingFamily }}
+              >
+                Dressed for the last light.
+              </p>
+              <div className="mt-2">
+                <BrandMark logo={effectiveLogo} palette={palette} brandName={brandName} height={34} />
+              </div>
               <p className="mt-3 max-w-xs text-sm" style={{ opacity: 0.8 }}>
                 {settings.data?.tagline || "Your tagline sets the tone for the whole shop."}
               </p>

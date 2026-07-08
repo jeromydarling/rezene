@@ -35,6 +35,7 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
     // Visual identity (managed from the Brand Studio) — JSON blobs.
     "brand_logo",
     "brand_palette",
+    "brand_typography",
     // Search & sharing (managed from the Search Checkup screen)
     "search_visibility",
     "default_og_image",
