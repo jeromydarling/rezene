@@ -167,8 +167,10 @@ Every result saves to **Model renders** at the bottom — click any to reopen it
 
 Fittings spark changes — tighter here, shorter sleeves there. With any render open, use **Refit this look** under the image:
 
-- Tap quick adjustments — **Tighter · Looser · Crop it · Longer hem · Shorter/Longer sleeves · Tucked · Untucked** — you can combine several.
-- Or just describe it: *"sleeves to the elbow, a touch boxier."*
+- **Fit** chips change the garment: **Tighter · Looser · Crop it · Longer hem · Shorter/Longer sleeves**.
+- **Styling** chips change how it's worn: **Full tuck · French tuck · Untucked** (pick one), **Roll the sleeves**, **Cuff the pants**, **Open collar · Buttoned up** (pick one).
+- **Finish** chips get it presentation-ready: **Complete the outfit** and **Press it** (freshly-steamed fabric).
+- Combine chips across rows, or just describe it: *"sleeves to the elbow, a touch boxier."*
 
 **Refit** re-renders the same person, garment, and scene with only the fit changed, saved as a new render beside the original — so your gallery reads as a fit progression you can compare and share.
 
