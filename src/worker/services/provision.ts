@@ -31,7 +31,12 @@ function generatePassword(): string {
   return `${randomToken(3)}-${randomToken(3)}-${randomToken(3)}`;
 }
 
-export async function provisionShop(env: Env, shop: Shop, ownerEmail: string): Promise<ProvisionResult> {
+export async function provisionShop(
+  env: Env,
+  shop: Shop,
+  ownerEmail: string,
+  opts?: { brandImportUrl?: string | null },
+): Promise<ProvisionResult> {
   const db = getShopDb(env, shop.id, PRIMARY_SHOP_ID);
 
   // Idempotency: a shop with users is already provisioned.
@@ -73,6 +78,11 @@ export async function provisionShop(env: Env, shop: Shop, ownerEmail: string): P
       "Homepage hero content (JSON) — edited under Admin → Content → Pages",
     ],
   ];
+  // If they gave a current website at signup, queue a one-click brand import
+  // that's waiting in the Brand Studio the first time they open it.
+  if (opts?.brandImportUrl) {
+    settings.push(["brand_import_url", opts.brandImportUrl, "Website queued for brand import (onboarding)"]);
+  }
   for (const [key, value, description] of settings) {
     await run(
       db,
