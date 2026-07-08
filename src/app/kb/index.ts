@@ -6,6 +6,7 @@ import { sourcing } from "./content/sourcing";
 import { finance } from "./content/finance";
 import { marketing } from "./content/marketing";
 import { commerceAccount } from "./content/commerceAccount";
+import { commerceNew } from "./content/commerceNew";
 
 export type { KbArticle, KbPart, KbHeading } from "./types";
 
@@ -30,6 +31,7 @@ export const KB_ARTICLES: KbArticle[] = [
   ...finance,
   ...marketing,
   ...commerceAccount,
+  ...commerceNew,
 ];
 
 const BASE_ORDER = new Map(KB_ARTICLES.map((a, i) => [a.slug, i]));

@@ -933,6 +933,9 @@ export function VertoFeatures() {
           ))}
         </div>
 
+        {/* A modern shop, out of the box */}
+        <ModernShopGrid />
+
         {/* Category killer: tech packs head-to-head */}
         <TechPackShowcase />
 
@@ -966,5 +969,77 @@ export function VertoFeatures() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------- A modern shop, out of the box ----------
+const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
+  {
+    group: "Sell",
+    items: [
+      ["Real checkout & payments", "Stripe checkout, live carrier rates, pre-orders that can't oversell."],
+      ["Discounts & tax", "Make a code your customers type; switch on sales tax/VAT with one toggle."],
+      ["Search & merchandising", "Instant search, size/category/price facets, and “only N left” urgency."],
+      ["Product reviews", "Only verified buyers can review — trustworthy by construction, great for SEO."],
+    ],
+  },
+  {
+    group: "Keep customers",
+    items: [
+      ["Customer accounts", "Passwordless sign-in, order tracking, one-tap reorder, saved addresses, wishlist."],
+      ["Returns in a click", "Shoppers start a return; you approve to refund and restock in one step."],
+      ["Win-back automations", "Real back-in-stock waitlists and abandoned-cart recovery, on brand."],
+      ["Email your customers", "Broadcast to buyers or repeat customers in your colours, unsubscribes honoured."],
+    ],
+  },
+  {
+    group: "Grow & run it",
+    items: [
+      ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
+      ["Data export", "Products, customers and orders as CSV — yours to take anywhere."],
+      ["Reorder signals", "Every piece running low, with its 90-day pace and a suggested reorder."],
+      ["Digital Product Passport", "A public, printable passport per piece — composition, care, origin."],
+    ],
+  },
+];
+
+function ModernShopGrid() {
+  return (
+    <section className="mt-24 scroll-mt-24">
+      <div className="text-center">
+        <Reveal>
+          <p className="eyebrow !text-terracotta">And the whole shop around it</p>
+        </Reveal>
+        <Reveal delay={100}>
+          <h2 className="mt-2 font-display text-3xl font-light md:text-4xl">
+            A modern storefront, out of the box.
+          </h2>
+        </Reveal>
+        <Reveal delay={200}>
+          <p className="prose-editorial mx-auto mt-3 max-w-2xl">
+            The design-to-factory tools are only half of it. Everything a boutique needs to actually
+            sell, keep customers, and run the business is built in — no plugins, no extra bills.
+          </p>
+        </Reveal>
+      </div>
+
+      <div className="mt-12 grid gap-8 md:grid-cols-3">
+        {MODERN_SHOP.map((col, ci) => (
+          <Reveal key={col.group} delay={150 + ci * 100}>
+            <div>
+              <p className="eyebrow mb-4">{col.group}</p>
+              <ul className="space-y-4">
+                {col.items.map(([title, blurb]) => (
+                  <li key={title} className="border-l-2 border-palm/40 pl-3">
+                    <p className="text-sm font-medium">{title}</p>
+                    <p className="text-sm text-ink/70">{blurb}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </section>
   );
 }
