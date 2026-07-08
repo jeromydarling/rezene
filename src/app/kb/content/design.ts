@@ -190,4 +190,35 @@ Every result saves to **Model renders** at the bottom — click any to reopen it
 
 Virtual try-on, refits, and mood-board style-matching use a best-in-class engine (fal.ai) that a platform admin enables with an API key — until then the page shows a short "needs a key" note.`,
   },
+  {
+    slug: "pattern-studio",
+    title: "The Pattern Studio: real sewing patterns",
+    summary: "Draft manufacturable 2D patterns — graded to a size or a person's measurements — and download the SVG.",
+    part: "design",
+    moduleRoute: "/admin/patterns",
+    keywords: "pattern studio sewing pattern freesewing block draft made to measure seam allowance grade size tailor seamstress svg cut",
+    updated: "2026-07-08",
+    body: `# The Pattern Studio
+
+For the shops with a tailor or seamstress in the room: the Pattern Studio drafts **real, manufacturable 2D sewing patterns** in your browser — genuine flat pattern pieces (front, back, sleeve) you can print, cut, and sew. Not a picture of a pattern; the pattern.
+
+## Draft one
+
+1. Pick a **pattern block** — T-shirt, hoodie/sweatshirt, slip dress, trouser, or skirt.
+2. Choose a **size** (XS–XXL), or go **made-to-measure**: enter a person's chest, waist, hips, and height and the pattern drafts to their body.
+3. **Adjust the cut.** The sliders drive the block's own drafting options — extra ease through the body, hem length (cropped to longline), sleeve length — so the pattern pieces genuinely redraft, seams and all.
+4. Choose your output: a drawn **1 cm seam allowance**, and **dimensions printed on the pattern** (paperless mode — measure and mark directly instead of printing at scale).
+5. **Download SVG** — hand it to your machinist, or open it in any vector tool to refine. **Save to library** keeps a copy with your shop files.
+
+> [!TIP]
+> In a hurry? **✨ Describe the garment** — *"a boxy cropped tee"* — and the studio picks the block, size, and adjustments for you. Fine-tune from there.
+
+## A made-to-measure client book
+
+**Save this pattern** stores the whole recipe — block, size, measurements, adjustments. Name it after a client and their pattern reloads with one click next season; link it to a **style** to keep it with the rest of that piece's story. This is the quiet superpower for ateliers doing alterations and one-offs.
+
+## Honest limits
+
+Grading from a standard size is a proportional first pass — good enough to start cutting a toile, not an industrial graded nest. Made-to-measure drafts use your numbers directly and are correspondingly better. The five blocks are foundations to build on; more are coming.`,
+  },
 ];
