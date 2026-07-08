@@ -3,78 +3,14 @@ import { all, first, jsonArray, run, writeAudit } from "../services/db";
 import {
   aiConceptCreateSchema,
   aiConceptUpdateSchema,
-  aiPromptCreateSchema,
   parseBody,
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
 import type { AppContext } from "../types/env";
-import type { AdminAiConcept, AdminAiPrompt } from "../../shared/types";
+import type { AdminAiConcept } from "../../shared/types";
 
 export const adminAiRoutes = new Hono<AppContext>();
-
-// ---------- Prompt library ----------
-adminAiRoutes.get("/prompts", async (c) => {
-  const rows = await all<Record<string, unknown>>(
-    c.var.db,
-    `SELECT * FROM ai_prompts ORDER BY is_preset DESC, category, name`,
-  );
-  const prompts: AdminAiPrompt[] = rows.map((r) => ({
-    id: r.id as string,
-    name: r.name as string,
-    category: r.category as string,
-    targetTool: r.target_tool as string,
-    promptText: r.prompt_text as string,
-    version: r.version as number,
-    isPreset: Boolean(r.is_preset),
-    notes: (r.notes as string) ?? null,
-  }));
-  return c.json(prompts);
-});
-
-adminAiRoutes.post("/prompts", requireAdminWrite, async (c) => {
-  const body = await parseBody(c, aiPromptCreateSchema);
-  const id = newId("aip");
-  await run(
-    c.var.db,
-    `INSERT INTO ai_prompts (id, name, category, target_tool, prompt_text, notes)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    id,
-    body.name,
-    body.category,
-    body.targetTool ?? "claude",
-    body.promptText,
-    body.notes ?? null,
-  );
-  return c.json({ id }, 201);
-});
-
-/** Version a prompt: creates a new row pointing at its parent. */
-adminAiRoutes.post("/prompts/:id/version", requireAdminWrite, async (c) => {
-  const parentId = c.req.param("id");
-  const body = await parseBody(c, aiPromptCreateSchema.pick({ promptText: true, notes: true }).partial({ notes: true }));
-  const parent = await first<Record<string, unknown>>(
-    c.var.db,
-    `SELECT * FROM ai_prompts WHERE id = ?`,
-    parentId,
-  );
-  if (!parent) return c.json({ error: "Prompt not found" }, 404);
-  const id = newId("aip");
-  await run(
-    c.var.db,
-    `INSERT INTO ai_prompts (id, name, category, target_tool, prompt_text, version, parent_prompt_id, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    id,
-    parent.name,
-    parent.category,
-    parent.target_tool,
-    body.promptText,
-    (parent.version as number) + 1,
-    parentId,
-    body.notes ?? null,
-  );
-  return c.json({ id, version: (parent.version as number) + 1 }, 201);
-});
 
 // ---------- Concepts ----------
 const CONCEPT_SELECT = `
@@ -338,6 +274,10 @@ adminAiRoutes.post("/concepts/:id/generate", requireAdminWrite, async (c) => {
   if (!(await first(c.var.db, `SELECT id FROM ai_concepts WHERE id = ?`, id))) {
     return c.json({ error: "Concept not found" }, 404);
   }
+  // Workers AI Flux isn't free — cap generation batches per shop per day.
+  const { reserveDesignQuota, designQuotaExceededBody } = await import("../services/ai-quota");
+  const quota = await reserveDesignQuota(c);
+  if (!quota.ok) return c.json(designQuotaExceededBody(quota), 429);
   let prompt = body.prompt.trim();
   if (body.useHouseStyle) {
     const hs = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = ?`, HOUSE_STYLE_KEY);
@@ -578,40 +518,4 @@ Thank you.`,
   return c.json({ styleId, sampleId, techPackId, shareUrl, emailed, makerName }, 201);
 });
 
-// ---------- External tool exports (Midjourney / Firefly / CLO bridges) ----------
-adminAiRoutes.get("/external-exports", async (c) => {
-  const rows = await all(
-    c.var.db,
-    `SELECT id, tool, entity_type, entity_id, title, external_url, metadata_json, created_at
-     FROM external_tool_exports ORDER BY created_at DESC LIMIT 200`,
-  );
-  return c.json(rows);
-});
 
-adminAiRoutes.post("/external-exports", requireAdminWrite, async (c) => {
-  const body = (await c.req.json().catch(() => null)) as {
-    tool?: string;
-    entityType?: string;
-    entityId?: string;
-    title?: string;
-    externalUrl?: string;
-    metadata?: unknown;
-  } | null;
-  if (!body?.tool || typeof body.tool !== "string") {
-    return c.json({ error: "tool is required" }, 400);
-  }
-  const id = newId("ext");
-  await run(
-    c.var.db,
-    `INSERT INTO external_tool_exports (id, tool, entity_type, entity_id, title, external_url, metadata_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    id,
-    body.tool.slice(0, 40),
-    body.entityType?.slice(0, 40) ?? null,
-    body.entityId?.slice(0, 80) ?? null,
-    body.title?.slice(0, 300) ?? null,
-    body.externalUrl?.slice(0, 1000) ?? null,
-    body.metadata ? JSON.stringify(body.metadata) : null,
-  );
-  return c.json({ id }, 201);
-});

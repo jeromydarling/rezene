@@ -116,6 +116,24 @@ interface UseTargetItem {
   title?: string;
 }
 
+/** A mid-fitting reload shouldn't lose the setup — persist the selections
+ *  (not the renders; those live server-side) in localStorage. */
+const SETUP_KEY = "verto:fitting:setup";
+interface FittingSetup {
+  garmentPhoto?: UploadedImg | null;
+  modelSels?: { kind: "roster" | "shop"; id: string }[];
+  category?: "auto" | "tops" | "bottoms" | "one-pieces";
+  rosterGender?: "female" | "male";
+  evenLighting?: boolean;
+}
+function loadSetup(): FittingSetup {
+  try {
+    return JSON.parse(localStorage.getItem(SETUP_KEY) ?? "{}") as FittingSetup;
+  } catch {
+    return {};
+  }
+}
+
 export function FittingStudioPage() {
   const toast = useToast();
   const [rendering, setRendering] = useState(false);
@@ -127,17 +145,18 @@ export function FittingStudioPage() {
   const garmentSources = useFetch<GarmentSource[]>("/api/admin/fitting/garment-sources");
   const quota = useFetch<QuotaInfo>("/api/admin/fitting/quota");
 
-  const [garmentPhoto, setGarmentPhoto] = useState<UploadedImg | null>(null);
+  const [setup] = useState<FittingSetup>(loadSetup);
+  const [garmentPhoto, setGarmentPhoto] = useState<UploadedImg | null>(setup.garmentPhoto ?? null);
   const [garmentSource, setGarmentSource] = useState<"studio" | "upload">("studio");
   // Up to three models — one try-on each, so a garment can be judged across
   // different bodies in a single pass (a mini line review).
-  const [modelSels, setModelSels] = useState<{ kind: "roster" | "shop"; id: string }[]>([]);
+  const [modelSels, setModelSels] = useState<{ kind: "roster" | "shop"; id: string }[]>(setup.modelSels ?? []);
   const [progress, setProgress] = useState("");
   const [compareWith, setCompareWith] = useState<FittingRender | null>(null);
   const [colorwayText, setColorwayText] = useState("");
-  const [rosterGender, setRosterGender] = useState<"female" | "male">("female");
-  const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
-  const [evenLighting, setEvenLighting] = useState(true);
+  const [rosterGender, setRosterGender] = useState<"female" | "male">(setup.rosterGender ?? "female");
+  const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">(setup.category ?? "auto");
+  const [evenLighting, setEvenLighting] = useState(setup.evenLighting ?? true);
   const [refitSel, setRefitSel] = useState<string[]>([]);
   const [refitNote, setRefitNote] = useState("");
   const [showGrid, setShowGrid] = useState(false);
@@ -162,6 +181,18 @@ export function FittingStudioPage() {
       setGarmentSource("studio");
     }
   }, []);
+
+  // Persist the setup so a reload mid-fitting picks up where it left off.
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SETUP_KEY,
+        JSON.stringify({ garmentPhoto, modelSels, category, rosterGender, evenLighting } satisfies FittingSetup),
+      );
+    } catch {
+      // Storage full or unavailable — persistence is best-effort.
+    }
+  }, [garmentPhoto, modelSels, category, rosterGender, evenLighting]);
 
   async function uploadImage(file: File): Promise<UploadedImg> {
     const form = new FormData();
