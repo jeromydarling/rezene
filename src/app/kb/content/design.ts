@@ -66,9 +66,9 @@ You don't have to build from a blank page. Create a tech pack **from a template*
     summary: "Generate real garment concepts with Flux, iterate, and ship them to a maker.",
     part: "design",
     moduleRoute: "/admin/ai-concepts",
-    keywords: "design studio flux ai image generate concept reference prompt lookbook ship maker sample",
+    keywords: "design studio flux ai image generate concept reference prompt lookbook ship maker sample rename archive delete download",
     screenshot: "/kb/shots/design-studio.png",
-    updated: "2026-07-06",
+    updated: "2026-07-08",
     body: `# The LLM Design Studio
 
 The Design Studio turns an idea into real, editable garment imagery — powered by **Flux**, built in. No external tools and no bring-your-own API keys.
@@ -83,9 +83,13 @@ The Design Studio turns an idea into real, editable garment imagery — powered 
 
 Upload up to a few **reference images** (a mood shot, a fabric, an existing piece) and Flux (FLUX.2) conditions the generation on them — carrying tone, drape, and detail across your concepts for a consistent line.
 
+## Keep the studio tidy
+
+Designs live in the left rail, newest first. **Rename** a design any time, **Archive** it when a direction is parked (archived designs tuck away under "Show archived"), or **Delete** it outright — deleting removes its generated looks too, so storage stays clean.
+
 ## Use a look on your site
 
-Love an image? Use it right away — attach it to a **product**, a **page**, or a **lookbook** without leaving the studio.
+Love an image? Use it right away — attach it to a **product** or a **lookbook** without leaving the studio, or hit **⤓** on any look to download the image itself. From the same hover bar, **▦ try on** sends the look straight to the Fitting Studio.
 
 ## Ship to a maker {#ship-to-a-maker}
 
@@ -124,35 +128,22 @@ Found a fit problem in simulation? **Log a fit issue** and Verto files a **sampl
   },
   {
     slug: "look-studio",
-    title: "The Look Studio: your garment on a model",
-    summary: "Try a real garment photo on a model, or generate one from a mood board — plus 3D and patterns.",
+    title: "The Fitting Studio: your garment on a model",
+    summary: "Try a real garment photo on a model, refit and style it, then send it to your site.",
     part: "design",
     moduleRoute: "/admin/fitting",
     keywords: "fitting room look studio virtual try on model mood board pinterest generate ai image garment photo drape 3d pattern freesewing",
     screenshot: "/kb/shots/fitting.png",
     updated: "2026-07-08",
-    body: `# The Look Studio
+    body: `# The Fitting Studio
 
-The Fitting Room has three views. The headline is **On a model** — see any garment on a photoreal body in seconds — backed by two more that do real production work: a **3D preview** and a downloadable **sewing pattern**.
+One job, done properly: **see a real garment on a real body before you cut, buy, or shoot**. Bring a Design Studio creation or a photo of an actual sample, put it on a consistent model roster, then refine the fit and styling until it's right.
 
-## On a model
+## Try it on
 
-Open the **On a model** tab. It has two modes:
-
-### Generate
-
-Photograph a garment on a photoreal AI model. Pick a **body** (petite, curvy, plus, tall, athletic, menswear…) and a **setting** (studio, runway, street, editorial), then **Generate on a model**. It uses the garment, fabric, and colour you've set below — or type a description in **✨ Describe your garment**.
-
-> [!TIP]
-> Drop images into the **Mood board** to match a Pinterest-style reference — the model wears a garment in the style, silhouette, and mood of your references.
-
-### Try on my garment
-
-This is the one designers love: **take a photo of a garment you actually made** — a shirt you tailored, a sample off the line — and see it on a model.
-
-1. **Upload your garment photo** (a flat lay or a photo of it worn both work).
+1. **Your garment** — pull an image straight from the Design Studio, or upload a photo (a flat lay or a photo of it worn both work).
 2. Choose the **garment type** (top, bottom, dress, or auto).
-3. Pick a **model**: generate one from a body preset, or **upload your own** model/fit photo.
+3. **Choose a model** — the shared roster spans shapes, sizes, and skin tones (the same bodies every season, so styles are comparable), or upload your own model/fit photo.
 4. **Try it on.**
 
 > [!TIP]
@@ -160,8 +151,6 @@ This is the one designers love: **take a photo of a garment you actually made** 
 > shadow raking across a flat lay doesn't come back as a two-tone garment. It's on by
 > default; if a colour ever looks off in the result, untick **Even out the photo's
 > lighting** and try again with the untouched photo.
-
-Every result saves to **Model renders** at the bottom — click any to reopen it, or delete it. Try-on results are badged **Try-on**, refits **Refit**.
 
 ## Refit a look
 
@@ -172,26 +161,25 @@ Fittings spark changes — tighter here, shorter sleeves there. With any render 
 - **Finish** chips get it presentation-ready: **Complete the outfit** and **Press it** (freshly-steamed fabric).
 - Combine chips across rows, or just describe it: *"sleeves to the elbow, a touch boxier."*
 
-**Refit** re-renders the same person, garment, and scene with only the fit changed, saved as a new render beside the original — so your gallery reads as a fit progression you can compare and share.
+Each refit saves as a new render beside the original, so your gallery reads as a fit progression you can compare and share.
 
 **Checking a refit really moved:** toggle the **Grid** button in the corner of the viewer. The proportion grid is a fixed overlay (never part of the image), and refits keep the same framing — so you can read exactly which line a hem or sleeve sits on, before and after.
 
 **Basics vs a full outfit:** models wear fitted neutral basics on purpose — like a real fit model, the body line stays visible so ease and hem positions read true. When you want the look presentation-ready instead (line reviews, client decks), tap **Complete the outfit** and the model gets quiet grey trousers and clean white sneakers — or a plain white tee when your featured piece is the bottoms — without touching your garment.
 
-The **fit controls below** (ease presets, body length, sleeve length) also shape photoreal generation now, not just the 3D preview — set Oversized and the generated model actually wears it oversized. And remember the sliders' real superpower: they redraft the **sewing pattern**, so once you've settled a fit visually you can pull a production-ready pattern at the same numbers.
+## Send it somewhere
 
-> [!NOTE]
-> Refits are generative — perfect for direction and client conversations, not millimetre-true tailoring. For exact numbers, set the fit sliders and download the pattern; for physics-true drape, use the 3D simulation bridge.
+A finished look shouldn't be a dead end. Under the refit chips:
 
-## 3D preview & Pattern
+- **Download** the image for a deck or a client message.
+- **Use on your site** — add it straight to a product's photo gallery or a lookbook, live immediately.
 
-- **3D preview** — a fast, stylized proportion and fabric study for exploring silhouette and ease early.
-- **Pattern** — drafts a genuine, manufacturable 2D sewing pattern (via FreeSewing) for your size or made-to-measure numbers. **Download SVG** and hand it to a factory or drop it in a tech pack.
+## Renders and the daily budget
 
-For a fully physics-accurate 3D drape, bring a CLO 3D / Browzwear / Style3D file into the [3D simulation bridge](/admin/support/kb/3d-simulation-bridge).
+Every result saves to **Model renders** at the bottom — click any to reopen it, or delete it. Try-on results are badged **Try-on**, refits **Refit**. Each try-on or refit uses one render from the shop's daily budget; the counter next to the button shows what's left (it resets at midnight UTC).
 
 ## Turning it on
 
-**Generate** works out of the box on the platform's image engine. **Virtual try-on** and **mood-board style-matching** use a best-in-class engine (fal.ai) that a platform admin enables with an API key — until then, try-on shows a short "needs a key" note and generation still works. There's a daily render cap per shop to keep costs sane.`,
+Virtual try-on, refits, and mood-board style-matching use a best-in-class engine (fal.ai) that a platform admin enables with an API key — until then the page shows a short "needs a key" note.`,
   },
 ];

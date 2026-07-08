@@ -16,7 +16,7 @@ import {
   type ImageInput,
   type ImageResult,
 } from "../services/ai-image";
-import { reserveFittingQuota, fittingQuotaExceededBody } from "../services/ai-quota";
+import { reserveFittingQuota, fittingQuotaExceededBody, peekFittingQuota } from "../services/ai-quota";
 import type { AppContext } from "../types/env";
 import type { Context } from "hono";
 
@@ -211,6 +211,12 @@ adminFittingRoutes.get("/renders", async (c) => {
 
 // What the Fitting Room can do given the platform's configured keys.
 adminFittingRoutes.get("/capabilities", (c) => c.json(fittingCapabilities(c.env)));
+
+// Today's render budget — read-only, so the UI can show "N renders left".
+adminFittingRoutes.get("/quota", async (c) => {
+  const q = await peekFittingQuota(c);
+  return c.json({ used: q.used, limit: q.limit, remaining: Math.max(0, q.limit - q.used) });
+});
 
 // The shared platform model roster — a curated, diverse cast every shop can try
 // garments onto. Images ship as static assets at /roster/<id>.jpg.
@@ -759,6 +765,61 @@ adminFittingRoutes.delete("/models/:id", requireAdminWrite, async (c) => {
   }
   await run(c.var.db, `DELETE FROM fitting_models WHERE id = ?`, id);
   return c.json({ ok: true });
+});
+
+/**
+ * A render exit: put a finished try-on/refit straight on the shop — as a
+ * product photo or a lookbook image. Mirrors the Design Studio's "use" action
+ * so fitting renders stop being a dead end.
+ */
+adminFittingRoutes.post("/renders/:id/use", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    target?: "product" | "lookbook";
+    productId?: string;
+    lookbookId?: string;
+  };
+  const row = await first<{ file_id: string }>(
+    c.var.db,
+    `SELECT file_id FROM fitting_renders WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!row) return c.json({ error: "Render not found" }, 404);
+  const url = `/media/${row.file_id}`;
+  if (body.target === "product") {
+    if (!body.productId) return c.json({ error: "Pick a product." }, 400);
+    const next = await first<{ n: number }>(
+      c.var.db,
+      `SELECT COALESCE(MAX(sort_order),-1)+1 AS n FROM product_images WHERE product_id = ?`,
+      body.productId,
+    );
+    await run(
+      c.var.db,
+      `INSERT INTO product_images (id, product_id, url, sort_order) VALUES (?, ?, ?, ?)`,
+      newId("img"),
+      body.productId,
+      url,
+      next?.n ?? 0,
+    );
+    return c.json({ ok: true, url });
+  }
+  if (body.target === "lookbook") {
+    if (!body.lookbookId) return c.json({ error: "Pick a lookbook." }, 400);
+    const next = await first<{ n: number }>(
+      c.var.db,
+      `SELECT COALESCE(MAX(sort_order),-1)+1 AS n FROM lookbook_images WHERE lookbook_id = ?`,
+      body.lookbookId,
+    );
+    await run(
+      c.var.db,
+      `INSERT INTO lookbook_images (id, lookbook_id, image_url, sort_order) VALUES (?, ?, ?, ?)`,
+      newId("lbi"),
+      body.lookbookId,
+      url,
+      next?.n ?? 0,
+    );
+    return c.json({ ok: true, url });
+  }
+  return c.json({ error: "Pick where to use it." }, 400);
 });
 
 adminFittingRoutes.delete("/renders/:id", requireAdminWrite, async (c) => {
