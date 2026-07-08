@@ -228,6 +228,32 @@ publicRoutes.get("/products/:slug", async (c) => {
   return c.json(detail);
 });
 
+// Digital Product Passport — a public, care-label-linkable page carrying the
+// material, care, and origin facts (the direction EU textile rules are heading).
+// Built from fields the shop already keeps, so it's zero extra data entry.
+publicRoutes.get("/passport/:slug", async (c) => {
+  const p = await first<Record<string, unknown>>(
+    c.var.db,
+    `SELECT p.name, p.slug, p.category, p.fabric_composition, p.care_summary, p.origin_statement,
+            p.subtitle, s.name AS style_name
+     FROM products p LEFT JOIN styles s ON s.id = p.style_id
+     WHERE p.slug = ? AND p.is_published = 1`,
+    c.req.param("slug"),
+  );
+  if (!p) return c.json({ error: "Product not found" }, 404);
+  const brand = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = 'brand_name'`);
+  return c.json({
+    brandName: brand?.value ?? null,
+    name: p.name,
+    slug: p.slug,
+    category: p.category,
+    subtitle: p.subtitle ?? null,
+    fabricComposition: p.fabric_composition ?? null,
+    careSummary: p.care_summary ?? null,
+    originStatement: p.origin_statement ?? null,
+  });
+});
+
 // Back-in-stock waitlist: leave an email against a sold-out product.
 publicRoutes.post(
   "/products/:slug/notify-restock",
