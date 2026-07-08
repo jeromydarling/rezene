@@ -176,6 +176,7 @@ export function FittingStudioPage() {
   const [showGrid, setShowGrid] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
   const [addingModel, setAddingModel] = useState(false);
+  const [modelName, setModelName] = useState("");
 
   // "Use on your site" mini-panel for the active render.
   const [useOpen, setUseOpen] = useState(false);
@@ -335,15 +336,26 @@ export function FittingStudioPage() {
       const img = await uploadImage(files[0]);
       const m = await api.post<FittingModelItem>("/api/admin/fitting/models", {
         fileId: img.id,
-        label: "My model",
+        label: modelName.trim() || "My model",
       });
       models.reload();
       toggleModel({ kind: "shop", id: m.id });
-      toast.success("Model added");
+      setModelName("");
+      toast.success(modelName.trim() ? `${modelName.trim()} added to your models` : "Model added");
     } catch {
       toast.error("Couldn't add model");
     } finally {
       setAddingModel(false);
+    }
+  }
+
+  async function removeModel(id: string) {
+    try {
+      await api.delete(`/api/admin/fitting/models/${id}`);
+      setModelSels((s) => s.filter((m) => !(m.kind === "shop" && m.id === id)));
+      models.reload();
+    } catch {
+      toast.error("Couldn't delete");
     }
   }
 
@@ -813,36 +825,62 @@ export function FittingStudioPage() {
               </div>
               {(models.data ?? []).length > 0 && (
                 <>
-                  <p className="mt-2 text-[11px] uppercase tracking-wider text-warmgrey/70">Your models</p>
+                  <p className="mt-2 text-[11px] uppercase tracking-wider text-warmgrey/70">
+                    Your models & clients
+                  </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {(models.data ?? []).map((m) => {
                       const on = modelSels.some((s) => s.kind === "shop" && s.id === m.id);
                       return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => toggleModel({ kind: "shop", id: m.id })}
-                          className={`relative overflow-hidden rounded border ${
-                            on ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
-                          }`}
-                          title={m.label}
-                        >
-                          <img src={m.url} alt={m.label} className="h-20 w-16 object-cover" />
-                        </button>
+                        <div key={m.id} className="group relative w-16">
+                          <button
+                            type="button"
+                            onClick={() => toggleModel({ kind: "shop", id: m.id })}
+                            className={`relative block w-full overflow-hidden rounded border ${
+                              on ? "border-navy ring-2 ring-navy/40" : "border-ink/15"
+                            }`}
+                            title={m.label}
+                          >
+                            <img src={m.url} alt={m.label} className="h-20 w-16 object-cover" />
+                          </button>
+                          <p className="mt-0.5 truncate text-center text-[9px] text-warmgrey" title={m.label}>
+                            {m.label}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => removeModel(m.id)}
+                            className="absolute -right-1 -top-1 rounded-full bg-white px-1 text-[10px] text-ink/60 opacity-0 shadow transition group-hover:opacity-100 hover:text-red-600"
+                            title={`Remove ${m.label}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
                 </>
               )}
-              <label className="mt-2 flex cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 py-1.5 text-center text-[11px] text-warmgrey hover:border-navy hover:text-navy">
-                {addingModel ? "Uploading…" : "+ Upload your own model photo"}
+              <div className="mt-2 space-y-1.5">
                 <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => adoptUploadedModel(e.target.files)}
+                  className="input w-full !py-1 text-[11px]"
+                  placeholder="Client or model name (optional) — e.g. “Mme. Laurent”"
+                  value={modelName}
+                  onChange={(e) => setModelName(e.target.value)}
                 />
-              </label>
+                <label className="flex cursor-pointer items-center justify-center rounded border border-dashed border-ink/25 py-1.5 text-center text-[11px] text-warmgrey hover:border-navy hover:text-navy">
+                  {addingModel ? "Uploading…" : "+ Upload a model or client photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => adoptUploadedModel(e.target.files)}
+                  />
+                </label>
+                <p className="text-[10px] leading-snug text-warmgrey">
+                  A client sent a photo? Upload it and try looks on <em>them</em>. Best results: full body,
+                  facing the camera, fitted clothing, even light, plain background.
+                </p>
+              </div>
             </div>
             <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-warmgrey">
               <input
