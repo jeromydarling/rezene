@@ -4,6 +4,7 @@ import { ValidationError } from "./services/validators";
 import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 import { commerceRoutes } from "./routes/commerce";
+import { accountRoutes } from "./routes/account";
 import { stripeWebhookRoutes } from "./routes/stripe-webhooks";
 import { shippingWebhookRoutes } from "./routes/shipping-webhooks";
 import { renderCallbackRoutes } from "./routes/render-callbacks";
@@ -268,6 +269,7 @@ app.get("/llms.txt", async (c) => {
 // Public API — no auth, rate-limited where it accepts writes.
 app.route("/api/public", publicRoutes);
 app.route("/api/public", commerceRoutes);
+app.route("/api/public/account", accountRoutes);
 
 // Verto platform — shop signup + slug availability (public).
 import { vertoRoutes } from "./routes/verto";

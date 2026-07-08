@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { useCart } from "../../lib/cart";
+import { useToast } from "../../lib/toast";
+import { Heart } from "lucide-react";
 import { formatDate, formatMoney } from "../../lib/format";
 import { track } from "../../lib/analytics";
 import { EditorialImage } from "../../components/ImagePlaceholder";
@@ -157,7 +159,10 @@ export function ProductDetailPage() {
         {/* Purchase panel */}
         <div className="min-w-0">
           <p className="eyebrow mb-2">{product.category}</p>
-          <h1 className="font-display text-4xl font-light">{product.name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="font-display text-4xl font-light">{product.name}</h1>
+            <WishlistHeart productId={product.id} />
+          </div>
           {product.subtitle && <p className="mt-1 text-sm text-warmgrey">{product.subtitle}</p>}
           <p className="mt-4 text-xl">{formatMoney(product.basePriceCents, product.currency)}</p>
 
@@ -367,5 +372,48 @@ export function ProductDetailPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/** Save-to-wishlist heart. Prompts a gentle sign-in when there's no account. */
+function WishlistHeart({ productId }: { productId: string }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      if (saved) {
+        await api.delete(`/api/public/account/wishlist/${productId}`);
+        setSaved(false);
+      } else {
+        await api.post("/api/public/account/wishlist", { productId });
+        setSaved(true);
+        toast.success("Saved", "Find it under Account → Wishlist.");
+      }
+    } catch (e) {
+      if (e instanceof ApiRequestError && e.status === 401) {
+        toast.info("Sign in to save", "Create a free account to keep a wishlist.");
+        navigate("/account");
+      } else {
+        toast.error("Couldn't save", e instanceof ApiRequestError ? e.message : undefined);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void toggle()}
+      disabled={busy}
+      aria-label={saved ? "Remove from wishlist" : "Save to wishlist"}
+      className={`mt-1 shrink-0 transition ${saved ? "text-terracotta" : "text-ink/35 hover:text-terracotta"}`}
+    >
+      <Heart size={22} strokeWidth={1.6} fill={saved ? "currentColor" : "none"} />
+    </button>
   );
 }

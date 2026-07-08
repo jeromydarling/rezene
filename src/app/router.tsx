@@ -17,6 +17,7 @@ import { JournalPage, JournalPostPage } from "./pages/public/JournalPage";
 import { ContactPage } from "./pages/public/ContactPage";
 import { CheckoutSuccessPage } from "./pages/public/CheckoutSuccessPage";
 import { CartPage } from "./pages/public/CartPage";
+import { AccountPage } from "./pages/public/AccountPage";
 import { FactoryPortalPage } from "./pages/public/FactoryPortalPage";
 import { LineSheetPage } from "./pages/public/LineSheetPage";
 import { LoginPage } from "./pages/auth/LoginPage";
@@ -118,6 +119,7 @@ export function AppRouter() {
           <Route path="terms" element={<MarkdownPage slug="terms" eyebrow="Legal" />} />
           <Route path="contact" element={<ContactPage />} />
           <Route path="cart" element={<CartPage />} />
+          <Route path="account" element={<AccountPage />} />
           <Route path="checkout/success" element={<CheckoutSuccessPage />} />
           <Route path="p/:slug" element={<DynamicPage />} />
           <Route path="*" element={<NotFoundPage />} />
