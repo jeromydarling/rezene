@@ -178,6 +178,8 @@ export function DiscountsPage() {
         </div>
       </div>
 
+      <LoyaltyCard />
+
       <SlideOver open={creating} title="New discount code" onClose={() => setCreating(false)}>
         <NewCodeForm
           onCreated={() => {
@@ -320,6 +322,106 @@ function NewCodeForm({ onCreated }: { onCreated: () => void }) {
       {error && <p className="field-error">{error}</p>}
       <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={() => void submit()}>
         {busy ? "Creating…" : "Create code"}
+      </button>
+    </div>
+  );
+}
+
+// ---------- Loyalty & referral ----------
+function LoyaltyCard() {
+  const toast = useToast();
+  const loyalty = useFetch<{
+    enabled: boolean;
+    earnPct: number;
+    referralRewardCents: number;
+    friendPct: number;
+    stripeReady: boolean;
+  }>("/api/admin/commerce/loyalty-settings");
+  const [form, setForm] = useState({ enabled: false, earnPct: "5", referralReward: "10", friendPct: "10" });
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (loyalty.data && !loaded) {
+    setForm({
+      enabled: loyalty.data.enabled,
+      earnPct: String(loyalty.data.earnPct || 5),
+      referralReward: String((loyalty.data.referralRewardCents || 1000) / 100),
+      friendPct: String(loyalty.data.friendPct || 10),
+    });
+    setLoaded(true);
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.put("/api/admin/commerce/loyalty-settings", {
+        enabled: form.enabled,
+        earnPct: Number(form.earnPct) || 0,
+        referralRewardCents: Math.round((Number(form.referralReward) || 0) * 100),
+        friendPct: Number(form.friendPct) || 0,
+      });
+      toast.success("Loyalty saved");
+      loyalty.reload();
+    } catch (e) {
+      toast.error("Couldn't save", e instanceof ApiRequestError ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-card mt-6 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="max-w-xl">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Loyalty & referrals</h2>
+          <p className="mt-2 text-sm text-ink/80">
+            Reward the customers who come back. Shoppers earn store credit on every order and for
+            referring friends, and redeem it as a one-time code at checkout.
+          </p>
+        </div>
+        <label className="flex shrink-0 cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            className="peer sr-only"
+            checked={form.enabled}
+            disabled={!loyalty.data?.stripeReady}
+            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+          />
+          <span className="relative h-6 w-11 rounded-full bg-ink/20 transition peer-checked:bg-navy peer-disabled:opacity-40 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
+          <span className="text-sm font-medium">{form.enabled ? "On" : "Off"}</span>
+        </label>
+      </div>
+
+      {form.enabled && (
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="label">Credit earned per order</span>
+              <div className="flex items-center gap-1">
+                <input className="input" inputMode="decimal" value={form.earnPct} onChange={(e) => setForm({ ...form, earnPct: e.target.value })} />
+                <span className="text-warmgrey">%</span>
+              </div>
+            </label>
+            <label className="block">
+              <span className="label">Referrer reward</span>
+              <input className="input" inputMode="decimal" placeholder="10.00" value={form.referralReward} onChange={(e) => setForm({ ...form, referralReward: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="label">Friend's first-order discount</span>
+              <div className="flex items-center gap-1">
+                <input className="input" inputMode="decimal" value={form.friendPct} onChange={(e) => setForm({ ...form, friendPct: e.target.value })} />
+                <span className="text-warmgrey">%</span>
+              </div>
+            </label>
+          </div>
+          {!loyalty.data?.stripeReady && (
+            <p className="mt-2 text-xs text-warmgrey">Connect Stripe — credit is redeemed as a checkout code.</p>
+          )}
+        </>
+      )}
+
+      <button type="button" className="btn btn-secondary mt-4 !py-1.5 text-sm" disabled={busy} onClick={() => void save()}>
+        {busy ? "Saving…" : "Save loyalty settings"}
       </button>
     </div>
   );

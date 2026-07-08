@@ -429,6 +429,14 @@ async function handleCheckoutCompleted(
     newId("evt"),
     orderId,
   );
+
+  // Loyalty: earn store credit, and qualify a referral on a first order.
+  try {
+    const { accrueLoyalty } = await import("../services/loyalty");
+    await accrueLoyalty(db, orderId);
+  } catch (err) {
+    console.error("[webhook] loyalty accrual failed:", String(err).slice(0, 160));
+  }
   return orderId;
 }
 

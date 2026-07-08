@@ -125,6 +125,31 @@ Pick a segment (live counts shown): **All customers**, **Repeat customers** (two
 Unsubscribes are honoured everywhere: once someone opts out, no future send reaches them.`,
   },
   {
+    slug: "loyalty",
+    title: "Loyalty & referrals",
+    summary: "Reward repeat customers with store credit they redeem at checkout.",
+    part: "commerce",
+    moduleRoute: "/admin/discounts",
+    keywords: "loyalty referral store credit reward points redeem discount friend",
+    updated: "2026-07-08",
+    body: `# Loyalty & referrals
+
+Turn on a rewards programme under **Selling → Discounts & Tax → Loyalty & referrals**.
+
+## What you set
+
+- **Credit earned per order** — a percentage of each order that comes back to the customer as store credit.
+- **Referrer reward** — the credit a customer earns when a friend they referred makes a first order.
+- **Friend's first-order discount** — the welcome discount their friend gets.
+
+## How customers use it
+
+In their account's **Rewards** tab, customers see their credit balance and a shareable **referral code**. They **redeem** credit — turning any amount into a one-time discount code — and enter that code at checkout. Because credit becomes a normal Stripe promotion code, it just works with the existing checkout; you need Stripe connected.
+
+> [!NOTE]
+> Credit is earned automatically when an order is paid, and a referral is rewarded the moment the referred friend places their first paid order.`,
+  },
+  {
     slug: "wholesale-portal",
     title: "Wholesale buyer portal",
     summary: "Approve buyers and take orders at their own pricing, with net terms.",
