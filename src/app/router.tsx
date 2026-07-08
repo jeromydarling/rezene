@@ -34,6 +34,7 @@ import { ProductEditorPage } from "./pages/admin/ProductEditorPage";
 import { ImportStudioPage } from "./pages/admin/ImportStudioPage";
 import { InventoryPage } from "./pages/admin/InventoryPage";
 import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/CommercePages";
+import { DiscountsPage } from "./pages/admin/DiscountsPage";
 import { LineSheetsPage } from "./pages/admin/WholesalePage";
 import { ProductionPage } from "./pages/admin/ProductionPage";
 import { SuppliersPage } from "./pages/admin/SuppliersPage";
@@ -147,6 +148,7 @@ export function AppRouter() {
           <Route path="orders" element={<OrdersPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="pre-orders" element={<PreOrdersPage />} />
+          <Route path="discounts" element={<DiscountsPage />} />
           <Route path="line-sheets" element={<LineSheetsPage />} />
           <Route path="shipping" element={<ShippingPage />} />
           <Route path="marketing" element={<MarketingPage />} />

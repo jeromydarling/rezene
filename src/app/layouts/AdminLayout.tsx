@@ -32,6 +32,7 @@ import {
   MessagesSquare,
   Package,
   Palette,
+  Percent,
   PersonStanding,
   Rocket,
   Rotate3d,
@@ -103,6 +104,7 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/orders", label: "Orders", icon: Package },
       { to: "/admin/pre-orders", label: "Pre-orders", icon: Sparkles },
+      { to: "/admin/discounts", label: "Discounts & Tax", icon: Percent },
       { to: "/admin/shipping", label: "Shipping", icon: Truck },
       { to: "/admin/line-sheets", label: "Line Sheets", icon: FileSpreadsheet },
       { to: "/admin/customers", label: "Customers", icon: Users },
