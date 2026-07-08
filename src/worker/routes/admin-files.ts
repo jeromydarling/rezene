@@ -18,6 +18,11 @@ const ENTITY_TYPES = new Set([
   "journal",
   "product",
   "general",
+  "brand",
+  "emblem",
+  "import",
+  "fitting_model",
+  "fitting_render",
 ]);
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;

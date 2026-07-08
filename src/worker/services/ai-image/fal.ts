@@ -74,29 +74,37 @@ async function falRun(env: Env, model: string, body: unknown): Promise<unknown> 
     method: "POST",
     headers: { ...auth, "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }).catch((e: unknown) => {
+    // fetch() rejects with an untyped TypeError (network reset, oversized body…)
+    throw new ProviderError(`fal submit failed: ${e instanceof Error ? e.message : String(e)}`);
   });
   if (!submit.ok) {
     const detail = (await submit.text().catch(() => "")).slice(0, 300);
     throw new ProviderError(`fal ${submit.status}: ${detail}`, submit.status === 429 ? 429 : 502);
   }
-  const { status_url, response_url } = (await submit.json()) as {
+  const handle = (await submit.json().catch(() => null)) as {
     status_url?: string;
     response_url?: string;
-  };
+  } | null;
+  const { status_url, response_url } = handle ?? {};
   if (!status_url || !response_url) throw new ProviderError("fal did not return a queue handle.");
 
   for (let i = 0; i < MAX_POLLS; i++) {
     await sleep(POLL_MS);
-    const st = await fetch(status_url, { headers: auth });
-    if (!st.ok) continue;
-    const { status } = (await st.json()) as { status?: string };
+    const st = await fetch(status_url, { headers: auth }).catch(() => null);
+    if (!st || !st.ok) continue;
+    const { status } = (await st.json().catch(() => ({}))) as { status?: string };
     if (status === "COMPLETED") {
-      const done = await fetch(response_url, { headers: auth });
+      const done = await fetch(response_url, { headers: auth }).catch((e: unknown) => {
+        throw new ProviderError(`fal result fetch failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
       if (!done.ok) {
         const d = (await done.text().catch(() => "")).slice(0, 300);
         throw new ProviderError(`fal result ${done.status}: ${d}`);
       }
-      return done.json();
+      return done.json().catch(() => {
+        throw new ProviderError("fal returned an unreadable result.");
+      });
     }
     // IN_QUEUE / IN_PROGRESS → keep polling. Any FAILED-like state falls through.
     if (status && status !== "IN_QUEUE" && status !== "IN_PROGRESS") {
@@ -117,7 +125,9 @@ function extractImageUrls(out: unknown): string[] {
 }
 
 async function fetchImage(url: string): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const res = await fetch(url);
+  const res = await fetch(url).catch((e: unknown) => {
+    throw new ProviderError(`Couldn't fetch fal result image: ${e instanceof Error ? e.message : String(e)}`);
+  });
   if (!res.ok) throw new ProviderError(`Couldn't fetch fal result image (${res.status}).`);
   const contentType = res.headers.get("content-type") || "image/jpeg";
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
