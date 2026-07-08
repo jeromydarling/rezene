@@ -508,7 +508,9 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
         ? ", constructed exactly from the flat sewing-pattern pieces shown in the reference image — read the " +
           "pieces ONLY to infer the garment's true proportions (sleeve length relative to torso, hem width and " +
           "height, collar scale). The reference is a technical cutting diagram, NOT a print or texture: no " +
-          "pattern paper, piece outlines, or markings may appear anywhere in the photograph"
+          "pattern paper, piece outlines, or markings may appear anywhere in the photograph, and the " +
+          "reference's colours are meaningless — take the garment's fabric and colour from the description " +
+          "alone, and add no clothing items beyond those described"
         : " in the style, silhouette, and mood of the reference images";
   // Lead with the shared HOUSE_STYLE so every generated look matches the roster's
   // lighting, camera, and posture; the setting only swaps the backdrop.
