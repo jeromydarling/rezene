@@ -45,6 +45,7 @@ import {
   Store,
   Sparkles,
   Tags,
+  TrendingUp,
   Truck,
   Undo2,
   Users,
@@ -140,6 +141,7 @@ const NAV_SECTIONS: {
     title: "Finance",
     items: [
       { to: "/admin/costing", label: "Costing & Margins", icon: CircleDollarSign },
+      { to: "/admin/cash-flow", label: "Cash Flow", icon: TrendingUp },
       { to: "/admin/duties", label: "Duties & Landed Cost", icon: Landmark },
       { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
     ],

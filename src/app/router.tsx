@@ -57,6 +57,7 @@ const FittingStudioPage = lazy(() =>
   import("./pages/admin/FittingStudioPage").then((m) => ({ default: m.FittingStudioPage })),
 );
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
+import { CashFlowPage } from "./pages/admin/CashFlowPage";
 import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
 import { VideoStudioPage } from "./pages/admin/VideoStudioPage";
@@ -188,6 +189,7 @@ export function AppRouter() {
           />
           <Route path="files" element={<FilesPage />} />
           <Route path="costing" element={<CostingPage />} />
+          <Route path="cash-flow" element={<CashFlowPage />} />
           <Route path="duties" element={<DutiesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />

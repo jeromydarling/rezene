@@ -997,7 +997,8 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     group: "Grow & run it",
     items: [
       ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
-      ["Data export", "Products, customers and orders as CSV — yours to take anywhere."],
+      ["Cash flow & open-to-buy", "Money in vs. out and how much of your season budget is left, from real POs and invoices."],
+      ["Data export", "Products, customers and orders as CSV — plus QuickBooks/Xero-ready accounting."],
       ["Reorder signals", "Every piece running low, with its 90-day pace and a suggested reorder."],
       ["Digital Product Passport", "A public, printable passport per piece — composition, care, origin."],
     ],
