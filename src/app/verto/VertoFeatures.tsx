@@ -609,6 +609,7 @@ const FEATURES: Feature[] = [
     body: "Take a Design Studio look — or a photo of a real sample — and try it on a consistent roster of photoreal models spanning shapes, sizes, and skin tones. Judge fit and styling on the same bodies across every style, so the whole line hangs together before a single metre of fabric is cut.",
     points: [
       "A fixed model roster — the same bodies, every style, every season",
+      "Try looks on your actual client — from a photo they send",
       "Try on a Design Studio creation or a photo of a real sample",
       "Photoreal virtual try-on from best-in-class image models",
       "Refit any look in a click — tighter, looser, cropped, different sleeves",

@@ -152,6 +152,15 @@ One job, done properly: **see a real garment on a real body before you cut, buy,
 > default; if a colour ever looks off in the result, untick **Even out the photo's
 > lighting** and try again with the untouched photo.
 
+## Fit a real client
+
+Your shop models aren't limited to the roster. When a client sends in a photo, upload it under **Your models & clients** with their name — and try looks on *them*. The render keeps their body, pose, and face; only the garment changes. Refits, colorways, and side-by-side compare all work on client renders, so "this dress, on you, in sage, cropped" is four clicks.
+
+**Getting a good client photo:** full body head-to-toe, facing the camera, wearing fitted clothing (baggy layers hide the body line), even light, plain background. A phone photo is fine.
+
+> [!NOTE]
+> Be straight with clients: this is a styling preview, not a fitting. It shows how a look reads on their body — colour, proportion, vibe — not how the seams will sit. Their photo stays in your shop's private storage and is sent only to the AI engine that produces the render.
+
 ## Refit a look
 
 Fittings spark changes — tighter here, shorter sleeves there. With any render open, use **Refit this look** under the image:
