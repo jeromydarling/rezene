@@ -435,7 +435,10 @@ export function PatternStudioPage() {
   }
 
   /** Pattern-first design: render THIS block + adjustments on a photoreal
-   *  model via the Fitting Studio's generate path. */
+   *  model via the Fitting Studio's generate path. Honest scope: the image
+   *  model gets a text description — the silhouette class, the fit buckets,
+   *  and every NAMEABLE styling choice (cuffs, collar, plackets, buttons) —
+   *  never the drafted geometry itself. */
   async function seeOnModel() {
     setVisualising(true);
     try {
@@ -447,7 +450,29 @@ export function PatternStudioPage() {
       if (adjustables.length && state.lengthPct >= 8) bits.push("a longline hem");
       if (adjustables.sleeve && state.sleevePct <= -12) bits.push("short sleeves");
       if (adjustables.sleeve && state.sleevePct >= 6) bits.push("extra-long sleeves");
-      const description = `a ${block.name.toLowerCase()} cut with ${bits.join(", ")}`;
+
+      // Carry the touched drafting choices that translate to words: list
+      // choices ("rounded french cuff"), booleans ("split yoke"), counts
+      // ("8 buttons"). Geometry (percent/degree/mm) stays behind — no text
+      // prompt renders a 70° collar angle faithfully.
+      const defs = new Map(nativeOptions.map((o) => [o.key, o]));
+      const details: string[] = [];
+      for (const [key, value] of Object.entries(state.advanced)) {
+        const def = defs.get(key);
+        if (!def) continue;
+        if (def.type === "list") {
+          const v = humanizeKey(String(value)).toLowerCase();
+          const noun = humanizeKey(key).toLowerCase().replace(/ style$/, "");
+          details.push(v.includes(noun.split(" ")[0]) ? v : `a ${v} ${noun}`);
+        } else if (def.type === "bool") {
+          const name = humanizeKey(key).toLowerCase();
+          details.push(value ? `a ${name}` : `no ${name}`);
+        } else if (def.type === "count") {
+          details.push(`${value} ${humanizeKey(key).toLowerCase()}`);
+        }
+      }
+      const detailClause = details.length ? `, detailed with ${details.slice(0, 8).join(", ")}` : "";
+      const description = `a ${block.name.toLowerCase()} cut with ${bits.join(", ")}${detailClause}`.slice(0, 450);
       await api.post("/api/admin/fitting/generate", {
         description,
         fit: {
@@ -957,13 +982,15 @@ export function PatternStudioPage() {
               {visualising ? "Rendering…" : "Render this cut on a model"}
             </button>
             <p className="text-[11px] leading-snug text-warmgrey">
-              Pattern-first design: this block and your adjustments become a photoreal look.{" "}
+              A <strong>visual sketch</strong> of this cut — the silhouette, proportions, and the styling
+              details it can name (cuffs, collar, buttons). Not your exact draft: the seams and geometry live
+              in the pattern, not the picture.{" "}
               {visualised ? (
                 <a href="/admin/fitting" className="link-quiet">
                   View it in the Fitting Studio →
                 </a>
               ) : (
-                "The render lands in the Fitting Studio's gallery (uses one render from the daily budget)."
+                "Lands in the Fitting Studio's gallery (one render from the daily budget)."
               )}
             </p>
           </div>
