@@ -110,6 +110,157 @@ adminBrandRoutes.post("/generate", requireAdminWrite, async (c) => {
   }
 });
 
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&#x27;/gi, "'")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+/** Import an existing brand from a live website — logo, colours, fonts, name. */
+adminBrandRoutes.post("/import-url", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { url?: string };
+  let target = (body.url ?? "").toString().trim();
+  if (!target) return c.json({ error: "Enter your website address." }, 400);
+  if (!/^https?:\/\//i.test(target)) target = "https://" + target;
+  let u: URL;
+  try {
+    u = new URL(target);
+  } catch {
+    return c.json({ error: "That doesn't look like a valid web address." }, 400);
+  }
+  const host = u.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host === "::1" ||
+    host.endsWith(".internal") ||
+    host.endsWith(".local") ||
+    /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)
+  ) {
+    return c.json({ error: "That address isn't allowed." }, 400);
+  }
+
+  let html = "";
+  try {
+    const res = await fetch(u.toString(), {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; VertoBrandImport/1.0)", Accept: "text/html" },
+      redirect: "follow",
+    });
+    if (!res.ok) return c.json({ error: `Couldn't reach that site (${res.status}).` }, 502);
+    html = (await res.text()).slice(0, 600_000);
+  } catch {
+    return c.json({ error: "Couldn't reach that site — check the address." }, 502);
+  }
+
+  const abs = (href: string | null | undefined): string | null => {
+    if (!href) return null;
+    try {
+      return new URL(href, u).toString();
+    } catch {
+      return null;
+    }
+  };
+  const first = (patterns: RegExp[]): string | null => {
+    for (const re of patterns) {
+      const m = html.match(re);
+      if (m?.[1]) return decodeEntities(m[1]);
+    }
+    return null;
+  };
+
+  const name = first([
+    /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i,
+    /<title[^>]*>([^<]+)<\/title>/i,
+  ]);
+  const tagline = first([
+    /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+  ]);
+  const themeColor = html.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["'](#[0-9a-fA-F]{3,6})["']/i)?.[1] ?? null;
+
+  // Logo candidates, best-first: a header <img> with "logo", then icons, then OG.
+  const linkHref = (rel: string): string | null => {
+    const tag = html.match(new RegExp(`<link[^>]+rel=["'][^"']*${rel}[^"']*["'][^>]*>`, "i"))?.[0];
+    return abs(tag?.match(/href=["']([^"']+)["']/i)?.[1]);
+  };
+  const imgLogo = (() => {
+    for (const tag of html.match(/<img[^>]+>/gi) ?? []) {
+      if (/logo/i.test(tag)) {
+        const a = abs(tag.match(/\bsrc=["']([^"']+)["']/i)?.[1]);
+        if (a) return a;
+      }
+    }
+    return null;
+  })();
+  const candidates = [
+    imgLogo,
+    linkHref("apple-touch-icon"),
+    linkHref("icon"),
+    abs(html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]),
+  ].filter((x): x is string => Boolean(x));
+
+  // Fonts → nearest type pairing.
+  const fontBlob = (
+    (html.match(/family=([A-Za-z+ ]+)/g) ?? []).join(" ") +
+    " " +
+    (html.match(/font-family:\s*([^;"'}]+)/gi) ?? []).join(" ")
+  ).toLowerCase();
+  const pairing = /playfair/.test(fontBlob)
+    ? "grand"
+    : /cormorant/.test(fontBlob)
+      ? "refined"
+      : /space grotesk/.test(fontBlob)
+        ? "modern"
+        : /archivo/.test(fontBlob)
+          ? "bold"
+          : /dm serif|dm sans/.test(fontBlob)
+            ? "warm"
+            : /libre baskerville/.test(fontBlob)
+              ? "classic"
+              : /syne/.test(fontBlob)
+                ? "avant"
+                : "editorial";
+
+  // Download the best usable logo into R2 so the client can read it same-origin
+  // (needed for canvas palette extraction) and it's stable.
+  let logoUrl: string | null = null;
+  for (const cand of candidates.slice(0, 5)) {
+    try {
+      const r = await fetch(cand, { redirect: "follow" });
+      if (!r.ok) continue;
+      const ct = r.headers.get("content-type") || "";
+      if (!ct.startsWith("image/")) continue;
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      if (bytes.length < 80 || bytes.length > 3_000_000) continue;
+      const ext = ct.includes("svg") ? "svg" : ct.includes("webp") ? "webp" : ct.includes("jpeg") ? "jpg" : ct.includes("x-icon") || ct.includes("vnd.microsoft.icon") ? "ico" : "png";
+      const fileId = newId("file");
+      const key = `uploads/brand/import/${fileId}.${ext}`;
+      await c.env.FILES.put(key, bytes, { httpMetadata: { contentType: ct } });
+      await run(
+        c.var.db,
+        `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, 'brand', 'import', 1, ?)`,
+        fileId,
+        key,
+        `imported-logo.${ext}`,
+        ct,
+        bytes.length,
+        c.var.userId,
+      );
+      logoUrl = `/media/${fileId}`;
+      break;
+    } catch {
+      /* try the next candidate */
+    }
+  }
+
+  return c.json({ name, tagline, themeColor, logoUrl, pairing });
+});
+
 adminBrandRoutes.post("/emblem", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { brandName?: string; prompt?: string };
   const brandName = (body.brandName ?? "the brand").toString().slice(0, 120);

@@ -28,8 +28,11 @@ export function BrandStudioPage() {
   const [typography, setTypography] = useState<BrandTypography>(DEFAULT_TYPOGRAPHY);
   const [tab, setTab] = useState<LogoTab>("wordmark");
   const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState<"upload" | "upload-dark" | "emblem" | "palette" | "generate" | "extract" | null>(null);
+  const [busy, setBusy] = useState<
+    "upload" | "upload-dark" | "emblem" | "palette" | "generate" | "extract" | "import" | null
+  >(null);
   const [vibe, setVibe] = useState("");
+  const [importUrl, setImportUrl] = useState("");
   // Brand-in-a-box (AI full-identity generator).
   const [makes, setMakes] = useState("");
   const [genVibe, setGenVibe] = useState("");
@@ -113,6 +116,41 @@ export function BrandStudioPage() {
       setEmblemUrl(res.url);
     } catch (e) {
       toast.error("Couldn't generate an emblem", e instanceof Error ? e.message : undefined);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function importFromUrl() {
+    if (!importUrl.trim()) return;
+    setBusy("import");
+    try {
+      const res = await api.post<{
+        name: string | null;
+        tagline: string | null;
+        themeColor: string | null;
+        logoUrl: string | null;
+        pairing: string;
+      }>("/api/admin/brand/import-url", { url: importUrl.trim() });
+
+      if (res.logoUrl) {
+        setLogo({ kind: "image", imageUrl: res.logoUrl });
+        setTab("upload");
+        // Pull a palette from the imported logo (same-origin → canvas-safe).
+        try {
+          const pal = await extractPalette(res.logoUrl);
+          setPalette(res.themeColor ? { ...pal, accent: res.themeColor } : pal);
+        } catch {
+          if (res.themeColor) setPalette((p) => ({ ...p, accent: res.themeColor! }));
+        }
+      } else if (res.themeColor) {
+        setPalette((p) => ({ ...p, accent: res.themeColor! }));
+      }
+      setTypography({ pairing: res.pairing });
+      if (res.tagline) setSuggestion({ tagline: res.tagline, voice: "" });
+      toast.success("Imported from your site", "Review the logo, colours, and type, then save.");
+    } catch (e) {
+      toast.error("Couldn't import from that site", e instanceof Error ? e.message : undefined);
     } finally {
       setBusy(null);
     }
@@ -230,6 +268,35 @@ export function BrandStudioPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         {/* Controls */}
         <div className="space-y-5">
+          {/* Import from an existing website */}
+          <div className="admin-card space-y-2 p-5">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">
+                Already have a brand?
+              </h2>
+              <p className="text-[11px] text-warmgrey">
+                Paste your current website and we'll pull in your logo, colours, and fonts to start from.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="input !py-1.5 text-sm"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void importFromUrl()}
+                placeholder="yourlabel.com"
+              />
+              <button
+                type="button"
+                className="btn btn-secondary shrink-0"
+                disabled={busy === "import" || !importUrl.trim()}
+                onClick={() => void importFromUrl()}
+              >
+                {busy === "import" ? "Importing…" : "Import"}
+              </button>
+            </div>
+          </div>
+
           {/* Brand in a box — AI full-identity generator */}
           <div className="admin-card space-y-3 border-navy/20 bg-navy/[0.03] p-5">
             <div>
