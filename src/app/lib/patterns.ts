@@ -13,6 +13,32 @@ import { Titan } from "@freesewing/titan";
 import { Penelope } from "@freesewing/penelope";
 import { Sven } from "@freesewing/sven";
 import { Sophie } from "@freesewing/sophie";
+import { Aaron } from "@freesewing/aaron";
+import { Bella } from "@freesewing/bella";
+import { Bent } from "@freesewing/bent";
+import { Benjamin } from "@freesewing/benjamin";
+import { Breanna } from "@freesewing/breanna";
+import { Brian } from "@freesewing/brian";
+import { Bruce } from "@freesewing/bruce";
+import { Carlita } from "@freesewing/carlita";
+import { Carlton } from "@freesewing/carlton";
+import { Cathrin } from "@freesewing/cathrin";
+import { Charlie } from "@freesewing/charlie";
+import { Diana } from "@freesewing/diana";
+import { Huey } from "@freesewing/huey";
+import { Hugo } from "@freesewing/hugo";
+import { Noble } from "@freesewing/noble";
+import { Paco } from "@freesewing/paco";
+import { Sandy } from "@freesewing/sandy";
+import { Shin } from "@freesewing/shin";
+import { Simon } from "@freesewing/simon";
+import { Simone } from "@freesewing/simone";
+import { Tamiko } from "@freesewing/tamiko";
+import { Uma } from "@freesewing/uma";
+import { Wahid } from "@freesewing/wahid";
+import { Walburga } from "@freesewing/walburga";
+import { Waralee } from "@freesewing/waralee";
+import { Yuri } from "@freesewing/yuri";
 import { pluginTheme } from "@freesewing/plugin-theme";
 import { SIZE_SCALE, type SizeStep } from "../../shared/garments";
 
@@ -39,11 +65,40 @@ interface PatternEntry {
 }
 
 const DESIGN_MAP: Record<string, PatternEntry> = {
-  "classic-tee": { design: Teagan as unknown as Design, label: "T-shirt block · FreeSewing “Teagan”" },
-  "relaxed-hoodie": { design: Sven as unknown as Design, label: "Sweatshirt block · FreeSewing “Sven”" },
-  "slip-dress": { design: Sophie as unknown as Design, label: "Slip dress · FreeSewing “Sophie”" },
-  "wide-trouser": { design: Titan as unknown as Design, label: "Trouser block · FreeSewing “Titan”" },
-  "pleated-skirt": { design: Penelope as unknown as Design, label: "Skirt block · FreeSewing “Penelope”" },
+  // Legacy ids (early saved patterns + the shared garment library use these).
+  "classic-tee": { design: Teagan as unknown as Design, label: "T-shirt · FreeSewing \u201cTeagan\u201d" },
+  "relaxed-hoodie": { design: Sven as unknown as Design, label: "Sweatshirt · FreeSewing \u201cSven\u201d" },
+  "slip-dress": { design: Sophie as unknown as Design, label: "Slip dress · FreeSewing \u201cSophie\u201d" },
+  "wide-trouser": { design: Titan as unknown as Design, label: "Trouser block · FreeSewing \u201cTitan\u201d" },
+  "pleated-skirt": { design: Penelope as unknown as Design, label: "Skirt · FreeSewing \u201cPenelope\u201d" },
+  // The rest of FreeSewing's apparel catalogue (each verified to draft against
+  // the studio's measurement set — see the probe in the Pattern Studio PR).
+  aaron: { design: Aaron as unknown as Design, label: "Tank top · FreeSewing \u201cAaron\u201d" },
+  tamiko: { design: Tamiko as unknown as Design, label: "Loose-cut top · FreeSewing \u201cTamiko\u201d" },
+  diana: { design: Diana as unknown as Design, label: "Drape-neck top · FreeSewing \u201cDiana\u201d" },
+  simon: { design: Simon as unknown as Design, label: "Button-down shirt · FreeSewing \u201cSimon\u201d" },
+  simone: { design: Simone as unknown as Design, label: "Button-down shirt (women's) · FreeSewing \u201cSimone\u201d" },
+  hugo: { design: Hugo as unknown as Design, label: "Pullover hoodie · FreeSewing \u201cHugo\u201d" },
+  huey: { design: Huey as unknown as Design, label: "Zip-up hoodie · FreeSewing \u201cHuey\u201d" },
+  yuri: { design: Yuri as unknown as Design, label: "Hoodie dress · FreeSewing \u201cYuri\u201d" },
+  walburga: { design: Walburga as unknown as Design, label: "Wrap dress · FreeSewing \u201cWalburga\u201d" },
+  charlie: { design: Charlie as unknown as Design, label: "Chinos · FreeSewing \u201cCharlie\u201d" },
+  paco: { design: Paco as unknown as Design, label: "Summer pants · FreeSewing \u201cPaco\u201d" },
+  waralee: { design: Waralee as unknown as Design, label: "Wrap pants · FreeSewing \u201cWaralee\u201d" },
+  sandy: { design: Sandy as unknown as Design, label: "Circle skirt · FreeSewing \u201cSandy\u201d" },
+  carlita: { design: Carlita as unknown as Design, label: "Coat · FreeSewing \u201cCarlita\u201d" },
+  carlton: { design: Carlton as unknown as Design, label: "Coat (men's) · FreeSewing \u201cCarlton\u201d" },
+  bent: { design: Bent as unknown as Design, label: "Jacket block · FreeSewing \u201cBent\u201d" },
+  wahid: { design: Wahid as unknown as Design, label: "Waistcoat · FreeSewing \u201cWahid\u201d" },
+  cathrin: { design: Cathrin as unknown as Design, label: "Corset · FreeSewing \u201cCathrin\u201d" },
+  brian: { design: Brian as unknown as Design, label: "Basic block (men's) · FreeSewing \u201cBrian\u201d" },
+  bella: { design: Bella as unknown as Design, label: "Bodice block · FreeSewing \u201cBella\u201d" },
+  breanna: { design: Breanna as unknown as Design, label: "Bodice block (alt) · FreeSewing \u201cBreanna\u201d" },
+  noble: { design: Noble as unknown as Design, label: "Dart-manipulation bodice · FreeSewing \u201cNoble\u201d" },
+  bruce: { design: Bruce as unknown as Design, label: "Briefs · FreeSewing \u201cBruce\u201d" },
+  uma: { design: Uma as unknown as Design, label: "Underwear · FreeSewing \u201cUma\u201d" },
+  shin: { design: Shin as unknown as Design, label: "Swim trunks · FreeSewing \u201cShin\u201d" },
+  benjamin: { design: Benjamin as unknown as Design, label: "Bow tie · FreeSewing \u201cBenjamin\u201d" },
 };
 
 export function hasPattern(garmentId: string): boolean {
@@ -52,13 +107,59 @@ export function hasPattern(garmentId: string): boolean {
 
 /** The garment blocks that can be drafted into a real pattern — for a picker
  *  in the Design Studio, where the AI concept has no fixed silhouette. */
-export const PATTERN_BLOCKS: readonly { id: string; name: string }[] = [
-  { id: "classic-tee", name: "T-shirt" },
-  { id: "relaxed-hoodie", name: "Hoodie / sweatshirt" },
-  { id: "slip-dress", name: "Slip dress" },
-  { id: "wide-trouser", name: "Trouser" },
-  { id: "pleated-skirt", name: "Skirt" },
+export const PATTERN_GROUPS: readonly { label: string; blocks: readonly { id: string; name: string }[] }[] = [
+  { label: "Tops", blocks: [
+    { id: "classic-tee", name: "T-shirt" },
+    { id: "aaron", name: "Tank top" },
+    { id: "tamiko", name: "Loose-cut top" },
+    { id: "diana", name: "Drape-neck top" },
+  ]},
+  { label: "Shirts", blocks: [
+    { id: "simon", name: "Button-down shirt" },
+    { id: "simone", name: "Button-down shirt (women's)" },
+  ]},
+  { label: "Hoodies & sweats", blocks: [
+    { id: "relaxed-hoodie", name: "Sweatshirt" },
+    { id: "hugo", name: "Pullover hoodie" },
+    { id: "huey", name: "Zip-up hoodie" },
+    { id: "yuri", name: "Hoodie dress" },
+  ]},
+  { label: "Dresses", blocks: [
+    { id: "slip-dress", name: "Slip dress" },
+    { id: "walburga", name: "Wrap dress" },
+  ]},
+  { label: "Bottoms", blocks: [
+    { id: "wide-trouser", name: "Trouser block" },
+    { id: "charlie", name: "Chinos" },
+    { id: "paco", name: "Summer pants" },
+    { id: "waralee", name: "Wrap pants" },
+    { id: "pleated-skirt", name: "Pleated skirt" },
+    { id: "sandy", name: "Circle skirt" },
+  ]},
+  { label: "Tailoring & outerwear", blocks: [
+    { id: "carlita", name: "Coat" },
+    { id: "carlton", name: "Coat (men's)" },
+    { id: "bent", name: "Jacket block" },
+    { id: "wahid", name: "Waistcoat" },
+    { id: "cathrin", name: "Corset" },
+  ]},
+  { label: "Foundation blocks", blocks: [
+    { id: "brian", name: "Basic block (men's)" },
+    { id: "bella", name: "Bodice block" },
+    { id: "breanna", name: "Bodice block (alt)" },
+    { id: "noble", name: "Dart-manipulation bodice" },
+  ]},
+  { label: "Underwear, swim & extras", blocks: [
+    { id: "bruce", name: "Briefs" },
+    { id: "uma", name: "Underwear" },
+    { id: "shin", name: "Swim trunks" },
+    { id: "benjamin", name: "Bow tie" },
+  ]},
 ];
+
+export const PATTERN_BLOCKS: readonly { id: string; name: string }[] = PATTERN_GROUPS.flatMap(
+  (g) => g.blocks,
+);
 
 export function patternLabel(garmentId: string): string | null {
   return DESIGN_MAP[garmentId]?.label ?? null;
@@ -94,11 +195,32 @@ export interface PatternOptions {
 // Which native option names carry each adjustment, per design. Only options a
 // design actually defines are listed — unknown names would be ignored at best.
 const OPTION_KEYS: Record<string, { ease?: string[]; length?: string[]; sleeve?: string[] }> = {
-  "classic-tee": { ease: ["chestEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
-  "relaxed-hoodie": { ease: ["chestEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
-  "slip-dress": { length: ["lengthBonus"] },
-  "wide-trouser": { ease: ["waistEase", "seatEase"] },
-  "pleated-skirt": { ease: ["waistEase", "hipsEase"], length: ["lengthBonus"] },
+  // Probed per design: only options each design actually defines are listed.
+  "classic-tee": { ease: ["chestEase", "waistEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  "relaxed-hoodie": { ease: ["chestEase", "waistEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  "slip-dress": { ease: ["waistEase", "hipsEase", "seatEase", "bustEase"], length: ["lengthBonus"] },
+  "wide-trouser": { ease: ["waistEase", "seatEase"], length: ["lengthBonus"] },
+  "pleated-skirt": { ease: ["waistEase", "seatEase"], length: ["lengthBonus"] },
+  aaron: { ease: ["chestEase", "hipsEase"], length: ["lengthBonus"] },
+  tamiko: { ease: ["chestEase"], length: ["lengthBonus"] },
+  diana: { ease: ["chestEase", "waistEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  simon: { ease: ["chestEase", "waistEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  simone: { ease: ["chestEase", "waistEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  hugo: { ease: ["chestEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  huey: { ease: ["chestEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  yuri: { ease: ["chestEase", "hipsEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  walburga: { length: ["lengthBonus"] },
+  charlie: { ease: ["waistEase", "seatEase"], length: ["lengthBonus"] },
+  paco: { ease: ["waistEase", "seatEase"], length: ["lengthBonus"] },
+  sandy: { length: ["lengthBonus"] },
+  carlita: { ease: ["chestEase", "waistEase", "seatEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  carlton: { ease: ["chestEase", "waistEase", "seatEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  bent: { ease: ["chestEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  wahid: { ease: ["chestEase", "waistEase", "hipsEase"], length: ["lengthBonus"] },
+  brian: { ease: ["chestEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  bella: { ease: ["chestEase", "waistEase"] },
+  breanna: { ease: ["chestEase", "waistEase"], sleeve: ["sleeveLengthBonus"] },
+  noble: { ease: ["chestEase", "waistEase"] },
 };
 
 /** Which sliders make sense for a block — drives the studio UI. */

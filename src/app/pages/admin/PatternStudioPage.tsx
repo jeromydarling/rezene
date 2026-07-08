@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
@@ -8,6 +8,7 @@ import {
   draftPatternSvg,
   patternAdjustables,
   PATTERN_BLOCKS,
+  PATTERN_GROUPS,
   type BodyMeasurements,
   type PatternOptions,
 } from "../../lib/patterns";
@@ -89,6 +90,39 @@ export function PatternStudioPage() {
   const [styleId, setStyleId] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingToLibrary, setSavingToLibrary] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [pageFormat, setPageFormat] = useState<"a4" | "letter">("a4");
+  const [visualising, setVisualising] = useState(false);
+  const [visualised, setVisualised] = useState(false);
+
+  // Fit notes arriving from the Fitting Studio: /admin/patterns?adjust=cropped,looser
+  // Each refit chip maps to a slider delta, so a visual fit decision lands as a
+  // drafting adjustment.
+  useEffect(() => {
+    const adjust = new URLSearchParams(window.location.search).get("adjust");
+    if (!adjust) return;
+    const DELTAS: Record<string, Partial<Record<"easePct" | "lengthPct" | "sleevePct", number>>> = {
+      tighter: { easePct: -6 },
+      looser: { easePct: 8 },
+      cropped: { lengthPct: -10 },
+      longer: { lengthPct: 10 },
+      "sleeves-shorter": { sleevePct: -15 },
+      "sleeves-longer": { sleevePct: 8 },
+    };
+    setState((s) => {
+      let next = { ...s };
+      for (const chip of adjust.split(",")) {
+        const d = DELTAS[chip.trim()];
+        if (!d) continue;
+        if (d.easePct) next = { ...next, easePct: Math.min(25, Math.max(0, next.easePct + d.easePct)) };
+        if (d.lengthPct) next = { ...next, lengthPct: Math.min(20, Math.max(-15, next.lengthPct + d.lengthPct)) };
+        if (d.sleevePct) next = { ...next, sleevePct: Math.min(10, Math.max(-30, next.sleevePct + d.sleevePct)) };
+      }
+      return next;
+    });
+    toast.success("Fit notes applied", "The Fitting Studio's adjustments are on the sliders — pick the block that matches.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const styles = useFetch<AdminStyle[]>("/api/admin/styles");
   const saved = useFetch<SavedPattern[]>("/api/admin/fitting/looks");
@@ -139,6 +173,51 @@ export function PatternStudioPage() {
       toast.error("Couldn't interpret that", "Try describing the garment a bit differently.");
     } finally {
       setDrafting(false);
+    }
+  }
+
+  async function printPdf() {
+    if (!pattern) return;
+    setPrinting(true);
+    try {
+      const { downloadTiledPdf } = await import("../../lib/pattern-pdf");
+      await downloadTiledPdf(pattern.svg, `${blockId}-${state.size}${hasMeasurements ? "-mtm" : ""}-pattern`, pageFormat);
+      toast.success("Print-ready PDF saved", "Print at 100% scale and check the 5 cm bar on each page.");
+    } catch (e) {
+      toast.error("Couldn't build the PDF", e instanceof Error ? e.message : undefined);
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  /** Pattern-first design: render THIS block + adjustments on a photoreal
+   *  model via the Fitting Studio's generate path. */
+  async function seeOnModel() {
+    setVisualising(true);
+    try {
+      const bits: string[] = [];
+      if (state.easePct >= 15) bits.push("an oversized, boxy fit");
+      else if (state.easePct >= 7) bits.push("a relaxed fit with visible ease");
+      else bits.push("a clean regular fit");
+      if (adjustables.length && state.lengthPct <= -8) bits.push("a cropped hem");
+      if (adjustables.length && state.lengthPct >= 8) bits.push("a longline hem");
+      if (adjustables.sleeve && state.sleevePct <= -12) bits.push("short sleeves");
+      if (adjustables.sleeve && state.sleevePct >= 6) bits.push("extra-long sleeves");
+      const description = `a ${block.name.toLowerCase()} cut with ${bits.join(", ")}`;
+      await api.post("/api/admin/fitting/generate", {
+        description,
+        fit: {
+          ease: 1 + state.easePct / 100,
+          length: 1 + state.lengthPct / 100,
+          sleeve: adjustables.sleeve ? 1 + state.sleevePct / 100 : undefined,
+        },
+      });
+      setVisualised(true);
+      toast.success("Rendered on a model", "Open the Fitting Studio to see it — it's in Model renders.");
+    } catch (e) {
+      toast.error("Couldn't render it", e instanceof Error ? e.message : undefined);
+    } finally {
+      setVisualising(false);
     }
   }
 
@@ -234,7 +313,25 @@ export function PatternStudioPage() {
               {pattern?.label ?? block.name} · size {state.size}
               {hasMeasurements ? " · made-to-measure" : ""}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="input !py-1 w-auto text-xs"
+                value={pageFormat}
+                onChange={(e) => setPageFormat(e.target.value as "a4" | "letter")}
+                title="Paper size for the tiled print PDF"
+              >
+                <option value="a4">A4</option>
+                <option value="letter">Letter</option>
+              </select>
+              <button
+                type="button"
+                className="btn btn-secondary text-xs"
+                onClick={printPdf}
+                disabled={!pattern || printing}
+                title="A tiled, true-scale PDF — tape the pages together and cut"
+              >
+                {printing ? "Building…" : "Print PDF"}
+              </button>
               <button
                 type="button"
                 className="btn btn-secondary text-xs"
@@ -297,25 +394,22 @@ export function PatternStudioPage() {
             </p>
           </div>
 
-          {/* Block */}
+          {/* Block — the full FreeSewing apparel catalogue, grouped */}
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
-              Pattern block
+              Pattern block <span className="normal-case text-warmgrey/70">· {PATTERN_BLOCKS.length} blocks</span>
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {PATTERN_BLOCKS.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => setBlockId(b.id)}
-                  className={`rounded-full border px-2.5 py-1 text-xs ${
-                    blockId === b.id ? "border-navy bg-navy text-chalk" : "border-ink/15 bg-white text-ink/70 hover:text-ink"
-                  }`}
-                >
-                  {b.name}
-                </button>
+            <select className="input w-full" value={blockId} onChange={(e) => setBlockId(e.target.value)}>
+              {PATTERN_GROUPS.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.blocks.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Size */}
@@ -452,6 +546,31 @@ export function PatternStudioPage() {
               />
               Print dimensions on the pattern (paperless)
             </label>
+          </div>
+
+          {/* Pattern-first design: visualize the block on a body */}
+          <div className="space-y-2 rounded-lg border border-navy/15 bg-navy/[0.03] p-3">
+            <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
+              See it on a model
+            </label>
+            <button
+              type="button"
+              className="btn btn-secondary w-full"
+              onClick={seeOnModel}
+              disabled={visualising}
+            >
+              {visualising ? "Rendering…" : "Render this cut on a model"}
+            </button>
+            <p className="text-[11px] leading-snug text-warmgrey">
+              Pattern-first design: this block and your adjustments become a photoreal look.{" "}
+              {visualised ? (
+                <a href="/admin/fitting" className="link-quiet">
+                  View it in the Fitting Studio →
+                </a>
+              ) : (
+                "The render lands in the Fitting Studio's gallery (uses one render from the daily budget)."
+              )}
+            </p>
           </div>
 
           {/* Save */}

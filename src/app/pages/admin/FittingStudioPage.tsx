@@ -56,6 +56,17 @@ const CHIP_EXCL: Record<string, string | undefined> = Object.fromEntries(
   REFIT_GROUPS.flatMap((g) => g.chips.map((c) => [c.id, c.excl])),
 );
 
+/** The fit chips (not styling/finish) that translate into Pattern Studio
+ *  drafting adjustments — the fit-notes bridge only carries these. */
+const FIT_NOTE_CHIPS: Record<string, true> = {
+  tighter: true,
+  looser: true,
+  cropped: true,
+  longer: true,
+  "sleeves-shorter": true,
+  "sleeves-longer": true,
+};
+
 interface FittingRender {
   id: string;
   url: string;
@@ -154,6 +165,9 @@ export function FittingStudioPage() {
   const [progress, setProgress] = useState("");
   const [compareWith, setCompareWith] = useState<FittingRender | null>(null);
   const [colorwayText, setColorwayText] = useState("");
+  // Fit chips applied to the current render chain — hand them to the Pattern
+  // Studio as drafting adjustments ("shorter sleeves" → the sleeve slider).
+  const [fitNotes, setFitNotes] = useState<string[]>([]);
   const [rosterGender, setRosterGender] = useState<"female" | "male">(setup.rosterGender ?? "female");
   const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">(setup.category ?? "auto");
   const [evenLighting, setEvenLighting] = useState(setup.evenLighting ?? true);
@@ -301,6 +315,7 @@ export function FittingStudioPage() {
         note: refitNote.trim() || undefined,
       });
       setActiveRender(res);
+      setFitNotes((n) => [...new Set([...n, ...refitSel])]);
       renders.reload();
       quota.reload();
       setRefitSel([]);
@@ -558,6 +573,15 @@ export function FittingStudioPage() {
                 >
                   Use on your site
                 </button>
+                {fitNotes.some((n) => n in FIT_NOTE_CHIPS) && (
+                  <a
+                    href={`/admin/patterns?adjust=${fitNotes.filter((n) => n in FIT_NOTE_CHIPS).join(",")}`}
+                    title="Carry this session's fit decisions into the Pattern Studio as drafting adjustments"
+                    className="rounded-full border border-ink/20 bg-white px-2.5 py-0.5 text-[11px] text-ink/70 transition hover:border-navy hover:text-navy"
+                  >
+                    Fit notes → Pattern Studio
+                  </a>
+                )}
                 {typeof remaining === "number" && (
                   <span className="ml-auto text-[11px] text-warmgrey" title="Each try-on or refit uses one render. Resets at 00:00 UTC.">
                     {remaining} of {quota.data!.limit} renders left today
@@ -868,7 +892,14 @@ export function FittingStudioPage() {
               <div key={r.id} className="group relative overflow-hidden rounded-lg border border-ink/10 bg-white">
                 <button
                   type="button"
-                  onClick={() => (compareWith && activeRender && r.id !== activeRender.id ? setCompareWith(r) : setActiveRender(r))}
+                  onClick={() => {
+                    if (compareWith && activeRender && r.id !== activeRender.id) {
+                      setCompareWith(r);
+                    } else {
+                      setActiveRender(r);
+                      setFitNotes([]);
+                    }
+                  }}
                   className="block w-full"
                   title={compareWith ? "Compare against this render" : "View this render"}
                 >
