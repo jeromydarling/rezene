@@ -5,11 +5,16 @@ import { api } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { SIZE_STEPS, type SizeStep } from "../../../shared/garments";
 import {
+  designMeasurementNames,
+  designNativeOptions,
   draftPatternSvg,
+  effectiveMeasurementsCm,
+  humanizeKey,
   patternAdjustables,
   PATTERN_BLOCKS,
   PATTERN_GROUPS,
   type BodyMeasurements,
+  type NativeOptionDef,
   type PatternOptions,
 } from "../../lib/patterns";
 import type { AdminStyle } from "../../../shared/types";
@@ -39,9 +44,12 @@ interface PatternState {
   easePct: number;
   lengthPct: number;
   sleevePct: number;
-  seamAllowance: boolean;
+  saMm: number;
   paperless: boolean;
   measurements: BodyMeasurements;
+  /** Touched native drafting options (UI units), keyed by FreeSewing option name. */
+  advanced: Record<string, number | string | boolean>;
+  units: "cm" | "in";
 }
 
 const DEFAULT_STATE: PatternState = {
@@ -49,9 +57,11 @@ const DEFAULT_STATE: PatternState = {
   easePct: 0,
   lengthPct: 0,
   sleevePct: 0,
-  seamAllowance: true,
+  saMm: 10,
   paperless: true,
   measurements: {},
+  advanced: {},
+  units: "cm",
 };
 
 /** The old Fitting Studio stored fit as multipliers (ease 0.7–1.5, length
@@ -72,12 +82,87 @@ function stateFromFit(fit: Record<string, unknown>): Partial<PatternState> {
   if (length !== undefined) out.lengthPct = Math.min(20, Math.max(-15, length));
   const sleeve = pct(fit.sleevePct ?? fit.sleeve, 1);
   if (sleeve !== undefined) out.sleevePct = Math.min(10, Math.max(-30, sleeve));
-  if (typeof fit.seamAllowance === "boolean") out.seamAllowance = fit.seamAllowance;
+  if (typeof fit.saMm === "number") out.saMm = Math.min(30, Math.max(0, fit.saMm));
+  else if (typeof fit.seamAllowance === "boolean") out.saMm = fit.seamAllowance ? 10 : 0;
   if (typeof fit.paperless === "boolean") out.paperless = fit.paperless;
   if (fit.measurements && typeof fit.measurements === "object") {
     out.measurements = fit.measurements as BodyMeasurements;
   }
+  if (fit.advanced && typeof fit.advanced === "object") {
+    out.advanced = fit.advanced as Record<string, number | string | boolean>;
+  }
+  if (fit.units === "in" || fit.units === "cm") out.units = fit.units;
   return out;
+}
+
+const CM_PER_IN = 2.54;
+
+/** One introspected FreeSewing option, rendered by its native type. Untouched
+ *  options show the block's default; touching one adds it to the overrides. */
+function NativeOptionControl({
+  def,
+  value,
+  onChange,
+}: {
+  def: NativeOptionDef;
+  value: number | string | boolean | undefined;
+  onChange: (v: number | string | boolean) => void;
+}) {
+  const label = humanizeKey(def.key);
+  if (def.type === "bool") {
+    return (
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-warmgrey">
+        <input
+          type="checkbox"
+          checked={value === undefined ? Boolean(def.dflt) : Boolean(value)}
+          onChange={(e) => onChange(e.target.checked)}
+          className="accent-navy"
+        />
+        {label}
+      </label>
+    );
+  }
+  if (def.type === "list") {
+    return (
+      <label className="block text-xs text-warmgrey">
+        <span className="mb-0.5 block text-[10px]">{label}</span>
+        <select
+          className="input w-full !py-1 text-xs"
+          value={String(value ?? def.dflt)}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {(def.choices ?? []).map((c) => (
+            <option key={c} value={c}>
+              {humanizeKey(c)}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+  // pct / deg / mm / count — a slider with a live readout.
+  const num = value === undefined ? Number(def.dflt) : Number(value);
+  const unit = def.type === "pct" ? "%" : def.type === "deg" ? "°" : def.type === "mm" ? " mm" : "";
+  return (
+    <div className="text-xs text-warmgrey">
+      <div className="mb-0.5 flex justify-between text-[10px]">
+        <span>{label}</span>
+        <span>
+          {Math.round(num * 10) / 10}
+          {unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={def.min}
+        max={def.max}
+        step={def.type === "count" ? 1 : 0.5}
+        value={num}
+        onChange={(e) => onChange(def.type === "count" ? Math.round(Number(e.target.value)) : Number(e.target.value))}
+        className="w-full"
+      />
+    </div>
+  );
 }
 
 export function PatternStudioPage() {
@@ -134,8 +219,9 @@ export function PatternStudioPage() {
     easePct: state.easePct,
     lengthPct: state.lengthPct,
     sleevePct: state.sleevePct,
-    seamAllowanceMm: state.seamAllowance ? 10 : 0,
+    seamAllowanceMm: state.saMm,
     paperless: state.paperless,
+    advanced: state.advanced,
   };
   const pattern = useMemo(
     () => draftPatternSvg(blockId, state.size, state.measurements, opts),
@@ -143,18 +229,57 @@ export function PatternStudioPage() {
     [blockId, state],
   );
 
-  const hasMeasurements = Object.values(state.measurements).some((v) => v !== undefined);
+  // Touched drafting options belong to a specific block; body measurements
+  // belong to the person. Switching blocks clears the former, keeps the latter.
+  useEffect(() => {
+    setState((s) => (Object.keys(s.advanced).length ? { ...s, advanced: {} } : s));
+  }, [blockId]);
+
+  const nativeOptions = useMemo(() => designNativeOptions(blockId), [blockId]);
+  const measurementNames = useMemo(() => designMeasurementNames(blockId), [blockId]);
+  const effective = useMemo(
+    () => effectiveMeasurementsCm(blockId, state.size, state.measurements),
+    [blockId, state.size, state.measurements],
+  );
+  const touchedCount = Object.keys(state.advanced).length;
+
+  const hasMeasurements =
+    state.measurements.chestCm !== undefined ||
+    state.measurements.waistCm !== undefined ||
+    state.measurements.hipsCm !== undefined ||
+    state.measurements.heightCm !== undefined ||
+    Object.values(state.measurements.exact ?? {}).some((v) => v !== undefined);
+
+  // Unit helpers: everything is stored in cm (or mm for seam allowance);
+  // imperial is a display-layer conversion only.
+  const inches = state.units === "in";
+  const toDisplay = (cm: number | undefined): string =>
+    cm === undefined ? "" : String(Math.round((inches ? cm / CM_PER_IN : cm) * 10) / 10);
+  const fromDisplay = (v: string): number | undefined => {
+    const n = Number(v);
+    if (v === "" || !Number.isFinite(n)) return undefined;
+    return inches ? n * CM_PER_IN : n;
+  };
 
   function set<K extends keyof PatternState>(key: K, value: PatternState[K]) {
     setState((s) => ({ ...s, [key]: value }));
   }
 
-  function setMeasure(key: keyof BodyMeasurements, value: string) {
-    const n = Number(value);
+  function setMeasure(key: "chestCm" | "waistCm" | "hipsCm" | "heightCm", value: string) {
+    const cm = fromDisplay(value);
+    setState((s) => ({ ...s, measurements: { ...s.measurements, [key]: cm } }));
+  }
+
+  function setExactMeasure(name: string, value: string) {
+    const cm = fromDisplay(value);
     setState((s) => ({
       ...s,
-      measurements: { ...s.measurements, [key]: value === "" || !Number.isFinite(n) ? undefined : n },
+      measurements: { ...s.measurements, exact: { ...s.measurements.exact, [name]: cm } },
     }));
+  }
+
+  function setAdvanced(key: string, value: number | string | boolean) {
+    setState((s) => ({ ...s, advanced: { ...s.advanced, [key]: value } }));
   }
 
   async function draftFromWords() {
@@ -257,18 +382,29 @@ export function PatternStudioPage() {
   async function savePattern() {
     setSaving(true);
     try {
+      const fit = {
+        size: state.size,
+        easePct: state.easePct,
+        lengthPct: state.lengthPct,
+        sleevePct: state.sleevePct,
+        saMm: state.saMm,
+        paperless: state.paperless,
+        measurements: state.measurements,
+        advanced: state.advanced,
+        units: state.units,
+      };
+      if (JSON.stringify(fit).length > 1900) {
+        toast.error(
+          "Too many custom settings to save",
+          "Clear a few untouched drafting options or exact measurements, then save again.",
+        );
+        setSaving(false);
+        return;
+      }
       await api.post("/api/admin/fitting/looks", {
         name: patternName.trim() || `${block.name} — ${state.size}${hasMeasurements ? " (made-to-measure)" : ""}`,
         garmentId: blockId,
-        fit: {
-          size: state.size,
-          easePct: state.easePct,
-          lengthPct: state.lengthPct,
-          sleevePct: state.sleevePct,
-          seamAllowance: state.seamAllowance,
-          paperless: state.paperless,
-          measurements: state.measurements,
-        },
+        fit,
         styleId: styleId || null,
       });
       setPatternName("");
@@ -361,8 +497,11 @@ export function PatternStudioPage() {
           </div>
           <div className="flex items-center justify-between border-t border-ink/10 bg-white/60 px-4 py-2 text-xs text-warmgrey">
             <span>
-              {state.seamAllowance ? "1 cm seam allowance drawn" : "No seam allowance"} ·{" "}
-              {state.paperless ? "dimensions printed on the pattern" : "clean cutting lines"}
+              {state.saMm > 0
+                ? `${inches ? `${Math.round((state.saMm / 25.4) * 100) / 100} in` : `${state.saMm} mm`} seam allowance drawn`
+                : "No seam allowance"}{" "}
+              · {state.paperless ? "dimensions printed on the pattern" : "clean cutting lines"}
+              {touchedCount > 0 ? ` · ${touchedCount} drafting option${touchedCount > 1 ? "s" : ""} customised` : ""}
             </span>
             <span>Real, manufacturable pattern (FreeSewing)</span>
           </div>
@@ -435,9 +574,25 @@ export function PatternStudioPage() {
 
           {/* Made-to-measure */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmgrey">
-              Made-to-measure <span className="normal-case text-warmgrey/70">· cm, optional</span>
-            </label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="block text-xs font-medium uppercase tracking-wider text-warmgrey">
+                Made-to-measure <span className="normal-case text-warmgrey/70">· optional</span>
+              </label>
+              <div className="flex overflow-hidden rounded-md border border-ink/15 text-[11px]">
+                {(["cm", "in"] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => set("units", u)}
+                    className={`px-2 py-0.5 ${
+                      state.units === u ? "bg-navy text-chalk" : "bg-white text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
@@ -450,9 +605,10 @@ export function PatternStudioPage() {
                 <input
                   key={key}
                   type="number"
+                  step="0.1"
                   className="input w-full"
-                  placeholder={label}
-                  value={state.measurements[key] ?? ""}
+                  placeholder={`${label} (${state.units})`}
+                  value={toDisplay(state.measurements[key])}
                   onChange={(e) => setMeasure(key, e.target.value)}
                 />
               ))}
@@ -461,6 +617,33 @@ export function PatternStudioPage() {
               Enter a person's measurements and the pattern drafts to their body — blank fields grade from the
               size above.
             </p>
+            {/* Full bespoke input: every measurement this block drafts from. */}
+            <details className="mt-2 rounded border border-ink/10 bg-white px-2.5 py-1.5">
+              <summary className="cursor-pointer text-[11px] font-medium text-ink/70">
+                Full measurements ({measurementNames.length}) — bespoke input
+              </summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {measurementNames.map((name) => (
+                  <label key={name} className="block">
+                    <span className="mb-0.5 block truncate text-[10px] text-warmgrey" title={humanizeKey(name)}>
+                      {humanizeKey(name)}
+                    </span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="input w-full !py-1 text-xs"
+                      placeholder={toDisplay(effective[name])}
+                      value={toDisplay(state.measurements.exact?.[name])}
+                      onChange={(e) => setExactMeasure(name, e.target.value)}
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-snug text-warmgrey">
+                Greyed values show what the draft currently uses ({state.units}). Type over any of them and the
+                pattern uses your number exactly — this is true bespoke input, the same points a tailor takes.
+              </p>
+            </details>
           </div>
 
           {/* Adjustments — the block's native drafting options */}
@@ -526,16 +709,66 @@ export function PatternStudioPage() {
             </div>
           )}
 
+          {/* Every drafting option this block defines, straight from the design. */}
+          <details className="rounded-lg border border-ink/10 bg-white px-3 py-2" open={touchedCount > 0}>
+            <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-warmgrey">
+              All drafting options ({nativeOptions.length})
+              {touchedCount > 0 ? ` · ${touchedCount} changed` : ""}
+            </summary>
+            {touchedCount > 0 && (
+              <button
+                type="button"
+                className="mt-1 text-[11px] text-navy hover:underline"
+                onClick={() => set("advanced", {})}
+              >
+                Reset all to the block's defaults
+              </button>
+            )}
+            {(["fit", "style", "advanced"] as const).map((group) => {
+              const items = nativeOptions.filter((o) => o.group === group);
+              if (items.length === 0) return null;
+              return (
+                <div key={group} className="mt-2.5">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-warmgrey/70">
+                    {group === "fit" ? "Fit" : group === "style" ? "Style" : "Advanced"}
+                  </p>
+                  <div className="space-y-2">
+                    {items.map((o) => (
+                      <NativeOptionControl
+                        key={o.key}
+                        def={o}
+                        value={state.advanced[o.key]}
+                        onChange={(v) => setAdvanced(o.key, v)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <p className="mt-2 text-[10px] leading-snug text-warmgrey">
+              These are the block's own drafting options — the same controls a pattern-maker gets from
+              FreeSewing itself. Anything you change here redrafts the actual pattern pieces.
+            </p>
+          </details>
+
           {/* Output options */}
-          <div className="space-y-1.5">
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-warmgrey">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs text-warmgrey">
+              Seam allowance
               <input
-                type="checkbox"
-                checked={state.seamAllowance}
-                onChange={(e) => set("seamAllowance", e.target.checked)}
-                className="accent-navy"
+                type="number"
+                step={inches ? 0.125 : 1}
+                min={0}
+                max={inches ? 1.25 : 30}
+                className="input w-20 !py-1 text-xs"
+                value={inches ? Math.round((state.saMm / 25.4) * 1000) / 1000 : state.saMm}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  set("saMm", Math.min(30, Math.max(0, inches ? n * 25.4 : n)));
+                }}
               />
-              Draw a 1 cm seam allowance
+              {inches ? "in" : "mm"} <span className="text-warmgrey/70">(0 = none drawn)</span>
             </label>
             <label className="flex cursor-pointer items-center gap-2 text-xs text-warmgrey">
               <input

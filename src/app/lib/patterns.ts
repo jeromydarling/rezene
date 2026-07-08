@@ -166,12 +166,93 @@ export function patternLabel(garmentId: string): string | null {
 }
 
 /** Optional made-to-measure inputs (centimetres). Blank fields fall back to the
- *  size-graded standard set. */
+ *  size-graded standard set. `exact` carries per-measurement overrides (cm,
+ *  keyed by FreeSewing measurement name) for full bespoke input. */
 export interface BodyMeasurements {
   chestCm?: number;
   waistCm?: number;
   hipsCm?: number;
   heightCm?: number;
+  exact?: Record<string, number | undefined>;
+}
+
+// ---------------------------------------------------------------------------
+// Native option introspection — every FreeSewing design publishes its full
+// option tree (type, range, default, menu grouping) in patternConfig. The
+// studio renders that tree directly, so each design exposes ALL of its real
+// drafting options (Simon's six cuff styles, collar geometry, plackets…), not
+// a generic subset.
+// ---------------------------------------------------------------------------
+
+export interface NativeOptionDef {
+  key: string;
+  type: "pct" | "deg" | "mm" | "bool" | "list" | "count";
+  min?: number;
+  max?: number;
+  dflt: number | string | boolean;
+  choices?: string[];
+  group: string;
+}
+
+interface RawOptionDef {
+  pct?: number;
+  deg?: number;
+  mm?: number;
+  bool?: boolean;
+  list?: unknown[];
+  count?: number;
+  min?: number;
+  max?: number;
+  dflt?: unknown;
+  menu?: unknown;
+}
+
+/** The design's full public option tree, grouped by its own menu metadata.
+ *  Options the design marks internal (no menu) are skipped; conditional menus
+ *  (functions) land under "advanced". */
+export function designNativeOptions(garmentId: string): NativeOptionDef[] {
+  const design = DESIGN_MAP[garmentId]?.design as unknown as {
+    patternConfig?: { options?: Record<string, unknown> };
+  };
+  const raw = design?.patternConfig?.options ?? {};
+  const out: NativeOptionDef[] = [];
+  for (const [key, defU] of Object.entries(raw)) {
+    if (!defU || typeof defU !== "object") continue;
+    const def = defU as RawOptionDef;
+    const menu = def.menu;
+    if (menu === false || menu === undefined || menu === null) continue;
+    const group = typeof menu === "string" ? menu.split(".")[0] : "advanced";
+    if (def.pct !== undefined) {
+      out.push({ key, type: "pct", min: def.min ?? 0, max: def.max ?? 100, dflt: def.pct, group });
+    } else if (def.deg !== undefined) {
+      out.push({ key, type: "deg", min: def.min ?? -90, max: def.max ?? 90, dflt: def.deg, group });
+    } else if (def.mm !== undefined) {
+      out.push({ key, type: "mm", min: def.min ?? 0, max: def.max ?? 200, dflt: def.mm, group });
+    } else if (def.bool !== undefined) {
+      out.push({ key, type: "bool", dflt: Boolean(def.bool), group });
+    } else if (Array.isArray(def.list)) {
+      out.push({ key, type: "list", choices: def.list.map(String), dflt: String(def.dflt ?? def.list[0]), group });
+    } else if (def.count !== undefined) {
+      out.push({ key, type: "count", min: def.min ?? 0, max: def.max ?? 12, dflt: def.count, group });
+    }
+  }
+  const order: Record<string, number> = { fit: 0, style: 1, advanced: 2 };
+  return out.sort((a, b) => (order[a.group] ?? 9) - (order[b.group] ?? 9) || a.key.localeCompare(b.key));
+}
+
+/** The measurements this design actually drafts from (FreeSewing names). */
+export function designMeasurementNames(garmentId: string): string[] {
+  const design = DESIGN_MAP[garmentId]?.design as unknown as {
+    patternConfig?: { measurements?: string[]; optionalMeasurements?: string[] };
+  };
+  const cfg = design?.patternConfig ?? {};
+  return [...(cfg.measurements ?? []), ...(cfg.optionalMeasurements ?? [])].filter((m) => m in BASE_MEASUREMENTS);
+}
+
+/** "shoulderToWrist" → "Shoulder to wrist" — for labels on introspected fields. */
+export function humanizeKey(key: string): string {
+  const words = key.replace(/([A-Z])/g, " $1").toLowerCase().trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**
@@ -190,6 +271,10 @@ export interface PatternOptions {
   seamAllowanceMm?: number;
   /** Paperless mode prints the dimensions on the pattern itself. */
   paperless?: boolean;
+  /** Direct native-option overrides (values in UI units: pct/deg/mm/count as
+   *  numbers, bool, list id). Applied AFTER the quick sliders, so a touched
+   *  native control always wins. */
+  advanced?: Record<string, number | string | boolean>;
 }
 
 // Which native option names carry each adjustment, per design. Only options a
@@ -246,6 +331,30 @@ function designOptions(garmentId: string, opts?: PatternOptions): Record<string,
   return out;
 }
 
+/** Convert touched native controls into FreeSewing settings.options values
+ *  (percent options are fractions in settings; everything else passes raw). */
+function advancedOptions(garmentId: string, advanced?: Record<string, number | string | boolean>) {
+  const out: Record<string, number | string | boolean> = {};
+  if (!advanced) return out;
+  const defs = new Map(designNativeOptions(garmentId).map((d) => [d.key, d]));
+  for (const [key, value] of Object.entries(advanced)) {
+    const def = defs.get(key);
+    if (!def) continue;
+    if (def.type === "pct") {
+      const n = Number(value);
+      if (Number.isFinite(n)) out[key] = Math.min(def.max ?? 100, Math.max(def.min ?? 0, n)) / 100;
+    } else if (def.type === "deg" || def.type === "mm" || def.type === "count") {
+      const n = Number(value);
+      if (Number.isFinite(n)) out[key] = Math.min(def.max ?? 999, Math.max(def.min ?? -999, n));
+    } else if (def.type === "bool") {
+      out[key] = Boolean(value);
+    } else if (def.type === "list") {
+      if (def.choices?.includes(String(value))) out[key] = String(value);
+    }
+  }
+  return out;
+}
+
 // Measurements that scale with height (lengths) rather than girth.
 const LENGTH_MEASURES = new Set([
   "ankle", "crotchDepth", "hpsToBust", "hpsToWaistBack", "hpsToWaistFront", "inseam",
@@ -273,6 +382,23 @@ function measurementsFor(size: SizeStep, m?: BodyMeasurements): Record<string, n
     out.hips = Math.round(m.hipsCm * 10);
     out.seat = Math.round(m.hipsCm * 10);
   }
+  // Full bespoke input: exact per-measurement values (cm) win over everything.
+  for (const [k, v] of Object.entries(m?.exact ?? {})) {
+    if (k in out && typeof v === "number" && Number.isFinite(v) && v > 0) out[k] = Math.round(v * 10);
+  }
+  return out;
+}
+
+/** The values a draft would actually use (cm), for prefill/placeholder display
+ *  in the full measurement editor. */
+export function effectiveMeasurementsCm(
+  garmentId: string,
+  size: SizeStep,
+  m?: BodyMeasurements,
+): Record<string, number> {
+  const all = measurementsFor(size, m);
+  const out: Record<string, number> = {};
+  for (const name of designMeasurementNames(garmentId)) out[name] = Math.round(all[name]) / 10;
   return out;
 }
 
@@ -294,7 +420,13 @@ export function draftPatternSvg(
   const draft = (settings: Record<string, unknown>) =>
     new entry.design(settings).use(pluginTheme).draft().render();
   try {
-    return { svg: draft({ ...base, options: designOptions(garmentId, opts) }), label: entry.label };
+    return {
+      svg: draft({
+        ...base,
+        options: { ...designOptions(garmentId, opts), ...advancedOptions(garmentId, opts?.advanced) },
+      }),
+      label: entry.label,
+    };
   } catch {
     // An adjustment outside a design's accepted range shouldn't brick the
     // studio — fall back to the unadjusted draft.

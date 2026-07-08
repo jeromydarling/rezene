@@ -206,11 +206,12 @@ For the shops with a tailor or seamstress in the room: the Pattern Studio drafts
 ## Draft one
 
 1. Pick a **pattern block** — the full FreeSewing apparel catalogue is in, over thirty blocks across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear (coats, jacket block, waistcoat, corset), foundation bodice blocks, underwear and swim.
-2. Choose a **size** (XS–XXL), or go **made-to-measure**: enter a person's chest, waist, hips, and height and the pattern drafts to their body.
-3. **Adjust the cut.** The sliders drive the block's own drafting options — extra ease through the body, hem length (cropped to longline), sleeve length — so the pattern pieces genuinely redraft, seams and all.
-4. Choose your output: a drawn **1 cm seam allowance**, and **dimensions printed on the pattern** (paperless mode — measure and mark directly instead of printing at scale).
-5. **Download SVG** — hand it to your machinist, or open it in any vector tool to refine. **Save to library** keeps a copy with your shop files.
-6. **Print PDF** — a tiled, true-scale PDF (A4 or Letter). Print at 100%, check the **5 cm bar** on each page, tape the pages along the dashed glue guides, and cut. Overlaps and row/column labels are printed on every page.
+2. Choose a **size** (XS–XXL), or go **made-to-measure**: the four quick fields (chest, waist, hips, height) get you close fast, and **Full measurements** opens every point the block actually drafts from — neck, shoulder-to-wrist, bicep, waist-to-hip and the rest — for true bespoke input, in **cm or inches**. Greyed values show what the draft currently uses; type over any of them.
+3. **Adjust the cut.** The quick sliders cover ease, hem, and sleeve length — and **All drafting options** opens the block's complete native option set, straight from the design itself: on the button-down that means six cuff styles, collar geometry, plackets, split yoke, back darts, button count and more. Everything redrafts the actual pattern pieces, seams and all.
+4. Set the **seam allowance** to whatever your fabric and construction call for (in mm or inches; 0 draws none).
+5. **Dimensions on the pattern** (paperless mode) lets you measure and mark directly instead of printing at scale.
+6. **Download SVG** — hand it to your machinist, or open it in any vector tool to refine. **Save to library** keeps a copy with your shop files.
+7. **Print PDF** — a tiled, true-scale PDF (A4 or Letter). Print at 100%, check the **5 cm bar** on each page, tape the pages along the dashed glue guides, and cut. Overlaps and row/column labels are printed on every page.
 
 > [!TIP]
 > In a hurry? **✨ Describe the garment** — *"a boxy cropped tee"* — and the studio picks the block, size, and adjustments for you. Fine-tune from there.
