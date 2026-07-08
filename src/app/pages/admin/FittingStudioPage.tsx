@@ -283,6 +283,7 @@ export function FittingStudioPage() {
   const [modelSel, setModelSel] = useState<{ kind: "roster" | "shop"; id: string } | null>(null);
   const [rosterGender, setRosterGender] = useState<"female" | "male">("female");
   const [category, setCategory] = useState<"auto" | "tops" | "bottoms" | "one-pieces">("auto");
+  const [evenLighting, setEvenLighting] = useState(true);
   const [busyUpload, setBusyUpload] = useState(false);
   const [addingModel, setAddingModel] = useState(false);
 
@@ -364,6 +365,7 @@ export function FittingStudioPage() {
       category,
       garmentId,
       styleId: styleId || null,
+      cleanGarment: evenLighting,
     };
     if (modelSel.kind === "roster") {
       payload.modelRosterId = modelSel.id;
@@ -948,6 +950,19 @@ export function FittingStudioPage() {
                       />
                     </label>
                   </div>
+                  <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-warmgrey">
+                    <input
+                      type="checkbox"
+                      checked={evenLighting}
+                      onChange={(e) => setEvenLighting(e.target.checked)}
+                      className="mt-0.5 accent-navy"
+                    />
+                    <span>
+                      <span className="font-medium text-ink/80">Even out the photo's lighting first.</span>{" "}
+                      Shadows falling across your garment photo can read as darker fabric — this
+                      re-lights the photo before the try-on. Untick if a colour comes back wrong.
+                    </span>
+                  </label>
                   <button
                     type="button"
                     className="btn btn-primary w-full"
