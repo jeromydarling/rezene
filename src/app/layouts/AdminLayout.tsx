@@ -83,6 +83,10 @@ const NAV_SECTIONS: {
     ],
   },
   {
+    title: "Brand",
+    items: [{ to: "/admin/brand", label: "Brand Studio", icon: Palette }],
+  },
+  {
     title: "Marketing",
     items: [
       { to: "/admin/marketing", label: "Campaigns", icon: Megaphone },
@@ -114,7 +118,6 @@ const NAV_SECTIONS: {
     title: "Studio",
     items: [
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
-      { to: "/admin/brand", label: "Brand Studio", icon: Palette },
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
       { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },

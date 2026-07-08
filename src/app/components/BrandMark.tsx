@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import type { BrandLogo, BrandPalette } from "../../shared/types";
-import { applyCase, brandFont, brandInitials, logoImageFor } from "../../shared/brand-identity";
+import type { BrandLogo, BrandPalette, BrandTypography } from "../../shared/types";
+import { applyCase, brandFont, brandInitials, logoImageFor, typePairing } from "../../shared/brand-identity";
 
 /**
  * The one place a brand's logo renders — storefront header/footer, admin
@@ -106,5 +106,16 @@ export function paletteVars(palette: BrandPalette | null | undefined): CSSProper
     ["--color-chalk" as string]: palette.bg,
     ["--color-cream" as string]: palette.bg,
     ["--color-ivory" as string]: palette.bg,
+  } as CSSProperties;
+}
+
+/** Override the storefront's display + body font tokens with the brand pairing.
+ *  Merge onto the same container as paletteVars. */
+export function typographyVars(typography: BrandTypography | null | undefined): CSSProperties {
+  if (!typography?.pairing) return {};
+  const p = typePairing(typography.pairing);
+  return {
+    ["--font-display" as string]: p.headingFamily,
+    ["--font-sans" as string]: p.bodyFamily,
   } as CSSProperties;
 }

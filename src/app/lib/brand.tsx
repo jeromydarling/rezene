@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
 import type { BrandSettings } from "../../shared/types";
-import { faviconDataUri } from "../../shared/brand-identity";
+import { faviconDataUri, typePairing } from "../../shared/brand-identity";
 
 /**
  * Brand identity is data (admin Settings → brand), not code. This context
@@ -27,6 +27,7 @@ const DEFAULT_BRAND: BrandSettings = {
   languages: ["en"],
   logo: null,
   palette: null,
+  typography: null,
 };
 
 /** Point the browser tab's icon at the brand's favicon (or a derived one). */
@@ -38,6 +39,19 @@ function setFavicon(href: string) {
     document.head.appendChild(link);
   }
   link.href = href;
+}
+
+/** Load a brand type pairing's web fonts once (id-guarded), if it needs any. */
+function loadBrandFonts(pairingKey: string | undefined) {
+  const pairing = typePairing(pairingKey);
+  if (!pairing.googleUrl) return; // bundled default → nothing to fetch
+  const id = `brand-font-${pairing.key}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = pairing.googleUrl;
+  document.head.appendChild(link);
 }
 
 const BrandContext = createContext<BrandSettings>(DEFAULT_BRAND);
@@ -59,8 +73,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
             settings.languages && settings.languages.length > 0 ? settings.languages : ["en"],
           logo: settings.logo ?? null,
           palette: settings.palette ?? null,
+          typography: settings.typography ?? null,
         });
         if (settings.brandName) document.title = settings.brandName;
+        if (settings.typography?.pairing) loadBrandFonts(settings.typography.pairing);
         // Favicon: an explicit one if set, else derive initials-on-accent from
         // the palette so every shop has a distinct tab icon out of the box.
         const fav = settings.logo?.faviconUrl;

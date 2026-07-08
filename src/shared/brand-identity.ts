@@ -33,6 +33,96 @@ export function brandFont(key: string | undefined): BrandFont {
   return BRAND_FONTS.find((f) => f.key === key) ?? BRAND_FONTS[0];
 }
 
+// ── Type pairings ────────────────────────────────────────────────────────────
+// Curated heading/body pairs that re-theme the storefront's --font-display and
+// --font-sans. The first ("Editorial") is the app's bundled Fraunces + Inter, so
+// it needs no web-font fetch; the rest load from Google Fonts on demand. Each
+// carries the css2 query so the client can inject exactly the weights used.
+export interface TypePairing {
+  key: string;
+  label: string;
+  headingFamily: string;
+  bodyFamily: string;
+  /** Google Fonts css2 URL, or null for the bundled default. */
+  googleUrl: string | null;
+  mood: string;
+}
+
+const g = (families: string) => `https://fonts.googleapis.com/css2?${families}&display=swap`;
+
+export const TYPE_PAIRINGS: readonly TypePairing[] = [
+  {
+    key: "editorial",
+    label: "Editorial",
+    headingFamily: '"Fraunces", Georgia, serif',
+    bodyFamily: '"Inter", system-ui, sans-serif',
+    googleUrl: null,
+    mood: "Warm high-fashion serif + clean sans — the house default",
+  },
+  {
+    key: "grand",
+    label: "Grand",
+    headingFamily: '"Playfair Display", Georgia, serif',
+    bodyFamily: '"Inter", system-ui, sans-serif',
+    googleUrl: g("family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600"),
+    mood: "Dramatic high-contrast serif — luxe, editorial",
+  },
+  {
+    key: "refined",
+    label: "Refined",
+    headingFamily: '"Cormorant Garamond", Georgia, serif',
+    bodyFamily: '"Jost", system-ui, sans-serif',
+    googleUrl: g("family=Cormorant+Garamond:wght@500;600&family=Jost:wght@400;500"),
+    mood: "Delicate old-style serif + geometric sans — quiet luxury",
+  },
+  {
+    key: "modern",
+    label: "Modern",
+    headingFamily: '"Space Grotesk", "Helvetica Neue", sans-serif',
+    bodyFamily: '"Inter", system-ui, sans-serif',
+    googleUrl: g("family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500;600"),
+    mood: "Contemporary grotesk — minimal, design-forward",
+  },
+  {
+    key: "bold",
+    label: "Bold",
+    headingFamily: '"Archivo", "Helvetica Neue", sans-serif',
+    bodyFamily: '"Archivo", "Helvetica Neue", sans-serif',
+    googleUrl: g("family=Archivo:wght@500;700;800"),
+    mood: "Heavy single-family grotesk — confident, streetwear",
+  },
+  {
+    key: "warm",
+    label: "Warm",
+    headingFamily: '"DM Serif Display", Georgia, serif',
+    bodyFamily: '"DM Sans", system-ui, sans-serif',
+    googleUrl: g("family=DM+Serif+Display&family=DM+Sans:wght@400;500;600"),
+    mood: "Friendly serif display + soft sans — approachable, crafted",
+  },
+  {
+    key: "classic",
+    label: "Classic",
+    headingFamily: '"Libre Baskerville", Georgia, serif',
+    bodyFamily: '"Source Sans 3", system-ui, sans-serif',
+    googleUrl: g("family=Libre+Baskerville:wght@400;700&family=Source+Sans+3:wght@400;500;600"),
+    mood: "Traditional book serif — heritage, trustworthy",
+  },
+  {
+    key: "avant",
+    label: "Avant",
+    headingFamily: '"Syne", "Helvetica Neue", sans-serif',
+    bodyFamily: '"Inter", system-ui, sans-serif',
+    googleUrl: g("family=Syne:wght@600;700;800&family=Inter:wght@400;500"),
+    mood: "Wide experimental display — art-house, statement",
+  },
+];
+
+export function typePairing(key: string | undefined): TypePairing {
+  return TYPE_PAIRINGS.find((p) => p.key === key) ?? TYPE_PAIRINGS[0];
+}
+
+export const DEFAULT_TYPOGRAPHY = { pairing: "editorial" };
+
 // ── Palettes ─────────────────────────────────────────────────────────────────
 export interface PalettePreset extends BrandPalette {
   key: string;

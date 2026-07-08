@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { ShoppingBag } from "lucide-react";
 import { track } from "../lib/analytics";
 import { useBrand } from "../lib/brand";
-import { BrandMark, paletteVars } from "../components/BrandMark";
+import { BrandMark, paletteVars, typographyVars } from "../components/BrandMark";
 import { useCart } from "../lib/cart";
 import { useLang } from "../lib/lang";
 import { NewsletterForm } from "../components/LeadForm";
@@ -60,7 +60,7 @@ export function PublicLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col" style={paletteVars(brand.palette)}>
+    <div className="flex min-h-screen flex-col" style={{ ...paletteVars(brand.palette), ...typographyVars(brand.typography) }}>
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-chalk/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <Link to="/" aria-label={brand.brandName}>
