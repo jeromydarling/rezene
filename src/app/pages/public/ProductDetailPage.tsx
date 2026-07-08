@@ -9,7 +9,6 @@ import { formatDate, formatMoney } from "../../lib/format";
 import { track } from "../../lib/analytics";
 import { EditorialImage } from "../../components/ImagePlaceholder";
 import { ProductCard } from "../../components/ProductCard";
-import { NewsletterForm } from "../../components/LeadForm";
 import type { PublicProductDetail } from "../../../shared/types";
 
 export function ProductDetailPage() {
@@ -267,8 +266,7 @@ export function ProductDetailPage() {
                 <p className="text-sm font-semibold uppercase tracking-editorial text-warmgrey">
                   Sold out
                 </p>
-                <p className="text-sm text-ink/70">Be notified when this piece returns:</p>
-                <NewsletterForm kind="drop_notification" />
+                <RestockNotify slug={product.slug} />
               </div>
             ) : (
               <div className="flex gap-3">
@@ -415,5 +413,54 @@ function WishlistHeart({ productId }: { productId: string }) {
     >
       <Heart size={22} strokeWidth={1.6} fill={saved ? "currentColor" : "none"} />
     </button>
+  );
+}
+
+/** Sold-out waitlist: leave an email and we notify when the piece is restocked. */
+function RestockNotify({ slug }: { slug: string }) {
+  const [email, setEmail] = useState("");
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!email.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/api/public/products/${slug}/notify-restock`, { email: email.trim() });
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done)
+    return (
+      <p className="rounded bg-cream/60 px-3 py-2.5 text-sm text-ink/75">
+        You're on the list — we'll email you the moment it's back.
+      </p>
+    );
+
+  return (
+    <div>
+      <p className="mb-2 text-sm text-ink/70">Be the first to know when it's back:</p>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          className="input flex-1"
+          placeholder="you@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && void submit()}
+        />
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void submit()}>
+          {busy ? "…" : "Notify me"}
+        </button>
+      </div>
+      {error && <p className="mt-1 text-xs text-terracotta">{error}</p>}
+    </div>
   );
 }

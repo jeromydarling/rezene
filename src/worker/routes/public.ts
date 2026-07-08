@@ -205,6 +205,33 @@ publicRoutes.get("/products/:slug", async (c) => {
   return c.json(detail);
 });
 
+// Back-in-stock waitlist: leave an email against a sold-out product.
+publicRoutes.post(
+  "/products/:slug/notify-restock",
+  rateLimit({ key: "restock_sub", limit: 20, windowSeconds: 3600 }),
+  async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { email?: string };
+    const email = (body.email ?? "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return c.json({ error: "Enter a valid email." }, 400);
+    const product = await first<{ id: string }>(
+      c.var.db,
+      `SELECT id FROM products WHERE slug = ? AND is_published = 1`,
+      c.req.param("slug"),
+    );
+    if (!product) return c.json({ error: "Product not found" }, 404);
+    // Deduped by the partial unique index (product_id, email) where variant is null.
+    await run(
+      c.var.db,
+      `INSERT INTO restock_subscriptions (id, product_id, email) VALUES (?, ?, ?)
+       ON CONFLICT DO NOTHING`,
+      newId("rs"),
+      product.id,
+      email,
+    );
+    return c.json({ ok: true });
+  },
+);
+
 // ---------- Lookbook ----------
 publicRoutes.get("/lookbooks", async (c) => {
   const books = await all<Record<string, unknown>>(
