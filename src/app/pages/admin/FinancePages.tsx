@@ -1137,6 +1137,17 @@ export function AnalyticsPage() {
           </div>
         }
       />
+      <div className="admin-card mb-4 flex flex-wrap items-center justify-between gap-3 p-4">
+        <div>
+          <p className="text-sm font-medium">Export your data</p>
+          <p className="text-xs text-warmgrey">Download everything as CSV — open it in a spreadsheet or hand it to your accountant.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a href="/api/admin/export/products.csv" download className="btn btn-secondary !py-1.5 text-xs">Products</a>
+          <a href="/api/admin/export/customers.csv" download className="btn btn-secondary !py-1.5 text-xs">Customers</a>
+          <a href="/api/admin/export/orders.csv" download className="btn btn-secondary !py-1.5 text-xs">Orders</a>
+        </div>
+      </div>
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable />}
       {data && cur && prev && (

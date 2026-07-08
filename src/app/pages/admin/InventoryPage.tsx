@@ -60,6 +60,7 @@ export function InventoryPage() {
         help="inventory"
         description="SKU-level stock with a full movement ledger. Available = on hand − reserved."
       />
+      <ReorderSuggestions />
       {error && <ErrorNote message={error} />}
       {loading && <LoadingTable rows={8} />}
       {data && data.length === 0 && (
@@ -161,6 +162,61 @@ export function InventoryPage() {
           </button>
         </div>
       </SlideOver>
+    </div>
+  );
+}
+
+// ---------- Reorder suggestions ----------
+interface ReorderRow {
+  productName: string;
+  colorway: string;
+  size: string;
+  onHand: number;
+  reserved: number;
+  threshold: number;
+  sold90: number;
+  suggestedReorder: number;
+}
+
+function ReorderSuggestions() {
+  const { data } = useFetch<{ suggestions: ReorderRow[] }>("/api/admin/export/reorder");
+  const rows = data?.suggestions ?? [];
+  const [open, setOpen] = useState(false);
+  if (rows.length === 0) return null;
+  return (
+    <div className="admin-card mb-5 border-amber-200 bg-amber-50/60 p-4">
+      <button type="button" className="flex w-full items-center justify-between" onClick={() => setOpen((v) => !v)}>
+        <span className="text-sm font-semibold text-amber-800">
+          {rows.length} {rows.length === 1 ? "piece needs" : "pieces need"} reordering
+        </span>
+        <span className="text-xs text-amber-700">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Variant</th>
+                <th>Available</th>
+                <th>Sold (90d)</th>
+                <th>Suggested reorder</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="font-medium">{r.productName}</td>
+                  <td className="text-xs">{r.colorway} / {r.size}</td>
+                  <td>{r.onHand - r.reserved}</td>
+                  <td className="text-warmgrey">{r.sold90}</td>
+                  <td className="font-medium text-navy">{r.suggestedReorder}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
