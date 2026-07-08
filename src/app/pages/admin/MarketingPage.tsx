@@ -62,6 +62,7 @@ export function MarketingPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [graphicsOpen, setGraphicsOpen] = useState(false);
   const [ideasOpen, setIdeasOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   const selected = data?.find((cp) => cp.id === selectedId) ?? null;
 
   return (
@@ -73,6 +74,9 @@ export function MarketingPage() {
         description="Describe a campaign once — LLM writes the whole kit in your brand voice: social posts, email, blog draft, press release, ad copy. Edit, schedule, send. Uses your Anthropic key when set, otherwise built-in Llama."
         actions={
           <>
+            <button type="button" className="btn btn-secondary" onClick={() => setBroadcastOpen(true)}>
+              Email customers
+            </button>
             <button type="button" className="btn btn-secondary" onClick={() => setIdeasOpen(true)}>
               Content ideas
             </button>
@@ -145,6 +149,9 @@ export function MarketingPage() {
       </SlideOver>
       <SlideOver open={graphicsOpen} title="Graphics studio" onClose={() => setGraphicsOpen(false)}>
         <MarketingGraphic />
+      </SlideOver>
+      <SlideOver open={broadcastOpen} title="Email your customers" onClose={() => setBroadcastOpen(false)}>
+        <BroadcastComposer onSent={() => setBroadcastOpen(false)} />
       </SlideOver>
       <SlideOver open={ideasOpen} title="Content ideas" onClose={() => setIdeasOpen(false)}>
         <ContentIdeasPanel />
@@ -691,6 +698,129 @@ function ContentIdeasPanel() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ---------- Email your customers ----------
+const SEGMENTS = [
+  ["customers", "All customers", "Everyone who has bought from you"],
+  ["repeat", "Repeat customers", "Bought two or more times — your best people"],
+  ["newsletter", "Newsletter subscribers", "Signed up on your site"],
+] as const;
+
+function BroadcastComposer({ onSent }: { onSent: () => void }) {
+  const audience = useFetch<{ configured: boolean; counts: Record<string, number> }>(
+    "/api/admin/marketing/broadcast-audience",
+  );
+  const [segment, setSegment] = useState<"customers" | "repeat" | "newsletter">("customers");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const configured = audience.data?.configured ?? false;
+  const count = audience.data?.counts?.[segment] ?? 0;
+
+  async function send() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ recipients: number }>("/api/admin/marketing/broadcast", {
+        subject: subject.trim(),
+        body: body.trim(),
+        segment,
+      });
+      setResult(`Sending to ${res.recipients} ${res.recipients === 1 ? "person" : "people"} now.`);
+      setTimeout(onSent, 1400);
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "Couldn't send.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="rounded-lg border border-palm/30 bg-palm/10 p-5 text-center text-sm">
+        <p className="font-medium">On its way ✓</p>
+        <p className="mt-1 text-warmgrey">{result}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 text-sm">
+      {!configured && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          Email sending isn't switched on yet. Set up your sending domain to reach customers from
+          your own address.
+        </div>
+      )}
+
+      <div>
+        <p className="label">Who should get this?</p>
+        <div className="space-y-2">
+          {SEGMENTS.map(([value, label, hint]) => (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 ${
+                segment === value ? "border-navy ring-1 ring-navy" : "border-ink/12 hover:border-ink/25"
+              }`}
+            >
+              <input
+                type="radio"
+                className="mt-0.5"
+                checked={segment === value}
+                onChange={() => setSegment(value)}
+              />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{label}</span>
+                  <span className="text-xs text-warmgrey">
+                    {audience.data?.counts?.[value] ?? 0} {(audience.data?.counts?.[value] ?? 0) === 1 ? "person" : "people"}
+                  </span>
+                </div>
+                <p className="text-xs text-warmgrey">{hint}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="block">
+        <span className="label">Subject</span>
+        <input
+          className="input"
+          placeholder="A little something new…"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+      </label>
+
+      <label className="block">
+        <span className="label">Message</span>
+        <textarea
+          className="input min-h-[160px]"
+          placeholder={"Write to your customers like a person.\n\nUse {{SHOP_URL}} to drop in a link to your shop."}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <span className="mt-1 block text-xs text-warmgrey">
+          Sent in your brand's colours and logo. An unsubscribe link is added automatically.
+        </span>
+      </label>
+
+      {error && <p className="field-error">{error}</p>}
+      <button
+        type="button"
+        className="btn btn-primary w-full"
+        disabled={busy || !configured || !subject.trim() || !body.trim() || count === 0}
+        onClick={() => void send()}
+      >
+        {busy ? "Sending…" : `Send to ${count} ${count === 1 ? "person" : "people"}`}
+      </button>
     </div>
   );
 }
