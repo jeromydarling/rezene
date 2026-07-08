@@ -43,6 +43,7 @@ import { TechPackAiPage } from "./pages/admin/TechPackAiPage";
 import { ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { DesignStudioPage } from "./pages/admin/DesignStudioPage";
 import { BrandStudioPage } from "./pages/admin/BrandStudioPage";
+import { BrandPrintPage } from "./pages/admin/BrandPrintPage";
 // Lazy-loaded: pulls in three.js / react-three-fiber, kept out of the main bundle.
 const FittingStudioPage = lazy(() =>
   import("./pages/admin/FittingStudioPage").then((m) => ({ default: m.FittingStudioPage })),
@@ -159,6 +160,7 @@ export function AppRouter() {
           <Route path="tech-packs/:id/ai-assist" element={<TechPackAiPage />} />
           <Route path="ai-concepts" element={<DesignStudioPage />} />
           <Route path="brand" element={<BrandStudioPage />} />
+          <Route path="brand/print" element={<BrandPrintPage />} />
           <Route path="3d" element={<ThreeDPage />} />
           <Route
             path="fitting"
