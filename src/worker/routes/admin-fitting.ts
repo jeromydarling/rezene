@@ -554,8 +554,34 @@ const REFIT_PRESETS: Record<string, string> = {
   "sleeves-longer":
     "lengthen the sleeves so they end distinctly LOWER on the arm than in the reference photo " +
     "(a short sleeve reaches past the elbow; a long sleeve reaches the wrist)",
-  tucked: "tuck the garment's hem neatly into the waistband",
-  untucked: "let the garment hang fully untucked over the waistband",
+  // Styling — how the garment is WORN. Same discipline: name the exact end
+  // state and the landmark, never a relative nudge.
+  tucked:
+    "tuck the garment's entire hem inside the waistband all the way around — no hem fabric visible " +
+    "below the waistband, with a slight natural blouse of fabric above it",
+  "tuck-full":
+    "tuck the garment's entire hem inside the waistband all the way around — no hem fabric visible " +
+    "below the waistband, with a slight natural blouse of fabric above it",
+  "tuck-french":
+    "French tuck: tuck ONLY the front centre of the hem inside the waistband; the sides and back of the " +
+    "hem hang loose outside the trousers, clearly visible below the waistline",
+  untucked:
+    "let the garment hang fully untucked over the waistband, the entire hem visible below the waistline",
+  "sleeves-rolled":
+    "roll the sleeves up: a long sleeve is rolled into a neat cuff sitting just below the elbow with the " +
+    "forearm bare; a short sleeve gets one clean shallow fold ending at mid-bicep",
+  "pants-cuffed":
+    "cuff the trousers: fold each trouser hem up once in a clean cuff about four centimetres deep, ending " +
+    "just above the ankle bone so the ankles are visible",
+  "collar-open":
+    "open the collar: the top one or two buttons at the neck are undone and the collar sits open and " +
+    "relaxed; every button below stays fastened",
+  "collar-buttoned":
+    "button up: every button is fastened including the top button at the neck, the collar sitting closed " +
+    "and neat",
+  pressed:
+    "press the garment: the fabric looks freshly steamed, with wrinkles and rumples smoothed away, while " +
+    "every seam, drape line, proportion and colour stays exactly as in the reference",
   "complete-outfit":
     "complete the outfit with simple neutral basics: plain straight-leg mid-grey trousers and clean minimal " +
     "white sneakers (if the featured garment IS trousers or a skirt, instead add a plain fitted white crew-neck " +

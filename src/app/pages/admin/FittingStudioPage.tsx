@@ -150,19 +150,49 @@ interface SavedLook {
   updatedAt: string;
 }
 
-/** Quick fit adjustments for refitting a finished render — ids match the
- *  server's vetted REFIT_PRESETS map. */
-const REFIT_CHIPS: { id: string; label: string }[] = [
-  { id: "tighter", label: "Tighter" },
-  { id: "looser", label: "Looser" },
-  { id: "cropped", label: "Crop it" },
-  { id: "longer", label: "Longer hem" },
-  { id: "sleeves-shorter", label: "Shorter sleeves" },
-  { id: "sleeves-longer", label: "Longer sleeves" },
-  { id: "tucked", label: "Tucked" },
-  { id: "untucked", label: "Untucked" },
-  { id: "complete-outfit", label: "Complete the outfit" },
+/** Quick adjustments for refitting a finished render — ids match the server's
+ *  vetted REFIT_PRESETS map. Fit changes the garment; Styling changes how it's
+ *  worn. Chips sharing an `excl` key are mutually exclusive (radio-style). */
+interface RefitChip {
+  id: string;
+  label: string;
+  excl?: string;
+}
+const REFIT_GROUPS: { label: string; chips: RefitChip[] }[] = [
+  {
+    label: "Fit",
+    chips: [
+      { id: "tighter", label: "Tighter" },
+      { id: "looser", label: "Looser" },
+      { id: "cropped", label: "Crop it" },
+      { id: "longer", label: "Longer hem" },
+      { id: "sleeves-shorter", label: "Shorter sleeves" },
+      { id: "sleeves-longer", label: "Longer sleeves" },
+    ],
+  },
+  {
+    label: "Styling",
+    chips: [
+      { id: "tuck-full", label: "Full tuck", excl: "tuck" },
+      { id: "tuck-french", label: "French tuck", excl: "tuck" },
+      { id: "untucked", label: "Untucked", excl: "tuck" },
+      { id: "sleeves-rolled", label: "Roll the sleeves" },
+      { id: "pants-cuffed", label: "Cuff the pants" },
+      { id: "collar-open", label: "Open collar", excl: "collar" },
+      { id: "collar-buttoned", label: "Buttoned up", excl: "collar" },
+    ],
+  },
+  {
+    label: "Finish",
+    chips: [
+      { id: "complete-outfit", label: "Complete the outfit" },
+      { id: "pressed", label: "Press it" },
+    ],
+  },
 ];
+const CHIP_EXCL: Record<string, string | undefined> = Object.fromEntries(
+  REFIT_GROUPS.flatMap((g) => g.chips.map((c) => [c.id, c.excl])),
+);
 
 interface FittingRender {
   id: string;
@@ -680,26 +710,39 @@ export function FittingStudioPage() {
                   <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-warmgrey">
                     Refit this look
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {REFIT_CHIPS.map((chip) => {
-                      const on = refitSel.includes(chip.id);
-                      return (
-                        <button
-                          key={chip.id}
-                          type="button"
-                          onClick={() =>
-                            setRefitSel((s) => (on ? s.filter((x) => x !== chip.id) : [...s, chip.id]))
-                          }
-                          className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${
-                            on
-                              ? "border-navy bg-navy text-chalk"
-                              : "border-ink/20 bg-white text-ink/70 hover:border-navy hover:text-navy"
-                          }`}
-                        >
-                          {chip.label}
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-1.5">
+                    {REFIT_GROUPS.map((group) => (
+                      <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                        <span className="w-12 shrink-0 text-[10px] uppercase tracking-wider text-warmgrey/70">
+                          {group.label}
+                        </span>
+                        {group.chips.map((chip) => {
+                          const on = refitSel.includes(chip.id);
+                          return (
+                            <button
+                              key={chip.id}
+                              type="button"
+                              onClick={() =>
+                                setRefitSel((s) => {
+                                  if (s.includes(chip.id)) return s.filter((x) => x !== chip.id);
+                                  const cleared = chip.excl
+                                    ? s.filter((x) => CHIP_EXCL[x] !== chip.excl)
+                                    : s;
+                                  return [...cleared, chip.id];
+                                })
+                              }
+                              className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${
+                                on
+                                  ? "border-navy bg-navy text-chalk"
+                                  : "border-ink/20 bg-white text-ink/70 hover:border-navy hover:text-navy"
+                              }`}
+                            >
+                              {chip.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                   <div className="mt-2 flex gap-2">
                     <input
