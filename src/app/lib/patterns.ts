@@ -73,6 +73,57 @@ export interface BodyMeasurements {
   heightCm?: number;
 }
 
+/**
+ * Parametric pattern adjustments, expressed as percentage bonuses and mapped
+ * onto each design's NATIVE FreeSewing options — so moving a slider redrafts
+ * the actual pattern pieces, not a picture of them.
+ */
+export interface PatternOptions {
+  /** Extra ease through the body, in % (0–25). */
+  easePct?: number;
+  /** Hem length bonus in % (−15 cropped … +20 longline). */
+  lengthPct?: number;
+  /** Sleeve length bonus in % (−30 … +10). */
+  sleevePct?: number;
+  /** Seam allowance in mm (0 = none drawn). */
+  seamAllowanceMm?: number;
+  /** Paperless mode prints the dimensions on the pattern itself. */
+  paperless?: boolean;
+}
+
+// Which native option names carry each adjustment, per design. Only options a
+// design actually defines are listed — unknown names would be ignored at best.
+const OPTION_KEYS: Record<string, { ease?: string[]; length?: string[]; sleeve?: string[] }> = {
+  "classic-tee": { ease: ["chestEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  "relaxed-hoodie": { ease: ["chestEase"], length: ["lengthBonus"], sleeve: ["sleeveLengthBonus"] },
+  "slip-dress": { length: ["lengthBonus"] },
+  "wide-trouser": { ease: ["waistEase", "seatEase"] },
+  "pleated-skirt": { ease: ["waistEase", "hipsEase"], length: ["lengthBonus"] },
+};
+
+/** Which sliders make sense for a block — drives the studio UI. */
+export function patternAdjustables(garmentId: string): { ease: boolean; length: boolean; sleeve: boolean } {
+  const k = OPTION_KEYS[garmentId] ?? {};
+  return { ease: Boolean(k.ease), length: Boolean(k.length), sleeve: Boolean(k.sleeve) };
+}
+
+function designOptions(garmentId: string, opts?: PatternOptions): Record<string, number> {
+  const keys = OPTION_KEYS[garmentId];
+  const out: Record<string, number> = {};
+  if (!keys || !opts) return out;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v)) / 100;
+  if (opts.easePct !== undefined && keys.ease) {
+    for (const k of keys.ease) out[k] = clamp(opts.easePct, 0, 25);
+  }
+  if (opts.lengthPct !== undefined && keys.length) {
+    for (const k of keys.length) out[k] = clamp(opts.lengthPct, -15, 20);
+  }
+  if (opts.sleevePct !== undefined && keys.sleeve) {
+    for (const k of keys.sleeve) out[k] = clamp(opts.sleevePct, -30, 10);
+  }
+  return out;
+}
+
 // Measurements that scale with height (lengths) rather than girth.
 const LENGTH_MEASURES = new Set([
   "ankle", "crotchDepth", "hpsToBust", "hpsToWaistBack", "hpsToWaistFront", "inseam",
@@ -108,16 +159,27 @@ export function draftPatternSvg(
   garmentId: string,
   size: SizeStep,
   measurements?: BodyMeasurements,
+  opts?: PatternOptions,
 ): { svg: string; label: string } | null {
   const entry = DESIGN_MAP[garmentId];
   if (!entry) return null;
+  const measured = measurementsFor(size, measurements);
+  const base: Record<string, unknown> = {
+    measurements: measured,
+    paperless: opts?.paperless ?? true,
+  };
+  if (opts?.seamAllowanceMm) base.sa = opts.seamAllowanceMm;
+  const draft = (settings: Record<string, unknown>) =>
+    new entry.design(settings).use(pluginTheme).draft().render();
   try {
-    const svg = new entry.design({ measurements: measurementsFor(size, measurements), paperless: true })
-      .use(pluginTheme)
-      .draft()
-      .render();
-    return { svg, label: entry.label };
+    return { svg: draft({ ...base, options: designOptions(garmentId, opts) }), label: entry.label };
   } catch {
-    return null;
+    // An adjustment outside a design's accepted range shouldn't brick the
+    // studio — fall back to the unadjusted draft.
+    try {
+      return { svg: draft(base), label: entry.label };
+    } catch {
+      return null;
+    }
   }
 }

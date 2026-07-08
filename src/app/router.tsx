@@ -52,9 +52,12 @@ import { DesignStudioPage } from "./pages/admin/DesignStudioPage";
 import { BrandStudioPage } from "./pages/admin/BrandStudioPage";
 import { BrandPrintPage } from "./pages/admin/BrandPrintPage";
 import { BrandGuidelinesPage } from "./pages/admin/BrandGuidelinesPage";
-// Lazy-loaded: pulls in three.js / react-three-fiber, kept out of the main bundle.
 const FittingStudioPage = lazy(() =>
   import("./pages/admin/FittingStudioPage").then((m) => ({ default: m.FittingStudioPage })),
+);
+// Lazy-loaded: pulls in the FreeSewing drafting engine, kept out of the main bundle.
+const PatternStudioPage = lazy(() =>
+  import("./pages/admin/PatternStudioPage").then((m) => ({ default: m.PatternStudioPage })),
 );
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 import { CashFlowPage } from "./pages/admin/CashFlowPage";
@@ -184,6 +187,14 @@ export function AppRouter() {
             element={
               <Suspense fallback={<div className="p-8 text-sm text-warmgrey">Loading the 3D Fitting Room…</div>}>
                 <FittingStudioPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="patterns"
+            element={
+              <Suspense fallback={<div className="p-8 text-sm text-warmgrey">Loading the Pattern Studio…</div>}>
+                <PatternStudioPage />
               </Suspense>
             }
           />

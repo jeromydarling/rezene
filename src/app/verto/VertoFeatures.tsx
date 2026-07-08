@@ -613,6 +613,7 @@ const FEATURES: Feature[] = [
       "Photoreal virtual try-on from best-in-class image models",
       "Refit any look in a click — tighter, looser, cropped, different sleeves",
       "Colorways on demand, and side-by-side compare across bodies",
+      "A real Pattern Studio: manufacturable sewing patterns, graded or made-to-measure",
     ],
     screen: MiniFittingStudio,
     url: "verto.style/maison/admin/fitting",
