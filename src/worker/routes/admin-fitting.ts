@@ -181,6 +181,7 @@ interface RenderRow {
   model_id: string | null;
   setting_id: string | null;
   prompt: string | null;
+  style_id: string | null;
   kind: string | null;
   provider: string | null;
   created_at: string;
@@ -281,7 +282,7 @@ async function storeRender(
   c: Context<AppContext>,
   result: ImageResult,
   meta: {
-    kind: "generate" | "tryon";
+    kind: "generate" | "tryon" | "refit";
     garmentId?: string | null;
     modelId?: string | null;
     settingId?: string | null;
@@ -363,6 +364,33 @@ async function storeRenderOrFail(
  * Free-text description wins; else we compose a phrase from the picked garment.
  * With reference images it becomes "make a garment in the style of these".
  */
+/** Turn the numeric fit config (the same ease/length/sleeve the 3D preview and
+ *  sewing pattern use) into fashion language the image model acts on. */
+function fitClause(fit?: { ease?: number; length?: number; sleeve?: number }): string {
+  if (!fit) return "";
+  const parts: string[] = [];
+  const ease = Number(fit.ease);
+  if (Number.isFinite(ease)) {
+    if (ease <= 0.88) parts.push("a slim, tailored fit close to the body");
+    else if (ease <= 1.1) parts.push("a regular, true-to-size fit");
+    else if (ease <= 1.3) parts.push("a relaxed fit with visible ease through the body");
+    else parts.push("an oversized, boxy fit with generous volume");
+  }
+  const len = Number(fit.length);
+  if (Number.isFinite(len)) {
+    if (len <= 0.92) parts.push("a cropped length");
+    else if (len >= 1.08) parts.push("a longer-line hem");
+  }
+  const sleeve = Number(fit.sleeve);
+  if (Number.isFinite(sleeve)) {
+    if (sleeve <= 0.05) parts.push("no sleeves");
+    else if (sleeve <= 0.55) parts.push("short sleeves");
+    else if (sleeve <= 0.85) parts.push("three-quarter sleeves");
+    else if (sleeve >= 1.15) parts.push("extra-long sleeves");
+  }
+  return parts.length ? `, cut with ${parts.join(", ")}` : "";
+}
+
 adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     garmentId?: string;
@@ -373,6 +401,7 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
     settingId?: string;
     styleId?: string | null;
     referenceFileIds?: string[];
+    fit?: { ease?: number; length?: number; sleeve?: number };
   };
   const garment = GARMENT_LIBRARY.find((g) => g.id === body.garmentId);
   const fabric = FABRIC_LIBRARY.find((f) => f.id === body.fabricId);
@@ -392,7 +421,7 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
   // Lead with the shared HOUSE_STYLE so every generated look matches the roster's
   // lighting, camera, and posture; the setting only swaps the backdrop.
   const prompt =
-    `${HOUSE_STYLE} The subject is ${model.descriptor} wearing ${garmentPhrase}${refClause}, ` +
+    `${HOUSE_STYLE} The subject is ${model.descriptor} wearing ${garmentPhrase}${fitClause(body.fit)}${refClause}, ` +
     `the garment fitting naturally and draping realistically on the body. ${setting.descriptor}.`;
 
   const references: ImageInput[] = [];
@@ -499,6 +528,70 @@ adminFittingRoutes.post("/tryon", requireAdminWrite, async (c) => {
     garmentFileId: body.garmentFileId,
     modelFileId: body.modelFileId || null,
     prompt: "Virtual try-on",
+  });
+  return stored.ok ? c.json(stored.render, 201) : stored.response;
+});
+
+// ---- Refit: adjust the fit of a finished render ------------------------------
+
+/** The quick-pick adjustments the UI offers. Server-side map so the model only
+ *  ever sees vetted instructions (the free-text note rides alongside). */
+const REFIT_PRESETS: Record<string, string> = {
+  tighter: "make the garment fit tighter and closer to the body",
+  looser: "make the garment fit looser, with more ease and relaxed volume",
+  cropped: "shorten the garment's hem to a cropped length",
+  longer: "lengthen the garment's hem to a longer line",
+  "sleeves-shorter": "shorten the sleeves",
+  "sleeves-longer": "lengthen the sleeves",
+  tucked: "tuck the garment in neatly",
+  untucked: "let the garment hang untucked",
+};
+
+/**
+ * Take a finished render (generate or try-on) and adjust ONLY the fit —
+ * tighter, looser, cropped, different sleeves, or a free-text tweak — keeping
+ * the person, garment design, and scene identical. Each refit saves as a new
+ * render, so the gallery becomes a comparable fit progression.
+ */
+adminFittingRoutes.post("/renders/:id/refit", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const body = (await c.req.json().catch(() => ({}))) as { adjustments?: string[]; note?: string };
+  const instructions = (body.adjustments ?? [])
+    .map((a) => REFIT_PRESETS[a])
+    .filter((x): x is string => Boolean(x));
+  const note = (body.note || "").trim().slice(0, 300);
+  if (note) instructions.push(note);
+  if (instructions.length === 0) {
+    return c.json({ error: "Pick at least one adjustment, or describe the change you want." }, 400);
+  }
+
+  const row = await first<RenderRow>(c.var.db, `SELECT * FROM fitting_renders WHERE id = ?`, id);
+  if (!row) return c.json({ error: "Render not found" }, 404);
+  const source = await imageInputFromFile(c, row.file_id);
+  if (!source) return c.json({ error: "Couldn't load the render image." }, 404);
+
+  const prompt =
+    `Adjust the fit of the garment in this photograph: ${instructions.join("; ")}. ` +
+    `Keep everything else exactly the same — the same person (face, hair, body, skin tone, pose), the same ` +
+    `garment design, fabric, colour and details, the same background and lighting. The fabric should drape ` +
+    `naturally and realistically in the adjusted fit. Change nothing except the requested fit adjustments.`;
+
+  const quota = await reserveFittingQuota(c);
+  if (!quota.ok) return c.json(fittingQuotaExceededBody(quota), 429);
+  let result: ImageResult | undefined;
+  try {
+    [result] = await generateLook(c.env, { prompt, references: [source], count: 1 });
+    if (!result) throw new ProviderError("No image produced.");
+  } catch (err) {
+    return providerFail(c, err);
+  }
+  const stored = await storeRenderOrFail(c, result, {
+    kind: "refit",
+    garmentId: row.garment_id,
+    modelId: row.model_id,
+    settingId: row.setting_id,
+    styleId: row.style_id,
+    prompt: `Refit: ${instructions.join("; ")}`,
   });
   return stored.ok ? c.json(stored.render, 201) : stored.response;
 });

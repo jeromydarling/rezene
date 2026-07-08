@@ -611,6 +611,7 @@ const FEATURES: Feature[] = [
       "A fixed model roster — the same bodies, every style, every season",
       "Try on a Design Studio creation or a photo of a real sample",
       "Photoreal virtual try-on from best-in-class image models",
+      "Refit any look in a click — tighter, looser, cropped, different sleeves",
     ],
     screen: MiniFittingStudio,
     url: "verto.style/maison/admin/fitting",
