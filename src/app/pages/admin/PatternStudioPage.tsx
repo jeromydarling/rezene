@@ -97,6 +97,56 @@ function stateFromFit(fit: Record<string, unknown>): Partial<PatternState> {
 
 const CM_PER_IN = 2.54;
 
+/** A range slider with −/+ tap steps — sliders alone are miserable on a
+ *  tablet at a cutting table, and that's exactly where this page gets used. */
+function TouchRange({
+  min,
+  max,
+  step,
+  tap,
+  value,
+  onChange,
+}: {
+  min: number;
+  max: number;
+  step: number;
+  /** How far one −/+ tap moves the value. */
+  tap: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const nudge = (dir: 1 | -1) => onChange(Math.min(max, Math.max(min, Math.round((value + dir * tap) * 10) / 10)));
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => nudge(-1)}
+        className="h-6 w-6 shrink-0 rounded border border-ink/15 bg-white text-xs leading-none text-ink/60 hover:border-navy hover:text-navy"
+        aria-label="Decrease"
+      >
+        −
+      </button>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full"
+      />
+      <button
+        type="button"
+        onClick={() => nudge(1)}
+        className="h-6 w-6 shrink-0 rounded border border-ink/15 bg-white text-xs leading-none text-ink/60 hover:border-navy hover:text-navy"
+        aria-label="Increase"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 /** One introspected FreeSewing option, rendered by its native type. Untouched
  *  options show the block's default; touching one adds it to the overrides. */
 function NativeOptionControl({
@@ -152,14 +202,13 @@ function NativeOptionControl({
           {unit}
         </span>
       </div>
-      <input
-        type="range"
-        min={def.min}
-        max={def.max}
+      <TouchRange
+        min={def.min ?? 0}
+        max={def.max ?? 100}
         step={def.type === "count" ? 1 : 0.5}
+        tap={def.type === "count" ? 1 : 1}
         value={num}
-        onChange={(e) => onChange(def.type === "count" ? Math.round(Number(e.target.value)) : Number(e.target.value))}
-        className="w-full"
+        onChange={(v) => onChange(def.type === "count" ? Math.round(v) : v)}
       />
     </div>
   );
@@ -177,8 +226,12 @@ export function PatternStudioPage() {
   const [savingToLibrary, setSavingToLibrary] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [pageFormat, setPageFormat] = useState<"a4" | "letter">("a4");
+  const [zoom, setZoom] = useState(1);
   const [visualising, setVisualising] = useState(false);
   const [visualised, setVisualised] = useState(false);
+  const [styling, setStyling] = useState(false);
+  const [explaining, setExplaining] = useState(false);
+  const [explainText, setExplainText] = useState<string | null>(null);
 
   // Fit notes arriving from the Fitting Studio: /admin/patterns?adjust=cropped,looser
   // Each refit chip maps to a slider delta, so a visual fit decision lands as a
@@ -280,6 +333,72 @@ export function PatternStudioPage() {
 
   function setAdvanced(key: string, value: number | string | boolean) {
     setState((s) => ({ ...s, advanced: { ...s.advanced, [key]: value } }));
+  }
+
+  async function styleThisBlock() {
+    if (!describe.trim()) return;
+    setStyling(true);
+    try {
+      const res = await api.post<{ options: Record<string, unknown>; rationale?: string }>(
+        "/api/admin/fitting/pattern-assist",
+        {
+          prompt: describe,
+          block: { id: blockId, name: block.name },
+          options: nativeOptions.map((o) => ({
+            key: o.key,
+            type: o.type,
+            min: o.min,
+            max: o.max,
+            choices: o.choices,
+          })),
+        },
+      );
+      // Re-validate everything the model returned against the introspected
+      // defs before it touches state — the assistant proposes, the defs decide.
+      const defs = new Map(nativeOptions.map((o) => [o.key, o]));
+      const accepted: Record<string, number | string | boolean> = {};
+      for (const [key, raw] of Object.entries(res.options)) {
+        const def = defs.get(key);
+        if (!def) continue;
+        if (def.type === "bool" && typeof raw === "boolean") accepted[key] = raw;
+        else if (def.type === "list" && def.choices?.includes(String(raw))) accepted[key] = String(raw);
+        else if (def.type !== "bool" && def.type !== "list") {
+          const n = Number(raw);
+          if (Number.isFinite(n)) accepted[key] = Math.min(def.max ?? 999, Math.max(def.min ?? -999, n));
+        }
+      }
+      if (Object.keys(accepted).length === 0) {
+        toast.error("Nothing usable came back", "Try naming the details — cuffs, collar, buttons…");
+        return;
+      }
+      setState((s) => ({ ...s, advanced: { ...s.advanced, ...accepted } }));
+      toast.success(
+        `${Object.keys(accepted).length} drafting option${Object.keys(accepted).length > 1 ? "s" : ""} set`,
+        res.rationale || "Check them under “All drafting options” — everything is yours to override.",
+      );
+    } catch (e) {
+      toast.error("Couldn't style the block", e instanceof Error ? e.message : undefined);
+    } finally {
+      setStyling(false);
+    }
+  }
+
+  async function explainPattern() {
+    setExplaining(true);
+    try {
+      const changed = Object.keys(state.advanced).map(humanizeKey).join(", ");
+      const res = await api.post<{ text: string }>("/api/admin/fitting/pattern-explain", {
+        block: block.name,
+        summary: `size ${state.size}${hasMeasurements ? ", made-to-measure" : ""}, seam allowance ${state.saMm}mm${
+          changed ? `, customised: ${changed}` : ""
+        }`,
+      });
+      setExplainText(res.text);
+    } catch (e) {
+      toast.error("Couldn't get the guidance", e instanceof Error ? e.message : undefined);
+    } finally {
+      setExplaining(false);
+    }
   }
 
   async function draftFromWords() {
@@ -481,10 +600,39 @@ export function PatternStudioPage() {
               </button>
             </div>
           </div>
-          <div className="h-[560px] w-full overflow-auto bg-white p-4">
+          <div className="relative h-[560px] w-full overflow-auto bg-white p-4">
+            {pattern && (
+              <div className="absolute right-3 top-3 z-10 flex overflow-hidden rounded-md border border-ink/15 bg-white/90 text-xs shadow-sm backdrop-blur">
+                <button
+                  type="button"
+                  className="h-8 w-8 text-ink/60 hover:text-navy"
+                  onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+                  aria-label="Zoom out"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="h-8 min-w-12 border-x border-ink/10 px-1 text-[11px] text-ink/60 hover:text-navy"
+                  onClick={() => setZoom(1)}
+                  title="Reset zoom"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  className="h-8 w-8 text-ink/60 hover:text-navy"
+                  onClick={() => setZoom((z) => Math.min(4, Math.round((z + 0.25) * 100) / 100))}
+                  aria-label="Zoom in"
+                >
+                  +
+                </button>
+              </div>
+            )}
             {pattern ? (
               <div
-                className="[&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
+                style={{ width: `${zoom * 100}%` }}
+                className="[&_svg]:mx-auto [&_svg]:h-auto [&_svg]:w-full"
                 // FreeSewing renders a self-contained SVG string (its own styles).
                 dangerouslySetInnerHTML={{ __html: pattern.svg }}
               />
@@ -503,8 +651,33 @@ export function PatternStudioPage() {
               · {state.paperless ? "dimensions printed on the pattern" : "clean cutting lines"}
               {touchedCount > 0 ? ` · ${touchedCount} drafting option${touchedCount > 1 ? "s" : ""} customised` : ""}
             </span>
-            <span>Real, manufacturable pattern (FreeSewing)</span>
+            <button
+              type="button"
+              className="text-navy hover:underline disabled:opacity-50"
+              onClick={explainPattern}
+              disabled={explaining}
+              title="A plain-language guide to cutting and sewing this pattern"
+            >
+              {explaining ? "Writing…" : "✨ Explain this pattern"}
+            </button>
           </div>
+          {explainText && (
+            <div className="border-t border-ink/10 bg-navy/[0.03] px-4 py-3">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-warmgrey">
+                  Cutting & sewing guide
+                </p>
+                <button
+                  type="button"
+                  className="text-xs text-ink/50 hover:text-ink"
+                  onClick={() => setExplainText(null)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="whitespace-pre-wrap text-xs leading-relaxed text-ink/80">{explainText}</div>
+            </div>
+          )}
         </div>
 
         {/* Controls */}
@@ -520,16 +693,29 @@ export function PatternStudioPage() {
               value={describe}
               onChange={(e) => setDescribe(e.target.value)}
             />
-            <button
-              type="button"
-              className="btn btn-primary w-full"
-              onClick={draftFromWords}
-              disabled={drafting || !describe.trim()}
-            >
-              {drafting ? "Drafting…" : "Draft it"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn btn-primary flex-1"
+                onClick={draftFromWords}
+                disabled={drafting || styling || !describe.trim()}
+              >
+                {drafting ? "Drafting…" : "Draft it"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary flex-1"
+                onClick={styleThisBlock}
+                disabled={drafting || styling || !describe.trim()}
+                title="Apply your words to THIS block's full drafting options — cuffs, collar, plackets…"
+              >
+                {styling ? "Styling…" : "Style this block"}
+              </button>
+            </div>
             <p className="text-[11px] leading-snug text-warmgrey">
-              Your words become a block, size, and adjustments — then fine-tune everything below.
+              <strong>Draft it</strong> picks a block and rough fit. <strong>Style this block</strong> drives the
+              current block's full drafting options — "french cuffs, split yoke, eight buttons". Everything the
+              assistant sets appears on the manual controls, yours to override.
             </p>
           </div>
 
@@ -655,15 +841,7 @@ export function PatternStudioPage() {
                     <span>Extra ease</span>
                     <span>+{state.easePct}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={state.easePct}
-                    onChange={(e) => set("easePct", Number(e.target.value))}
-                    className="w-full"
-                  />
+                  <TouchRange min={0} max={25} step={1} tap={1} value={state.easePct} onChange={(v) => set("easePct", v)} />
                 </div>
               )}
               {adjustables.length && (
@@ -675,15 +853,7 @@ export function PatternStudioPage() {
                       {state.lengthPct}%
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={-15}
-                    max={20}
-                    step={1}
-                    value={state.lengthPct}
-                    onChange={(e) => set("lengthPct", Number(e.target.value))}
-                    className="w-full"
-                  />
+                  <TouchRange min={-15} max={20} step={1} tap={1} value={state.lengthPct} onChange={(v) => set("lengthPct", v)} />
                 </div>
               )}
               {adjustables.sleeve && (
@@ -695,15 +865,7 @@ export function PatternStudioPage() {
                       {state.sleevePct}%
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={-30}
-                    max={10}
-                    step={1}
-                    value={state.sleevePct}
-                    onChange={(e) => set("sleevePct", Number(e.target.value))}
-                    className="w-full"
-                  />
+                  <TouchRange min={-30} max={10} step={1} tap={1} value={state.sleevePct} onChange={(v) => set("sleevePct", v)} />
                 </div>
               )}
             </div>

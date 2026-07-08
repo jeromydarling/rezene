@@ -214,7 +214,10 @@ For the shops with a tailor or seamstress in the room: the Pattern Studio drafts
 7. **Print PDF** — a tiled, true-scale PDF (A4 or Letter). Print at 100%, check the **5 cm bar** on each page, tape the pages along the dashed glue guides, and cut. Overlaps and row/column labels are printed on every page.
 
 > [!TIP]
-> In a hurry? **✨ Describe the garment** — *"a boxy cropped tee"* — and the studio picks the block, size, and adjustments for you. Fine-tune from there.
+> The **✨ pattern assistant** works two ways. **Draft it** — *"a boxy cropped tee"* — picks the block, size, and rough fit. **Style this block** goes deeper: *"french cuffs, split yoke, eight buttons"* sets the block's own drafting options. Everything the assistant chooses lands on the manual controls, visible and yours to override — it's a concierge, never a gatekeeper.
+
+> [!TIP]
+> New to cutting? **✨ Explain this pattern** (under the viewer) writes a plain-language guide to the drafted pieces — what each is, how many to cut, grain lines, and the mistakes beginners make on that garment type. Use the **zoom controls** and the −/+ steppers on every slider when you're working from a tablet at the cutting table.
 
 ## Both directions: picture ↔ pattern
 
