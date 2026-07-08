@@ -192,6 +192,29 @@ The same panel has two accounting exports: a **Sales CSV** (one row per paid ord
 You'll also find **reorder suggestions** at the top of **Inventory**: every piece at or below its low-stock threshold with nothing incoming, shown with its 90-day sales pace and a suggested reorder quantity.`,
   },
   {
+    slug: "locations",
+    title: "Multiple locations & transfers",
+    summary: "Track stock across a studio, warehouse, or shopfront, and move it between them.",
+    part: "catalog",
+    moduleRoute: "/admin/inventory",
+    keywords: "location warehouse studio shopfront transfer stock multi-location move",
+    updated: "2026-07-08",
+    body: `# Multiple locations & transfers
+
+By default every shop has one location, and your storefront fulfils orders from it.
+
+## Adding locations
+
+On **Inventory → Locations**, add a **warehouse**, **studio**, or **shopfront**. Each new location tracks its own stock; the **default** location's stock is your main inventory (and is what the storefront ships from).
+
+## Moving stock
+
+On any inventory row, click **Transfer** to move units between locations — you'll see the current stock at each location, pick a source and destination, and enter how many to move. Every transfer is logged.
+
+> [!NOTE]
+> Online orders always ship from the default location, so keep that one stocked for your storefront. Other locations are for your own tracking (e.g. what's on the shop floor).`,
+  },
+  {
     slug: "cash-flow",
     title: "Cash flow & open-to-buy",
     summary: "See money in vs. out, and how much of your buy budget is left.",

@@ -24,6 +24,8 @@ export function InventoryPage() {
     "/api/admin/products/inventory/all",
   );
   const [adjusting, setAdjusting] = useState<AdminInventoryRow | null>(null);
+  const [transferRow, setTransferRow] = useState<AdminInventoryRow | null>(null);
+  const [locationsOpen, setLocationsOpen] = useState(false);
   const [kind, setKind] = useState("receive");
   const [qty, setQty] = useState("");
   const [note, setNote] = useState("");
@@ -59,6 +61,11 @@ export function InventoryPage() {
         title="Inventory"
         help="inventory"
         description="SKU-level stock with a full movement ledger. Available = on hand − reserved."
+        actions={
+          <button type="button" className="btn btn-secondary" onClick={() => setLocationsOpen(true)}>
+            Locations
+          </button>
+        }
       />
       <ReorderSuggestions />
       {error && <ErrorNote message={error} />}
@@ -100,13 +107,12 @@ export function InventoryPage() {
                       {row.isLow && <span className="badge badge-terracotta ml-2">low</span>}
                     </td>
                     <td>{row.incoming}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="link-quiet text-xs"
-                        onClick={() => setAdjusting(row)}
-                      >
+                    <td className="whitespace-nowrap text-right text-xs">
+                      <button type="button" className="link-quiet" onClick={() => setAdjusting(row)}>
                         Adjust
+                      </button>
+                      <button type="button" className="link-quiet ml-3" onClick={() => setTransferRow(row)}>
+                        Transfer
                       </button>
                     </td>
                   </tr>
@@ -162,6 +168,184 @@ export function InventoryPage() {
           </button>
         </div>
       </SlideOver>
+
+      <SlideOver open={locationsOpen} title="Locations" onClose={() => setLocationsOpen(false)}>
+        <LocationsPanel />
+      </SlideOver>
+      <SlideOver
+        open={Boolean(transferRow)}
+        title={transferRow ? `Transfer — ${transferRow.productName} ${transferRow.colorwayName}/${transferRow.size}` : ""}
+        onClose={() => setTransferRow(null)}
+      >
+        {transferRow && (
+          <TransferPanel
+            variantId={transferRow.variantId}
+            onDone={() => {
+              setTransferRow(null);
+              reload();
+            }}
+          />
+        )}
+      </SlideOver>
+    </div>
+  );
+}
+
+// ---------- Locations management ----------
+interface LocationRow {
+  id: string;
+  name: string;
+  kind: string;
+  isDefault: number;
+  units: number;
+}
+
+function LocationsPanel() {
+  const { data, reload } = useFetch<{ locations: LocationRow[] }>("/api/admin/locations");
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState("shopfront");
+  const rows = data?.locations ?? [];
+
+  async function add() {
+    if (!name.trim()) return;
+    await api.post("/api/admin/locations", { name: name.trim(), kind });
+    setName("");
+    reload();
+  }
+  async function remove(id: string) {
+    try {
+      await api.delete(`/api/admin/locations/${id}`);
+      reload();
+    } catch (e) {
+      window.alert(e instanceof ApiRequestError ? e.message : "Couldn't remove.");
+    }
+  }
+
+  return (
+    <div className="space-y-4 text-sm">
+      <ul className="space-y-2">
+        {rows.map((l) => (
+          <li key={l.id} className="flex items-center justify-between rounded border border-ink/10 px-3 py-2">
+            <div>
+              <p className="font-medium">
+                {l.name}
+                {l.isDefault ? <span className="ml-2 text-xs text-warmgrey">· default (storefront ships from here)</span> : null}
+              </p>
+              <p className="text-xs text-warmgrey">
+                {l.kind} · {l.units} units
+              </p>
+            </div>
+            {!l.isDefault && (
+              <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void remove(l.id)}>
+                Remove
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <div className="rounded border border-dashed border-ink/15 p-3">
+        <p className="mb-2 text-xs font-medium text-warmgrey">Add a location</p>
+        <input className="input mb-2 text-sm" placeholder="e.g. Marais shopfront" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="flex gap-2">
+          <select className="input text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="shopfront">Shopfront</option>
+            <option value="warehouse">Warehouse</option>
+            <option value="studio">Studio</option>
+          </select>
+          <button type="button" className="btn btn-primary !py-1.5 text-sm" onClick={() => void add()}>
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Stock transfer ----------
+interface StockAtLocation {
+  locationId: string;
+  name: string;
+  isDefault: boolean;
+  onHand: number;
+}
+
+function TransferPanel({ variantId, onDone }: { variantId: string; onDone: () => void }) {
+  const { data, reload } = useFetch<{ stock: StockAtLocation[] }>(`/api/admin/locations/stock/${variantId}`);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [qty, setQty] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const stock = data?.stock ?? [];
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/admin/locations/transfer", {
+        variantId,
+        fromLocationId: from,
+        toLocationId: to,
+        quantity: Number(qty) || 0,
+      });
+      setQty("");
+      reload();
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : "Transfer failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (stock.length < 2)
+    return <p className="text-sm text-warmgrey">Add a second location first (Inventory → Locations).</p>;
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="rounded bg-cream/60 p-3">
+        <p className="mb-1 text-xs font-medium text-warmgrey">Stock by location</p>
+        <ul className="space-y-0.5">
+          {stock.map((s) => (
+            <li key={s.locationId} className="flex justify-between">
+              <span>{s.name}</span>
+              <span className="font-medium">{s.onHand}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="label">From</span>
+          <select className="input text-sm" value={from} onChange={(e) => setFrom(e.target.value)}>
+            <option value="">Select…</option>
+            {stock.map((s) => (
+              <option key={s.locationId} value={s.locationId}>
+                {s.name} ({s.onHand})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="label">To</span>
+          <select className="input text-sm" value={to} onChange={(e) => setTo(e.target.value)}>
+            <option value="">Select…</option>
+            {stock.map((s) => (
+              <option key={s.locationId} value={s.locationId}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="block">
+        <span className="label">Units to move</span>
+        <input className="input text-sm" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
+      </label>
+      {error && <p className="field-error">{error}</p>}
+      <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={() => void submit()}>
+        {busy ? "Moving…" : "Transfer stock"}
+      </button>
     </div>
   );
 }
