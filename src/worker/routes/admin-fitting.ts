@@ -229,7 +229,7 @@ adminFittingRoutes.get("/garment-sources", async (c) => {
   try {
     const rows = await all<{ file_id: string; concept_name: string | null; prompt_text: string | null }>(
       c.var.db,
-      `SELECT g.file_id, c.name AS concept_name, g.prompt_text
+      `SELECT g.file_id, c.title AS concept_name, g.prompt_text
          FROM ai_generations g
          JOIN ai_concepts c ON c.id = g.concept_id
         WHERE g.output_kind = 'image' AND g.file_id IS NOT NULL
