@@ -172,6 +172,10 @@ Fittings spark changes — tighter here, shorter sleeves there. With any render 
 
 **Refit** re-renders the same person, garment, and scene with only the fit changed, saved as a new render beside the original — so your gallery reads as a fit progression you can compare and share.
 
+**Checking a refit really moved:** toggle the **Grid** button in the corner of the viewer. The proportion grid is a fixed overlay (never part of the image), and refits keep the same framing — so you can read exactly which line a hem or sleeve sits on, before and after.
+
+**Basics vs a full outfit:** models wear fitted neutral basics on purpose — like a real fit model, the body line stays visible so ease and hem positions read true. When you want the look presentation-ready instead (line reviews, client decks), tap **Complete the outfit** and the model gets quiet grey trousers and clean white sneakers — or a plain white tee when your featured piece is the bottoms — without touching your garment.
+
 The **fit controls below** (ease presets, body length, sleeve length) also shape photoreal generation now, not just the 3D preview — set Oversized and the generated model actually wears it oversized. And remember the sliders' real superpower: they redraft the **sewing pattern**, so once you've settled a fit visually you can pull a production-ready pattern at the same numbers.
 
 > [!NOTE]

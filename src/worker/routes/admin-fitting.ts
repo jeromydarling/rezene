@@ -556,6 +556,11 @@ const REFIT_PRESETS: Record<string, string> = {
     "(a short sleeve reaches past the elbow; a long sleeve reaches the wrist)",
   tucked: "tuck the garment's hem neatly into the waistband",
   untucked: "let the garment hang fully untucked over the waistband",
+  "complete-outfit":
+    "complete the outfit with simple neutral basics: plain straight-leg mid-grey trousers and clean minimal " +
+    "white sneakers (if the featured garment IS trousers or a skirt, instead add a plain fitted white crew-neck " +
+    "t-shirt and white sneakers). The featured garment stays EXACTLY as it is; the added pieces are understated, " +
+    "logo-free and quiet so the featured garment remains the clear focus",
 };
 
 /**
