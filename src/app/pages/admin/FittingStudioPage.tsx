@@ -161,6 +161,7 @@ const REFIT_CHIPS: { id: string; label: string }[] = [
   { id: "sleeves-longer", label: "Longer sleeves" },
   { id: "tucked", label: "Tucked" },
   { id: "untucked", label: "Untucked" },
+  { id: "complete-outfit", label: "Complete the outfit" },
 ];
 
 interface FittingRender {
@@ -299,6 +300,7 @@ export function FittingStudioPage() {
   const [evenLighting, setEvenLighting] = useState(true);
   const [refitSel, setRefitSel] = useState<string[]>([]);
   const [refitNote, setRefitNote] = useState("");
+  const [showGrid, setShowGrid] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
   const [addingModel, setAddingModel] = useState(false);
 
@@ -615,11 +617,37 @@ export function FittingStudioPage() {
             <>
             <div className="relative h-[540px] w-full bg-white">
               {activeRender ? (
-                <img
-                  src={activeRender.url}
-                  alt="Garment rendered on a model"
-                  className="h-full w-full object-contain"
-                />
+                <>
+                  <img
+                    src={activeRender.url}
+                    alt="Garment rendered on a model"
+                    className="h-full w-full object-contain"
+                  />
+                  {showGrid && (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(to right, rgba(28,43,58,0.14) 1px, transparent 1px), " +
+                          "linear-gradient(to bottom, rgba(28,43,58,0.14) 1px, transparent 1px)",
+                        backgroundSize: "10% 5%",
+                      }}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowGrid((g) => !g)}
+                    title="Proportion grid — the lines stay put between renders, so you can verify a refit actually moved a hem or sleeve"
+                    className={`absolute right-2 top-2 rounded-full border px-2.5 py-1 text-[11px] backdrop-blur transition ${
+                      showGrid
+                        ? "border-navy bg-navy text-chalk"
+                        : "border-ink/20 bg-white/85 text-ink/70 hover:border-navy hover:text-navy"
+                    }`}
+                  >
+                    {showGrid ? "Grid on" : "Grid"}
+                  </button>
+                </>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   <p className="max-w-sm text-sm text-warmgrey">
