@@ -173,6 +173,18 @@ publicRoutes.get("/products/:slug", async (c) => {
     };
   });
 
+  const reviewRows = await all<{ rating: number; title: string | null; body: string | null; author_name: string | null; created_at: string }>(
+    c.var.db,
+    `SELECT rating, title, body, author_name, created_at FROM product_reviews
+     WHERE product_id = ? AND status = 'published' ORDER BY created_at DESC LIMIT 50`,
+    p.id,
+  );
+  const reviewAgg = await first<{ avg: number | null; n: number }>(
+    c.var.db,
+    `SELECT AVG(rating) AS avg, COUNT(*) AS n FROM product_reviews WHERE product_id = ? AND status = 'published'`,
+    p.id,
+  );
+
   const related = await queryProductSummaries(
     c.var.db,
     `WHERE p.is_published = 1 AND p.id != ? AND (p.collection_id = ? OR p.gender = ?)
@@ -204,6 +216,14 @@ publicRoutes.get("/products/:slug", async (c) => {
     })),
     variants,
     related,
+    reviews: reviewRows.map((r) => ({
+      rating: r.rating,
+      title: r.title,
+      body: r.body,
+      authorName: r.author_name,
+      createdAt: r.created_at,
+    })),
+    reviewSummary: { average: reviewAgg?.avg ?? null, count: reviewAgg?.n ?? 0 },
   };
   return c.json(detail);
 });

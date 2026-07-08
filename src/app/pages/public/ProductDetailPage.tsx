@@ -174,6 +174,14 @@ export function ProductDetailPage() {
             <WishlistHeart productId={product.id} />
           </div>
           {product.subtitle && <p className="mt-1 text-sm text-warmgrey">{product.subtitle}</p>}
+          {product.reviewSummary.count > 0 && (
+            <a href="#reviews" className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink/70 hover:text-ink">
+              <Stars value={product.reviewSummary.average ?? 0} />
+              <span>
+                {(product.reviewSummary.average ?? 0).toFixed(1)} ({product.reviewSummary.count})
+              </span>
+            </a>
+          )}
           <p className="mt-4 text-xl">{formatMoney(product.basePriceCents, product.currency)}</p>
 
           {isPreOrder && (
@@ -374,6 +382,34 @@ export function ProductDetailPage() {
         </section>
       )}
 
+      {/* Reviews */}
+      {product.reviews.length > 0 && (
+        <section id="reviews" className="mx-auto mt-20 max-w-2xl">
+          <div className="mb-6 flex items-center gap-3">
+            <p className="eyebrow">Reviews</p>
+            <Stars value={product.reviewSummary.average ?? 0} />
+            <span className="text-sm text-ink/60">
+              {(product.reviewSummary.average ?? 0).toFixed(1)} · {product.reviewSummary.count}{" "}
+              {product.reviewSummary.count === 1 ? "review" : "reviews"}
+            </span>
+          </div>
+          <div className="space-y-6">
+            {product.reviews.map((r, i) => (
+              <div key={i} className="border-b border-ink/8 pb-5">
+                <div className="mb-1 flex items-center justify-between">
+                  <Stars value={r.rating} />
+                  <span className="text-xs text-ink/45">
+                    {r.authorName || "Verified buyer"} · {formatDate(r.createdAt)}
+                  </span>
+                </div>
+                {r.title && <p className="font-medium">{r.title}</p>}
+                {r.body && <p className="mt-0.5 text-sm text-ink/75">{r.body}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Related */}
       {product.related.length > 0 && (
         <section className="mt-20">
@@ -478,5 +514,18 @@ function RestockNotify({ slug }: { slug: string }) {
       </div>
       {error && <p className="mt-1 text-xs text-terracotta">{error}</p>}
     </div>
+  );
+}
+
+/** Read-only star rating (supports halves via width clip). */
+function Stars({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, (value / 5) * 100));
+  return (
+    <span className="relative inline-block align-middle text-base leading-none" aria-label={`${value.toFixed(1)} out of 5`}>
+      <span className="text-ink/20">★★★★★</span>
+      <span className="absolute inset-0 overflow-hidden text-saffron" style={{ width: `${pct}%` }}>
+        ★★★★★
+      </span>
+    </span>
   );
 }

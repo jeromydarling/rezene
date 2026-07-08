@@ -51,6 +51,16 @@ export interface PublicProductDetail extends PublicProductSummary {
   images: { url: string; altText: string | null; colorwayName: string | null }[];
   variants: PublicVariant[];
   related: PublicProductSummary[];
+  reviews: PublicReview[];
+  reviewSummary: { average: number | null; count: number };
+}
+
+export interface PublicReview {
+  rating: number;
+  title: string | null;
+  body: string | null;
+  authorName: string | null;
+  createdAt: string;
 }
 
 export interface PublicVariant {
