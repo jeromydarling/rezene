@@ -1,6 +1,7 @@
 import { EmailMessage } from "cloudflare:email";
 import { createMimeMessage } from "mimetext";
 import { getBrandName } from "./brand";
+import { renderBrandedEmail, itemsTableHtml, type EmailBrand } from "./email-template";
 import type { Env } from "../types/env";
 
 /**
@@ -18,7 +19,7 @@ export function buyerEmailConfigured(env: Env): boolean {
 
 export async function sendBuyerEmail(
   env: Env,
-  opts: { to: string; subject: string; text: string; fromName?: string },
+  opts: { to: string; subject: string; text: string; html?: string; fromName?: string },
 ): Promise<boolean> {
   if (!buyerEmailConfigured(env)) {
     console.log(`[buyer-email] skipped (not configured): ${opts.subject}`);
@@ -29,7 +30,11 @@ export async function sendBuyerEmail(
     msg.setSender({ name: opts.fromName ?? (await getBrandName(env)), addr: env.BUYER_EMAIL_FROM });
     msg.setRecipient(opts.to);
     msg.setSubject(opts.subject);
+    // multipart/alternative: text first, HTML second (clients prefer the last
+    // part they can render), so styled inboxes get the branded version and
+    // everything else falls back cleanly to plain text.
     msg.addMessage({ contentType: "text/plain", data: opts.text });
+    if (opts.html) msg.addMessage({ contentType: "text/html", data: opts.html });
     await env.EMAIL!.send(new EmailMessage(env.BUYER_EMAIL_FROM, opts.to, msg.asRaw()));
     return true;
   } catch (err) {
@@ -44,27 +49,47 @@ export function orderConfirmationEmail(opts: {
   totalCents: number;
   currency: string;
   items: { description: string; quantity: number; isPreOrder: boolean }[];
-}): { subject: string; text: string } {
+  /** Optional brand identity → a styled HTML version alongside the text. */
+  brand?: EmailBrand;
+}): { subject: string; text: string; html?: string } {
   const hasPreOrder = opts.items.some((i) => i.isPreOrder);
+  const total = `${(opts.totalCents / 100).toFixed(2)} ${opts.currency}`;
   const lines = opts.items
     .map((i) => `  ${i.quantity} × ${i.description}${i.isPreOrder ? "  (pre-order)" : ""}`)
     .join("\n");
-  return {
+  const closing = hasPreOrder
+    ? "Your pre-order pieces are allocated against our next production run and ship once they clear quality control — we'll keep you posted at every stage."
+    : "We're preparing your order for dispatch and will confirm the moment it ships.";
+
+  const result: { subject: string; text: string; html?: string } = {
     subject: `${opts.brandName} — order ${opts.orderNumber} confirmed`,
     text: `Thank you — your order is confirmed.
 
 Order:  ${opts.orderNumber}
-Total:  ${(opts.totalCents / 100).toFixed(2)} ${opts.currency}
+Total:  ${total}
 
 ${lines}
-${
-  hasPreOrder
-    ? `
-Your pre-order pieces will be cut in our Casablanca production run and ship once they clear quality control. We'll keep you posted at every stage.`
-    : `
-We're preparing your order for dispatch and will confirm when it ships.`
-}
+
+${closing}
 
 — ${opts.brandName}`,
   };
+
+  if (opts.brand) {
+    const rows = [
+      ...opts.items.map((i) => ({
+        label: `${i.quantity} × ${i.description}${i.isPreOrder ? " · pre-order" : ""}`,
+      })),
+      { label: "Order", right: opts.orderNumber, muted: true },
+      { label: "Total", right: total },
+    ];
+    result.html = renderBrandedEmail({
+      brand: opts.brand,
+      preheader: `Order ${opts.orderNumber} confirmed`,
+      heading: "Thank you — your order is confirmed.",
+      bodyHtml: itemsTableHtml(rows, opts.brand.palette.ink),
+      footerNote: closing,
+    });
+  }
+  return result;
 }
