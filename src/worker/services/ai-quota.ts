@@ -68,6 +68,34 @@ export async function reserveFittingQuota(c: Context<AppContext>): Promise<Quota
   return { ok: true, used: used + 1, limit };
 }
 
+const DEFAULT_DESIGN_LIMIT = 40;
+
+/**
+ * Per-shop daily cap on Design Studio generation batches (Workers AI Flux —
+ * cheaper than fal, but not free, and previously uncapped). One unit = one
+ * "Generate 4 looks" click. Tune with DESIGN_DAILY_LIMIT.
+ */
+export async function reserveDesignQuota(c: Context<AppContext>): Promise<QuotaResult> {
+  const raw = c.env.DESIGN_DAILY_LIMIT;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_DESIGN_LIMIT;
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `aiq:${c.var.shopId}:design:${day}`;
+  const used = parseInt((await c.env.KV.get(key)) ?? "0", 10);
+  if (used >= limit) return { ok: false, used, limit };
+  await c.env.KV.put(key, String(used + 1), { expirationTtl: 172800 });
+  return { ok: true, used: used + 1, limit };
+}
+
+export function designQuotaExceededBody(q: QuotaResult) {
+  return {
+    error: `Daily design-generation limit reached (${q.limit} batches/day for this shop). It resets at 00:00 UTC.`,
+    code: "design_quota_exceeded" as const,
+    used: q.used,
+    limit: q.limit,
+  };
+}
+
 /** Read today's fitting usage WITHOUT reserving — for showing "N renders left". */
 export async function peekFittingQuota(c: Context<AppContext>): Promise<QuotaResult> {
   const raw = c.env.FITTING_DAILY_LIMIT;

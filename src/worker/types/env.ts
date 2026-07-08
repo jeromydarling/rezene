@@ -93,6 +93,8 @@ export interface Env {
   HIGGSFIELD_API_KEY?: string;
   /** Per-shop daily cap on paid Fitting Room renders (default 30). */
   FITTING_DAILY_LIMIT?: string;
+  /** Per-shop daily cap on Design Studio Flux generation batches (default 40). */
+  DESIGN_DAILY_LIMIT?: string;
 }
 
 /** Hono context variables set by middleware. */
