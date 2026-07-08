@@ -97,6 +97,36 @@ function stateFromFit(fit: Record<string, unknown>): Partial<PatternState> {
 
 const CM_PER_IN = 2.54;
 
+/** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
+ *  image-model reference. White background; the SVG's own mm dimensions set
+ *  the aspect ratio. */
+async function rasterizePattern(svg: string, maxPx = 1280): Promise<Blob> {
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Couldn't rasterize the pattern."));
+      img.src = url;
+    });
+    const w = img.naturalWidth || 1000;
+    const h = img.naturalHeight || 1000;
+    const scale = Math.min(1, maxPx / Math.max(w, h));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't encode the pattern image."))), "image/png"),
+    );
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 /** A range slider with −/+ tap steps — sliders alone are miserable on a
  *  tablet at a cutting table, and that's exactly where this page gets used. */
 function TouchRange({
@@ -229,6 +259,7 @@ export function PatternStudioPage() {
   const [zoom, setZoom] = useState(1);
   const [visualising, setVisualising] = useState(false);
   const [visualised, setVisualised] = useState(false);
+  const [usePatternRef, setUsePatternRef] = useState(false);
   const [styling, setStyling] = useState(false);
   const [explaining, setExplaining] = useState(false);
   const [explainText, setExplainText] = useState<string | null>(null);
@@ -473,8 +504,36 @@ export function PatternStudioPage() {
       }
       const detailClause = details.length ? `, detailed with ${details.slice(0, 8).join(", ")}` : "";
       const description = `a ${block.name.toLowerCase()} cut with ${bits.join(", ")}${detailClause}`.slice(0, 450);
+
+      // Experimental: show the engine the pattern sheet itself. A CLEAN draft
+      // (no seam allowance, no dimension text) rasterized and passed as a
+      // reference, with a server-side clause that frames it as a technical
+      // diagram — proportions only, never a print.
+      let referenceFileIds: string[] | undefined;
+      if (usePatternRef) {
+        const clean = draftPatternSvg(blockId, state.size, state.measurements, {
+          easePct: state.easePct,
+          lengthPct: state.lengthPct,
+          sleevePct: state.sleevePct,
+          seamAllowanceMm: 0,
+          paperless: false,
+          advanced: state.advanced,
+        });
+        if (clean) {
+          const png = await rasterizePattern(clean.svg);
+          const form = new FormData();
+          form.set("file", new File([png], `${blockId}-pattern-ref.png`, { type: "image/png" }));
+          form.set("entityType", "general");
+          form.set("isPublic", "1");
+          const up = await api.upload<{ id: string }>("/api/admin/files/upload", form);
+          referenceFileIds = [up.id];
+        }
+      }
+
       await api.post("/api/admin/fitting/generate", {
         description,
+        referenceFileIds,
+        referenceRole: referenceFileIds ? "pattern" : undefined,
         fit: {
           ease: 1 + state.easePct / 100,
           length: 1 + state.lengthPct / 100,
@@ -981,6 +1040,20 @@ export function PatternStudioPage() {
             >
               {visualising ? "Rendering…" : "Render this cut on a model"}
             </button>
+            <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-warmgrey">
+              <input
+                type="checkbox"
+                checked={usePatternRef}
+                onChange={(e) => setUsePatternRef(e.target.checked)}
+                className="mt-0.5 accent-navy"
+              />
+              <span>
+                <span className="font-medium text-ink/80">Experimental: show the engine the pattern sheet.</span>{" "}
+                Sends a clean drawing of the pieces as a proportion reference. May land proportions closer to
+                your draft — may also add artifacts. Judge it honestly: render the same cut with and without,
+                then use <em>Compare</em> + <em>Grid</em> in the Fitting Studio.
+              </span>
+            </label>
             <p className="text-[11px] leading-snug text-warmgrey">
               A <strong>visual sketch</strong> of this cut — the silhouette, proportions, and the styling
               details it can name (cuffs, collar, buttons). Not your exact draft: the seams and geometry live

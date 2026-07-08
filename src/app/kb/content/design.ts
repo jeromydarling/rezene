@@ -231,7 +231,7 @@ For the shops with a tailor or seamstress in the room: the Pattern Studio drafts
 ## Both directions: picture ↔ pattern
 
 - **Fitting → Pattern.** After refitting a look in the Fitting Studio (tighter, cropped, shorter sleeves…), tap **Fit notes → Pattern Studio** and those decisions arrive here as drafting adjustments, already on the sliders.
-- **Pattern → Model.** Working pattern-first, the traditional way? **Render this cut on a model** turns the block, your fit adjustments, and every styling choice it can name — cuffs, collar, plackets, buttons — into a photoreal look in the Fitting Studio's gallery. Honest scope: it's a **visual sketch** of the cut, not a render of your exact draft — seams and geometry live in the pattern, not the picture. For a physically true drape of the drafted seams, that's the 3D simulation bridge.
+- **Pattern → Model.** Working pattern-first, the traditional way? **Render this cut on a model** turns the block, your fit adjustments, and every styling choice it can name — cuffs, collar, plackets, buttons — into a photoreal look in the Fitting Studio's gallery. Honest scope: it's a **visual sketch** of the cut, not a render of your exact draft — seams and geometry live in the pattern, not the picture. For a physically true drape of the drafted seams, that's the 3D simulation bridge. There's also an **experimental toggle** — *show the engine the pattern sheet* — that sends a clean drawing of the pieces as a proportion reference. It's honestly experimental: render the same cut with and without, then judge with **Compare** and the **Grid** in the Fitting Studio.
 
 ## A made-to-measure client book
 

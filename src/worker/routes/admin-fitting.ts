@@ -481,6 +481,10 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
     settingId?: string;
     styleId?: string | null;
     referenceFileIds?: string[];
+    /** How the references should be read: mood-board styling (default), or a
+     *  flat sewing-pattern sheet whose pieces define the garment's true
+     *  proportions (the Pattern Studio's experimental bridge). */
+    referenceRole?: "mood" | "pattern";
     fit?: { ease?: number; length?: number; sleeve?: number };
   };
   const garment = GARMENT_LIBRARY.find((g) => g.id === body.garmentId);
@@ -497,7 +501,15 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
     const parts = [colorName, garment.name.toLowerCase()].filter(Boolean).join(" ");
     garmentPhrase = fabric ? `${parts} in ${fabric.name.toLowerCase()}` : parts;
   }
-  const refClause = refIds.length ? " in the style, silhouette, and mood of the reference images" : "";
+  const refClause =
+    refIds.length === 0
+      ? ""
+      : body.referenceRole === "pattern"
+        ? ", constructed exactly from the flat sewing-pattern pieces shown in the reference image — read the " +
+          "pieces ONLY to infer the garment's true proportions (sleeve length relative to torso, hem width and " +
+          "height, collar scale). The reference is a technical cutting diagram, NOT a print or texture: no " +
+          "pattern paper, piece outlines, or markings may appear anywhere in the photograph"
+        : " in the style, silhouette, and mood of the reference images";
   // Lead with the shared HOUSE_STYLE so every generated look matches the roster's
   // lighting, camera, and posture; the setting only swaps the backdrop.
   const prompt =
