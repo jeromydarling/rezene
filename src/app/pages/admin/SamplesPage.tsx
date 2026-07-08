@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router";
+import { MessagesSquare } from "lucide-react";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
+import { makerMessageHref } from "../../lib/maker-link";
 import { formatDate, formatMoney, titleCase } from "../../lib/format";
 import {
   EmptyState,
@@ -102,8 +105,24 @@ export function SamplesPage() {
                     </select>
                   </td>
                   <td className="max-w-xs truncate text-xs text-warmgrey">{s.notes ?? "—"}</td>
-                  <td className="text-right">
-                    <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void del(s)}>
+                  <td className="whitespace-nowrap text-right text-xs">
+                    {s.supplierId && (
+                      <Link
+                        to={makerMessageHref({
+                          supplierId: s.supplierId,
+                          supplierName: s.supplierName,
+                          contextType: "sample",
+                          contextId: s.id,
+                          contextLabel: `Sample: ${s.styleName} · ${s.kind.toUpperCase()} #${s.round}`,
+                        })}
+                        className="link-quiet inline-flex items-center gap-1"
+                        title={`Message ${s.supplierName} about this sample`}
+                      >
+                        <MessagesSquare size={13} strokeWidth={1.8} />
+                        Message
+                      </Link>
+                    )}
+                    <button type="button" className="ml-3 text-terracotta hover:underline" onClick={() => void del(s)}>
                       Delete
                     </button>
                   </td>
@@ -550,7 +569,24 @@ function PoDetailPanel({
           <h3 className="font-mono text-lg">{data.poNumber}</h3>
           <p className="text-warmgrey">{data.supplierName}</p>
         </div>
-        <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void del()}>Delete PO</button>
+        <div className="flex flex-col items-end gap-1.5">
+          {data.supplierId && (
+            <Link
+              to={makerMessageHref({
+                supplierId: data.supplierId,
+                supplierName: data.supplierName,
+                contextType: "po",
+                contextId: data.id,
+                contextLabel: `PO: ${data.poNumber}`,
+              })}
+              className="link-quiet inline-flex items-center gap-1 text-xs"
+            >
+              <MessagesSquare size={13} strokeWidth={1.8} />
+              Message maker
+            </Link>
+          )}
+          <button type="button" className="text-xs text-terracotta hover:underline" onClick={() => void del()}>Delete PO</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

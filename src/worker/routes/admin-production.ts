@@ -215,6 +215,7 @@ function mapSample(row: Record<string, unknown>): AdminSample {
     id: row.id as string,
     styleId: row.style_id as string,
     styleName: row.style_name as string,
+    supplierId: (row.supplier_id as string) ?? null,
     supplierName: (row.supplier_name as string) ?? null,
     round: row.round as number,
     kind: row.kind as string,

@@ -429,6 +429,7 @@ export interface AdminSample {
   id: string;
   styleId: string;
   styleName: string;
+  supplierId: string | null;
   supplierName: string | null;
   round: number;
   kind: string;
