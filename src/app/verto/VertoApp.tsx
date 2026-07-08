@@ -763,6 +763,7 @@ function VertoSignup() {
     email: "",
     plan: params.get("plan") ?? "label",
     note: "",
+    website: "",
   });
   const [slugState, setSlugState] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [busy, setBusy] = useState(false);
@@ -792,6 +793,7 @@ function VertoSignup() {
         email: form.email,
         plan: form.plan,
         note: form.note || undefined,
+        website: form.website || undefined,
       });
       setDone(res);
     } catch (err) {
@@ -853,6 +855,12 @@ function VertoSignup() {
             First stop: Content → Pages → <strong>Site starter</strong> — eight questions and your
             story, FAQ, press page, and first post are drafted in your voice.
           </p>
+          {form.website && (
+            <p className="prose-editorial mx-auto mt-3 max-w-md text-sm">
+              Already branded? Your site is queued in <strong>Brand → Brand Studio</strong> — one click
+              imports your logo, colours, and fonts.
+            </p>
+          )}
         </Reveal>
       </div>
     );
@@ -934,6 +942,18 @@ function VertoSignup() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
+          </div>
+          <div>
+            <label className="label">Current website (optional)</label>
+            <input
+              className="input"
+              placeholder="yourlabel.com"
+              value={form.website}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-warmgrey">
+              Already have a brand? We'll queue a one-click import of your logo, colours, and fonts.
+            </p>
           </div>
           <div>
             <label className="label">Plan</label>

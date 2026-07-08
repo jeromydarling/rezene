@@ -25,6 +25,7 @@ const signupSchema = z.object({
   email: z.string().email().max(200),
   plan: z.enum(["starter", "label", "studio", "house"]).optional(),
   note: z.string().max(1000).optional(),
+  website: z.string().max(200).optional(),
 });
 
 vertoRoutes.post(
@@ -75,6 +76,7 @@ vertoRoutes.post(
         c.env,
         { id, slug: body.slug, name: body.shopName, status: "pending", custom_domain: null },
         body.email,
+        { brandImportUrl: body.website?.trim() || null },
       );
       return c.json(
         {

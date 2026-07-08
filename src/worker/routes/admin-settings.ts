@@ -36,6 +36,7 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
     "brand_logo",
     "brand_palette",
     "brand_typography",
+    "brand_import_url",
     // Search & sharing (managed from the Search Checkup screen)
     "search_visibility",
     "default_og_image",

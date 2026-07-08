@@ -21,7 +21,10 @@ type LogoTab = "wordmark" | "upload" | "emblem";
 export function BrandStudioPage() {
   const toast = useToast();
   const settings = useFetch<BrandSettings>("/api/public/settings");
+  const adminSettings = useFetch<{ settings: { key: string; value: string }[] }>("/api/admin/settings");
   const brandName = settings.data?.brandName ?? "Your Label";
+  // A website queued at signup for a one-click brand import.
+  const queuedImportUrl = adminSettings.data?.settings?.find((s) => s.key === "brand_import_url")?.value || "";
 
   const [logo, setLogo] = useState<BrandLogo | null>(null);
   const [palette, setPalette] = useState<BrandPalette>(DEFAULT_PALETTE);
@@ -54,6 +57,11 @@ export function BrandStudioPage() {
     }
     setHydrated(true);
   }, [settings.data, hydrated]);
+
+  // Prefill the importer with the website they gave at signup.
+  useEffect(() => {
+    if (queuedImportUrl) setImportUrl((cur) => cur || queuedImportUrl);
+  }, [queuedImportUrl]);
 
   // Load the selected pairing's web fonts so the preview is truthful.
   useEffect(() => {
@@ -245,6 +253,8 @@ export function BrandStudioPage() {
         brand_logo: JSON.stringify(toSave),
         brand_palette: JSON.stringify(palette),
         brand_typography: JSON.stringify(typography),
+        // Onboarding import hint is done once they've saved a brand.
+        ...(queuedImportUrl ? { brand_import_url: "" } : {}),
       });
       toast.success("Brand identity saved", "It's live across your storefront.");
       settings.reload();
@@ -269,13 +279,15 @@ export function BrandStudioPage() {
         {/* Controls */}
         <div className="space-y-5">
           {/* Import from an existing website */}
-          <div className="admin-card space-y-2 p-5">
+          <div className={`admin-card space-y-2 p-5 ${queuedImportUrl ? "!border-navy ring-1 ring-navy" : ""}`}>
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">
                 Already have a brand?
               </h2>
               <p className="text-[11px] text-warmgrey">
-                Paste your current website and we'll pull in your logo, colours, and fonts to start from.
+                {queuedImportUrl
+                  ? "You gave us this site at signup — import your logo, colours, and fonts in one click."
+                  : "Paste your current website and we'll pull in your logo, colours, and fonts to start from."}
               </p>
             </div>
             <div className="flex gap-2">
