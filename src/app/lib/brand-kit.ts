@@ -122,6 +122,53 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "brand";
+}
+
+/** Assemble and download the full brand kit as a .zip (JSZip is code-split). */
+export async function downloadKitZip(brand: CollateralBrand, voice: string): Promise<void> {
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  const slug = slugify(brand.name);
+
+  zip.file("colour-palette.txt", paletteText(brand.name, brand.palette));
+  zip.file("favicon.svg", faviconSvg(brand.name, brand.palette));
+  zip.file("brand-guidelines.html", buildGuidelinesDoc(brand, voice));
+  if (brand.logo?.kind !== "image") zip.file("logo-wordmark.svg", wordmarkSvg(brand));
+
+  const logos = zip.folder("logo");
+  if (brand.logo?.kind === "image") {
+    for (const [name, url] of [
+      ["logo", brand.logo.imageUrl],
+      ["logo-reversed", brand.logo.darkImageUrl],
+    ] as const) {
+      if (!url) continue;
+      try {
+        const blob = await (await fetch(url)).blob();
+        const ext = blob.type.includes("svg") ? "svg" : blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+        logos?.file(`${name}.${ext}`, blob);
+      } catch {
+        /* skip a logo that won't fetch */
+      }
+    }
+  }
+
+  const social = zip.folder("social");
+  for (const kind of ["avatar", "og", "banner"] as const) {
+    try {
+      const dataUrl = await socialImage(kind, brand);
+      const blob = await (await fetch(dataUrl)).blob();
+      social?.file(`${kind}.png`, blob);
+    } catch {
+      /* skip */
+    }
+  }
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  download(`${slug}-brand-kit.zip`, blob, "application/zip");
+}
+
 /** A complete, print-ready brand guidelines document (opens in a print window). */
 export function buildGuidelinesDoc(brand: CollateralBrand, voice: string): string {
   const p = brand.palette;
