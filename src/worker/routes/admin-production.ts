@@ -555,18 +555,20 @@ adminProductionRoutes.post("/orders", requireAdminWrite, async (c) => {
     body.notes ?? null,
   );
   for (const item of body.items ?? []) {
+    const breakdown = sizeBreakdownJson(item.sizeBreakdown);
     await run(
       c.var.db,
       `INSERT INTO production_order_items
-         (id, production_order_id, style_id, description, quantity, unit_cost_cents, currency)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (id, production_order_id, style_id, description, quantity, unit_cost_cents, currency, size_breakdown)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       newId("poi"),
       id,
       item.styleId ?? null,
       item.description,
-      item.quantity,
+      breakdown ? sumBreakdown(item.sizeBreakdown!) : item.quantity,
       item.unitCostCents ?? null,
       body.currency ?? "EUR",
+      breakdown,
     );
   }
   await recomputePoTotal(c.var.db, id);
@@ -632,22 +634,35 @@ adminProductionRoutes.post("/orders/:id/items", requireAdminWrite, async (c) => 
   );
   if (!po) return c.json({ error: "Production order not found" }, 404);
   const id = newId("poi");
+  const breakdown = sizeBreakdownJson(body.sizeBreakdown);
   await run(
     c.var.db,
     `INSERT INTO production_order_items
-       (id, production_order_id, style_id, description, quantity, unit_cost_cents, currency)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id, production_order_id, style_id, description, quantity, unit_cost_cents, currency, size_breakdown)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     poId,
     body.styleId ?? null,
     body.description,
-    body.quantity,
+    breakdown ? sumBreakdown(body.sizeBreakdown!) : body.quantity,
     body.unitCostCents ?? null,
     po.currency,
+    breakdown,
   );
   await recomputePoTotal(c.var.db, poId);
   return c.json({ id }, 201);
 });
+
+/** Normalize a size breakdown to compact JSON (positive sizes only), or null. */
+function sizeBreakdownJson(b: Record<string, number> | null | undefined): string | null {
+  if (!b) return null;
+  const clean: Record<string, number> = {};
+  for (const [size, qty] of Object.entries(b)) if (qty > 0) clean[size] = qty;
+  return Object.keys(clean).length > 0 ? JSON.stringify(clean) : null;
+}
+function sumBreakdown(b: Record<string, number>): number {
+  return Object.values(b).reduce((s, n) => s + (n > 0 ? n : 0), 0);
+}
 
 adminProductionRoutes.delete("/orders/:id/items/:itemId", requireAdminWrite, async (c) => {
   const poId = c.req.param("id");

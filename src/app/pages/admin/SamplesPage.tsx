@@ -276,7 +276,29 @@ interface PoItem {
   unit_cost_cents: number | null;
   currency: string;
   style_name: string | null;
+  size_breakdown: string | null;
 }
+
+/** Parse "S:10, M:20, L:15" → { S:10, M:20, L:15 } (blank → undefined). */
+function parseSizeRun(s: string): Record<string, number> | undefined {
+  const out: Record<string, number> = {};
+  for (const part of s.split(/[,\n]/)) {
+    const m = part.trim().match(/^([A-Za-z0-9.\/-]+)\s*[:x=]\s*(\d+)$/);
+    if (m && Number(m[2]) > 0) out[m[1].toUpperCase()] = Number(m[2]);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+const sizeRunTotal = (r: Record<string, number>) => Object.values(r).reduce((s, n) => s + n, 0);
+const fmtSizeRun = (json: string | null): string => {
+  if (!json) return "";
+  try {
+    return Object.entries(JSON.parse(json) as Record<string, number>)
+      .map(([s, q]) => `${s}:${q}`)
+      .join("  ");
+  } catch {
+    return "";
+  }
+};
 interface PoDetail extends AdminProductionOrder {
   issue_date: string | null;
   received_date: string | null;
@@ -379,6 +401,7 @@ interface DraftLine {
   styleId: string;
   quantity: string;
   unitCost: string;
+  sizes: string;
 }
 
 function PoCreateForm({
@@ -398,26 +421,30 @@ function PoCreateForm({
     status: "draft",
     notes: "",
   });
-  const [lines, setLines] = useState<DraftLine[]>([{ description: "", styleId: "", quantity: "", unitCost: "" }]);
+  const [lines, setLines] = useState<DraftLine[]>([{ description: "", styleId: "", quantity: "", unitCost: "", sizes: "" }]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const setLine = (i: number, patch: Partial<DraftLine>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  const addLine = () => setLines((ls) => [...ls, { description: "", styleId: "", quantity: "", unitCost: "" }]);
+  const addLine = () => setLines((ls) => [...ls, { description: "", styleId: "", quantity: "", unitCost: "", sizes: "" }]);
   const removeLine = (i: number) => setLines((ls) => ls.filter((_, idx) => idx !== i));
 
   async function submit() {
     if (!form.supplierId) return setError("Choose a supplier.");
     const items = lines
-      .filter((l) => l.description.trim() && l.quantity.trim())
-      .map((l) => ({
-        description: l.description.trim(),
-        styleId: l.styleId || null,
-        quantity: numOrNull(l.quantity) ?? 0,
-        unitCostCents: toCents(l.unitCost),
-      }))
-      .filter((it) => it.quantity > 0);
+      .map((l) => {
+        const run = parseSizeRun(l.sizes);
+        const quantity = run ? sizeRunTotal(run) : numOrNull(l.quantity) ?? 0;
+        return {
+          description: l.description.trim(),
+          styleId: l.styleId || null,
+          quantity,
+          unitCostCents: toCents(l.unitCost),
+          sizeBreakdown: run ?? null,
+        };
+      })
+      .filter((it) => it.description && it.quantity > 0);
     setBusy(true);
     setError(null);
     try {
@@ -479,9 +506,18 @@ function PoCreateForm({
                   <option value="">Style (opt)</option>
                   {styles?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                <input className="input !text-xs" inputMode="numeric" placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
+                <input className="input !text-xs" inputMode="numeric" placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} disabled={Boolean(parseSizeRun(l.sizes))} />
                 <input className="input !text-xs" inputMode="decimal" placeholder="Unit cost" value={l.unitCost} onChange={(e) => setLine(i, { unitCost: e.target.value })} />
               </div>
+              <input
+                className="input mt-1.5 !text-xs"
+                placeholder="Size run (optional) — S:10, M:20, L:15"
+                value={l.sizes}
+                onChange={(e) => setLine(i, { sizes: e.target.value })}
+              />
+              {parseSizeRun(l.sizes) && (
+                <p className="mt-0.5 text-[11px] text-warmgrey">Total {sizeRunTotal(parseSizeRun(l.sizes)!)} units from the size run.</p>
+              )}
               {lines.length > 1 && (
                 <button type="button" className="mt-1 text-[11px] text-terracotta hover:underline" onClick={() => removeLine(i)}>Remove line</button>
               )}
@@ -515,7 +551,7 @@ function PoDetailPanel({
   const { data, loading, error, reload } = useFetch<PoDetail>(`/api/admin/production/orders/${id}`);
   const { data: styles } = useFetch<AdminStyle[]>("/api/admin/styles");
   const [saving, setSaving] = useState(false);
-  const [newLine, setNewLine] = useState<DraftLine>({ description: "", styleId: "", quantity: "", unitCost: "" });
+  const [newLine, setNewLine] = useState<DraftLine>({ description: "", styleId: "", quantity: "", unitCost: "", sizes: "" });
 
   async function patch(patchBody: Record<string, unknown>) {
     setSaving(true);
@@ -529,14 +565,17 @@ function PoDetailPanel({
   }
 
   async function addItem() {
-    if (!newLine.description.trim() || !newLine.quantity.trim()) return;
+    const run = parseSizeRun(newLine.sizes);
+    const quantity = run ? sizeRunTotal(run) : numOrNull(newLine.quantity) ?? 0;
+    if (!newLine.description.trim() || quantity <= 0) return;
     await api.post(`/api/admin/production/orders/${id}/items`, {
       description: newLine.description.trim(),
       styleId: newLine.styleId || null,
-      quantity: numOrNull(newLine.quantity) ?? 0,
+      quantity,
       unitCostCents: toCents(newLine.unitCost),
+      sizeBreakdown: run ?? null,
     });
-    setNewLine({ description: "", styleId: "", quantity: "", unitCost: "" });
+    setNewLine({ description: "", styleId: "", quantity: "", unitCost: "", sizes: "" });
     reload();
     onChanged();
   }
@@ -619,6 +658,9 @@ function PoDetailPanel({
                   <p className="text-xs text-warmgrey">
                     {it.style_name ? `${it.style_name} · ` : ""}{it.quantity} × {it.unit_cost_cents ? formatMoney(it.unit_cost_cents, it.currency) : "—"}
                   </p>
+                  {it.size_breakdown && (
+                    <p className="mt-0.5 font-mono text-[11px] text-navy">{fmtSizeRun(it.size_breakdown)}</p>
+                  )}
                 </div>
                 <button type="button" className="text-[11px] text-terracotta hover:underline" onClick={() => void removeItem(it.id)}>Remove</button>
               </li>
@@ -632,9 +674,10 @@ function PoDetailPanel({
               <option value="">Style (opt)</option>
               {styles?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <input className="input !text-xs" inputMode="numeric" placeholder="Qty" value={newLine.quantity} onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })} />
+            <input className="input !text-xs" inputMode="numeric" placeholder="Qty" value={newLine.quantity} onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })} disabled={Boolean(parseSizeRun(newLine.sizes))} />
             <input className="input !text-xs" inputMode="decimal" placeholder="Unit cost" value={newLine.unitCost} onChange={(e) => setNewLine({ ...newLine, unitCost: e.target.value })} />
           </div>
+          <input className="input mt-1.5 !text-xs" placeholder="Size run (optional) — S:10, M:20, L:15" value={newLine.sizes} onChange={(e) => setNewLine({ ...newLine, sizes: e.target.value })} />
           <button type="button" className="btn btn-secondary mt-1.5 !py-1 text-xs" onClick={() => void addItem()}>+ Add line</button>
         </div>
       </div>
