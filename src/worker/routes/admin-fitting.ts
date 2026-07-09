@@ -17,6 +17,7 @@ import {
   type ImageResult,
 } from "../services/ai-image";
 import { reserveFittingQuota, fittingQuotaExceededBody, peekFittingQuota } from "../services/ai-quota";
+import { renderConfigured } from "../services/video-render";
 import type { AppContext } from "../types/env";
 import type { Context } from "hono";
 
@@ -481,10 +482,11 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
     settingId?: string;
     styleId?: string | null;
     referenceFileIds?: string[];
-    /** How the references should be read: mood-board styling (default), or a
+    /** How the references should be read: mood-board styling (default), a
      *  flat sewing-pattern sheet whose pieces define the garment's true
-     *  proportions (the Pattern Studio's experimental bridge). */
-    referenceRole?: "mood" | "pattern";
+     *  proportions, or a 3D cloth-simulation drape of the exact garment
+     *  (both Pattern Studio bridges). */
+    referenceRole?: "mood" | "pattern" | "drape";
     fit?: { ease?: number; length?: number; sleeve?: number };
   };
   const garment = GARMENT_LIBRARY.find((g) => g.id === body.garmentId);
@@ -504,7 +506,15 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
   const refClause =
     refIds.length === 0
       ? ""
-      : body.referenceRole === "pattern"
+      : body.referenceRole === "drape"
+        ? ", matching EXACTLY the garment in the reference image — the reference is a 3D cloth simulation of " +
+          "THIS garment draped on a plain grey dress form: copy its true proportions precisely (where the hem " +
+          "sits on the torso, how far the sleeves reach down the arm, the overall width and ease) and the way " +
+          "the fabric hangs. Render it as real sewn fabric on a real person: the reference's grey colour, " +
+          "faceted surface, jagged edges and any small gaps at the seams are simulation artifacts — the real " +
+          "garment is cleanly finished, with fabric and colour taken from the description alone, and no dress " +
+          "form or mannequin may appear; add no clothing items beyond those described"
+        : body.referenceRole === "pattern"
         ? ", constructed exactly from the flat sewing-pattern pieces shown in the reference image — read the " +
           "pieces ONLY to infer the garment's true proportions (sleeve length relative to torso, hem width and " +
           "height, collar scale). The reference is a technical cutting diagram, NOT a print or texture: no " +
@@ -995,4 +1005,85 @@ adminFittingRoutes.delete("/looks/:id", requireAdminWrite, async (c) => {
   if (!result.meta.changes) return c.json({ error: "Look not found" }, 404);
   await writeAudit(c.var.db, c.var.userId, "fitting_look.delete", "fitting_look", id, {});
   return c.json({ ok: true });
+});
+
+// ---- True-drape preview (beta) ---------------------------------------------
+// A Pattern Studio draft becomes a physically-simulated grey drape render:
+// the Worker dispatches a GitHub Actions job (FreeSewing draft → Blender
+// cloth solver → callback), tracks it in KV, and the finished PNG feeds the
+// photoreal generate as a `referenceRole: "drape"` reference. V1 covers the
+// classic tee. Degrades cleanly when the render backend isn't configured.
+
+const DRAPE_TTL = 60 * 60 * 24; // job records live a day
+
+function drapeKey(shopId: string, jobId: string): string {
+  return `drape:${shopId}:${jobId}`;
+}
+
+adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
+  if (!renderConfigured(c.env)) {
+    return c.json(
+      {
+        error:
+          "True-drape preview isn't switched on for this deployment yet — it needs the render " +
+          "backend (GitHub dispatch token + callback secret). Everything else in the Pattern " +
+          "Studio keeps working without it.",
+      },
+      503,
+    );
+  }
+  const body = (await c.req.json().catch(() => ({}))) as {
+    easePct?: number;
+    lengthPct?: number;
+    sleevePct?: number;
+  };
+  const clamp = (v: unknown, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
+  const spec = {
+    easePct: clamp(body.easePct, 0, 25),
+    lengthPct: clamp(body.lengthPct, -15, 20),
+    sleevePct: clamp(body.sleevePct, -30, 10),
+  };
+
+  const jobId = newId("drape");
+  await c.env.KV.put(
+    drapeKey(c.var.shopId, jobId),
+    JSON.stringify({ status: "queued", spec, createdAt: new Date().toISOString() }),
+    { expirationTtl: DRAPE_TTL },
+  );
+
+  const base = (c.env.APP_URL || "https://verto.style").replace(/\/$/, "");
+  const res = await fetch(`https://api.github.com/repos/${c.env.RENDER_REPO}/dispatches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${c.env.GITHUB_DISPATCH_TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "verto-render",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      event_type: "render_drape",
+      client_payload: { shopId: c.var.shopId, jobId, spec, callbackBase: `${base}/api/render` },
+    }),
+  });
+  if (res.status !== 204) {
+    const detail = await res.text().catch(() => "");
+    await c.env.KV.delete(drapeKey(c.var.shopId, jobId));
+    return c.json({ error: `Couldn't start the drape render (GitHub ${res.status}). ${detail.slice(0, 150)}` }, 502);
+  }
+  await writeAudit(c.var.db, c.var.userId, "fitting_drape.start", "drape_job", jobId, spec);
+  return c.json({ jobId, status: "queued" }, 202);
+});
+
+adminFittingRoutes.get("/drape/:jobId", async (c) => {
+  const raw = await c.env.KV.get(drapeKey(c.var.shopId, c.req.param("jobId")));
+  if (!raw) return c.json({ error: "Drape job not found (it may have expired)." }, 404);
+  const job = JSON.parse(raw) as { status: string; fileId?: string; error?: string };
+  return c.json({
+    status: job.status,
+    fileId: job.fileId,
+    url: job.fileId ? `/media/${job.fileId}` : undefined,
+    error: job.error,
+  });
 });

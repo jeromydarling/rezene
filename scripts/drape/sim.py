@@ -1,0 +1,458 @@
+"""
+Drape simulation — pieces.json -> ghost-mannequin drape render (PNG).
+
+Builds each pattern piece as a triangulated cloth mesh placed per its 3D
+hint, joins everything into one object, adds loose "sewing" edges between
+matched seam points, pins the shoulder seam, runs Blender's cloth solver
+(sewing springs pull the garment together as it falls), and renders a neutral
+grey front view on white with the Workbench engine.
+
+Usage: blender -b -noaudio -P scripts/drape/sim.py -- pieces.json out.png [frames]
+"""
+import bpy
+import bmesh
+import json
+import math
+import sys
+
+argv = sys.argv[sys.argv.index("--") + 1 :]
+
+# A pristine scene: the default cube/light/camera would photobomb the render.
+for o in list(bpy.data.objects):
+    bpy.data.objects.remove(o, do_unlink=True)
+DATA = json.load(open(argv[0]))
+OUT_PNG = argv[1]
+FRAMES = int(argv[2]) if len(argv) > 2 else 80
+
+S = 0.001  # pattern mm -> metres
+HEIGHT = max(y for p in DATA["pieces"] if p["placement"]["kind"] == "plane" for _, y in p["points"])
+
+# Invisible ghost-mannequin body the cloth drapes over. Without it the sewing
+# springs simply crush the garment flat. Dimensions loosely follow the studio
+# measurement set (chest 1080mm, shoulders 445mm, biceps 335mm).
+ARM_R = 55.0  # arm stub radius (mm) — fills the sleeve tube so it can't ruffle
+ARM_TILT = math.radians(30)  # arms hang tilted outward from the shoulder
+SHOULDER_X = 215.0  # arm axis origin distance from centre (mm)
+SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
+
+# Torso profile: (pattern-y, half-width a, half-depth b) from neck to below hem.
+TORSO = [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118), (740, 185, 125)]
+
+
+def torso_ab(y):
+    if y <= TORSO[0][0]:
+        return TORSO[0][1], TORSO[0][2]
+    for (y0, a0, b0), (y1, a1, b1) in zip(TORSO, TORSO[1:]):
+        if y <= y1:
+            t = (y - y0) / (y1 - y0)
+            return a0 + (a1 - a0) * t, b0 + (b1 - b0) * t
+    return TORSO[-1][1], TORSO[-1][2]
+
+
+def clamp_out(wx, wy, y_level):
+    """Push a cloth point (mm, at torso level y_level) radially out of the
+    body ellipse so nothing starts inside the collision mesh."""
+    ta, tb = torso_ab(y_level)
+    a2, b2 = ta + 12.0, tb + 12.0
+    k = (wx / a2) ** 2 + (wy / b2) ** 2
+    if 1e-9 < k < 1.0:
+        f = 1.0 / math.sqrt(k)
+        return wx * f, wy * f
+    return wx, wy
+
+
+def arm_frame(direction):
+    """Origin (mm) + orthonormal axes of the tilted hanging arm."""
+    origin = (SHOULDER_X * direction, 0.0, HEIGHT - SHOULDER_PY)
+    axis = (math.sin(ARM_TILT) * direction, 0.0, -math.cos(ARM_TILT))  # down the arm
+    e1 = (math.cos(ARM_TILT) * direction, 0.0, math.sin(ARM_TILT))  # outward
+    e2 = (0.0, 1.0, 0.0)
+    return origin, axis, e1, e2
+
+sleeve_half = {
+    p["name"]: max(abs(x) for x, _ in p["points"])
+    for p in DATA["pieces"]
+    if p["placement"]["kind"] == "sleeve"
+}
+sleeve_miny = {
+    p["name"]: min(y for _, y in p["points"])
+    for p in DATA["pieces"]
+    if p["placement"]["kind"] == "sleeve"
+}
+
+
+# Elliptical shell just outside the torso that the front/back pieces are
+# pre-wrapped onto — the sim then only stitches seams and relaxes, instead of
+# assembling flat planes from far away (which crumples chaotically). The shell
+# is scaled so a quarter arc fits the widest piece half + a seam gap: if the
+# pieces wrapped PAST the side line they would cross each other and the
+# self-collision solver explodes.
+def _make_arc_table(A, B):
+    phis, ss = [0.0], [0.0]
+    while phis[-1] < math.pi / 2:
+        p0, p1 = phis[-1], phis[-1] + 0.002
+        x0, y0 = A * math.sin(p0), B * math.cos(p0)
+        x1, y1 = A * math.sin(p1), B * math.cos(p1)
+        phis.append(p1)
+        ss.append(ss[-1] + math.hypot(x1 - x0, y1 - y0))
+    return phis, ss
+
+
+_max_half = max(
+    abs(x) for p in DATA["pieces"] if p["placement"]["kind"] == "plane" for x, _ in p["points"]
+)
+_phis, _ss = _make_arc_table(207.0, 143.0)
+_scale = (_max_half + 10.0) / _ss[-1]  # quarter arc = widest half + seam gap
+SHELL_A, SHELL_B = 207.0 * _scale, 143.0 * _scale
+_phis, _ss = _make_arc_table(SHELL_A, SHELL_B)
+
+
+def _phi_at(s):
+    lo, hi = 0, len(_ss) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if _ss[mid] < s:
+            lo = mid + 1
+        else:
+            hi = mid
+    return _phis[lo]
+
+
+def place(piece, x, y):
+    """Pattern-space (x, y) -> world metres per the piece's placement hint."""
+    pl = piece["placement"]
+    if pl["kind"] == "plane":
+        # Wrap pattern x around the shell by arc length. Front centre sits at
+        # (0, -B), back centre at (0, +B); both walk toward the sides so the
+        # side seams nearly meet. side = -1 for front, +1 for back.
+        side = -1.0 if pl["y"] < 0 else 1.0
+        phi = _phi_at(abs(x))
+        wx = math.copysign(SHELL_A * math.sin(phi), x)
+        # Depth follows the torso's own vertical profile (+ease) so the cloth
+        # starts just OUTSIDE the body at every height. Above the armpit only
+        # the neck stub exists, so the shoulder region collapses to the seam
+        # line (near 0 depth) where the pins hold front and back together.
+        _, tb = torso_ab(y)
+        wrapped = side * (tb + 15.0) * math.cos(phi)
+        # The panel hangs from the shoulder ridge: at the seam line it sits at
+        # ~centre depth, sweeping forward/backward onto the wrapped chest as it
+        # descends. Blend by distance BELOW the seam line at this x — near the
+        # centre (|x| < neck) the top edge is the neckline, fully wrapped.
+        y_seam = 10.0 + 22.0 * min(1.0, max(0.0, (abs(x) - 125.0) / 98.0))
+        t_seam = min(1.0, max(0.08, (y - y_seam) / 120.0))
+        t = max(t_seam, min(1.0, max(0.0, (115.0 - abs(x)) / 10.0)))
+        wy = side * 8.0 * (1 - t) + wrapped * t
+        wx, wy = clamp_out(wx, wy, y)
+        return (wx * S, wy * S, (HEIGHT - y) * S)
+    # Sleeve: wrap into a tube around the tilted arm axis so the underarm
+    # edges meet on the inner side and the cap opening hugs the shoulder. Tube
+    # radius comes from the piece's own flat width (circumference = 2*halfW).
+    half = sleeve_half[piece["name"]]
+    r = half / math.pi + 1  # ~exact tube; slack only invites ruffling
+    # Slightly less than a full wrap: the underarm edges must NOT start
+    # coincident (self-collision fights zero-length sewing and explodes).
+    theta = (x / half) * (math.pi - 10.0 / r)
+    u = y - sleeve_miny[piece["name"]]  # 0 at cap top, growing down the arm
+    o, ax, e1, e2 = arm_frame(pl["dir"])
+    c, s_ = r * math.cos(theta), r * math.sin(theta)
+    wx = o[0] + u * ax[0] + c * e1[0]
+    wy = c * e1[1] + s_ * e2[1]
+    wz = o[2] + u * ax[2] + c * e1[2]
+    wx, wy = clamp_out(wx, wy, HEIGHT - wz)
+    return (wx * S, wy * S, wz * S)
+
+
+# ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
+all_verts = []
+all_faces = []
+offsets = {}
+boundary_index = {}  # piece -> list of global indices for its ORIGINAL boundary points
+
+for piece in DATA["pieces"]:
+    # Build the piece FLAT in pattern space (mm), so triangulation and
+    # subdivision work in 2D, then map every vertex — interior included —
+    # through place(). (Placing only the boundary first would leave interior
+    # verts as straight 3D chords cutting through the wrapped shapes.)
+    bm = bmesh.new()
+    boundary2d = piece["points"]
+    boundary = [bm.verts.new((x, y, 0.0)) for x, y in boundary2d]
+    bm.verts.ensure_lookup_table()
+    edges = []
+    n = len(boundary)
+    for i in range(n):
+        edges.append(bm.edges.new((boundary[i], boundary[(i + 1) % n])))
+    bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False, edges=edges)
+    # Densify for a credible drape: two rounds of subdivision + retriangulate.
+    for _ in range(2):
+        bmesh.ops.subdivide_edges(bm, edges=list(bm.edges), cuts=1, use_grid_fill=False)
+        bmesh.ops.triangulate(bm, faces=list(bm.faces))
+    bmesh.ops.beautify_fill(bm, faces=list(bm.faces), edges=list(bm.edges))
+    bm.verts.ensure_lookup_table()
+    off = len(all_verts)
+    offsets[piece["name"]] = off
+    # Mesh ops may invalidate python vert refs — recover the boundary verts by
+    # 2D coordinate (their positions are untouched by fill/subdivide).
+    by_co = {}
+    for v in bm.verts:
+        by_co[(round(v.co.x, 3), round(v.co.y, 3))] = v.index
+    def find(x, y):
+        key = (round(x, 3), round(y, 3))
+        if key in by_co:
+            return by_co[key]
+        best, best_d = 0, 1e9
+        for v in bm.verts:
+            d = (v.co.x - x) ** 2 + (v.co.y - y) ** 2
+            if d < best_d:
+                best, best_d = v.index, d
+        return best
+    boundary_index[piece["name"]] = [off + find(x, y) for x, y in boundary2d]
+    for v in bm.verts:
+        all_verts.append(place(piece, v.co.x, v.co.y))
+    for f in bm.faces:
+        all_faces.append(tuple(off + v.index for v in f.verts))
+    bm.free()
+
+# ---- Sewing edges from matched seam points -----------------------------------
+def seg_indices(piece_name, seg_name):
+    piece = next(p for p in DATA["pieces"] if p["name"] == piece_name)
+    start, end = piece["segments"][seg_name]
+    npts = len(piece["points"])
+    idxs = []
+    i = start
+    while True:
+        idxs.append(boundary_index[piece_name][i % npts])
+        if i % npts == end % npts:
+            break
+        i += 1
+    return idxs
+
+
+def match(a, b):
+    """Pair two index lists point-by-point, resampling the longer by skipping."""
+    if len(a) > len(b):
+        a2, b2 = match(b, a)
+        return b2, a2
+    picks = [b[round(i * (len(b) - 1) / max(1, len(a) - 1))] for i in range(len(a))]
+    return a, picks
+
+
+sew_edges = []
+pin_indices = set()
+for seam in DATA["seams"]:
+    ia = seg_indices(*seam["a"])
+    ib = seg_indices(*seam["b"])
+    # Auto-orient: flip b if that brings matched endpoints closer in world
+    # space (rest positions) — more reliable than hand-set direction flags.
+    straight = math.dist(all_verts[ia[0]], all_verts[ib[0]]) + math.dist(all_verts[ia[-1]], all_verts[ib[-1]])
+    flipped = math.dist(all_verts[ia[0]], all_verts[ib[-1]]) + math.dist(all_verts[ia[-1]], all_verts[ib[0]])
+    if flipped < straight:
+        ib = list(reversed(ib))
+    ia, ib = match(ia, ib)
+    for va, vb in zip(ia, ib):
+        if va != vb:
+            sew_edges.append((va, vb))
+    if seam.get("pin"):
+        pin_indices.update(ia)
+        pin_indices.update(ib)
+
+# Pin the necklines too: on a ghost mannequin the collar keeps its shape (a
+# real neckband would hold it); unpinned it sags open into the neck hole.
+# Pin the sleeve-cap edges as well — they sit exactly where the armscye lies
+# on the body, and act as rigid anchors the body panels get stitched to.
+# Without this, the armscye springs ratchet the whole sleeve up the arm and
+# it bunches at the shoulder.
+for piece in DATA["pieces"]:
+    for seg_name in piece.get("segments", {}):
+        if seg_name.startswith("neck") or seg_name.startswith("cap"):
+            pin_indices.update(seg_indices(piece["name"], seg_name))
+
+# ---- Invisible collision body (ghost mannequin) -------------------------------
+def build_body():
+    verts, faces = [], []
+    N = 24
+
+    def ring(cx, a, b, z):
+        start = len(verts)
+        for i in range(N):
+            t = 2 * math.pi * i / N
+            verts.append(((cx + a * math.cos(t)) * S, b * math.sin(t) * S, z))
+        return start
+
+    def bridge(r0, r1):
+        for i in range(N):
+            j = (i + 1) % N
+            faces.append((r0 + i, r0 + j, r1 + j, r1 + i))
+
+    def cap(r0, cz, cx=0.0):
+        c = len(verts)
+        verts.append((cx * S, 0.0, cz))
+        for i in range(N):
+            faces.append((r0 + i, r0 + (i + 1) % N, c))
+
+    rings = [ring(0, a, b, (HEIGHT - y) * S) for y, a, b in TORSO]
+    for r0, r1 in zip(rings, rings[1:]):
+        bridge(r0, r1)
+    cap(rings[0], (HEIGHT - 10) * S)
+
+    # Arm stubs: cylinders hanging from the shoulder joints, tilted outward.
+    def arm_ring(o, ax, e1, e2, u):
+        start = len(verts)
+        for i in range(N):
+            t = 2 * math.pi * i / N
+            c, s_ = ARM_R * math.cos(t), ARM_R * math.sin(t)
+            verts.append((
+                (o[0] + u * ax[0] + c * e1[0]) * S,
+                (s_ * e2[1]) * S,
+                (o[2] + u * ax[2] + c * e1[2]) * S,
+            ))
+        return start
+
+    for d in (1, -1):
+        o, ax, e1, e2 = arm_frame(d)
+        top = arm_ring(o, ax, e1, e2, 10)
+        bot = arm_ring(o, ax, e1, e2, 380)
+        bridge(top, bot)
+        c = len(verts)
+        verts.append((o[0] * S, 0.0, (o[2] + 10) * S))
+        for i in range(N):
+            faces.append((top + i, top + (i + 1) % N, c))
+
+    m = bpy.data.meshes.new("body")
+    m.from_pydata(verts, [], faces)
+    m.update()
+    # Hand-wound quads have inconsistent normals; collision response follows
+    # face normals, so recalc them all to point outside.
+    bmb = bmesh.new()
+    bmb.from_mesh(m)
+    bmesh.ops.recalc_face_normals(bmb, faces=bmb.faces)
+    bmb.to_mesh(m)
+    bmb.free()
+    m.update()
+    o = bpy.data.objects.new("body", m)
+    bpy.context.collection.objects.link(o)
+    col = o.modifiers.new("collision", "COLLISION")
+    col.settings.thickness_outer = 0.003
+    col.settings.thickness_inner = 0.002
+    # The body stays in the render as a darker matte dress form: it gives the
+    # reference anatomical context and hides the armscye seam gaps.
+    for poly in m.polygons:
+        poly.use_smooth = True
+    mat_b = bpy.data.materials.new("body_grey")
+    mat_b.use_nodes = True
+    nb = mat_b.node_tree.nodes["Principled BSDF"]
+    nb.inputs["Base Color"].default_value = (0.32, 0.32, 0.34, 1.0)
+    nb.inputs["Roughness"].default_value = 0.85
+    m.materials.append(mat_b)
+    return o
+
+
+build_body()
+
+# ---- Assemble the object ------------------------------------------------------
+mesh = bpy.data.meshes.new("garment")
+mesh.from_pydata(all_verts, sew_edges, all_faces)
+mesh.update()
+for poly in mesh.polygons:
+    poly.use_smooth = True
+obj = bpy.data.objects.new("garment", mesh)
+bpy.context.collection.objects.link(obj)
+
+vg = obj.vertex_groups.new(name="pin")
+vg.add(list(pin_indices), 1.0, "REPLACE")
+
+mod = obj.modifiers.new("cloth", "CLOTH")
+st = mod.settings
+st.quality = 10
+st.mass = 0.3
+st.air_damping = 2.0
+st.tension_stiffness = 40
+st.compression_stiffness = 40
+st.shear_stiffness = 20
+st.bending_stiffness = 1.0
+st.vertex_group_mass = "pin"
+for name in ("use_sewing_springs", "use_sewing"):
+    if hasattr(st, name):
+        setattr(st, name, True)
+if hasattr(st, "sewing_force_max"):
+    # The garment starts nearly assembled — gentle stitching only. Strong
+    # sewing forces whip the light cloth into permanent crumples.
+    st.sewing_force_max = 2
+try:
+    mod.collision_settings.distance_min = 0.003
+    mod.collision_settings.collision_quality = 4
+    mod.collision_settings.use_self_collision = True
+    mod.collision_settings.self_distance_min = 0.002
+except Exception:
+    pass
+
+# Soften the harsh micro-folds the coarse sim leaves (esp. around the yoke) —
+# the reference should read as smooth jersey, not crinkled paper.
+sm = obj.modifiers.new("smooth", "SMOOTH")
+sm.factor = 0.4
+sm.iterations = 2
+
+# ---- Simulate -----------------------------------------------------------------
+scene = bpy.context.scene
+if FRAMES > 0:
+    scene.frame_start = 1
+    scene.frame_end = FRAMES
+    mod.point_cache.frame_end = FRAMES
+    bpy.ops.ptcache.bake_all(bake=True)
+    scene.frame_set(FRAMES)
+else:
+    obj.modifiers.remove(mod)
+
+# ---- Render (Cycles CPU — no OpenGL needed on headless runners) ---------------
+scene.render.engine = "CYCLES"
+scene.cycles.device = "CPU"
+scene.cycles.use_denoising = False
+scene.cycles.samples = 96
+mat = bpy.data.materials.new("cloth_grey")
+mat.use_nodes = True
+bsdf = mat.node_tree.nodes["Principled BSDF"]
+bsdf.inputs["Base Color"].default_value = (0.62, 0.62, 0.62, 1.0)
+bsdf.inputs["Roughness"].default_value = 0.9
+obj.data.materials.append(mat)
+world = bpy.data.worlds.new("w")
+world.use_nodes = True
+world.node_tree.nodes["Background"].inputs["Color"].default_value = (1, 1, 1, 1)
+world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
+scene.world = world
+# Raking key light from the upper front-left so folds read; soft shadows.
+sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
+sun.data.energy = 3.5
+sun.data.angle = 0.3
+sun.rotation_euler = (math.radians(60), 0, math.radians(-35))
+bpy.context.collection.objects.link(sun)
+
+cam_data = bpy.data.cameras.new("cam")
+cam_data.lens = 60
+cam = bpy.data.objects.new("cam", cam_data)
+bpy.context.collection.objects.link(cam)
+mid_z = (HEIGHT * S) * 0.5
+import os as _os
+if _os.environ.get("DRAPE_CAM") == "quarter":
+    cam.location = (1.5, -1.5, mid_z + 0.15)
+    cam.rotation_euler = (math.radians(83), 0, math.radians(45))
+else:
+    cam.location = (0, -2.0, mid_z)
+    cam.rotation_euler = (math.pi / 2, 0, 0)
+scene.camera = cam
+
+scene.render.resolution_x = 1024
+scene.render.resolution_y = 1280
+scene.render.film_transparent = False
+obj_eval = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+cos = [obj_eval.matrix_world @ v.co for v in obj_eval.data.vertices]
+xs = sorted(c.x for c in cos); ys = sorted(c.y for c in cos); zs = sorted(c.z for c in cos)
+print(f"bbox x[{xs[0]:.2f},{xs[-1]:.2f}] y[{ys[0]:.2f},{ys[-1]:.2f}] z[{zs[0]:.2f},{zs[-1]:.2f}]")
+extra = [int(f) for f in argv[3].split(",")] if len(argv) > 3 else []
+for f in extra:
+    scene.frame_set(f)
+    scene.render.filepath = OUT_PNG.replace(".png", f"-f{f}.png")
+    bpy.ops.render.render(write_still=True)
+if FRAMES > 0:
+    scene.frame_set(FRAMES)
+scene.render.filepath = OUT_PNG
+bpy.ops.render.render(write_still=True)
+print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(sew_edges)}, pins {len(pin_indices)})")

@@ -246,3 +246,62 @@ async function notifyOwner(env: Env, shopDb: D1Database, row: JobRow, ok: boolea
     });
   }
 }
+
+// ---- Pattern drape renders (Blender ghost-mannequin sims) ------------------
+// Same trust model as the video callbacks: authenticated by the shared
+// secret, shop addressed in the path. The Action posts one grey PNG per job;
+// job state lives in KV (the Worker's drape routes poll it).
+
+const DRAPE_TTL = 60 * 60 * 24;
+
+renderCallbackRoutes.post("/drape/:shopId/:jobId/complete", async (c) => {
+  const form = await c.req.parseBody();
+  if (!renderSecretOk(c.env, (form.secret as string) || c.req.header("x-render-secret"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const shopId = c.req.param("shopId");
+  const jobId = c.req.param("jobId");
+  const kvKey = `drape:${shopId}:${jobId}`;
+  const existing = await c.env.KV.get(kvKey);
+  if (!existing) return c.json({ error: "job not found" }, 404);
+
+  const image = form.image as unknown as File | undefined;
+  if (!image || typeof image.arrayBuffer !== "function") return c.json({ error: "missing image" }, 400);
+
+  const key = `${shopId}/drape/${jobId}.png`;
+  await c.env.FILES.put(key, await image.arrayBuffer(), { httpMetadata: { contentType: "image/png" } });
+  const fileId = newId("file");
+  await run(
+    db(c.env, shopId),
+    `INSERT INTO files (id, r2_key, filename, content_type, entity_type, entity_id, is_public, uploaded_by)
+     VALUES (?, ?, ?, 'image/png', 'general', ?, 1, NULL)`,
+    fileId,
+    key,
+    `${jobId}-drape.png`,
+    jobId,
+  );
+  await c.env.KV.put(
+    kvKey,
+    JSON.stringify({ ...(JSON.parse(existing) as object), status: "done", fileId }),
+    { expirationTtl: DRAPE_TTL },
+  );
+  return c.json({ ok: true, fileId });
+});
+
+renderCallbackRoutes.post("/drape/:shopId/:jobId/fail", async (c) => {
+  if (!secretOk(c)) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { error?: string };
+  const kvKey = `drape:${c.req.param("shopId")}:${c.req.param("jobId")}`;
+  const existing = await c.env.KV.get(kvKey);
+  if (!existing) return c.json({ error: "job not found" }, 404);
+  await c.env.KV.put(
+    kvKey,
+    JSON.stringify({
+      ...(JSON.parse(existing) as object),
+      status: "failed",
+      error: (body.error || "render failed").slice(0, 300),
+    }),
+    { expirationTtl: DRAPE_TTL },
+  );
+  return c.json({ ok: true });
+});
