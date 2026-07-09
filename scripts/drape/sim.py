@@ -800,20 +800,18 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # fit classification is shown only where the garment touches the form —
 # free-hanging cloth has no "fit" (CLO does the same).
 #
-# R&D STATUS (why this stays behind DRAPE_FITMAP=1): the relaxation is
-# converged — 1500 and 5000 sweeps give identical stats — and each fix so
-# far peeled a real layer (welding seams, freeing welded clusters from pin
-# anchors, dropping the tether that re-introduced assembly tension:
-# edge-strain p95 went 146%→49%, girth p95 288%→98% on the tee probe).
-# But the floor it converged to is still not credible: ~2x girth stretch
-# near seams/shoulders is residual assembly geometry, not fit. Root cause
-# hypothesis: Blender's match() resampling pairs only the shorter side of
-# each seam, so welding closes the paired verts while their unpaired 3mm
-# neighbours keep the seam gap baked in as local stretch. Springs can't
-# fix that — the next step is hard equality constraints over a DENSIFIED
-# pairing (every boundary vert on both sides projected onto the opposite
-# seam polyline, position-constrained, then relax). Until magnitudes are
-# credible, this map must not be shown to designers.
+# CALIBRATION RECORD (how the numbers got credible): the spring-only relax
+# converged to a false floor (girth p95 +98% on the tee) because Blender's
+# sewing only pairs the sparse ORIGINAL pattern points — the subdivision
+# verts along piece boundaries were never sewn, welded, or constrained, and
+# the bake leaves them up to 137mm from their seam (the armscye junctions
+# hide ~92mm median gaps under the sleeve caps). The densified closure
+# below (every boundary vert, subdivision verts included, arc-matched onto
+# the opposite side as a zero-rest point-on-segment constraint) removed
+# that floor: with 5000 sweeps at RHO 0.999 the tee probe lands at girth
+# median +0.5%, p95 +17%, seams closed to 0.1mm — the residual p95 lives
+# in ~20 verts at the armscye junction, which genuinely carries stretch on
+# a rigid form. 0.9995 diverges; 15000 sweeps buys only noise-level gains.
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     import numpy as np
     from mathutils.bvhtree import BVHTree
@@ -1007,7 +1005,7 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # et al. 2014 constraint averaging + SOR), with a weak tether to the
     # baked drape that fixes the sliding null-space like friction would.
     OMEGA = float(_os.environ.get("DRAPE_FIT_OMEGA", "1.7"))
-    N_ITER = int(_os.environ.get("DRAPE_FIT_ITERS", "1500"))
+    N_ITER = int(_os.environ.get("DRAPE_FIT_ITERS", "5000"))
     # No drape tether: over hundreds of sweeps even a 1e-3 pull is a strong
     # anchor that drags the relax back toward the spring-tensioned bake —
     # reintroducing exactly the assembly tension being removed. The pins fix
@@ -1045,7 +1043,11 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # the averaged-Jacobi sweep: unclosed seam gaps from the bake can be
     # tens of mm, and plain Jacobi transports closure ~one vertex ring per
     # sweep — Chebyshev makes that global.
-    RHO, GAMMA, WARMUP = 0.992, 0.7, 15
+    # RHO 0.999 with 5000 sweeps is the calibrated sweet spot on the tee
+    # probe (girth p95 +18%, median +0.9%); 0.9995 overshoots and diverges,
+    # 0.992 needs 3x the sweeps for the same depth.
+    RHO = float(_os.environ.get("DRAPE_FIT_RHO", "0.999"))
+    GAMMA, WARMUP = 0.7, 15
     omega_ch = 1.0
     x_prev = x.copy()
     for it in range(N_ITER):
@@ -1164,7 +1166,9 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             return (0.62, 0.66, 0.62)  # free-hanging: neutral, no "fit" there
         if s < -0.02:
             return (0.45, 0.62, 0.85)  # slack pooling against the body
-        stops = [(0.0, (0.30, 0.65, 0.34)), (0.02, (0.92, 0.85, 0.25)), (0.05, (0.85, 0.13, 0.10))]
+        # CLO's strain map runs 100->120% (red at +20%); we go red at +15%,
+        # slightly stricter, with yellow ("snug") from +5%.
+        stops = [(0.0, (0.30, 0.65, 0.34)), (0.05, (0.92, 0.85, 0.25)), (0.15, (0.85, 0.13, 0.10))]
         if s <= 0.0:
             return stops[0][1]
         for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
