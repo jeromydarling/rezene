@@ -578,15 +578,16 @@ export function PatternStudioPage() {
         }
       }
 
+      // No `fit` here: those multipliers are relative to THIS block's own
+      // proportions, but the server's fitClause words them on the Fitting
+      // Studio's absolute scale (where 0.75 sleeve = three-quarter length) —
+      // for a tee draft at -25% sleeves that injects "three-quarter sleeves"
+      // into the prompt, contradicting both the description and the drape.
+      // The description already words the fit; the drape carries geometry.
       await api.post("/api/admin/fitting/generate", {
         description,
         referenceFileIds,
         referenceRole,
-        fit: {
-          ease: 1 + state.easePct / 100,
-          length: 1 + state.lengthPct / 100,
-          sleeve: adjustables.sleeve ? 1 + state.sleevePct / 100 : undefined,
-        },
       });
       setVisualised(true);
       toast.success("Rendered on a model", "Open the Fitting Studio to see it — it's in Model renders.");
