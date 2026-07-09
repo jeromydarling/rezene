@@ -312,11 +312,18 @@ def place(piece, x, y):
     if pl["kind"] == "leg":
         # Trouser panel: half-tube around a leg stub, sweeping onto the hip
         # shell above the fork (the same tube+joint-sweep idea as sleeves).
+        # A slant-pocket waist cut (Charlie) collapses the TOP profile rows
+        # to a corner point — wrapping that sliver around a 2 mm micro-tube
+        # is what crumpled the seat. Clamp the lookup to the first row with
+        # substantial width; the sliver rides the same tube as the row below.
         prof = piece["edgesProfile"]
+        _wmax = max(h - l for _, l, h in prof)
+        _y_valid = next((y0 for y0, l, h in prof if h - l >= 0.5 * _wmax), prof[0][0])
+        y_prof = max(y, _y_valid)
         lo, hi = prof[0][1], prof[0][2]
         for (y0, l0, h0), (y1, l1, h1) in zip(prof, prof[1:]):
-            if y <= y1:
-                t = (y - y0) / max(1e-6, y1 - y0)
+            if y_prof <= y1:
+                t = (y_prof - y0) / max(1e-6, y1 - y0)
                 lo, hi = l0 + (l1 - l0) * t, h0 + (h1 - h0) * t
                 break
         else:
