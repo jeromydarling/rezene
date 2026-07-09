@@ -897,6 +897,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         return np.percentile(s, 50), np.percentile(s, 95), np.abs(s).max()
 
     print("fit relax pre :", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x))
+    if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+        _L = np.linalg.norm(x[ei] - x[ej], axis=1)
+        _s = (_L - L0) / L0
+        for k in np.argsort(_s)[-6:]:
+            a3, b3 = ei[k], ej[k]
+            pc = next(nm for nm, of in sorted(offsets.items(), key=lambda t: -t[1]) if of <= a3)
+            print(
+                f"  worst edge {a3}-{b3} piece={pc} rest={L0[k]*1000:.2f}mm cur={_L[k]*1000:.1f}mm "
+                f"flat_a=({all_flat[a3][0]:.1f},{all_flat[a3][1]:.1f}) flat_b=({all_flat[b3][0]:.1f},{all_flat[b3][1]:.1f})"
+            )
     for it in range(400):
         if it % 10 == 0:
             q, nrm, _ = contact_planes(x)
