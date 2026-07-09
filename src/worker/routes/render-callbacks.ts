@@ -280,12 +280,30 @@ renderCallbackRoutes.post("/drape/:shopId/:jobId/complete", async (c) => {
     `${jobId}-drape.png`,
     jobId,
   );
+  // Optional second render: the strain fit map (green = comfortable,
+  // red = tight vs the flat pattern). Older workflow runs won't send it.
+  let fitFileId: string | null = null;
+  const fit = form.fit as unknown as File | undefined;
+  if (fit && typeof fit.arrayBuffer === "function") {
+    const fitKey = `${shopId}/drape/${jobId}-fit.png`;
+    await c.env.FILES.put(fitKey, await fit.arrayBuffer(), { httpMetadata: { contentType: "image/png" } });
+    fitFileId = newId("file");
+    await run(
+      db(c.env, shopId),
+      `INSERT INTO files (id, r2_key, filename, content_type, entity_type, entity_id, is_public, uploaded_by)
+       VALUES (?, ?, ?, 'image/png', 'general', ?, 1, NULL)`,
+      fitFileId,
+      fitKey,
+      `${jobId}-fit.png`,
+      jobId,
+    );
+  }
   await c.env.KV.put(
     kvKey,
-    JSON.stringify({ ...(JSON.parse(existing) as object), status: "done", fileId }),
+    JSON.stringify({ ...(JSON.parse(existing) as object), status: "done", fileId, fitFileId }),
     { expirationTtl: DRAPE_TTL },
   );
-  return c.json({ ok: true, fileId });
+  return c.json({ ok: true, fileId, fitFileId });
 });
 
 renderCallbackRoutes.post("/drape/:shopId/:jobId/fail", async (c) => {

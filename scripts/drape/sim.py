@@ -382,6 +382,7 @@ def place(piece, x, y):
 
 # ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
 all_verts = []
+all_flat = []
 all_faces = []
 offsets = {}
 boundary_index = {}  # piece -> list of global indices for its ORIGINAL boundary points
@@ -425,6 +426,9 @@ for piece in DATA["pieces"]:
         return best
     boundary_index[piece["name"]] = [off + find(x, y) for x, y in boundary2d]
     for v in bm.verts:
+        # Flat pattern coordinates are the cloth's TRUE rest state (the cut
+        # pieces) — kept per vertex so the fit map can measure real strain.
+        all_flat.append((v.co.x, v.co.y))
         all_verts.append(place(piece, v.co.x, v.co.y))
     for f in bm.faces:
         all_faces.append(tuple(off + v.index for v in f.verts))
@@ -779,3 +783,61 @@ if FRAMES > 0:
 scene.render.filepath = OUT_PNG
 bpy.ops.render.render(write_still=True)
 print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(sew_edges)}, pins {len(pin_indices)})")
+
+# ---- Fit map: strain vs the FLAT pattern, industry green→red convention -------
+# Real strain is measured against the cut pieces (the pattern), not the
+# assembled start pose: every mesh edge's simulated length is compared to its
+# flat length. Tight zones ramp green → yellow → red (the same reading a
+# fitter takes from drag lines on a toile); pooling slack shows pale blue.
+if FRAMES > 0:
+    deps = bpy.context.evaluated_depsgraph_get()
+    me = obj.evaluated_get(deps).to_mesh()
+    n = len(me.vertices)
+    ssum = [0.0] * n
+    scnt = [0] * n
+    for e in me.edges:
+        a, b = e.vertices
+        fa, fb = all_flat[a], all_flat[b]
+        rest = math.hypot(fa[0] - fb[0], fa[1] - fb[1]) * S
+        if rest < 1e-9:
+            continue
+        cur = (me.vertices[a].co - me.vertices[b].co).length
+        s = (cur - rest) / rest
+        ssum[a] += s
+        scnt[a] += 1
+        ssum[b] += s
+        scnt[b] += 1
+
+    def strain_color(s):
+        stops = [(-0.08, (0.45, 0.62, 0.85)), (0.0, (0.30, 0.65, 0.34)),
+                 (0.05, (0.92, 0.85, 0.25)), (0.13, (0.85, 0.13, 0.10))]
+        if s <= stops[0][0]:
+            return stops[0][1]
+        for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
+            if s <= s1:
+                t = (s - s0) / (s1 - s0)
+                return tuple(a + (b - a) * t for a, b in zip(c0, c1))
+        return stops[-1][1]
+
+    attr = obj.data.color_attributes.new("strain_col", "FLOAT_COLOR", "POINT")
+    for i in range(n):
+        s = ssum[i] / scnt[i] if scnt[i] else 0.0
+        r, g, b = strain_color(s)
+        attr.data[i].color = (r, g, b, 1.0)
+
+    fit_mat = bpy.data.materials.new("fit_map")
+    fit_mat.use_nodes = True
+    fnodes = fit_mat.node_tree.nodes
+    flinks = fit_mat.node_tree.links
+    fb = fnodes["Principled BSDF"]
+    ca = fnodes.new("ShaderNodeVertexColor")
+    ca.layer_name = "strain_col"
+    flinks.new(ca.outputs["Color"], fb.inputs["Base Color"])
+    fb.inputs["Roughness"].default_value = 1.0
+    obj.data.materials.clear()
+    obj.data.materials.append(fit_mat)
+    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.55
+    FIT_PNG = OUT_PNG.replace(".png", "-fit.png")
+    scene.render.filepath = FIT_PNG
+    bpy.ops.render.render(write_still=True)
+    print(f"fit map written: {FIT_PNG}")
