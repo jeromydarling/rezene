@@ -598,7 +598,7 @@ def build_body():
     return o
 
 
-build_body()
+BODY_OBJ = build_body()
 
 
 def build_fit_tape():
@@ -784,58 +784,162 @@ scene.render.filepath = OUT_PNG
 bpy.ops.render.render(write_still=True)
 print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(sew_edges)}, pins {len(pin_indices)})")
 
-# ---- Fit map: strain vs the FLAT pattern, industry green→red convention -------
-# Real strain is measured against the cut pieces (the pattern), not the
-# assembled start pose: every mesh edge's simulated length is compared to its
-# flat length. Tight zones ramp green → yellow → red (the same reading a
-# fitter takes from drag lines on a toile); pooling slack shows pale blue.
-# PARKED behind DRAPE_FITMAP=1: the measurement is not yet honest. After
-# excluding pins, vertical gravity stretch, and smoothing distortion, the
-# remaining "strain" is dominated by assembly tension — the sewing springs
-# that close the panel gaps leave real horizontal tension that has nothing
-# to do with fit. A truthful map needs welded seams or a long relaxation
-# phase (R&D). The delivery plumbing (workflow upload, callback, fitUrl,
-# studio toggle) ships dormant and activates the moment this writes a file.
+# ---- Fit map: welded-seam relaxation + true girth strain vs the FLAT pattern --
+# How the professional tools earn a trustworthy strain map (CLO/MD, Style3D,
+# GarmentCodeData): seams carry NO force at equilibrium — they are welded
+# topology or satisfied zero-rest-length constraints — and strain is measured
+# per triangle against the 2D pattern, resolved along warp/weft. Blender's
+# sewing springs stay tensioned forever, so we do what the industry does in
+# a small numpy post-pass: weld the seam vertex pairs, relax edge lengths
+# toward their flat-pattern rest (averaged-Jacobi PBD), keep the cloth
+# outside the mannequin with sliding one-sided contact planes, then measure
+# the right Cauchy-Green tensor per triangle. Tightness = girth stretch
+# (lambda_weft - 1), clamped at zero: compression is slack, not fit. The
+# fit classification is shown only where the garment touches the form —
+# free-hanging cloth has no "fit" (CLO does the same).
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
-    # Measure the RAW cloth result: the cosmetic smooth pass distorts edge
-    # lengths by a few percent exactly where curvature is high, which reads
-    # as phantom strain across every wrinkled zone.
+    import numpy as np
+    from mathutils.bvhtree import BVHTree
+
+    # Raw cloth result (pre-smooth: the cosmetic pass distorts edge lengths
+    # in wrinkled zones).
     sm.show_viewport = False
     sm.show_render = False
     bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     me = obj.evaluated_get(deps).to_mesh()
-    n = len(me.vertices)
-    ssum = [0.0] * n
-    scnt = [0] * n
-    for e in me.edges:
-        a, b = e.vertices
-        # Pinned verts are frozen at their PLACED positions — any spacing
-        # artifact from the initial wrap reads as permanent fake strain, so
-        # pinned regions are excluded from the measurement entirely.
-        if a in pin_indices or b in pin_indices:
-            continue
-        fa, fb = all_flat[a], all_flat[b]
-        dx, dy = fa[0] - fb[0], fa[1] - fb[1]
-        # Tightness is GIRTH strain: only edges running mostly horizontally
-        # in the flat pattern count. Vertical edges stretch under plain
-        # gravity in any hanging cloth — that's weight, not fit.
-        if abs(dx) < abs(dy):
-            continue
-        rest = math.hypot(dx, dy) * S
-        if rest < 1e-9:
-            continue
-        cur = (me.vertices[a].co - me.vertices[b].co).length
-        s = (cur - rest) / rest
-        ssum[a] += s
-        scnt[a] += 1
-        ssum[b] += s
-        scnt[b] += 1
+    nv = len(me.vertices)
+    x = np.array([v.co[:] for v in me.vertices], dtype=np.float64)
+    flat = np.array(all_flat, dtype=np.float64) * S  # mm -> metres
+    edges = np.array([e.vertices[:] for e in me.edges], dtype=np.int64)
+    tris = np.array(all_faces, dtype=np.int64)
+    invw = np.ones(nv)
+    invw[list(pin_indices)] = 0.0
 
-    def strain_color(s):
-        stops = [(-0.05, (0.45, 0.62, 0.85)), (0.0, (0.30, 0.65, 0.34)),
-                 (0.035, (0.92, 0.85, 0.25)), (0.09, (0.85, 0.13, 0.10))]
-        if s <= stops[0][0]:
+    # Weld seams: union-find over the sew pairs -> shared representatives.
+    # Mesh edges never cross panels, so every edge keeps a valid rest length
+    # from its own piece's flat coordinates.
+    parent = np.arange(nv)
+
+    def _find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for va, vb in sew_edges:
+        ra, rb = _find(va), _find(vb)
+        if ra != rb:
+            parent[rb] = ra
+    remap = np.array([_find(i) for i in range(nv)])
+    # Welded representative takes the mean position; pins dominate (a welded
+    # pair with one pinned side stays pinned).
+    accp = np.zeros((nv, 3))
+    accn = np.zeros(nv)
+    np.add.at(accp, remap, x)
+    np.add.at(accn, remap, 1.0)
+    x = np.where(accn[:, None] > 0, accp / np.maximum(accn, 1)[:, None], x)
+    pinned_mask = np.zeros(nv, dtype=bool)
+    pinned_mask[list(pin_indices)] = True
+    welded_pin = np.zeros(nv, dtype=bool)
+    np.logical_or.at(welded_pin, remap, pinned_mask)
+    invw = np.where(welded_pin, 0.0, 1.0)
+
+    ei = remap[edges[:, 0]]
+    ej = remap[edges[:, 1]]
+    keep = ei != ej
+    ei, ej = ei[keep], ej[keep]
+    L0 = np.linalg.norm(flat[edges[keep, 0]] - flat[edges[keep, 1]], axis=1)
+    ok = L0 > 1e-9
+    ei, ej, L0 = ei[ok], ej[ok], L0[ok]
+    x_drape = x.copy()
+
+    # Mannequin BVH for sliding contact planes (vertices may slide along the
+    # form but not through it — freezing them would corrupt the strain field
+    # exactly in the tight zones being graded).
+    bm_body = BODY_OBJ.data
+    bvh = BVHTree.FromPolygons(
+        [v.co[:] for v in bm_body.vertices],
+        [tuple(p.vertices) for p in bm_body.polygons],
+    )
+    OFFSET = 0.003
+
+    def contact_planes(pos):
+        q = np.zeros((nv, 3))
+        nrm = np.zeros((nv, 3))
+        dist = np.full(nv, 1e9)
+        for i in range(nv):
+            hit = bvh.find_nearest(pos[i].tolist())
+            if hit[0] is not None:
+                q[i] = hit[0][:]
+                nrm[i] = hit[1][:]
+                dist[i] = hit[3]
+        return q, nrm, dist
+
+    # Averaged-Jacobi PBD relaxation toward the flat rest lengths (Macklin
+    # et al. 2014 constraint averaging + SOR), with a weak tether to the
+    # baked drape that fixes the sliding null-space like friction would.
+    OMEGA = 1.5
+    TETHER = 1e-3
+    for it in range(400):
+        if it % 10 == 0:
+            q, nrm, _ = contact_planes(x)
+        d = x[ei] - x[ej]
+        L = np.linalg.norm(d, axis=1) + 1e-12
+        wsum = invw[ei] + invw[ej] + 1e-12
+        corr = (L - L0) / wsum
+        dvec = d / L[:, None] * corr[:, None]
+        dx = np.zeros_like(x)
+        cnt = np.zeros(nv)
+        np.add.at(dx, ei, -invw[ei, None] * dvec)
+        np.add.at(dx, ej, invw[ej, None] * dvec)
+        np.add.at(cnt, ei, 1.0)
+        np.add.at(cnt, ej, 1.0)
+        x += OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
+        x += TETHER * (x_drape - x) * invw[:, None]
+        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+        x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
+
+    # Per-triangle right Cauchy-Green from the 2D->3D deformation gradient:
+    # C = F^T F with F = Ds Dm^-1; lambda_weft = sqrt(C00) is the girth
+    # stretch (pattern x IS the girth axis in every block we emit).
+    t0, t1, t2 = remap[tris[:, 0]], remap[tris[:, 1]], remap[tris[:, 2]]
+    u0, u1, u2 = flat[tris[:, 0]], flat[tris[:, 1]], flat[tris[:, 2]]
+    Dm = np.stack([u1 - u0, u2 - u0], axis=2)  # (T,2,2)
+    detDm = Dm[:, 0, 0] * Dm[:, 1, 1] - Dm[:, 0, 1] * Dm[:, 1, 0]
+    good = np.abs(detDm) > 1e-12
+    Dm_inv = np.zeros_like(Dm)
+    Dm_inv[good, 0, 0] = Dm[good, 1, 1] / detDm[good]
+    Dm_inv[good, 0, 1] = -Dm[good, 0, 1] / detDm[good]
+    Dm_inv[good, 1, 0] = -Dm[good, 1, 0] / detDm[good]
+    Dm_inv[good, 1, 1] = Dm[good, 0, 0] / detDm[good]
+    Ds = np.stack([x[t1] - x[t0], x[t2] - x[t0]], axis=2)  # (T,3,2)
+    F = Ds @ Dm_inv
+    C = np.einsum("tik,til->tkl", F, F)
+    lam_weft = np.sqrt(np.maximum(C[:, 0, 0], 0.0))
+    tight_tri = np.where(good, lam_weft - 1.0, 0.0)
+    areaT = np.abs(detDm) * 0.5
+
+    tight_v = np.zeros(nv)
+    area_v = np.zeros(nv)
+    for k in range(3):
+        vv = remap[tris[:, k]]
+        np.add.at(tight_v, vv, tight_tri * areaT)
+        np.add.at(area_v, vv, areaT)
+    tight = np.where(area_v > 0, tight_v / np.maximum(area_v, 1e-12), 0.0)
+
+    # Fit exists only where the garment meets the body (CLO computes its fit
+    # map the same way); free-hanging cloth shows neutral.
+    _, _, dist = contact_planes(x)
+    in_contact = dist < 0.012
+
+    def strain_color(s, contact):
+        if not contact:
+            return (0.62, 0.66, 0.62)  # free-hanging: neutral, no "fit" there
+        if s < -0.02:
+            return (0.45, 0.62, 0.85)  # slack pooling against the body
+        stops = [(0.0, (0.30, 0.65, 0.34)), (0.02, (0.92, 0.85, 0.25)), (0.05, (0.85, 0.13, 0.10))]
+        if s <= 0.0:
             return stops[0][1]
         for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
             if s <= s1:
@@ -844,14 +948,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         return stops[-1][1]
 
     attr = obj.data.color_attributes.new("strain_col", "FLOAT_COLOR", "POINT")
-    for i in range(n):
-        if scnt[i]:
-            r, g, b = strain_color(ssum[i] / scnt[i])
-        else:
-            r, g, b = (0.72, 0.72, 0.72)  # unmeasured (pinned/edge) — neutral
+    for i in range(nv):
+        r_i = remap[i]
+        r, g, b = strain_color(tight[r_i], bool(in_contact[r_i]))
         attr.data[i].color = (r, g, b, 1.0)
     sm.show_viewport = True
     sm.show_render = True
+    print(
+        f"fit relax: girth strain p50={np.percentile(tight[in_contact], 50) if in_contact.any() else 0:+.3f} "
+        f"p95={np.percentile(tight[in_contact], 95) if in_contact.any() else 0:+.3f} contact {int(in_contact.sum())}/{nv}"
+    )
 
     fit_mat = bpy.data.materials.new("fit_map")
     fit_mat.use_nodes = True
