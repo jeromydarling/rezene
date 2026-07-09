@@ -879,8 +879,15 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # Averaged-Jacobi PBD relaxation toward the flat rest lengths (Macklin
     # et al. 2014 constraint averaging + SOR), with a weak tether to the
     # baked drape that fixes the sliding null-space like friction would.
-    OMEGA = 1.5
+    OMEGA = float(_os.environ.get("DRAPE_FIT_OMEGA", "1.0"))
     TETHER = 1e-3
+
+    def _edge_strain_stats(pos):
+        L = np.linalg.norm(pos[ei] - pos[ej], axis=1)
+        s = (L - L0) / L0
+        return np.percentile(s, 50), np.percentile(s, 95), np.abs(s).max()
+
+    print("fit relax pre :", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x))
     for it in range(400):
         if it % 10 == 0:
             q, nrm, _ = contact_planes(x)
@@ -899,6 +906,8 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         x += TETHER * (x_drape - x) * invw[:, None]
         pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
         x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
+    print("fit relax post:", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x),
+          "maxdisp=%.4f" % np.abs(x - x_drape).max())
 
     # Per-triangle right Cauchy-Green from the 2D->3D deformation gradient:
     # C = F^T F with F = Ds Dm^-1; lambda_weft = sqrt(C00) is the girth
