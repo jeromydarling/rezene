@@ -16,6 +16,8 @@
  *   hugo (Hugo raglan)    raglan seams to the neckline; hood not simulated
  *   simon / simone        button-downs: two front panels pinned shut at the
  *                         buttons, back + yoke; collar not simulated
+ *   huey (zip hoodie)     two front halves pinned at the CF zip; hood and
+ *                         ribbed waistband not simulated
  *   slip-dress (Sophie)   bias slip, top edge pinned; straps not simulated
  *   wahid (waistcoat)     buttoned CF, waist darts sewn shut, sleeveless
  *   wide-trouser (Titan)  leg tubes + hip sweep on the lower-body mannequin
@@ -39,6 +41,10 @@ const BLOCKS = {
     design: "Teagan",
     parts: { front: "teagan.front", back: "teagan.back", sleeve: "teagan.sleeve" },
     sleeveAnchors: { hemL: "hemLeft", hemR: "hemRight" },
+    // At its true (longer) default length the tee's chest contact tunnels
+    // through the standard 3 mm collision shell; its short loose sleeves
+    // tolerate the thicker shell that long snug tubes can't.
+    sim: { shellMm: 6 },
   },
   aaron: {
     module: "@freesewing/aaron",
@@ -102,6 +108,21 @@ const BLOCKS = {
     cuffed: true,
     sim: { sewForce: 4 },
   },
+  huey: {
+    module: "@freesewing/huey",
+    design: "Huey",
+    // Zip-up hoodie: two mirrored front halves whose CF zip edges are pinned
+    // shut (a zip tape is rigid, unlike buttons), cut-on-fold back, set-in
+    // sleeves with ribbed cuffs. Hood and ribbed waistband are described,
+    // not simulated — the body hem is the ribbing attachment line.
+    zipFront: true,
+    parts: { front: "huey.front", back: "huey.back", sleeve: "huey.sleeve" },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    cuffed: true,
+    // The side seams pull each front half outward; the zip springs need the
+    // same firmer stitch as the button-downs to hold CF fully shut.
+    sim: { sewForce: 4 },
+  },
   "slip-dress": {
     module: "@freesewing/sophie",
     design: "Sophie",
@@ -110,6 +131,7 @@ const BLOCKS = {
     dressPanels: true,
     parts: { front: "sophie.frontPanel", back: "sophie.backPanel" },
     yOffset: 350, // pattern y=0 sits ~mid-torso; +350 = body coords (HPS=0)
+    sim: { shellMm: 6 }, // long heavy panels tunnel a 3 mm shell (no sleeves to harm)
   },
   wahid: {
     module: "@freesewing/wahid",
@@ -162,6 +184,10 @@ const BLOCKS = {
     parts: { skirt: "sandy.skirt" },
     yOffset: 460,
     bodyKind: "lowerColumn",
+    // NOTE: bending 2.0 was tried to match the ~7-9 broad folds a real
+    // mid-weight circle skirt falls into (Cusick drapemeter data) — it froze
+    // the fine flutes into knife pleats instead of merging them. Fold count
+    // is set by mesh density, not stiffness; the prompt clause carries it.
   },
   charlie: {
     module: "@freesewing/charlie",
@@ -172,6 +198,9 @@ const BLOCKS = {
     trousers: true,
     parts: { front: "charlie.front", back: "charlie.back" },
     frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
+    // NOTE: riseTopPin was tried here (0.35) and made things WORSE — pinning
+    // the rise top destabilised the whole garment. The seat recipe is still
+    // open; charlie stays off the drape whitelist meanwhile.
     yOffset: 460,
     bodyKind: "lower",
   },
@@ -592,6 +621,23 @@ function waistcoatBack() {
   ]);
 }
 
+/** Zip-front half (Huey): one drafted half-front, cut twice. The CF zip edge
+ *  is pinned shut continuously — zip tape holds rigid, unlike buttons. */
+function zipFrontHalf(pieceName, mirrored) {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  return buildPiece(pieceName, [
+    ["side", seg(slice(poly, P.hem, P.armhole))],
+    ["armscye", seg(slice(poly, P.armhole, P.shoulder))],
+    ["shoulder", seg(slice(poly, P.shoulder, P.neck))],
+    ["neck", seg(slice(poly, P.neck, P.cfNeck))],
+    ["zip", seg(slice(poly, P.cfNeck, P.cfHem))],
+    ["hem", seg(slice(poly, P.cfHem, P.hem))],
+  ]);
+}
+
 /** Slice that always takes the SHORT way between two anchors, regardless of
  *  the part's path direction (Titan's back walks opposite to its front). */
 function sliceShort(poly, a, b) {
@@ -625,11 +671,18 @@ function trouserPanel(partName, pieceName, mirrored) {
   const waistPts = cut
     ? [...sliceShort(poly, P.styleWaistIn, P[cut.top]), ...line(P[cut.top], P.styleWaistOut)]
     : sliceShort(poly, P.styleWaistIn, P.styleWaistOut);
+  // Optionally pin the top of the rise (waistband grip continues down the
+  // CF/CB seam): blocks with a deep back rise (chinos) crumple at the seat
+  // when the whole rise must find its place by springs alone.
+  const risePin = Number(cfg.riseTopPin) || 0;
+  const crotchFull = sliceShort(poly, P.fork, P.styleWaistIn);
+  const [crotchPts, riseTopPts] = risePin ? splitAt(crotchFull, 1 - risePin) : [crotchFull, null];
   const piece = buildPiece(pieceName, [
     ["outseam", seg(outseamPts)],
     ["hem", seg(sliceShort(poly, P.floorOut, P.floorIn))],
     ["inseam", seg(sliceShort(poly, P.floorIn, P.fork))],
-    ["crotch", seg(sliceShort(poly, P.fork, P.styleWaistIn))],
+    ["crotch", seg(crotchPts)],
+    ...(riseTopPts ? [["riseTop", seg(riseTopPts)]] : []),
     ["waist", seg(waistPts)],
   ]);
   const BIN = 50;
@@ -886,6 +939,19 @@ if (cfg.trousers) {
   frontL.pinStride = 4;
   frontR.pinStride = 4;
   bodyPieces = [frontL, frontR, back];
+} else if (cfg.zipFront) {
+  // The drafted half's body extends to +x (wearer's left panel). Zip edges
+  // butt rather than overlap, so no outset on either panel.
+  const frontL = zipFrontHalf("frontL", false);
+  const frontR = zipFrontHalf("frontR", true);
+  const back = bodyPiece(cfg.parts.back, "back");
+  frontL.placement = { kind: "plane", y: -160 };
+  frontR.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  // The zip is SEWN (springs), not pinned: both edges place coincident at
+  // CF, and pinning two coincident cloth layers makes self-collision fight
+  // the pins into a dark trench down the front.
+  bodyPieces = [frontL, frontR, back];
 } else if (cfg.buttonFront) {
   // Wearer's left panel (frontLeft, body on +x) carries the button stand and
   // lies on top; it gets a small outward offset so the closed placket layers
@@ -965,6 +1031,13 @@ const seams = cfg.trousers
       { name: "inseam_L", a: ["frontL", "inseam"], b: ["backL", "inseam"] },
       { name: "crotch_front", a: ["frontR", "crotch"], b: ["frontL", "crotch"] },
       { name: "crotch_back", a: ["backR", "crotch"], b: ["backL", "crotch"] },
+      // Deep-rise blocks pin the top of the rise like the waistband holds it.
+      ...(cfg.riseTopPin
+        ? [
+            { name: "rise_front", a: ["frontR", "riseTop"], b: ["frontL", "riseTop"], pin: true },
+            { name: "rise_back", a: ["backR", "riseTop"], b: ["backL", "riseTop"], pin: true },
+          ]
+        : []),
     ]
   : cfg.skirt
   ? [
@@ -1011,6 +1084,21 @@ const seams = cfg.trousers
       { name: "dartF_L", a: ["frontR", "dartL"], b: ["frontR", "dartR"] },
       { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
       { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
+    ]
+  : cfg.zipFront
+  ? [
+      // Hangs from pinned shoulders + necklines; the CF zip is sewn shut.
+      { name: "zip", a: ["frontL", "zip"], b: ["frontR", "zip"] },
+      { name: "shoulder_R", a: ["frontL", "shoulder"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["frontR", "shoulder"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R", a: ["frontL", "side"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["frontR", "side"], b: ["back", "sideL"] },
+      { name: "armscye_R_front", a: ["frontL", "armscye"], b: ["sleeve_R", "capFront"] },
+      { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
+      { name: "armscye_L_front", a: ["frontR", "armscye"], b: ["sleeve_L", "capFront"] },
+      { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
+      { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
+      { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
     ]
   : cfg.buttonFront
   ? [

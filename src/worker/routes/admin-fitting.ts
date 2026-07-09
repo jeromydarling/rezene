@@ -508,8 +508,9 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
       ? ""
       : body.referenceRole === "drape"
         ? ", matching EXACTLY the garment in the reference image — the reference is a 3D cloth simulation of " +
-          "THIS garment draped on a dark charcoal mannequin: the LIGHT PALE fabric is the garment, the dark " +
-          "form underneath is the mannequin's body and is NOT clothing. Copy the light garment's proportions " +
+          "THIS garment draped on a dark charcoal mannequin: the LIGHT PALE muslin-toned fabric is the garment, the dark " +
+          "form underneath is the mannequin's body and is NOT clothing; any thin black horizontal rings on the " +
+          "mannequin are the dress form's fitting tape, never a belt, strap or trim. Copy the light garment's proportions " +
           "precisely — the hem ends exactly where the pale cloth ends on the torso, each sleeve ends exactly " +
           "where the pale cloth ends on the arm, and the width and ease match the pale cloth. Render it as " +
           "real sewn fabric on a real person: the pale colour, faceted surface and any small gaps at the " +
@@ -1053,7 +1054,7 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
   const DRAPE_BLOCKS = new Set([
     "classic-tee", "aaron", "relaxed-hoodie", "hugo", "simon", "simone",
     "slip-dress", "wahid", "wide-trouser", "pleated-skirt",
-    "paco", "sandy", "bella",
+    "paco", "sandy", "bella", "huey",
   ]);
   const clamp = (v: unknown, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));

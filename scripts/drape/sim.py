@@ -571,8 +571,14 @@ def build_body():
     o = bpy.data.objects.new("body", m)
     bpy.context.collection.objects.link(o)
     col = o.modifiers.new("collision", "COLLISION")
-    col.settings.thickness_outer = 0.003
-    col.settings.thickness_inner = 0.002
+    # Shell thickness is a PER-BLOCK hint: heavy long drafts with tight chest
+    # contact (the tee at its true length) tunnel through a 3 mm shell and
+    # trap verts inside — they need 6 mm. But a fat shell also fattens the
+    # arms, and snug long-sleeve tubes (hugo, sven) ruche and tear on it, so
+    # thick can't be the default.
+    _shell = float(DATA.get("sim", {}).get("shellMm", 3.0)) / 1000.0
+    col.settings.thickness_outer = _shell
+    col.settings.thickness_inner = _shell * 2 / 3
     # The body stays in the render as a darker matte dress form: it gives the
     # reference anatomical context and hides the armscye seam gaps.
     for poly in m.polygons:
@@ -589,6 +595,62 @@ def build_body():
 
 
 build_body()
+
+
+def build_fit_tape():
+    """Thin near-black rings at the classic dress-form landmark lines (bust /
+    waist / hip). Real forms carry style tape there, and it's what the
+    industry-standard fit mannequins (AlvaForm) show — the horizontal
+    reference grid a fitter judges hem levelness and balance against. Built
+    as a separate non-colliding object so the cloth ignores it."""
+    def ab_at(by):
+        if by <= TORSO[0][0]:
+            return None
+        for (y0, a0, b0), (y1, a1, b1) in zip(TORSO, TORSO[1:]):
+            if by <= y1:
+                t = (by - y0) / (y1 - y0)
+                return a0 + (a1 - a0) * t, b0 + (b1 - b0) * t
+        return None
+
+    marks = [270.0, 460.0] if BODY_KIND == "upper" else [460.0, 575.0]
+    verts, faces = [], []
+    N = 48
+    for by in marks:
+        if by < TORSO[0][0] + 15 or by > _HEM_BY - 15:
+            continue
+        ab = ab_at(by)
+        if not ab:
+            continue
+        a, b = ab[0] + 1.5, ab[1] + 1.5
+        rows = []
+        for dz in (-3.0, 3.0):
+            start = len(verts)
+            for i in range(N):
+                t = 2 * math.pi * i / N
+                verts.append((a * math.cos(t) * S, b * math.sin(t) * S, z_of_body(by + dz)))
+            rows.append(start)
+        r0, r1 = rows
+        for i in range(N):
+            j = (i + 1) % N
+            faces.append((r0 + i, r0 + j, r1 + j, r1 + i))
+    if not verts:
+        return
+    m = bpy.data.meshes.new("fit_tape")
+    m.from_pydata(verts, [], faces)
+    m.update()
+    for poly in m.polygons:
+        poly.use_smooth = True
+    mat_t = bpy.data.materials.new("tape_black")
+    mat_t.use_nodes = True
+    nt = mat_t.node_tree.nodes["Principled BSDF"]
+    nt.inputs["Base Color"].default_value = (0.03, 0.03, 0.03, 1.0)
+    nt.inputs["Roughness"].default_value = 0.9
+    m.materials.append(mat_t)
+    o = bpy.data.objects.new("fit_tape", m)
+    bpy.context.collection.objects.link(o)
+
+
+build_fit_tape()
 
 # ---- Assemble the object ------------------------------------------------------
 mesh = bpy.data.meshes.new("garment")
@@ -610,7 +672,11 @@ st.air_damping = 2.0
 st.tension_stiffness = 40
 st.compression_stiffness = 40
 st.shear_stiffness = 20
-st.bending_stiffness = 1.0
+# Bending resists the fine accordion folds that read as "rings" on sleeves
+# and legs — per-block hint. Tested: 3.0 on the raglan hoodie traded rings
+# for tented shoulders and gaping side seams, so no block uses this yet; the
+# ring artifacts stay quarantined by the prompt clause instead.
+st.bending_stiffness = float(DATA.get("sim", {}).get("bending", 1.0))
 st.vertex_group_mass = "pin"
 for name in ("use_sewing_springs", "use_sewing"):
     if hasattr(st, name):
@@ -619,6 +685,9 @@ if hasattr(st, "sewing_force_max"):
     # The garment starts nearly assembled — gentle stitching only. Strong
     # sewing forces whip the light cloth into permanent crumples. Darted
     # blocks ask for more via the sim hint (darts fight the side seams).
+    # (Sew-force ramps were tried against shell tunneling — 25 frames starved
+    # seam closure, 8 frames didn't stop the tunneling. The per-block shell
+    # thickness below is the actual cure; constant force stays.)
     st.sewing_force_max = float(DATA.get("sim", {}).get("sewForce", 2))
 try:
     mod.collision_settings.distance_min = 0.003
@@ -657,7 +726,10 @@ scene.cycles.samples = 96
 mat = bpy.data.materials.new("cloth_grey")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
-bsdf.inputs["Base Color"].default_value = (0.84, 0.84, 0.84, 1.0)
+# Warm unbleached-muslin ecru, not pure white: the real-world toile is
+# calico, and the warm cast is part of what makes a fitting prototype read
+# as cloth instead of CG.
+bsdf.inputs["Base Color"].default_value = (0.85, 0.81, 0.70, 1.0)
 bsdf.inputs["Roughness"].default_value = 0.9
 obj.data.materials.append(mat)
 world = bpy.data.worlds.new("w")
