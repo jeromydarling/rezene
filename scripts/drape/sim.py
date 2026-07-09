@@ -921,6 +921,17 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
                 f"  worst edge {a3}-{b3} piece={pc} rest={L0[k]*1000:.2f}mm cur={_L[k]*1000:.1f}mm "
                 f"flat_a=({all_flat[a3][0]:.1f},{all_flat[a3][1]:.1f}) flat_b=({all_flat[b3][0]:.1f},{all_flat[b3][1]:.1f})"
             )
+        _sizes = np.bincount(np.bincount(remap[remap != np.arange(nv)]) + 1) if (remap != np.arange(nv)).any() else []
+        _csz = np.bincount(remap)
+        _csz = _csz[_csz > 1]
+        print(f"  weld clusters: n={len(_csz)} max_size={_csz.max() if len(_csz) else 0} "
+              f">4: {(int((_csz > 4).sum()) if len(_csz) else 0)}")
+        _tail = _s > 0.5
+        if _tail.any():
+            _ys = np.concatenate([x[ei[_tail]][:, 2], x[ej[_tail]][:, 2]])
+            print(f"  strain>50% edges: {int(_tail.sum())} z-range {(np.percentile(_ys,5)):.3f}..{np.percentile(_ys,95):.3f} "
+                  f"(garment z 0..{x[:,2].max():.3f}); pinned-endpoint share "
+                  f"{float(((invw[ei[_tail]]==0)|(invw[ej[_tail]]==0)).mean()):.2f}")
     # Chebyshev semi-iterative acceleration (Wang, SIGGRAPH Asia 2015) wraps
     # the averaged-Jacobi sweep: unclosed seam gaps from the bake can be
     # tens of mm, and plain Jacobi transports closure ~one vertex ring per
