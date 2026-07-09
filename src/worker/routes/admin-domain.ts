@@ -45,14 +45,23 @@ adminDomainRoutes.put("/", requireAdminOnly, async (c) => {
     DOMAIN_KEY,
     clean,
   );
-  // Let the platform operator know so they can finish activation.
   if (clean) {
-    const brand = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = 'brand_name'`);
-    const { sendNotification } = await import("../services/email");
-    await sendNotification(c.env, {
-      subject: `Domain request: ${clean}`,
-      text: `${brand?.value ?? c.var.shopSlug ?? "A shop"} wants to connect ${clean}. Add it as a custom hostname and set the shop's custom_domain in the registry.`,
-    }).catch(() => {});
+    const { customHostnamesConfigured, ensureCustomHostname } = await import("../services/custom-hostnames");
+    if (customHostnamesConfigured(c.env)) {
+      // Fully automated: register the hostname now; Cloudflare validates it
+      // over the merchant's CNAME and issues the certificate on its own —
+      // the /check endpoint flips the registry the moment TLS is live.
+      const r = await ensureCustomHostname(c.env, clean).catch(() => null);
+      if (r && !r.ok) console.log(`custom hostname ${clean}: ${r.error}`);
+    } else {
+      // Manual fallback: let the platform operator know.
+      const brand = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = 'brand_name'`);
+      const { sendNotification } = await import("../services/email");
+      await sendNotification(c.env, {
+        subject: `Domain request: ${clean}`,
+        text: `${brand?.value ?? c.var.shopSlug ?? "A shop"} wants to connect ${clean}. Add it as a custom hostname and set the shop's custom_domain in the registry.`,
+      }).catch(() => {});
+    }
   }
   return c.json({ ok: true, domain: clean });
 });
@@ -75,7 +84,33 @@ adminDomainRoutes.get("/check", async (c) => {
       }),
     );
     const ok = lookups.some((l) => l.ok);
-    return c.json({ ok, target: want, lookups });
+    // Layer 2: is HTTPS actually live? DNS can point at us while the
+    // certificate for the merchant's hostname hasn't been issued yet —
+    // the browser shows a security error until it is. Probe it the way a
+    // browser would; with automation configured, also nudge Cloudflare and
+    // flip the registry the moment the certificate goes active.
+    let https = false;
+    if (ok) {
+      const { customHostnamesConfigured, ensureCustomHostname, customHostnameActive, activateShopDomain } =
+        await import("../services/custom-hostnames");
+      if (customHostnamesConfigured(c.env)) {
+        await ensureCustomHostname(c.env, domain).catch(() => null);
+        if (await customHostnameActive(c.env, domain).catch(() => false)) {
+          await activateShopDomain(c.env, c.var.shopId, domain).catch(() => {});
+        }
+      }
+      try {
+        const r = await fetch(`https://${domain}/`, {
+          method: "HEAD",
+          redirect: "manual",
+          signal: AbortSignal.timeout(6000),
+        });
+        https = r.status > 0;
+      } catch {
+        https = false;
+      }
+    }
+    return c.json({ ok, https, target: want, lookups });
   } catch {
     return c.json({ error: "Couldn't check DNS right now — try again in a moment." }, 502);
   }

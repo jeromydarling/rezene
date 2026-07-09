@@ -312,11 +312,18 @@ def place(piece, x, y):
     if pl["kind"] == "leg":
         # Trouser panel: half-tube around a leg stub, sweeping onto the hip
         # shell above the fork (the same tube+joint-sweep idea as sleeves).
+        # A slant-pocket waist cut (Charlie) collapses the TOP profile rows
+        # to a corner point — wrapping that sliver around a 2 mm micro-tube
+        # is what crumpled the seat. Clamp the lookup to the first row with
+        # substantial width; the sliver rides the same tube as the row below.
         prof = piece["edgesProfile"]
+        _wmax = max(h - l for _, l, h in prof)
+        _y_valid = next((y0 for y0, l, h in prof if h - l >= 0.5 * _wmax), prof[0][0])
+        y_prof = max(y, _y_valid)
         lo, hi = prof[0][1], prof[0][2]
         for (y0, l0, h0), (y1, l1, h1) in zip(prof, prof[1:]):
-            if y <= y1:
-                t = (y - y0) / max(1e-6, y1 - y0)
+            if y_prof <= y1:
+                t = (y_prof - y0) / max(1e-6, y1 - y0)
                 lo, hi = l0 + (l1 - l0) * t, h0 + (h1 - h0) * t
                 break
         else:
@@ -1221,14 +1228,20 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             print(f"    vert {i} piece={_pc(i)} flat=({all_flat[i][0]:.0f},{all_flat[i][1]:.0f}) "
                   f"z={x[remap[i]][2]:.3f} girth={tight[remap[i]]:+.2f}")
 
+    # Fabric-aware scale: CLO's strain map runs 100->120% (red at +20%). For
+    # WOVENS we go slightly stricter (snug from +5%, tight at +15% — a woven
+    # at +20% girth is a split seam). KNITS wear comfortably at +15-30%
+    # stretch, so the same strain grades three times more forgivingly.
+    _fab = DATA.get("fabric", "woven")
+    _snug, _tight = (0.15, 0.35) if _fab == "knit" else (0.05, 0.15)
+    print(f"fit scale: {_fab} (snug {_snug:+.0%}, tight {_tight:+.0%})")
+
     def strain_color(s, contact):
         if not contact:
             return (0.62, 0.66, 0.62)  # free-hanging: neutral, no "fit" there
         if s < -0.02:
             return (0.45, 0.62, 0.85)  # slack pooling against the body
-        # CLO's strain map runs 100->120% (red at +20%); we go red at +15%,
-        # slightly stricter, with yellow ("snug") from +5%.
-        stops = [(0.0, (0.30, 0.65, 0.34)), (0.05, (0.92, 0.85, 0.25)), (0.15, (0.85, 0.13, 0.10))]
+        stops = [(0.0, (0.30, 0.65, 0.34)), (_snug, (0.92, 0.85, 0.25)), (_tight, (0.85, 0.13, 0.10))]
         if s <= 0.0:
             return stops[0][1]
         for (s0, c0), (s1, c1) in zip(stops, stops[1:]):

@@ -73,6 +73,15 @@ export interface Env {
   PERPLEXITY_DAILY_LIMIT?: string;
   /** Shared secret the render worker (GitHub Action) presents on callbacks. */
   RENDER_CALLBACK_SECRET?: string;
+  /**
+   * Cloudflare for SaaS: API token (Zone > SSL and Certificates > Edit +
+   * Custom Hostnames > Edit on the platform zone) + the zone id. Present →
+   * merchant custom domains activate fully automatically (hostname
+   * registered, certificate issued, registry flipped). Absent → the manual
+   * HQ-notification flow.
+   */
+  CF_API_TOKEN?: string;
+  CF_ZONE_ID?: string;
   /** GitHub token (repo scope) used to trigger the render workflow. */
   GITHUB_DISPATCH_TOKEN?: string;
   /**

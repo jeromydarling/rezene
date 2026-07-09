@@ -71,7 +71,7 @@ export function DomainPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [check, setCheck] = useState<{ ok: boolean } | null>(null);
+  const [check, setCheck] = useState<{ ok: boolean; https?: boolean } | null>(null);
   const [openReg, setOpenReg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -100,7 +100,9 @@ export function DomainPage() {
     setCheck(null);
     setError(null);
     try {
-      const res = await api.get<{ ok: boolean }>(`/api/admin/domain/check?domain=${encodeURIComponent(domain)}`);
+      const res = await api.get<{ ok: boolean; https?: boolean }>(
+        `/api/admin/domain/check?domain=${encodeURIComponent(domain)}`,
+      );
       setCheck(res);
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : "Couldn't check DNS");
@@ -202,13 +204,27 @@ export function DomainPage() {
           {checking ? "Checking…" : "Check connection"}
         </button>
         {check && (
-          <div className={`mt-3 rounded-md p-3 text-sm ${check.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>
-            {check.ok ? (
+          <div
+            className={`mt-3 rounded-md p-3 text-sm ${
+              check.ok && check.https
+                ? "bg-emerald-50 text-emerald-900"
+                : check.ok
+                ? "bg-sky-50 text-sky-900"
+                : "bg-amber-50 text-amber-900"
+            }`}
+          >
+            {check.ok && check.https ? (
               <>
-                <p className="font-medium">Pointing at Verto ✓</p>
+                <p className="font-medium">Fully live ✓</p>
+                <p className="mt-1 text-xs">DNS points here and the secure certificate is active — your domain is serving your store.</p>
+              </>
+            ) : check.ok ? (
+              <>
+                <p className="font-medium">DNS is right ✓ — certificate still switching on</p>
                 <p className="mt-1 text-xs">
-                  DNS looks right. We've let the team know to finish switching it on — your domain will start serving your store
-                  shortly (allow a little time for it to go fully live).
+                  Your DNS record is perfect. The secure certificate for your domain is issued during activation on our side —
+                  until that finishes (we've been notified), visiting your domain will show a browser security error. That's
+                  expected at this stage; check back here and this will flip to "fully live".
                 </p>
               </>
             ) : (

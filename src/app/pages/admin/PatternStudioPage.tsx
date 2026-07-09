@@ -103,7 +103,7 @@ const CM_PER_IN = 2.54;
 const DRAPE_BLOCKS = new Set([
   "classic-tee", "aaron", "relaxed-hoodie", "hugo", "simon", "simone",
   "slip-dress", "wahid", "wide-trouser", "pleated-skirt",
-  "paco", "sandy", "bella", "huey",
+  "paco", "sandy", "bella", "huey", "yuri", "walburga",
 ]);
 
 /** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
@@ -1166,7 +1166,10 @@ export function PatternStudioPage() {
                         <span className="font-medium" style={{ color: "#c22" }}>red</span> is pulling
                         tight (a real toile would show drag lines there), and{" "}
                         <span className="font-medium" style={{ color: "#6b93c9" }}>blue</span> is
-                        pooling slack you could pinch out. Pale areas hang free of the form. Judge
+                        pooling slack you could pinch out. Pale areas hang free of the form. The
+                        scale knows the block's cloth — a jersey tee is judged far more forgivingly
+                        than a woven shirt, because a knit worn at stretch is comfortable where a
+                        woven would split a seam. Judge
                         the body of the garment here — shoulder and armhole joins read warmer than
                         they really are on our rigid stand, the same reason fitters check sleeves on
                         a live model.
