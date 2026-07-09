@@ -459,6 +459,7 @@ def match(a, b):
 
 
 sew_edges = []
+seam_sides = []  # oriented FULL-density sides per seam — the fit map's densified pairing
 pin_indices = set()
 for seam in DATA["seams"]:
     ia = seg_indices(*seam["a"])
@@ -469,6 +470,7 @@ for seam in DATA["seams"]:
     flipped = math.dist(all_verts[ia[0]], all_verts[ib[-1]]) + math.dist(all_verts[ia[-1]], all_verts[ib[0]])
     if flipped < straight:
         ib = list(reversed(ib))
+    seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
     for va, vb in zip(ia, ib):
         if va != vb:
@@ -895,6 +897,53 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     ei, ej, L0 = ei[ok], ej[ok], L0[ok]
     x_drape = x.copy()
 
+    # Densified seam closure. Blender's match() resampling pairs only the
+    # SHORTER side of each seam, so the welds close the paired verts while
+    # every unpaired neighbour on the longer side keeps the bake's seam gap
+    # frozen in as local stretch — the converged floor of the spring-only
+    # relax. Fix: parameterize both sides of every seam by flat-pattern arc
+    # length and constrain EVERY boundary vert to the point at the same arc
+    # fraction on the opposite side (zero-rest point-on-segment constraints,
+    # both directions). That is the hard pairing garment CAD uses.
+    def _arc_params(idxs):
+        pts = flat[np.asarray(idxs)]
+        d = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+        s = np.concatenate([[0.0], np.cumsum(d)])
+        return s / max(s[-1], 1e-12)
+
+    cA, cB0, cB1, cT = [], [], [], []
+
+    def _attach(src, dst):
+        sp, dp = _arc_params(src), _arc_params(dst)
+        for i, sv in enumerate(src):
+            k = min(max(int(np.searchsorted(dp, sp[i])), 1), len(dst) - 1)
+            t = (sp[i] - dp[k - 1]) / max(dp[k] - dp[k - 1], 1e-12)
+            cA.append(remap[sv])
+            cB0.append(remap[dst[k - 1]])
+            cB1.append(remap[dst[k]])
+            cT.append(min(max(t, 0.0), 1.0))
+
+    for _sa, _sb in seam_sides:
+        _attach(_sa, _sb)
+        _attach(_sb, _sa)
+    cA, cB0, cB1 = np.array(cA), np.array(cB0), np.array(cB1)
+    cT = np.array(cT)
+    # Drop constraints already welded onto their target endpoint — zero work,
+    # and their zero-length segment direction is undefined.
+    _dg = ((cA == cB0) & (cT < 1e-6)) | ((cA == cB1) & (cT > 1 - 1e-6)) | ((cA == cB0) & (cA == cB1))
+    # ...and constraints whose every participant is pinned: nothing can move.
+    _dg |= (invw[cA] + (1 - cT) ** 2 * invw[cB0] + cT ** 2 * invw[cB1]) < 1e-9
+    cA, cB0, cB1, cT = cA[~_dg], cB0[~_dg], cB1[~_dg], cT[~_dg]
+
+    def _seam_gap(pos):
+        tgt = (1 - cT)[:, None] * pos[cB0] + cT[:, None] * pos[cB1]
+        return np.linalg.norm(pos[cA] - tgt, axis=1)
+
+    if len(cA):
+        _g = _seam_gap(x) * 1000
+        print(f"fit seams: {len(cA)} closure constraints, pre gap mm p50={np.percentile(_g,50):.2f} "
+              f"p95={np.percentile(_g,95):.2f} max={_g.max():.2f}")
+
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
     # exactly in the tight zones being graded).
@@ -976,6 +1025,19 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         np.add.at(dx, ej, invw[ej, None] * dvec)
         np.add.at(cnt, ei, 1.0)
         np.add.at(cnt, ej, 1.0)
+        if len(cA):
+            # densified seam closure: pull each boundary vert onto its arc-
+            # matched point on the opposite side (and the segment toward it)
+            tgt = (1 - cT)[:, None] * x[cB0] + cT[:, None] * x[cB1]
+            cd = x[cA] - tgt
+            cw = invw[cA] + (1 - cT) ** 2 * invw[cB0] + cT ** 2 * invw[cB1] + 1e-12
+            lam = cd / cw[:, None]
+            np.add.at(dx, cA, -invw[cA, None] * lam)
+            np.add.at(dx, cB0, ((1 - cT) * invw[cB0])[:, None] * lam)
+            np.add.at(dx, cB1, (cT * invw[cB1])[:, None] * lam)
+            np.add.at(cnt, cA, 1.0)
+            np.add.at(cnt, cB0, 1.0)
+            np.add.at(cnt, cB1, 1.0)
         x_new = x + OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
         x_new += TETHER * (x_drape - x_new) * invw[:, None]
         if it < WARMUP:
@@ -991,6 +1053,9 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     print("fit relax post:", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x),
           "maxdisp=%.4f" % np.abs(x - x_drape).max())
+    if len(cA):
+        _g = _seam_gap(x) * 1000
+        print(f"fit seams post: gap mm p50={np.percentile(_g,50):.2f} p95={np.percentile(_g,95):.2f} max={_g.max():.2f}")
 
     # Per-triangle right Cauchy-Green from the 2D->3D deformation gradient:
     # C = F^T F with F = Ds Dm^-1; lambda_weft = sqrt(C00) is the girth
