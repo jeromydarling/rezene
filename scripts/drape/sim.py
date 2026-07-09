@@ -459,6 +459,7 @@ def match(a, b):
 
 
 sew_edges = []
+seam_sides = []  # oriented FULL-density sides per seam — the fit map's densified pairing
 pin_indices = set()
 for seam in DATA["seams"]:
     ia = seg_indices(*seam["a"])
@@ -469,6 +470,7 @@ for seam in DATA["seams"]:
     flipped = math.dist(all_verts[ia[0]], all_verts[ib[-1]]) + math.dist(all_verts[ia[-1]], all_verts[ib[0]])
     if flipped < straight:
         ib = list(reversed(ib))
+    seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
     for va, vb in zip(ia, ib):
         if va != vb:
@@ -798,20 +800,26 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # fit classification is shown only where the garment touches the form —
 # free-hanging cloth has no "fit" (CLO does the same).
 #
-# R&D STATUS (why this stays behind DRAPE_FITMAP=1): the relaxation is
-# converged — 1500 and 5000 sweeps give identical stats — and each fix so
-# far peeled a real layer (welding seams, freeing welded clusters from pin
-# anchors, dropping the tether that re-introduced assembly tension:
-# edge-strain p95 went 146%→49%, girth p95 288%→98% on the tee probe).
-# But the floor it converged to is still not credible: ~2x girth stretch
-# near seams/shoulders is residual assembly geometry, not fit. Root cause
-# hypothesis: Blender's match() resampling pairs only the shorter side of
-# each seam, so welding closes the paired verts while their unpaired 3mm
-# neighbours keep the seam gap baked in as local stretch. Springs can't
-# fix that — the next step is hard equality constraints over a DENSIFIED
-# pairing (every boundary vert on both sides projected onto the opposite
-# seam polyline, position-constrained, then relax). Until magnitudes are
-# credible, this map must not be shown to designers.
+# CALIBRATION RECORD (and why DRAPE_FITMAP stays off by default): the
+# spring-only relax converged to a false floor (girth p95 +98% on the tee)
+# because Blender's sewing only pairs the sparse ORIGINAL pattern points —
+# the subdivision verts along piece boundaries were never sewn, welded, or
+# constrained, and the bake leaves them up to 137mm from their seam. The
+# densified closure below (every boundary vert, subdivision verts included,
+# arc-matched onto the opposite side as a zero-rest point-on-segment
+# constraint) removed that floor: seams close from 137mm to ~0.1mm, darts
+# to 0.09mm, and every rho/refresh config converges to the same optimum
+# (post-extrapolation hard contact projection was chaotically unstable;
+# in-sweep contact is not). Fitted blocks now grade credibly — bella reads
+# median +4% girth, snug at bust/waist, exactly what a darted bodice
+# should say. What remains is NOT a solver artifact: the tee still grades
+# hot in the neck-to-armscye band (p95 ~+64%) because the render pose
+# splays the arms 30deg for the airy tee stance, parking the pinned cap
+# rings ~92mm from where the panels' armscye edges live — the closed
+# garment genuinely cannot span that pose unstretched. Proven by freeing
+# every pin (and letting scaffold rings drift rigidly): the band persists
+# anchor-free. The fix is a pose calibration (arms at ~10deg for fit
+# grading, cap rings at the arm root), not more relaxation.
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     import numpy as np
     from mathutils.bvhtree import BVHTree
@@ -895,6 +903,90 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     ei, ej, L0 = ei[ok], ej[ok], L0[ok]
     x_drape = x.copy()
 
+    # Densified seam closure. The seam springs/welds only cover the ORIGINAL
+    # pattern points: subdivide_edges quadruples the boundary density with
+    # verts that boundary_index never sees, and those unpaired verts keep
+    # the bake's seam gap frozen in as local stretch — the converged floor
+    # of the spring-only relax. Fix: recover each seam side's TRUE dense
+    # vertex list geometrically (every mesh vert lying on the side's flat
+    # polyline — subdivision verts sit exactly on it), parameterize both
+    # sides by flat arc length, and constrain every vert to the point at
+    # the same arc fraction on the opposite side (zero-rest point-on-
+    # segment constraints, both directions) — the hard pairing garment
+    # CAD uses.
+    _pnames = [p["name"] for p in DATA["pieces"]]
+    _pr = {}
+    for _k, _nm in enumerate(_pnames):
+        _pr[_nm] = (offsets[_nm], offsets[_pnames[_k + 1]] if _k + 1 < len(_pnames) else len(all_verts))
+
+    def _dense_side(idxs):
+        """(indices, arc params in [0,1]) of ALL piece verts on the side's
+        flat polyline, subdivision verts included, ordered by arc length."""
+        poly = flat[np.asarray(idxs)]
+        s0p, s1p = next(r for nm, r in _pr.items() if r[0] <= idxs[0] < r[1])
+        cand = np.arange(s0p, s1p)
+        pts = flat[cand]
+        seg = np.diff(poly, axis=0)
+        seglen = np.linalg.norm(seg, axis=1)
+        cum = np.concatenate([[0.0], np.cumsum(seglen)])
+        best_d = np.full(len(cand), 1e9)
+        best_s = np.zeros(len(cand))
+        for k in range(len(seg)):
+            if seglen[k] < 1e-12:
+                continue
+            t = np.clip((pts - poly[k]) @ seg[k] / seglen[k] ** 2, 0.0, 1.0)
+            dk = np.linalg.norm(pts - (poly[k] + t[:, None] * seg[k]), axis=1)
+            upd = dk < best_d
+            best_d[upd] = dk[upd]
+            best_s[upd] = cum[k] + t[upd] * seglen[k]
+        on = best_d < 0.0005  # within 0.5 mm of the seam line
+        order = np.argsort(best_s[on])
+        return cand[on][order], best_s[on][order] / max(cum[-1], 1e-12)
+
+    cA, cB0, cB1, cT, cS = [], [], [], [], []
+
+    def _attach(si, sp, di, dp, sidx):
+        for i in range(len(si)):
+            k = min(max(int(np.searchsorted(dp, sp[i])), 1), len(di) - 1)
+            t = (sp[i] - dp[k - 1]) / max(dp[k] - dp[k - 1], 1e-12)
+            cA.append(remap[si[i]])
+            cB0.append(remap[di[k - 1]])
+            cB1.append(remap[di[k]])
+            cT.append(min(max(t, 0.0), 1.0))
+            cS.append(sidx)
+
+    for _si, (_sa, _sb) in enumerate(seam_sides):
+        _ai, _ap = _dense_side(_sa)
+        _bi, _bp = _dense_side(_sb)
+        if len(_ai) >= 2 and len(_bi) >= 2:
+            _attach(_ai, _ap, _bi, _bp, _si)
+            _attach(_bi, _bp, _ai, _ap, _si)
+    cA, cB0, cB1, cS = np.array(cA), np.array(cB0), np.array(cB1), np.array(cS)
+    cT = np.array(cT)
+    # Drop constraints already welded onto their target endpoint — zero work,
+    # and their zero-length segment direction is undefined.
+    _dg = ((cA == cB0) & (cT < 1e-6)) | ((cA == cB1) & (cT > 1 - 1e-6)) | ((cA == cB0) & (cA == cB1))
+    # ...and constraints whose every participant is pinned: nothing can move.
+    _dg |= (invw[cA] + (1 - cT) ** 2 * invw[cB0] + cT ** 2 * invw[cB1]) < 1e-9
+    cA, cB0, cB1, cT, cS = cA[~_dg], cB0[~_dg], cB1[~_dg], cT[~_dg], cS[~_dg]
+
+    def _seam_gap(pos):
+        tgt = (1 - cT)[:, None] * pos[cB0] + cT[:, None] * pos[cB1]
+        return np.linalg.norm(pos[cA] - tgt, axis=1)
+
+    def _seam_name(si):
+        s = DATA["seams"][si]
+        return s.get("name") or f'{s["a"][0]}.{s["a"][1]}-{s["b"][0]}.{s["b"][1]}'
+
+    if len(cA):
+        _g = _seam_gap(x) * 1000
+        print(f"fit seams: {len(cA)} closure constraints, pre gap mm p50={np.percentile(_g,50):.2f} "
+              f"p95={np.percentile(_g,95):.2f} max={_g.max():.2f}")
+        if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+            for si in np.unique(cS):
+                gs = _g[cS == si]
+                print(f"  seam {_seam_name(si)}: n={len(gs)} gap p50={np.percentile(gs,50):.1f} max={gs.max():.1f}mm")
+
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
     # exactly in the tight zones being graded).
@@ -921,7 +1013,7 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # et al. 2014 constraint averaging + SOR), with a weak tether to the
     # baked drape that fixes the sliding null-space like friction would.
     OMEGA = float(_os.environ.get("DRAPE_FIT_OMEGA", "1.7"))
-    N_ITER = int(_os.environ.get("DRAPE_FIT_ITERS", "1500"))
+    N_ITER = int(_os.environ.get("DRAPE_FIT_ITERS", "5000"))
     # No drape tether: over hundreds of sweeps even a 1e-3 pull is a strong
     # anchor that drags the relax back toward the spring-tensioned bake —
     # reintroducing exactly the assembly tension being removed. The pins fix
@@ -959,7 +1051,11 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # the averaged-Jacobi sweep: unclosed seam gaps from the bake can be
     # tens of mm, and plain Jacobi transports closure ~one vertex ring per
     # sweep — Chebyshev makes that global.
-    RHO, GAMMA, WARMUP = 0.992, 0.7, 15
+    # RHO 0.999 with 5000 sweeps is the calibrated sweet spot on the tee
+    # probe (girth p95 +18%, median +0.9%); 0.9995 overshoots and diverges,
+    # 0.992 needs 3x the sweeps for the same depth.
+    RHO = float(_os.environ.get("DRAPE_FIT_RHO", "0.999"))
+    GAMMA, WARMUP = 0.7, 15
     omega_ch = 1.0
     x_prev = x.copy()
     for it in range(N_ITER):
@@ -976,6 +1072,29 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         np.add.at(dx, ej, invw[ej, None] * dvec)
         np.add.at(cnt, ei, 1.0)
         np.add.at(cnt, ej, 1.0)
+        if len(cA):
+            # densified seam closure: pull each boundary vert onto its arc-
+            # matched point on the opposite side (and the segment toward it)
+            tgt = (1 - cT)[:, None] * x[cB0] + cT[:, None] * x[cB1]
+            cd = x[cA] - tgt
+            cw = invw[cA] + (1 - cT) ** 2 * invw[cB0] + cT ** 2 * invw[cB1] + 1e-12
+            lam = cd / cw[:, None]
+            np.add.at(dx, cA, -invw[cA, None] * lam)
+            np.add.at(dx, cB0, ((1 - cT) * invw[cB0])[:, None] * lam)
+            np.add.at(dx, cB1, (cT * invw[cB1])[:, None] * lam)
+            np.add.at(cnt, cA, 1.0)
+            np.add.at(cnt, cB0, 1.0)
+            np.add.at(cnt, cB1, 1.0)
+        # Contact joins the averaged sweep as one more constraint, so the
+        # Chebyshev extrapolation sees a consistent operator. Hard-projecting
+        # AFTER the accelerated step is chaotically unstable (identical
+        # configs scattered girth p95 anywhere from +0.6 to +1.8 depending
+        # on BVH normal noise); in-sweep contact converges to the same
+        # optimum from every rho/refresh setting tested.
+        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+        push = np.maximum(pen, 0.0)
+        dx += nrm * (push * invw)[:, None]
+        cnt += (push > 0).astype(float)
         x_new = x + OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
         x_new += TETHER * (x_drape - x_new) * invw[:, None]
         if it < WARMUP:
@@ -987,10 +1106,39 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         x_acc = omega_ch * (GAMMA * (x_new - x) + x - x_prev) + x_prev
         x_prev = x
         x = np.where(invw[:, None] > 0, x_acc, x)
-        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
-        x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
+    # one exact projection at the end so nothing renders inside the form
+    q, nrm, _ = contact_planes(x)
+    pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+    x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     print("fit relax post:", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x),
           "maxdisp=%.4f" % np.abs(x - x_drape).max())
+    if len(cA):
+        _g = _seam_gap(x) * 1000
+        print(f"fit seams post: gap mm p50={np.percentile(_g,50):.2f} p95={np.percentile(_g,95):.2f} max={_g.max():.2f}")
+    if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+        _pc = lambda gi: next(nm for nm, of in sorted(offsets.items(), key=lambda t: -t[1]) if of <= gi)
+        _L = np.linalg.norm(x[ei] - x[ej], axis=1)
+        _s = (_L - L0) / L0
+        for k in np.argsort(_s)[-6:]:
+            a3, b3 = ei[k], ej[k]
+            print(f"  post worst edge {a3}-{b3} piece={_pc(a3)} rest={L0[k]*1000:.2f}mm cur={_L[k]*1000:.1f}mm "
+                  f"flat_a=({all_flat[a3][0]:.1f},{all_flat[a3][1]:.1f}) flat_b=({all_flat[b3][0]:.1f},{all_flat[b3][1]:.1f})")
+    if _os.environ.get("DRAPE_FIT_DUMP"):
+        np.savez_compressed(
+            _os.environ["DRAPE_FIT_DUMP"],
+            x_drape=x_drape, x_relaxed=x, flat=flat, remap=remap, invw=invw,
+            ei=ei, ej=ej, L0=L0, tris=tris, cA=cA, cB0=cB0, cB1=cB1, cT=cT, cS=cS,
+            body_verts=np.array([v.co[:] for v in bm_body.vertices]),
+            # fan-triangulate: quads truncated to one triangle would leave
+            # holes in the offline BVH and understate contact
+            body_tris=np.array([
+                (q[0], q[k], q[k + 1])
+                for p in bm_body.polygons
+                for q in [tuple(p.vertices)]
+                for k in range(1, len(q) - 1)
+            ]),
+        )
+        print(f"fit dump written: {_os.environ['DRAPE_FIT_DUMP']}")
 
     # Per-triangle right Cauchy-Green from the 2D->3D deformation gradient:
     # C = F^T F with F = Ds Dm^-1; lambda_weft = sqrt(C00) is the girth
@@ -1030,13 +1178,24 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # (no measured area) also fall out here.
     _, _, dist = contact_planes(x)
     in_contact = (dist < 0.012) & (area_v > 0)
+    if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+        _pc = lambda gi: next(nm for nm, of in sorted(offsets.items(), key=lambda t: -t[1]) if of <= gi)
+        _tail_v = [i for i in range(nv) if in_contact[remap[i]] and tight[remap[i]] > 0.5]
+        from collections import Counter
+        _byp = Counter(_pc(i) for i in _tail_v)
+        print(f"  girth>50% contact verts: {len(_tail_v)} by piece {dict(_byp)}")
+        for i in _tail_v[:: max(1, len(_tail_v) // 6)][:6]:
+            print(f"    vert {i} piece={_pc(i)} flat=({all_flat[i][0]:.0f},{all_flat[i][1]:.0f}) "
+                  f"z={x[remap[i]][2]:.3f} girth={tight[remap[i]]:+.2f}")
 
     def strain_color(s, contact):
         if not contact:
             return (0.62, 0.66, 0.62)  # free-hanging: neutral, no "fit" there
         if s < -0.02:
             return (0.45, 0.62, 0.85)  # slack pooling against the body
-        stops = [(0.0, (0.30, 0.65, 0.34)), (0.02, (0.92, 0.85, 0.25)), (0.05, (0.85, 0.13, 0.10))]
+        # CLO's strain map runs 100->120% (red at +20%); we go red at +15%,
+        # slightly stricter, with yellow ("snug") from +5%.
+        stops = [(0.0, (0.30, 0.65, 0.34)), (0.05, (0.92, 0.85, 0.25)), (0.15, (0.85, 0.13, 0.10))]
         if s <= 0.0:
             return stops[0][1]
         for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
