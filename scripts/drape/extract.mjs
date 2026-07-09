@@ -20,6 +20,10 @@
  *   wahid (waistcoat)     buttoned CF, waist darts sewn shut, sleeveless
  *   wide-trouser (Titan)  leg tubes + hip sweep on the lower-body mannequin
  *   pleated-skirt (Penelope) pencil skirt on the hip column, waist pinned
+ *   paco (Paco)           summer trousers on the Titan topology
+ *   charlie (Charlie)     chinos; slant-pocket edge pinned like the waist
+ *   sandy (Sandy)         circle skirt: one ring sector, polar "circle" wrap
+ *   bella (Bella)         foundation bodice; waist + side bust darts sewn
  *
  * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
@@ -133,6 +137,50 @@ const BLOCKS = {
     yOffset: 460,
     bodyKind: "lowerColumn",
   },
+  paco: {
+    module: "@freesewing/paco",
+    design: "Paco",
+    // Summer trousers on the Titan draft: same panel topology, so the leg
+    // machinery applies verbatim. The elastic waist/cuffs are described, not
+    // simulated (same honesty as collars and hoods).
+    trousers: true,
+    parts: { front: "paco.front", back: "paco.back" },
+    yOffset: 460,
+    bodyKind: "lower",
+  },
+  sandy: {
+    module: "@freesewing/sandy",
+    design: "Sandy",
+    // Circle skirt: ONE ring-sector piece cut on fold. The flat inner arc is
+    // the full waist; worn, that arc wraps 2π around the body and the ring
+    // cones outward — the sim maps it polar-ly (kind "circle").
+    circleSkirt: true,
+    parts: { skirt: "sandy.skirt" },
+    yOffset: 460,
+    bodyKind: "lowerColumn",
+  },
+  charlie: {
+    module: "@freesewing/charlie",
+    design: "Charlie",
+    // Chinos on the Titan draft. The slant pocket cuts the front panel's
+    // waist-side corner, so the outseam starts at the pocket's lower end and
+    // the slant edge itself is pinned (a real pocket bag holds it closed).
+    trousers: true,
+    parts: { front: "charlie.front", back: "charlie.back" },
+    frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
+    yOffset: 460,
+    bodyKind: "lower",
+  },
+  bella: {
+    module: "@freesewing/bella",
+    design: "Bella",
+    // Women's foundation bodice: fitted to the waist with waist darts front
+    // and back plus a side bust dart — all sewn shut in the sim, which is
+    // the whole point of draping a block: seeing the fit it encodes.
+    bodice: true,
+    parts: { front: "bella.frontSideDart", back: "bella.back" },
+    sim: { sewForce: 6 }, // the bust dart's wide mouth needs a firm pull
+  },
 };
 
 const blockId = BLOCKS[spec.block] ? spec.block : "classic-tee";
@@ -143,7 +191,7 @@ const cfg = BLOCKS[blockId];
 const M = {
   ankle: 230, biceps: 335, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080,
   crossSeam: 800, crossSeamFront: 390, head: 560, heel: 330, highBust: 1040, hips: 1000,
-  hpsToBust: 270, hpsToWaistBack: 460, inseam: 790, knee: 420, neck: 400, seat: 1050,
+  hpsToBust: 270, hpsToWaistBack: 460, hpsToWaistFront: 505, inseam: 790, knee: 420, neck: 400, seat: 1050,
   seatBack: 520, shoulderSlope: 13, shoulderToShoulder: 445, shoulderToWrist: 620,
   underbust: 900, upperLeg: 600, waist: 820, waistBack: 410, waistToArmpit: 230,
   waistToFloor: 1040, waistToHead: 670, waistToHips: 130, waistToKnee: 590,
@@ -544,12 +592,19 @@ function trouserPanel(partName, pieceName, mirrored) {
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
   const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  // A slant front pocket (chinos) cuts the waist-side corner away: the
+  // outseam then starts at the pocket's lower end and the slant edge itself
+  // is a pinned opening (the pocket bag holds it in a real pair).
+  const cut = cfg.frontWaistCut && pieceName.startsWith("front") ? cfg.frontWaistCut : null;
+  const outTop = cut ? P[cut.bottom] : P.styleWaistOut;
+  const waistEnd = cut ? P[cut.top] : P.styleWaistOut;
   const piece = buildPiece(pieceName, [
-    ["outseam", seg(sliceShort(poly, P.styleWaistOut, P.floorOut))],
+    ["outseam", seg(sliceShort(poly, outTop, P.floorOut))],
     ["hem", seg(sliceShort(poly, P.floorOut, P.floorIn))],
     ["inseam", seg(sliceShort(poly, P.floorIn, P.fork))],
     ["crotch", seg(sliceShort(poly, P.fork, P.styleWaistIn))],
-    ["waist", seg(sliceShort(poly, P.styleWaistIn, P.styleWaistOut))],
+    ["waist", seg(sliceShort(poly, P.styleWaistIn, waistEnd))],
+    ...(cut ? [["slant", seg(sliceShort(poly, P[cut.top], P[cut.bottom]))]] : []),
   ]);
   const BIN = 50;
   const bins = new Map();
@@ -582,6 +637,171 @@ function skirtPanel(partName, pieceName) {
   ]);
 }
 
+/** Split a segment's raw polyline in two at a given arc-length fraction —
+ *  used to pair one long seam edge against a dart-split opposite edge. */
+function splitAt(pts, frac) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  }
+  const target = cum[cum.length - 1] * frac;
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < target) i++;
+  const t = (target - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1]);
+  const cut = [
+    pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t,
+    pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t,
+  ];
+  return [[...pts.slice(0, i), cut], [cut, ...pts.slice(i)]];
+}
+
+/** Circle skirt (Sandy): one ring-sector piece cut on fold. We unfold it here
+ *  (mirror across the fold edge) so the sim sees the full flat sector; its
+ *  inner arc is the whole waist and wraps 2π around the body. */
+function circleSkirtPiece() {
+  const part = set[cfg.parts.skirt];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const C = P.center;
+  // Work in polar coordinates about the sector centre. The drawn outline runs
+  // between the two straight edges (in2..ex2 and in2Flipped..ex2Flipped) with
+  // the waist arc (through in1) and hem arc (through ex1) between them.
+  const rIn = Math.hypot(P.in1.x - C.x, P.in1.y - C.y);
+  const rOut = Math.hypot(P.ex1.x - C.x, P.ex1.y - C.y);
+  const angleOf = (pt) => Math.atan2(pt.y - C.y, pt.x - C.x);
+  const a0 = angleOf(P.in2);
+  const a1 = angleOf(P.in2Flipped);
+  // Re-express every boundary point as (theta, r), unfolding across the
+  // in2Flipped edge: the drawn sector spans [a0, a1]; the mirror spans
+  // [a1, a1 + (a1 - a0)]. We rebuild the outline analytically (arcs are true
+  // circles) — more robust than walking the drawn path through macro points.
+  const span = a1 - a0;
+  const N = 48;
+  const arc = (r, t0, t1, n) => {
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = t0 + ((t1 - t0) * i) / n;
+      pts.push([t, r]); // (theta, r) — converted to flat mm below
+    }
+    return pts;
+  };
+  // Flat coordinates for the sim: x = theta * rMid (arc-length-ish), y = r.
+  // The sim's circle placement reads thetaSpan/rIn/rOut and re-derives the
+  // true angle from x, so the exact flattening only affects mesh density.
+  const toFlat = ([t, r]) => [(t - a0) * ((rIn + rOut) / 2), r - rIn];
+  const waist = arc(rIn, a0, a0 + 2 * span, N).map(toFlat);
+  // Straight edges run radially at each end of the doubled sector.
+  const radial = (t, r0, r1, n = 12) => {
+    const pts = [];
+    for (let i = 0; i <= n; i++) pts.push([t, r0 + ((r1 - r0) * i) / n]);
+    return pts.map(toFlat);
+  };
+  const hem = arc(rOut, a0 + 2 * span, a0, N).map(toFlat);
+  const piece = buildPiece("skirt", [
+    ["waist", waist],
+    ["edgeEnd", radial(a0 + 2 * span, rIn, rOut)],
+    ["hem", hem],
+    ["edgeStart", radial(a0, rOut, rIn)],
+  ]);
+  piece.circle = {
+    rIn,
+    rOut,
+    // Total flat angle of the worn garment (the unfolded piece).
+    thetaSpan: 2 * span,
+    // Flat-x back to angle: theta = x / rMid.
+    rMid: (rIn + rOut) / 2,
+  };
+  return piece;
+}
+
+/** Bodice front (Bella "frontSideDart"): cut on fold at CF, a waist dart in
+ *  the hem and a side bust dart splitting the side seam — both sewn shut. */
+function bodiceFront() {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hem1R = slice(poly, P.cfHem, P.waistDartLeft);
+  const wdartLR = slice(poly, P.waistDartLeft, P.waistDartTip);
+  const wdartRR = slice(poly, P.waistDartTip, P.waistDartRight);
+  const hem2R = slice(poly, P.waistDartRight, P.sideHem);
+  const sideLoR = slice(poly, P.sideHem, P.bustDartBottom);
+  const bdartLR = slice(poly, P.bustDartBottom, P.bustDartTip);
+  const bdartRR = slice(poly, P.bustDartTip, P.bustDartTop);
+  const sideUpR = slice(poly, P.bustDartTop, P.armhole);
+  const armscyeR = slice(poly, P.armhole, P.shoulder);
+  const shoulderR = slice(poly, P.shoulder, P.hps);
+  const neckR = slice(poly, P.hps, P.cfNeck);
+  const piece = buildPiece("front", [
+    ["hem1R", hem1R],
+    ["wdartLR", wdartLR],
+    ["wdartRR", wdartRR],
+    ["hem2R", hem2R],
+    ["sideLoR", sideLoR],
+    ["bdartLR", bdartLR],
+    ["bdartRR", bdartRR],
+    ["sideUpR", sideUpR],
+    ["armscyeR", armscyeR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideUpL", mirror([...sideUpR].reverse())],
+    ["bdartRL", mirror([...bdartRR].reverse())],
+    ["bdartLL", mirror([...bdartLR].reverse())],
+    ["sideLoL", mirror([...sideLoR].reverse())],
+    ["hem2L", mirror([...hem2R].reverse())],
+    ["wdartRL", mirror([...wdartRR].reverse())],
+    ["wdartLL", mirror([...wdartLR].reverse())],
+    ["hem1L", mirror([...hem1R].reverse())],
+  ]);
+  // Where the bust dart splits the front side seam, as a fraction of the
+  // full side length — the back side seam is split at the same fraction so
+  // the two seam halves pair up point-by-point.
+  const loLen = segLen(sideLoR);
+  piece.sideSplitFrac = loLen / (loLen + segLen(sideUpR));
+  return piece;
+}
+
+/** Bodice back (Bella): half draft mirrored (the slight CB shaping is folded
+ *  flat — a 12 mm fudge the drape can't see), one waist dart per side. */
+function bodiceBack(splitFrac) {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hem1R = slice(poly, P.waistCenter, P.dartBottomLeft);
+  const dartLR = slice(poly, P.dartBottomLeft, P.dartTip);
+  const dartRR = slice(poly, P.dartTip, P.dartBottomRight);
+  const hem2R = slice(poly, P.dartBottomRight, P.waistSide);
+  const sideFull = slice(poly, P.waistSide, P.armhole);
+  // Split the back side seam where the front's bust dart lands, so the front
+  // (dart-split) and back side edges sew as two matched pairs.
+  const [sideLoR, sideUpR] = splitAt(sideFull, splitFrac);
+  const armscyeR = slice(poly, P.armhole, P.shoulder);
+  const shoulderR = slice(poly, P.shoulder, P.hps);
+  const neckR = slice(poly, P.hps, P.cbNeck);
+  return buildPiece("back", [
+    ["hem1R", hem1R],
+    ["dartLR", dartLR],
+    ["dartRR", dartRR],
+    ["hem2R", hem2R],
+    ["sideLoR", sideLoR],
+    ["sideUpR", sideUpR],
+    ["armscyeR", armscyeR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideUpL", mirror([...sideUpR].reverse())],
+    ["sideLoL", mirror([...sideLoR].reverse())],
+    ["hem2L", mirror([...hem2R].reverse())],
+    ["dartRL", mirror([...dartRR].reverse())],
+    ["dartLL", mirror([...dartLR].reverse())],
+    ["hem1L", mirror([...hem1R].reverse())],
+  ]);
+}
+
 const hasSleeves = Boolean(cfg.parts.sleeve);
 const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
 
@@ -599,7 +819,8 @@ if (cfg.trousers) {
   frontL.placement = { kind: "leg", leg: -1, panel: "front" };
   backL.placement = { kind: "leg", leg: -1, panel: "back" };
   for (const p of [frontR, backR, frontL, backL]) {
-    p.pinSegments = ["waist"]; // waistband grip; seams close by stitching
+    // Waistband grip; a slant pocket edge is pinned too (its bag holds it).
+    p.pinSegments = p.segments.slant ? ["waist", "slant"] : ["waist"];
   }
   bodyPieces = [frontR, backR, frontL, backL];
 } else if (cfg.skirt) {
@@ -609,6 +830,17 @@ if (cfg.trousers) {
   back.placement = { kind: "plane", y: 160 };
   front.pinSegments = ["waistR", "waistL"];
   back.pinSegments = ["waistR", "waistL"];
+  bodyPieces = [front, back];
+} else if (cfg.circleSkirt) {
+  const skirt = circleSkirtPiece();
+  skirt.placement = { kind: "circle", ...skirt.circle };
+  skirt.pinSegments = ["waist"];
+  bodyPieces = [skirt];
+} else if (cfg.bodice) {
+  const front = bodiceFront();
+  const back = bodiceBack(front.sideSplitFrac);
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
   bodyPieces = [front, back];
 } else if (cfg.dressPanels) {
   const front = dressPanel(cfg.parts.front, "front");
@@ -713,6 +945,29 @@ const seams = cfg.trousers
   ? [
       { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
       { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+    ]
+  : cfg.circleSkirt
+  ? [
+      // One piece: its two straight radial edges meet at CB.
+      { name: "cb", a: ["skirt", "edgeStart"], b: ["skirt", "edgeEnd"] },
+    ]
+  : cfg.bodice
+  ? [
+      // Hangs from pinned shoulders + necklines; the side seams are split
+      // where the bust dart lands so front and back pair edge-for-edge; all
+      // six darts (2 waist front, 2 waist back, 2 bust) are sewn shut.
+      { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R_lo", a: ["front", "sideLoR"], b: ["back", "sideLoR"] },
+      { name: "side_R_up", a: ["front", "sideUpR"], b: ["back", "sideUpR"] },
+      { name: "side_L_lo", a: ["front", "sideLoL"], b: ["back", "sideLoL"] },
+      { name: "side_L_up", a: ["front", "sideUpL"], b: ["back", "sideUpL"] },
+      { name: "wdartF_R", a: ["front", "wdartLR"], b: ["front", "wdartRR"] },
+      { name: "wdartF_L", a: ["front", "wdartLL"], b: ["front", "wdartRL"] },
+      { name: "bdart_R", a: ["front", "bdartLR"], b: ["front", "bdartRR"] },
+      { name: "bdart_L", a: ["front", "bdartLL"], b: ["front", "bdartRL"] },
+      { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
+      { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
     ]
   : cfg.dressPanels
   ? [
