@@ -811,8 +811,17 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     nv = len(me.vertices)
     x = np.array([v.co[:] for v in me.vertices], dtype=np.float64)
     flat = np.array(all_flat, dtype=np.float64) * S  # mm -> metres
-    edges = np.array([e.vertices[:] for e in me.edges], dtype=np.int64)
     tris = np.array(all_faces, dtype=np.int64)
+    # Only FACE edges are cloth. The mesh also carries the loose sewing edges
+    # Blender used as springs — their endpoints live on different panels
+    # whose flat layouts overlap, so their "rest length" is meaningless
+    # garbage that poisons both the relax and the statistics.
+    face_edges = set()
+    for tri in all_faces:
+        for k in range(3):
+            a2, b2 = tri[k], tri[(k + 1) % 3]
+            face_edges.add((a2, b2) if a2 < b2 else (b2, a2))
+    edges = np.array(sorted(face_edges), dtype=np.int64)
     invw = np.ones(nv)
     invw[list(pin_indices)] = 0.0
 
