@@ -279,6 +279,17 @@ adminAiRoutes.post("/concepts/:id/generate", requireAdminWrite, async (c) => {
   const quota = await reserveDesignQuota(c);
   if (!quota.ok) return c.json(designQuotaExceededBody(quota), 429);
   let prompt = body.prompt.trim();
+  // Garment-only presentations (flat lay, hanger, ghost mannequin) drift into
+  // "invisible model" shots with stray hands and feet unless people are
+  // excluded outright. Guard every such prompt — including hand-written ones.
+  if (
+    /flat[\s-]?lay|hanger|ghost[\s-]?mannequin|product shot/i.test(prompt) &&
+    !/no person|no model|no body/i.test(prompt)
+  ) {
+    prompt +=
+      ". The garment is shown completely empty and alone: strictly no person, no model, no mannequin, " +
+      "and no body parts of any kind — no hands, arms, legs, feet or skin anywhere in the image";
+  }
   if (body.useHouseStyle) {
     const hs = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = ?`, HOUSE_STYLE_KEY);
     const style = hs?.value ?? DEFAULT_HOUSE_STYLE;

@@ -25,7 +25,14 @@ OUT_PNG = argv[1]
 FRAMES = int(argv[2]) if len(argv) > 2 else 80
 
 S = 0.001  # pattern mm -> metres
-HEIGHT = max(y for p in DATA["pieces"] if p["placement"]["kind"] == "plane" for _, y in p["points"])
+HEIGHT = max(y for p in DATA["pieces"] if p["placement"]["kind"] in ("plane",) for _, y in p["points"]) if any(
+    p["placement"]["kind"] == "plane" for p in DATA["pieces"]
+) else max(y for p in DATA["pieces"] for _, y in p["points"])
+# Vertical anchor: pattern y + Y_OFF = body coordinate (0 = high point
+# shoulder, 460 = waist on the standard form). Brian-family tops use 0;
+# dresses and lower-body garments anchor their own y=0 elsewhere.
+Y_OFF = float(DATA.get("yOffset", 0.0))
+BODY_KIND = DATA.get("bodyKind", "upper")
 
 # Invisible ghost-mannequin body the cloth drapes over. Without it the sewing
 # springs simply crush the garment flat. The base profile follows the studio
@@ -41,14 +48,33 @@ ARM_R = 55.0 * _biceps_s  # arm stub radius — fills the sleeve tube so it can'
 SHOULDER_X = 215.0 * _shoulder_s  # arm axis origin distance from centre (mm)
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
 
-# Torso profile: (pattern-y, half-width a, half-depth b), neck to JUST below
-# the hem — the form must not continue far past the cloth, or the image model
-# can't tell where the garment ends. The hem breakpoint follows THIS draft's
-# actual hem so the crop stays right for longer/shorter blocks.
-TORSO = [
-    (py * _torso_s, a * _chest_s, b * _chest_s)
-    for py, a, b in [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118)]
-] + [(HEIGHT + 26, 182 * _chest_s, 123 * _chest_s)]
+def z_of_body(by):
+    """World z (metres) for a BODY-coordinate height (0 = HPS, 460 = waist)."""
+    return (HEIGHT + Y_OFF - by) * S
+
+
+# Body profile: (BODY-y, half-width a, half-depth b), down to JUST below the
+# garment hem — the form must not continue far past the cloth, or the image
+# model can't tell where the garment ends. The hem breakpoint follows THIS
+# draft's actual hem so the crop stays right for longer/shorter blocks.
+_HEM_BY = HEIGHT + Y_OFF + 26
+if BODY_KIND == "upper":
+    TORSO = [
+        (by * _torso_s, a * _chest_s, b * _chest_s)
+        for by, a, b in [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118)]
+    ] + [(_HEM_BY, 182 * _chest_s, 123 * _chest_s)]
+else:
+    # Lower body (trousers, skirts): a hip form from just above the waist.
+    # "lowerColumn" continues as a dress-form column to the hem; "lower"
+    # (trousers) ends at the crotch, where the leg stubs take over.
+    _hip_s = _chest_s  # hips scale with the same girth hint family
+    _LOWER = [(400, 138, 110), (460, 135, 108), (575, 165, 135), (690, 172, 140)]
+    if BODY_KIND == "lowerColumn":
+        TORSO = [(by, a * _hip_s, b * _hip_s) for by, a, b in _LOWER] + [
+            (_HEM_BY, 166 * _hip_s, 136 * _hip_s)
+        ]
+    else:
+        TORSO = [(by, a * _hip_s, b * _hip_s) for by, a, b in _LOWER] + [(742, 168 * _hip_s, 138 * _hip_s)]
 
 # Arm stubs end just below the sleeve hem for the same reason. Long sleeves
 # hang closer to the body (a wide splay looks scarecrow-ish and crops out of
@@ -75,11 +101,13 @@ WRIST_R = ARM_R * 0.6  # arm stubs taper toward the wrist
 
 
 def torso_ab(y):
-    if y <= TORSO[0][0]:
+    """Form half-width/half-depth at PATTERN y (converted to body coords)."""
+    by = y + Y_OFF
+    if by <= TORSO[0][0]:
         return TORSO[0][1], TORSO[0][2]
     for (y0, a0, b0), (y1, a1, b1) in zip(TORSO, TORSO[1:]):
-        if y <= y1:
-            t = (y - y0) / (y1 - y0)
+        if by <= y1:
+            t = (by - y0) / (y1 - y0)
             return a0 + (a1 - a0) * t, b0 + (b1 - b0) * t
     return TORSO[-1][1], TORSO[-1][2]
 
@@ -127,6 +155,23 @@ def neck_half_width(piece):
     return _neck_w_cache[name]
 
 
+_width_cache = {}
+
+
+def width_at(piece, y):
+    """Max |x| of the piece at pattern y, from the emitted width profile."""
+    prof = piece.get("widthProfile")
+    if not prof:
+        return None
+    if y <= prof[0][0]:
+        return prof[0][1]
+    for (y0, w0), (y1, w1) in zip(prof, prof[1:]):
+        if y <= y1:
+            t = (y - y0) / max(1e-6, y1 - y0)
+            return w0 + (w1 - w0) * t
+    return prof[-1][1]
+
+
 def clamp_out(wx, wy, y_level):
     """Push a cloth point (mm, at torso level y_level) radially out of the
     body ellipse so nothing starts inside the collision mesh."""
@@ -141,7 +186,7 @@ def clamp_out(wx, wy, y_level):
 
 def arm_frame(direction):
     """Origin (mm) + orthonormal axes of the tilted hanging arm."""
-    origin = (SHOULDER_X * direction, 0.0, HEIGHT - SHOULDER_PY)
+    origin = (SHOULDER_X * direction, 0.0, HEIGHT + Y_OFF - SHOULDER_PY)
     axis = (math.sin(ARM_TILT) * direction, 0.0, -math.cos(ARM_TILT))  # down the arm
     e1 = (math.cos(ARM_TILT) * direction, 0.0, math.sin(ARM_TILT))  # outward
     e2 = (0.0, 1.0, 0.0)
@@ -177,7 +222,8 @@ def _make_arc_table(A, B):
 
 
 _max_half = max(
-    abs(x) for p in DATA["pieces"] if p["placement"]["kind"] == "plane" for x, _ in p["points"]
+    (abs(x) for p in DATA["pieces"] if p["placement"]["kind"] == "plane" for x, _ in p["points"]),
+    default=250.0,
 )
 _phis, _ss = _make_arc_table(207.0, 143.0)
 _scale = (_max_half + 10.0) / _ss[-1]  # quarter arc = widest half + seam gap
@@ -204,8 +250,13 @@ def place(piece, x, y):
         # (0, -B), back centre at (0, +B); both walk toward the sides so the
         # side seams nearly meet. side = -1 for front, +1 for back.
         side = -1.0 if pl["y"] < 0 else 1.0
-        phi = _phi_at(abs(x))
-        wx = math.copysign(SHELL_A * math.sin(phi), x)
+        # Per-height wrap scale: a flared garment wraps snug where it is
+        # narrow and full where it is wide; one global scale bunches the
+        # excess wherever the garment is narrower than its widest line.
+        w_here = width_at(piece, y)
+        f = max(0.35, (w_here + 10.0) / _ss[-1]) if w_here else 1.0
+        phi = _phi_at(abs(x) / f)
+        wx = math.copysign(f * SHELL_A * math.sin(phi), x)
         # Depth follows the torso's own vertical profile (+ease) so the cloth
         # starts just OUTSIDE the body at every height. Above the armpit only
         # the neck stub exists, so the shoulder region collapses to the seam
@@ -226,6 +277,49 @@ def place(piece, x, y):
         wy = side * 8.0 * (1 - t) + wrapped * t
         wx, wy = clamp_out(wx, wy, y)
         return (wx * S, wy * S, (HEIGHT - y) * S)
+    if pl["kind"] == "leg":
+        # Trouser panel: half-tube around a leg stub, sweeping onto the hip
+        # shell above the fork (the same tube+joint-sweep idea as sleeves).
+        prof = piece["edgesProfile"]
+        lo, hi = prof[0][1], prof[0][2]
+        for (y0, l0, h0), (y1, l1, h1) in zip(prof, prof[1:]):
+            if y <= y1:
+                t = (y - y0) / max(1e-6, y1 - y0)
+                lo, hi = l0 + (l1 - l0) * t, h0 + (h1 - h0) * t
+                break
+        else:
+            lo, hi = prof[-1][1], prof[-1][2]
+        w = max(1.0, hi - lo)
+        r = w / math.pi + 2.0
+        leg = pl["leg"]
+        # s: 0 at the OUTSEAM edge, 1 at the INSEAM edge (mirrored panels
+        # walk their profile the other way).
+        s_n = (x - lo) / w if leg > 0 else (hi - x) / w
+        s_n = min(1.0, max(0.0, s_n))
+        gap = 4.0 / r
+        if pl["panel"] == "front":
+            phi = (math.pi / 2 - gap) - s_n * (math.pi - 2 * gap)
+            lx = 92.0 * _chest_s + r * math.sin(phi)
+            ly = -r * math.cos(phi)
+        else:
+            phi = (-math.pi / 2 + gap) + s_n * (math.pi - 2 * gap)
+            lx = 92.0 * _chest_s + r * math.sin(phi)
+            ly = r * math.cos(phi)
+        fork_y = float(piece.get("forkY", 280.0))
+        if y < fork_y:
+            # Above the fork: sweep onto the hip shell — outseam edge stays
+            # at the hip side, inseam/crotch edge reaches CF/CB.
+            ta, tb = torso_ab(y)
+            A, B = ta + 12.0, tb + 12.0
+            psi = (1.0 - s_n) * (math.pi / 2)
+            hx = A * math.sin(psi)
+            hy = -B * math.cos(psi) if pl["panel"] == "front" else B * math.cos(psi)
+            min_y = min(py for _, py in piece["points"])
+            t = min(1.0, max(0.0, (fork_y - y) / max(1.0, fork_y - min_y)))
+            lx = lx * (1 - t) + hx * t
+            ly = ly * (1 - t) + hy * t
+        return (leg * lx * S, ly * S, (HEIGHT - y) * S)
+
     # Sleeve: wrap into a CONE around the tilted arm axis — radius follows the
     # piece's local width (biceps -> hem taper), else a straight tube leaves
     # an open wedge along a tapered forearm. Underarm edges meet inner-side.
@@ -397,10 +491,24 @@ def build_body():
         for i in range(N):
             faces.append((r0 + i, r0 + (i + 1) % N, c))
 
-    rings = [ring(0, a, b, (HEIGHT - y) * S) for y, a, b in TORSO]
+    rings = [ring(0, a, b, z_of_body(by)) for by, a, b in TORSO]
     for r0, r1 in zip(rings, rings[1:]):
         bridge(r0, r1)
-    cap(rings[0], (HEIGHT - 10) * S)
+    cap(rings[0], z_of_body(TORSO[0][0] - 10))
+
+    if BODY_KIND == "lower":
+        # Leg stubs: tapered cones from the crotch to just past the hem.
+        LEG_X = 92.0 * _chest_s
+        R_THIGH = 95.0 * _chest_s
+        R_ANKLE = 42.0 * _chest_s
+        for d in (1, -1):
+            top = ring(LEG_X * d, R_THIGH, R_THIGH, z_of_body(700))
+            bot = ring(LEG_X * d, R_ANKLE, R_ANKLE, z_of_body(_HEM_BY + 6))
+            bridge(top, bot)
+            c = len(verts)
+            verts.append((LEG_X * d * S, 0.0, z_of_body(690)))
+            for i in range(N):
+                faces.append((top + i, top + (i + 1) % N, c))
 
     # Arm stubs: tapered cones hanging from the shoulder joints, tilted
     # outward — matching the sleeves' own biceps->wrist taper.
@@ -416,7 +524,7 @@ def build_body():
             ))
         return start
 
-    for d in (1, -1):
+    for d in (1, -1) if BODY_KIND == "upper" else ():
         o, ax, e1, e2 = arm_frame(d)
         top = arm_ring(o, ax, e1, e2, 10, ARM_R)
         bot = arm_ring(o, ax, e1, e2, ARM_LEN, WRIST_R)
@@ -486,8 +594,9 @@ for name in ("use_sewing_springs", "use_sewing"):
         setattr(st, name, True)
 if hasattr(st, "sewing_force_max"):
     # The garment starts nearly assembled — gentle stitching only. Strong
-    # sewing forces whip the light cloth into permanent crumples.
-    st.sewing_force_max = 2
+    # sewing forces whip the light cloth into permanent crumples. Darted
+    # blocks ask for more via the sim hint (darts fight the side seams).
+    st.sewing_force_max = float(DATA.get("sim", {}).get("sewForce", 2))
 try:
     mod.collision_settings.distance_min = 0.003
     mod.collision_settings.collision_quality = 4
