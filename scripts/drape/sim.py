@@ -256,6 +256,7 @@ def _phi_at(s):
 
 
 SLEEVE_FIT = {}  # piece name -> (twist about arm axis, slide along it) — see fit below
+CAP_WARP = {}  # piece name -> sorted (pattern x, edge y, armscye target) — see fit below
 
 
 def place(piece, x, y):
@@ -387,6 +388,28 @@ def place(piece, x, y):
         wx = wx * (1 - t) + tx * t
         wy = wy * (1 - t) + (s_ * 0.5) * t
         wz = wz * (1 - t) + (HEIGHT - 10.0) * t
+    warp = CAP_WARP.get(piece["name"])
+    if warp and y <= 0:
+        # cap zone: blend from the cone (biceps line, y=0) to the matched
+        # armscye target (cap edge) so the pinned ring starts ON the seam
+        lo, hi = 0, len(warp) - 1
+        xx = min(max(x, warp[0][0]), warp[-1][0])
+        while lo < hi - 1:
+            mid = (lo + hi) // 2
+            if warp[mid][0] <= xx:
+                lo = mid
+            else:
+                hi = mid
+        x0, y0e, t0 = warp[lo]
+        x1, y1e, t1 = warp[hi]
+        f = (xx - x0) / max(1e-6, x1 - x0)
+        y_edge = y0e + (y1e - y0e) * f
+        tgt = tuple(a + (b - a) * f for a, b in zip(t0, t1))
+        t = min(1.0, max(0.0, y / min(y_edge, -1e-6)))
+        t = t * t * (3 - 2 * t)  # smoothstep: no crease at the biceps line
+        wx = wx + (tgt[0] / S - wx) * t
+        wy = wy + (tgt[1] / S - wy) * t
+        wz = wz + (tgt[2] / S - wz) * t
     wx, wy = clamp_out(wx, wy, HEIGHT - wz)
     return (wx * S, wy * S, wz * S)
 
@@ -446,6 +469,28 @@ for _sname, _pairs in _cap_pairs.items():
     _n = sum(len(s) for s, _ in _samples)
     print(f"sleeve fit {_sname}: twist {_best[1]}deg slide {_best[2]:.0f}mm "
           f"rest residual {_best[0] / _n * 1000:.1f}mm/pt")
+
+# A rigid twist+slide can't fit both cap halves (the cap curve on the cone
+# and the armscye curve on the body have different shapes — the back half
+# stayed ~50mm off). Warp the cap zone onto the seam itself: at the cap
+# edge every vert is placed exactly where its arc-matched armscye partner
+# lives (zero rest gap for the pinned ring), blending smoothly down to the
+# cone at the biceps line.
+for _sname, _pairs in _cap_pairs.items():
+    _spiece = next(p for p in DATA["pieces"] if p["name"] == _sname)
+    _entries = []
+    for _ssg, _op, _osg in _pairs:
+        _, _spts = _seg_pattern_samples(_sname, _ssg, k=48)
+        _opiece, _opts = _seg_pattern_samples(_op, _osg, k=48)
+        _tgt = [place(_opiece, px, py) for px, py in _opts]
+        _src = [place(_spiece, px, py) for px, py in _spts]
+        _fwd = sum(math.dist(a, b) for a, b in zip(_src, _tgt))
+        _rev = sum(math.dist(a, b) for a, b in zip(_src, reversed(_tgt)))
+        if _rev < _fwd:
+            _tgt = list(reversed(_tgt))
+        _entries += [(px, py, t) for (px, py), t in zip(_spts, _tgt)]
+    _entries.sort(key=lambda e: e[0])
+    CAP_WARP[_sname] = _entries
 
 # ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
 all_verts = []
