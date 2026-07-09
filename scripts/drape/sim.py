@@ -611,7 +611,9 @@ st.tension_stiffness = 40
 st.compression_stiffness = 40
 st.shear_stiffness = 20
 # Bending resists the fine accordion folds that read as "rings" on sleeves
-# and legs — per-block hint; higher = fewer, softer, larger folds.
+# and legs — per-block hint. Tested: 3.0 on the raglan hoodie traded rings
+# for tented shoulders and gaping side seams, so no block uses this yet; the
+# ring artifacts stay quarantined by the prompt clause instead.
 st.bending_stiffness = float(DATA.get("sim", {}).get("bending", 1.0))
 st.vertex_group_mass = "pin"
 for name in ("use_sewing_springs", "use_sewing"):

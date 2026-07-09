@@ -172,7 +172,9 @@ const BLOCKS = {
     trousers: true,
     parts: { front: "charlie.front", back: "charlie.back" },
     frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
-    riseTopPin: 0.35, // the deep back rise crumples at the seat if left to springs
+    // NOTE: riseTopPin was tried here (0.35) and made things WORSE — pinning
+    // the rise top destabilised the whole garment. The seat recipe is still
+    // open; charlie stays off the drape whitelist meanwhile.
     yOffset: 460,
     bodyKind: "lower",
   },
