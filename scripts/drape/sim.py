@@ -789,7 +789,14 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # assembled start pose: every mesh edge's simulated length is compared to its
 # flat length. Tight zones ramp green → yellow → red (the same reading a
 # fitter takes from drag lines on a toile); pooling slack shows pale blue.
-if FRAMES > 0:
+# PARKED behind DRAPE_FITMAP=1: the measurement is not yet honest. After
+# excluding pins, vertical gravity stretch, and smoothing distortion, the
+# remaining "strain" is dominated by assembly tension — the sewing springs
+# that close the panel gaps leave real horizontal tension that has nothing
+# to do with fit. A truthful map needs welded seams or a long relaxation
+# phase (R&D). The delivery plumbing (workflow upload, callback, fitUrl,
+# studio toggle) ships dormant and activates the moment this writes a file.
+if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # Measure the RAW cloth result: the cosmetic smooth pass distorts edge
     # lengths by a few percent exactly where curvature is high, which reads
     # as phantom strain across every wrinkled zone.

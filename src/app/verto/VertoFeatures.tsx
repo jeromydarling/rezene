@@ -663,7 +663,6 @@ const FEATURES: Feature[] = [
       "31 pattern blocks — tops, shirts, dresses, trousers, coats, foundation blocks",
       "True made-to-measure: every measurement point the block drafts from, cm or inches",
       "Cloth-physics drape preview on fourteen blocks — tees to circle skirts — that grounds a photoreal render",
-      "A pro-grade fit map with every drape: green where fabric skims, red where your pattern pulls tight",
       "Print-at-scale tiled PDF, SVG download, and a per-client pattern book",
     ],
     screen: MiniPatternStudio,
