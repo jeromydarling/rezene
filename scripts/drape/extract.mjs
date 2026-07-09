@@ -26,6 +26,10 @@
  *   charlie (Charlie)     chinos; slant-pocket corner restored synthetically
  *   sandy (Sandy)         circle skirt: one ring sector, polar "circle" wrap
  *   bella (Bella)         foundation bodice; waist + side bust darts sewn
+ *   yuri (Yuri)           zipless crossover hoodie: overlapping wrap fronts,
+ *                         button-pinned diagonal opening; hood/gussets described
+ *   walburga (Walburga)   tabard: two kite-hemmed panels joined only at the
+ *                         shoulders, sides open by design
  *
  * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
@@ -228,9 +232,12 @@ const BLOCKS = {
     trousers: true,
     parts: { front: "charlie.front", back: "charlie.back" },
     frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
-    // NOTE: riseTopPin was tried here (0.35) and made things WORSE — pinning
-    // the rise top destabilised the whole garment. The seat recipe is still
-    // open; charlie stays off the drape whitelist meanwhile.
+    // The mid-rise cut collapses the panels' top profile rows to a corner —
+    // the sim's leg placement clamps those (the old seat crumple). With
+    // placement sane, the waistband's grip on the rise top is modelled by
+    // pinning its top fifth (riseTopPin 0.35 pre-clamp destabilised the
+    // garment; 0.2 after the clamp is what closed the CB seat hole).
+    riseTopPin: 0.2,
     yOffset: 460,
     bodyKind: "lower",
   },
