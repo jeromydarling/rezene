@@ -38,6 +38,7 @@ const outPath = process.argv[3] ?? "pieces.json";
 const BLOCKS = {
   "classic-tee": {
     module: "@freesewing/teagan",
+    fabric: "knit",
     design: "Teagan",
     parts: { front: "teagan.front", back: "teagan.back", sleeve: "teagan.sleeve" },
     sleeveAnchors: { hemL: "hemLeft", hemR: "hemRight" },
@@ -48,6 +49,7 @@ const BLOCKS = {
   },
   aaron: {
     module: "@freesewing/aaron",
+    fabric: "knit",
     design: "Aaron",
     parts: { front: "aaron.front", back: "aaron.back" },
     // A tank's "shoulder seam" is the strap top; the Brian `shoulder` point
@@ -56,6 +58,7 @@ const BLOCKS = {
   },
   "relaxed-hoodie": {
     module: "@freesewing/sven",
+    fabric: "knit",
     design: "Sven",
     parts: { front: "sven.front", back: "sven.back", sleeve: "sven.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
@@ -63,6 +66,7 @@ const BLOCKS = {
   },
   hugo: {
     module: "@freesewing/hugo",
+    fabric: "knit",
     design: "Hugo",
     parts: { front: "hugo.front", back: "hugo.back", sleeve: "hugo.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
@@ -110,6 +114,7 @@ const BLOCKS = {
   },
   huey: {
     module: "@freesewing/huey",
+    fabric: "knit",
     design: "Huey",
     // Zip-up hoodie: two mirrored front halves whose CF zip edges are pinned
     // shut (a zip tape is rigid, unlike buttons), cut-on-fold back, set-in
@@ -122,6 +127,31 @@ const BLOCKS = {
     // The side seams pull each front half outward; the zip springs need the
     // same firmer stitch as the button-downs to hold CF fully shut.
     sim: { sewForce: 4 },
+  },
+  yuri: {
+    module: "@freesewing/yuri",
+    fabric: "knit",
+    design: "Yuri",
+    // Zipless crossover sweater (based on Huey): two FULL front panels whose
+    // opening edges sweep diagonally past CF — they overlap like a wrap
+    // cardigan and button shut. Hood and underarm gussets are described,
+    // not simulated (the gusset is a comfort diamond; its absence just
+    // leaves the sim's usual underarm join).
+    crossFront: true,
+    parts: { front: "yuri.front", back: "yuri.back", sleeve: "yuri.sleeve" },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    cuffed: true,
+    // Heavy overlapping knit panels need the button-down stitch.
+    sim: { sewForce: 4 },
+  },
+  walburga: {
+    module: "@freesewing/walburga",
+    design: "Walburga",
+    // Tabard (Wappenrock): two kite-hemmed panels joined ONLY at the
+    // shoulders — the sides hang open by design (it is worn over garments,
+    // often belted). The simplest construction in the catalogue.
+    tabard: true,
+    parts: { front: "walburga.front", back: "walburga.back" },
   },
   "slip-dress": {
     module: "@freesewing/sophie",
@@ -569,6 +599,35 @@ function dressPanel(partName, pieceName) {
  *  side -> armhole -> shoulder -> V-neck -> buttoned CF -> pointed hem with a
  *  waist dart slit (sewn shut in the sim). mirrored=true builds the other
  *  panel. */
+/** Tabard panel (Walburga): the draft is pure named-point geometry (straight
+ *  lines, drafted half at x<=0, cut on fold), so the piece is built from the
+ *  points directly instead of walking the seam path (which backtracks over
+ *  the head-slot notch). Front carries a V-neck; back a straight top edge. */
+function tabardPiece(partName, pieceName) {
+  const P = set[partName].points;
+  const pt = (p) => [p.x, p.y];
+  const mm = ([x, y]) => [-x, y];
+  const isFront = pieceName === "front";
+  const headL = pt(P.headLeft); // (-141, 0): head-slot edge
+  const topL = pt(P.topLeft); // (-211, 0): shoulder tip
+  const slitL = pt(P.triangleLeft); // (-211, 745): side edge ends
+  const lowL = pt(P.bottomMiddle); // (-106, 876): kite point
+  const cfLow = pt(P.triangle); // (0, 745): hem rises back to CF
+  const neckCF = isFront ? pt(P.neckomid) : pt(P.top); // (0,135) V / (0,0) straight
+  const neckR = isFront ? [neckCF, mm(pt(P.neckotop)), mm(headL)] : [neckCF, mm(headL)];
+  const neckL = isFront ? [headL, pt(P.neckotop), neckCF] : [headL, neckCF];
+  return buildPiece(pieceName, [
+    ["neckR", neckR],
+    ["shoulderR", [mm(headL), mm(topL)]],
+    ["sideR", [mm(topL), mm(slitL)]],
+    ["hemR", [mm(slitL), mm(lowL), cfLow]],
+    ["hemL", [cfLow, lowL, slitL]],
+    ["sideL", [slitL, topL]],
+    ["shoulderL", [topL, headL]],
+    ["neckL", neckL],
+  ]);
+}
+
 function waistcoatFront(pieceName, mirrored) {
   const part = set[cfg.parts.front];
   const P = part.points;
@@ -618,6 +677,50 @@ function waistcoatBack() {
     ["dartRL", mirror([...dartRR].reverse())],
     ["dartLL", mirror([...dartLR].reverse())],
     ["hem1L", mirror([...hem1R].reverse())],
+  ]);
+}
+
+/** Crossover front (Yuri): the zipless sweater's front is a FULL panel, cut
+ *  twice mirrored, whose opening edge sweeps diagonally from the neck across
+ *  CF (the "button" point sits ~200mm past centre) down to the hem — the two
+ *  fronts overlap like a wrap cardigan and button shut. */
+function crossFrontPanel(pieceName, mirrored) {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  return buildPiece(pieceName, [
+    ["hem", seg(slice(poly, P.cfBottom, P.bottom))],
+    ["side", seg(slice(poly, P.bottom, P.armhole))],
+    ["armscye", seg(slice(poly, P.armhole, P.shoulder))],
+    ["shoulder", seg(slice(poly, P.shoulder, P.hps))],
+    ["cross", seg(slice(poly, P.hps, P.button))],
+    ["crossLow", seg(slice(poly, P.button, P.cfBottom))],
+  ]);
+}
+
+/** Yuri back: cut on fold, hem at the drafted bottom edge (the generic
+ *  bodyPiece can't be used — yuri's seam path hem anchors differ). */
+function crossBack() {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hemR = slice(poly, P.cbBottom, P.bottom);
+  const sideR = slice(poly, P.bottom, P.armhole);
+  const armscyeR = slice(poly, P.armhole, P.shoulder);
+  const shoulderR = slice(poly, P.shoulder, P.hps);
+  const neckR = slice(poly, P.hps, P.cbNeck);
+  return buildPiece("back", [
+    ["hemR", hemR],
+    ["sideR", sideR],
+    ["armscyeR", armscyeR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hemL", mirror([...hemR].reverse())],
   ]);
 }
 
@@ -926,6 +1029,12 @@ if (cfg.trousers) {
   front.placement = { kind: "plane", y: -160 };
   back.placement = { kind: "plane", y: 160 };
   bodyPieces = [front, back];
+} else if (cfg.tabard) {
+  const front = tabardPiece(cfg.parts.front, "front");
+  const back = tabardPiece(cfg.parts.back, "back");
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  bodyPieces = [front, back];
 } else if (cfg.waistcoat) {
   // The drafted front's body extends to +x (wearer's left panel).
   const frontL = waistcoatFront("frontL", false);
@@ -938,6 +1047,22 @@ if (cfg.trousers) {
   frontR.pinSegments = ["placket"];
   frontL.pinStride = 4;
   frontR.pinStride = 4;
+  bodyPieces = [frontL, frontR, back];
+} else if (cfg.crossFront) {
+  // The drafted panel's body extends to +x (wearer's left front); it lies on
+  // top of the mirrored right front with a small outset so the crossover
+  // layers instead of interpenetrating. Buttons hold the wrap: pin the upper
+  // (diagonal) opening edge at button spacing, leave the skirt edge free.
+  const frontL = crossFrontPanel("frontL", false);
+  const frontR = crossFrontPanel("frontR", true);
+  const back = crossBack();
+  frontL.placement = { kind: "plane", y: -160, outset: 5 };
+  frontR.placement = { kind: "plane", y: -160 };
+  frontL.pinSegments = ["cross"];
+  frontR.pinSegments = ["cross"];
+  frontL.pinStride = 4;
+  frontR.pinStride = 4;
+  back.placement = { kind: "plane", y: 160 };
   bodyPieces = [frontL, frontR, back];
 } else if (cfg.zipFront) {
   // The drafted half's body extends to +x (wearer's left panel). Zip edges
@@ -1049,6 +1174,12 @@ const seams = cfg.trousers
       // One piece: its two straight radial edges meet at CB.
       { name: "cb", a: ["skirt", "edgeStart"], b: ["skirt", "edgeEnd"] },
     ]
+  : cfg.tabard
+  ? [
+      // A tabard joins ONLY at the shoulders; the sides hang open.
+      { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
+    ]
   : cfg.bodice
   ? [
       // Hangs from pinned shoulders + necklines; the side seams are split
@@ -1089,6 +1220,21 @@ const seams = cfg.trousers
   ? [
       // Hangs from pinned shoulders + necklines; the CF zip is sewn shut.
       { name: "zip", a: ["frontL", "zip"], b: ["frontR", "zip"] },
+      { name: "shoulder_R", a: ["frontL", "shoulder"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["frontR", "shoulder"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R", a: ["frontL", "side"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["frontR", "side"], b: ["back", "sideL"] },
+      { name: "armscye_R_front", a: ["frontL", "armscye"], b: ["sleeve_R", "capFront"] },
+      { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
+      { name: "armscye_L_front", a: ["frontR", "armscye"], b: ["sleeve_L", "capFront"] },
+      { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
+      { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
+      { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
+    ]
+  : cfg.crossFront
+  ? [
+      // Crossover front: hangs from pinned shoulders; the diagonal opening
+      // edges are button-pinned (pinSegments "cross") and overlap at CF.
       { name: "shoulder_R", a: ["frontL", "shoulder"], b: ["back", "shoulderR"], pin: true },
       { name: "shoulder_L", a: ["frontR", "shoulder"], b: ["back", "shoulderL"], pin: true },
       { name: "side_R", a: ["frontL", "side"], b: ["back", "sideR"] },
@@ -1158,6 +1304,10 @@ const out = {
   // which ghost-mannequin the sim should build.
   yOffset: cfg.yOffset ?? 0,
   bodyKind: cfg.bodyKind ?? "upper",
+  // Fabric class for the fit map's colour scale: a knit worn at +20% girth
+  // is comfortable, a woven at +20% is a split seam — the same strain must
+  // not be graded the same way.
+  fabric: cfg.fabric ?? "woven",
   // Per-block solver hints (e.g. darted blocks need stronger stitching to
   // pull the dart wedges shut against the side seams).
   sim: cfg.sim ?? {},

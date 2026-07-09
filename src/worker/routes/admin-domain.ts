@@ -75,7 +75,24 @@ adminDomainRoutes.get("/check", async (c) => {
       }),
     );
     const ok = lookups.some((l) => l.ok);
-    return c.json({ ok, target: want, lookups });
+    // Layer 2: is HTTPS actually live? DNS can point at us while the
+    // certificate for the merchant's hostname hasn't been issued yet (the
+    // operator activation step) — the browser shows a security error until
+    // it is. Probe it the way a browser would.
+    let https = false;
+    if (ok) {
+      try {
+        const r = await fetch(`https://${domain}/`, {
+          method: "HEAD",
+          redirect: "manual",
+          signal: AbortSignal.timeout(6000),
+        });
+        https = r.status > 0;
+      } catch {
+        https = false;
+      }
+    }
+    return c.json({ ok, https, target: want, lookups });
   } catch {
     return c.json({ error: "Couldn't check DNS right now — try again in a moment." }, 502);
   }

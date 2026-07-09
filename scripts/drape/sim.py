@@ -1221,14 +1221,20 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             print(f"    vert {i} piece={_pc(i)} flat=({all_flat[i][0]:.0f},{all_flat[i][1]:.0f}) "
                   f"z={x[remap[i]][2]:.3f} girth={tight[remap[i]]:+.2f}")
 
+    # Fabric-aware scale: CLO's strain map runs 100->120% (red at +20%). For
+    # WOVENS we go slightly stricter (snug from +5%, tight at +15% — a woven
+    # at +20% girth is a split seam). KNITS wear comfortably at +15-30%
+    # stretch, so the same strain grades three times more forgivingly.
+    _fab = DATA.get("fabric", "woven")
+    _snug, _tight = (0.15, 0.35) if _fab == "knit" else (0.05, 0.15)
+    print(f"fit scale: {_fab} (snug {_snug:+.0%}, tight {_tight:+.0%})")
+
     def strain_color(s, contact):
         if not contact:
             return (0.62, 0.66, 0.62)  # free-hanging: neutral, no "fit" there
         if s < -0.02:
             return (0.45, 0.62, 0.85)  # slack pooling against the body
-        # CLO's strain map runs 100->120% (red at +20%); we go red at +15%,
-        # slightly stricter, with yellow ("snug") from +5%.
-        stops = [(0.0, (0.30, 0.65, 0.34)), (0.05, (0.92, 0.85, 0.25)), (0.15, (0.85, 0.13, 0.10))]
+        stops = [(0.0, (0.30, 0.65, 0.34)), (_snug, (0.92, 0.85, 0.25)), (_tight, (0.85, 0.13, 0.10))]
         if s <= 0.0:
             return stops[0][1]
         for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
