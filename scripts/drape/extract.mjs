@@ -14,6 +14,8 @@
  *   aaron (Aaron tank)    front/back only, armholes are free edges
  *   relaxed-hoodie (Sven) front/back/long cuffed sleeves
  *   hugo (Hugo raglan)    raglan seams to the neckline; hood not simulated
+ *   simon / simone        button-downs: two front panels pinned shut at the
+ *                         buttons, back + yoke; collar not simulated
  *
  * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
@@ -56,6 +58,38 @@ const BLOCKS = {
     // simulated; the text description carries it, the sim carries the body.
     raglan: true,
   },
+  simon: {
+    module: "@freesewing/simon",
+    design: "Simon",
+    // Button-front: two separate front panels pinned closed at the placket,
+    // back + yoke assembly, buttoned cuffs. Collar and collar stand are NOT
+    // simulated — the description carries them (same honesty as Hugo's hood).
+    buttonFront: true,
+    parts: {
+      frontR: "simon.frontRight",
+      frontL: "simon.frontLeft",
+      back: "simon.back",
+      yoke: "simon.yoke",
+      sleeve: "simon.sleeve",
+    },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    cuffed: true,
+  },
+  simone: {
+    module: "@freesewing/simone",
+    design: "Simone",
+    // Simone (women's button-down) drafts into the same simon.* part names.
+    buttonFront: true,
+    parts: {
+      frontR: "simon.frontRight",
+      frontL: "simon.frontLeft",
+      back: "simon.back",
+      yoke: "simon.yoke",
+      sleeve: "simon.sleeve",
+    },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    cuffed: true,
+  },
 };
 
 const blockId = BLOCKS[spec.block] ? spec.block : "classic-tee";
@@ -64,9 +98,10 @@ const cfg = BLOCKS[blockId];
 // The studio's standard measurement set (mm) — any client measurement sent in
 // the spec overrides its entry.
 const M = {
-  biceps: 335, chest: 1080, head: 560, hips: 1000, hpsToBust: 130, hpsToWaistBack: 460,
-  neck: 400, shoulderSlope: 13, shoulderToShoulder: 445, shoulderToWrist: 620,
-  waist: 820, waistToArmpit: 230, waistToHead: 670, waistToHips: 130, wrist: 170,
+  biceps: 335, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080, head: 560, highBust: 1040,
+  hips: 1000, hpsToBust: 270, hpsToWaistBack: 460, neck: 400, shoulderSlope: 13,
+  shoulderToShoulder: 445, shoulderToWrist: 620, waist: 820, waistToArmpit: 230,
+  waistToHead: 670, waistToHips: 130, wrist: 170,
 };
 for (const [k, v] of Object.entries(spec.measurements ?? {})) {
   const n = Number(v);
@@ -286,21 +321,10 @@ function sleevePiece(side) {
   ]);
 }
 
-const front = bodyPiece(cfg.parts.front, "front");
-const back = bodyPiece(cfg.parts.back, "back");
-const hasSleeves = Boolean(cfg.parts.sleeve);
-const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
-
-// 3D placement hints. Body pieces wrap an elliptical shell (front/back sign);
-// sleeves wrap tubes around the mannequin's tilted arm stubs.
-const chestHalf = Math.max(...front.points.map(([x]) => Math.abs(x)));
-front.placement = { kind: "plane", y: -160 };
-back.placement = { kind: "plane", y: 160 };
-
 // Top-edge profile per body piece: min pattern-y per x-bin along the
 // boundary. The sim hangs the panel from this line (collapsing depth toward
 // the seam/neck line above it), whatever shape the block's top edge takes —
-// shoulder seam, tank strap, or raglan diagonal.
+// shoulder seam, tank strap, raglan diagonal or shirt-front yoke line.
 function topProfile(piece) {
   const BIN = 25;
   const bins = new Map();
@@ -310,8 +334,102 @@ function topProfile(piece) {
   }
   return [...bins.entries()].sort((a, b) => a[0] - b[0]);
 }
-front.topProfile = topProfile(front);
-back.topProfile = topProfile(back);
+
+/** Button-front panel (Simon frontRight/frontLeft): drafted as a full panel
+ *  with the centre front at x=0 and the button/buttonhole stand crossing it.
+ *  The two panels are natural mirror complements, so pattern coordinates map
+ *  straight into world space. */
+function frontPanel(partName, pieceName) {
+  const part = set[partName];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  return buildPiece(pieceName, [
+    ["hem", slice(poly, P.cfHem, P.hem)],
+    ["side", slice(poly, P.hem, P.armhole)],
+    ["armscye", slice(poly, P.armhole, P.shoulder)],
+    ["shoulder", slice(poly, P.shoulder, P.neck)],
+    ["neck", slice(poly, P.neck, P.cfNeck)],
+    ["placket", slice(poly, P.cfNeck, P.cfHem)],
+  ]);
+}
+
+/** Shirt back below the yoke (half draft, mirrored). */
+function shirtBackPiece() {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hemR = slice(poly, P.cbHem, P.hem);
+  const sideR = slice(poly, P.hem, P.armhole);
+  const armscyeR = slice(poly, P.armhole, P.armholeYokeSplit);
+  const yokeR = slice(poly, P.armholeYokeSplit, P.cbYoke);
+  return buildPiece("back", [
+    ["hemR", hemR],
+    ["sideR", sideR],
+    ["armscyeR", armscyeR],
+    ["yokeR", yokeR],
+    ["yokeL", mirror([...yokeR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hemL", mirror([...hemR].reverse())],
+  ]);
+}
+
+/** Shirt yoke (drafted full width). Bottom sews to the back, shoulders to
+ *  the front panels, neck curve joins the pinned collar line. */
+function yokePiece() {
+  const part = set[cfg.parts.yoke];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const m = (pt) => ({ x: -pt.x, y: pt.y });
+  return buildPiece("yoke", [
+    ["bottomR", slice(poly, P.cbYoke, P.armholeYokeSplit)],
+    ["armTopR", slice(poly, P.armholeYokeSplit, P.shoulder)],
+    ["shoulderR", slice(poly, P.shoulder, P.neck)],
+    ["neckR", slice(poly, P.neck, P.cbNeck)],
+    ["neckL", slice(poly, P.cbNeck, m(P.neck))],
+    ["shoulderL", slice(poly, m(P.neck), m(P.shoulder))],
+    ["armTopL", slice(poly, m(P.shoulder), m(P.armholeYokeSplit))],
+    ["bottomL", slice(poly, m(P.armholeYokeSplit), P.cbYoke)],
+  ]);
+}
+
+const hasSleeves = Boolean(cfg.parts.sleeve);
+const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
+
+let bodyPieces;
+if (cfg.buttonFront) {
+  // Wearer's left panel (frontLeft, body on +x) carries the button stand and
+  // lies on top; it gets a small outward offset so the closed placket layers
+  // instead of interpenetrating. Both plackets are pinned shut (buttoned).
+  const frontR = frontPanel(cfg.parts.frontR, "frontR");
+  const frontL = frontPanel(cfg.parts.frontL, "frontL");
+  const back = shirtBackPiece();
+  const yoke = yokePiece();
+  frontR.placement = { kind: "plane", y: -160 };
+  frontL.placement = { kind: "plane", y: -160, outset: 5 };
+  back.placement = { kind: "plane", y: 160 };
+  yoke.placement = { kind: "plane", y: 160 };
+  // Pin the plackets at button spacing, not continuously: a fully rigid CF
+  // line fights the wrapped panel's longer path over the chest and compresses
+  // the fronts into horizontal ripples. Buttons every ~4th boundary point
+  // (~50mm) hold the shirt closed and let the fabric relax between them.
+  frontR.pinSegments = ["placket"];
+  frontL.pinSegments = ["placket"];
+  frontR.pinStride = 4;
+  frontL.pinStride = 4;
+  bodyPieces = [frontR, frontL, back, yoke];
+} else {
+  const front = bodyPiece(cfg.parts.front, "front");
+  const back = bodyPiece(cfg.parts.back, "back");
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  bodyPieces = [front, back];
+}
+
+// 3D placement hints. Body pieces wrap an elliptical shell (front/back sign);
+// sleeves wrap tubes around the mannequin's tilted arm stubs.
+const chestHalf = Math.max(...bodyPieces[0].points.map(([x]) => Math.abs(x)));
+for (const p of bodyPieces) p.topProfile = topProfile(p);
 
 if (hasSleeves) {
   // Taper hints: half-width at the biceps line (pattern y=0) and at the hem,
@@ -345,7 +463,26 @@ if (hasSleeves) {
  *  point-by-point after resampling both to the same count (the sim
  *  auto-orients direction from world-space endpoints). Shoulders are pinned
  *  — the garment hangs from them on the ghost mannequin. */
-const seams = cfg.raglan
+const seams = cfg.buttonFront
+  ? [
+      // Button-front: the garment hangs from pinned shoulders + necklines +
+      // pinned plackets. The yoke bridges back and fronts; the yoke's own
+      // small armhole edges stay free (like the collar, they're covered by
+      // the description, not the sim).
+      { name: "shoulder_R", a: ["yoke", "shoulderR"], b: ["frontL", "shoulder"], pin: true },
+      { name: "shoulder_L", a: ["yoke", "shoulderL"], b: ["frontR", "shoulder"], pin: true },
+      { name: "yoke_R", a: ["yoke", "bottomR"], b: ["back", "yokeR"] },
+      { name: "yoke_L", a: ["yoke", "bottomL"], b: ["back", "yokeL"] },
+      { name: "side_R", a: ["frontL", "side"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["frontR", "side"], b: ["back", "sideL"] },
+      { name: "armscye_R_front", a: ["frontL", "armscye"], b: ["sleeve_R", "capFront"] },
+      { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
+      { name: "armscye_L_front", a: ["frontR", "armscye"], b: ["sleeve_L", "capFront"] },
+      { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
+      { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
+      { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
+    ]
+  : cfg.raglan
   ? [
       // Raglan: no shoulder seam — the garment hangs from the pinned
       // necklines (body + sleeve tops) and pinned raglan sleeve edges.
@@ -378,7 +515,7 @@ const seams = cfg.raglan
 const out = {
   block: blockId,
   spec,
-  pieces: [front, back, ...sleeves],
+  pieces: [...bodyPieces, ...sleeves],
   seams,
   // Ghost-mannequin scale hints: ratios of this draft's measurements to the
   // studio-standard body the sim's torso profile was modelled on.
