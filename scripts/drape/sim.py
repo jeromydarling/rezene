@@ -790,6 +790,12 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # flat length. Tight zones ramp green → yellow → red (the same reading a
 # fitter takes from drag lines on a toile); pooling slack shows pale blue.
 if FRAMES > 0:
+    # Measure the RAW cloth result: the cosmetic smooth pass distorts edge
+    # lengths by a few percent exactly where curvature is high, which reads
+    # as phantom strain across every wrinkled zone.
+    sm.show_viewport = False
+    sm.show_render = False
+    bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     me = obj.evaluated_get(deps).to_mesh()
     n = len(me.vertices)
@@ -837,6 +843,8 @@ if FRAMES > 0:
         else:
             r, g, b = (0.72, 0.72, 0.72)  # unmeasured (pinned/edge) — neutral
         attr.data[i].color = (r, g, b, 1.0)
+    sm.show_viewport = True
+    sm.show_render = True
 
     fit_mat = bpy.data.materials.new("fit_map")
     fit_mat.use_nodes = True
