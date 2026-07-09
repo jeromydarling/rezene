@@ -971,8 +971,13 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     F = Ds @ Dm_inv
     C = np.einsum("tik,til->tkl", F, F)
     lam_weft = np.sqrt(np.maximum(C[:, 0, 0], 0.0))
-    tight_tri = np.where(good, lam_weft - 1.0, 0.0)
-    areaT = np.abs(detDm) * 0.5
+    # Pinned verts are artificial hanging scaffolding frozen at placed
+    # positions — triangles touching them measure the scaffold, not relaxed
+    # cloth, and junctions between two pinned clusters can never relax at
+    # all. Exclude them like the free-hanging regions.
+    free_tri = (invw[t0] > 0) & (invw[t1] > 0) & (invw[t2] > 0)
+    tight_tri = np.where(good & free_tri, lam_weft - 1.0, 0.0)
+    areaT = np.where(free_tri, np.abs(detDm) * 0.5, 0.0)
 
     tight_v = np.zeros(nv)
     area_v = np.zeros(nv)
@@ -983,9 +988,10 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     tight = np.where(area_v > 0, tight_v / np.maximum(area_v, 1e-12), 0.0)
 
     # Fit exists only where the garment meets the body (CLO computes its fit
-    # map the same way); free-hanging cloth shows neutral.
+    # map the same way); free-hanging cloth shows neutral. Pinned regions
+    # (no measured area) also fall out here.
     _, _, dist = contact_planes(x)
-    in_contact = dist < 0.012
+    in_contact = (dist < 0.012) & (area_v > 0)
 
     def strain_color(s, contact):
         if not contact:
