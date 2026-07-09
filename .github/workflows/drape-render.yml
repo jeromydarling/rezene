@@ -52,7 +52,7 @@ jobs:
             exit 1
           }
           node scripts/drape/extract.mjs "$SPEC" "$PWD/out/pieces.json" || fail "pattern extraction failed"
-          blender -b -noaudio -P scripts/drape/sim.py -- "$PWD/out/pieces.json" "$PWD/out/drape.png" 80 \
+          DRAPE_FITMAP=1 blender -b -noaudio -P scripts/drape/sim.py -- "$PWD/out/pieces.json" "$PWD/out/drape.png" 80 \
             || fail "cloth simulation failed"
           [ -f out/drape.png ] || fail "no render produced"
           FIT_ARG=()

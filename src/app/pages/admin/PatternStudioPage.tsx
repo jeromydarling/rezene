@@ -1166,7 +1166,10 @@ export function PatternStudioPage() {
                         <span className="font-medium" style={{ color: "#c22" }}>red</span> is pulling
                         tight (a real toile would show drag lines there), and{" "}
                         <span className="font-medium" style={{ color: "#6b93c9" }}>blue</span> is
-                        pooling slack you could pinch out.
+                        pooling slack you could pinch out. Pale areas hang free of the form. Judge
+                        the body of the garment here — shoulder and armhole joins read warmer than
+                        they really are on our rigid stand, the same reason fitters check sleeves on
+                        a live model.
                       </p>
                     )}
                     <button

@@ -105,7 +105,11 @@ else:
          for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"),
         default=335.0,
     )
-    ARM_TILT = math.radians(30 if _sleeve_umax <= 350 else 16)
+    # 12deg for short sleeves: the old airy 30deg splay parked the sleeve
+    # caps far from the shoulders, which read as phantom tightness across
+    # the chest band in the fit map (girth p95 +82% -> +49% at 12deg) —
+    # and arms-down is how a fitting photo actually looks.
+    ARM_TILT = math.radians(12 if _sleeve_umax <= 350 else 16)
     RAGLAN_U0 = 0.0
     ARM_LEN = _sleeve_umax + 45.0
 if _TILT_OVERRIDE:
@@ -255,10 +259,6 @@ def _phi_at(s):
     return _phis[lo]
 
 
-SLEEVE_FIT = {}  # piece name -> (twist about arm axis, slide along it) — see fit below
-CAP_WARP = {}  # piece name -> sorted (pattern x, edge y, armscye target) — see fit below
-
-
 def place(piece, x, y):
     """Pattern-space (x, y) -> world metres per the piece's placement hint."""
     pl = piece["placement"]
@@ -363,15 +363,12 @@ def place(piece, x, y):
     r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
     # Slightly less than a full wrap: the underarm edges must NOT start
     # coincident (self-collision fights zero-length sewing and explodes).
-    # SLEEVE_FIT twists the sleeve in its socket / slides it along the arm so
-    # the pinned cap ring lands ON the armscye line (fit below).
-    _dth, _du = SLEEVE_FIT.get(piece["name"], (0.0, 0.0))
-    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r))) + _dth
+    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
     # u: distance down the arm axis from the shoulder joint.
     if pl.get("raglan"):
         u = y + RAGLAN_U0  # biceps line lands at the armhole depth
     else:
-        u = y - sleeve_miny[piece["name"]] + _du  # 0 at cap top
+        u = y - sleeve_miny[piece["name"]]  # 0 at cap top
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]
@@ -388,109 +385,22 @@ def place(piece, x, y):
         wx = wx * (1 - t) + tx * t
         wy = wy * (1 - t) + (s_ * 0.5) * t
         wz = wz * (1 - t) + (HEIGHT - 10.0) * t
-    warp = CAP_WARP.get(piece["name"])
-    if warp and y <= 0:
-        # cap zone: blend from the cone (biceps line, y=0) to the matched
-        # armscye target (cap edge) so the pinned ring starts ON the seam
-        lo, hi = 0, len(warp) - 1
-        xx = min(max(x, warp[0][0]), warp[-1][0])
-        while lo < hi - 1:
-            mid = (lo + hi) // 2
-            if warp[mid][0] <= xx:
-                lo = mid
-            else:
-                hi = mid
-        x0, y0e, t0 = warp[lo]
-        x1, y1e, t1 = warp[hi]
-        f = (xx - x0) / max(1e-6, x1 - x0)
-        y_edge = y0e + (y1e - y0e) * f
-        tgt = tuple(a + (b - a) * f for a, b in zip(t0, t1))
-        t = min(1.0, max(0.0, y / min(y_edge, -1e-6)))
-        t = t * t * (3 - 2 * t)  # smoothstep: no crease at the biceps line
-        wx = wx + (tgt[0] / S - wx) * t
-        wy = wy + (tgt[1] / S - wy) * t
-        wz = wz + (tgt[2] / S - wz) * t
     wx, wy = clamp_out(wx, wy, HEIGHT - wz)
     return (wx * S, wy * S, wz * S)
 
 
-# ---- Set-in sleeve socket alignment -------------------------------------------
-# The cap ring is pinned, but the cone wrap places the cap top pointing
-# OUTWARD while the garment's armscye curve has its own azimuth around the
-# arm — the pinned cap ended up twisted ~90deg in its socket, freezing
-# ~92mm seam gaps that no sewing force could close (the gap vectors are
-# antisymmetric along the seam with zero mean: a pure rotation signature).
-# Fit a per-sleeve twist + slide from the seam correspondence at REST so
-# the pinned ring lands on the armscye line.
-def _seg_pattern_samples(piece_name, seg_name, k=24):
-    piece = next(p for p in DATA["pieces"] if p["name"] == piece_name)
-    start, end = piece["segments"][seg_name]
-    npts = len(piece["points"])
-    idxs = []
-    i = start
-    while True:
-        idxs.append(i % npts)
-        if i % npts == end % npts:
-            break
-        i += 1
-    pts = [piece["points"][j] for j in idxs]
-    return piece, [pts[round(j * (len(pts) - 1) / (k - 1))] for j in range(k)]
-
-
-_cap_pairs = {}
-for _seam in DATA["seams"]:
-    for (_sp, _ssg), (_op, _osg) in ((_seam["a"], _seam["b"]), (_seam["b"], _seam["a"])):
-        _pc = next(p for p in DATA["pieces"] if p["name"] == _sp)
-        if (_pc["placement"]["kind"] == "sleeve" and _ssg.startswith("cap")
-                and not _pc["placement"].get("raglan")):
-            _cap_pairs.setdefault(_sp, []).append((_ssg, _op, _osg))
-
-for _sname, _pairs in _cap_pairs.items():
-    _spiece = next(p for p in DATA["pieces"] if p["name"] == _sname)
-    _samples = []
-    for _ssg, _op, _osg in _pairs:
-        _, _spts = _seg_pattern_samples(_sname, _ssg)
-        _opiece, _opts = _seg_pattern_samples(_op, _osg)
-        _tgt = [place(_opiece, px, py) for px, py in _opts]
-        _samples.append((_spts, _tgt))
-    _best = None
-    for _dth_deg in range(-180, 180, 5):
-        for _du in range(-40, 50, 10):
-            SLEEVE_FIT[_sname] = (math.radians(_dth_deg), float(_du))
-            _res = 0.0
-            for _spts, _tgt in _samples:
-                _src = [place(_spiece, px, py) for px, py in _spts]
-                _fwd = sum(math.dist(a, b) for a, b in zip(_src, _tgt))
-                _rev = sum(math.dist(a, b) for a, b in zip(_src, reversed(_tgt)))
-                _res += min(_fwd, _rev)
-            if _best is None or _res < _best[0]:
-                _best = (_res, _dth_deg, float(_du))
-    SLEEVE_FIT[_sname] = (math.radians(_best[1]), _best[2])
-    _n = sum(len(s) for s, _ in _samples)
-    print(f"sleeve fit {_sname}: twist {_best[1]}deg slide {_best[2]:.0f}mm "
-          f"rest residual {_best[0] / _n * 1000:.1f}mm/pt")
-
-# A rigid twist+slide can't fit both cap halves (the cap curve on the cone
-# and the armscye curve on the body have different shapes — the back half
-# stayed ~50mm off). Warp the cap zone onto the seam itself: at the cap
-# edge every vert is placed exactly where its arc-matched armscye partner
-# lives (zero rest gap for the pinned ring), blending smoothly down to the
-# cone at the biceps line.
-for _sname, _pairs in _cap_pairs.items():
-    _spiece = next(p for p in DATA["pieces"] if p["name"] == _sname)
-    _entries = []
-    for _ssg, _op, _osg in _pairs:
-        _, _spts = _seg_pattern_samples(_sname, _ssg, k=48)
-        _opiece, _opts = _seg_pattern_samples(_op, _osg, k=48)
-        _tgt = [place(_opiece, px, py) for px, py in _opts]
-        _src = [place(_spiece, px, py) for px, py in _spts]
-        _fwd = sum(math.dist(a, b) for a, b in zip(_src, _tgt))
-        _rev = sum(math.dist(a, b) for a, b in zip(_src, reversed(_tgt)))
-        if _rev < _fwd:
-            _tgt = list(reversed(_tgt))
-        _entries += [(px, py, t) for (px, py), t in zip(_spts, _tgt)]
-    _entries.sort(key=lambda e: e[0])
-    CAP_WARP[_sname] = _entries
+# NOTE (socket-alignment experiments, tried and reverted): the pinned cap
+# ring sits twisted ~125deg in its socket relative to the garment's armscye
+# curve, freezing ~92mm rest gaps into the armscye seams (gap vectors are
+# antisymmetric with zero mean — a rotation signature). Rigidly twisting
+# the sleeve placement to fit (grid search over twist+slide) closed the
+# front halves to ~15mm but crumpled the sleeve tubes; warping the cap
+# zone onto its arc-matched armscye targets closed all halves to ~6mm but
+# crushed the sleeve-cap ease into ruffles and tore the shoulder line —
+# both regress the accepted drape look. The fit-map relax closes these
+# seams hard AFTER the bake instead, which measures fit without touching
+# the render. Keep any future attempt single-variable and eyeball the
+# drape before trusting the seam numbers.
 
 # ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
 all_verts = []
@@ -922,7 +832,7 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # fit classification is shown only where the garment touches the form —
 # free-hanging cloth has no "fit" (CLO does the same).
 #
-# CALIBRATION RECORD (and why DRAPE_FITMAP stays off by default): the
+# CALIBRATION RECORD: the
 # spring-only relax converged to a false floor (girth p95 +98% on the tee)
 # because Blender's sewing only pairs the sparse ORIGINAL pattern points —
 # the subdivision verts along piece boundaries were never sewn, welded, or
@@ -934,14 +844,15 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # (post-extrapolation hard contact projection was chaotically unstable;
 # in-sweep contact is not). Fitted blocks now grade credibly — bella reads
 # median +4% girth, snug at bust/waist, exactly what a darted bodice
-# should say. What remains is NOT a solver artifact: the tee still grades
-# hot in the neck-to-armscye band (p95 ~+64%) because the render pose
-# splays the arms 30deg for the airy tee stance, parking the pinned cap
-# rings ~92mm from where the panels' armscye edges live — the closed
-# garment genuinely cannot span that pose unstretched. Proven by freeing
-# every pin (and letting scaffold rings drift rigidly): the band persists
-# anchor-free. The fix is a pose calibration (arms at ~10deg for fit
-# grading, cap rings at the arm root), not more relaxation.
+# should say. What remains is NOT a solver artifact: the shoulder/armhole
+# join reads warmer than reality because the rigid stand's posed arms park
+# the pinned cap rings away from the panels' armscye edges — the closed
+# garment genuinely cannot span the pose unstretched (proven by freeing
+# every pin, even letting scaffold rings drift rigidly: the band persists
+# anchor-free). Lowering short-sleeve arms 30->12deg cut the tail nearly
+# in half (girth p95 +82% -> +49%); the residual is disclosed to the
+# designer in the fit-map legend, the same way fitters treat rigid-form
+# sleeve fit: judge the body here, judge shoulders on a live model.
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     import numpy as np
     from mathutils.bvhtree import BVHTree
