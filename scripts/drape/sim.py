@@ -13,6 +13,7 @@ import bpy
 import bmesh
 import json
 import math
+import os as _os
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1 :]
@@ -53,7 +54,8 @@ _shoulder_s = float(_body.get("shoulder", 1.0))
 _torso_s = float(_body.get("torso", 1.0))
 
 ARM_R = 55.0 * _biceps_s  # arm stub radius — fills the sleeve tube so it can't ruffle
-SHOULDER_X = 215.0 * _shoulder_s  # arm axis origin distance from centre (mm)
+# Arm axis origin distance from centre (mm). Env override for pose experiments.
+SHOULDER_X = float(_os.environ.get("DRAPE_SHOULDER_X", "215.0")) * _shoulder_s
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
 
 def z_of_body(by):
@@ -92,6 +94,7 @@ else:
 # shoulder, not arm length.
 _sleeve_pl = next((p["placement"] for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"), None)
 _RAGLAN = bool(_sleeve_pl and _sleeve_pl.get("raglan"))
+_TILT_OVERRIDE = _os.environ.get("DRAPE_ARM_TILT")
 if _RAGLAN:
     ARM_TILT = math.radians(30 if _sleeve_pl["y1"] <= 300 else 16)
     RAGLAN_U0 = max(0.0, _sleeve_pl.get("armDepth", 250.0) - SHOULDER_PY) / math.cos(ARM_TILT)
@@ -102,9 +105,15 @@ else:
          for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"),
         default=335.0,
     )
-    ARM_TILT = math.radians(30 if _sleeve_umax <= 350 else 16)
+    # 12deg for short sleeves: the old airy 30deg splay parked the sleeve
+    # caps far from the shoulders, which read as phantom tightness across
+    # the chest band in the fit map (girth p95 +82% -> +49% at 12deg) —
+    # and arms-down is how a fitting photo actually looks.
+    ARM_TILT = math.radians(12 if _sleeve_umax <= 350 else 16)
     RAGLAN_U0 = 0.0
     ARM_LEN = _sleeve_umax + 45.0
+if _TILT_OVERRIDE:
+    ARM_TILT = math.radians(float(_TILT_OVERRIDE))
 WRIST_R = ARM_R * 0.6  # arm stubs taper toward the wrist
 
 
@@ -380,6 +389,19 @@ def place(piece, x, y):
     return (wx * S, wy * S, wz * S)
 
 
+# NOTE (socket-alignment experiments, tried and reverted): the pinned cap
+# ring sits twisted ~125deg in its socket relative to the garment's armscye
+# curve, freezing ~92mm rest gaps into the armscye seams (gap vectors are
+# antisymmetric with zero mean — a rotation signature). Rigidly twisting
+# the sleeve placement to fit (grid search over twist+slide) closed the
+# front halves to ~15mm but crumpled the sleeve tubes; warping the cap
+# zone onto its arc-matched armscye targets closed all halves to ~6mm but
+# crushed the sleeve-cap ease into ruffles and tore the shoulder line —
+# both regress the accepted drape look. The fit-map relax closes these
+# seams hard AFTER the bake instead, which measures fit without touching
+# the render. Keep any future attempt single-variable and eyeball the
+# drape before trusting the seam numbers.
+
 # ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
 all_verts = []
 all_flat = []
@@ -461,14 +483,25 @@ def match(a, b):
 sew_edges = []
 seam_sides = []  # oriented FULL-density sides per seam — the fit map's densified pairing
 pin_indices = set()
+
+
+def _pair_score(ia, ib):
+    """Total rest-position distance over an arc-fraction pairing — the flip
+    test must consider the WHOLE seam: endpoint distances alone mis-orient
+    armscye seams (panel edge and sleeve cap endpoints sit nearly symmetric),
+    which reversed the sewing around the ring — springs pulled tangentially
+    against each other, the armscye never closed at any force, and the
+    rotated sleeve tube looked normal so it was invisible for seven waves."""
+    n = 24
+    sa = [ia[round(i * (len(ia) - 1) / (n - 1))] for i in range(n)]
+    sb = [ib[round(i * (len(ib) - 1) / (n - 1))] for i in range(n)]
+    return sum(math.dist(all_verts[a], all_verts[b]) for a, b in zip(sa, sb))
+
+
 for seam in DATA["seams"]:
     ia = seg_indices(*seam["a"])
     ib = seg_indices(*seam["b"])
-    # Auto-orient: flip b if that brings matched endpoints closer in world
-    # space (rest positions) — more reliable than hand-set direction flags.
-    straight = math.dist(all_verts[ia[0]], all_verts[ib[0]]) + math.dist(all_verts[ia[-1]], all_verts[ib[-1]])
-    flipped = math.dist(all_verts[ia[0]], all_verts[ib[-1]]) + math.dist(all_verts[ia[-1]], all_verts[ib[0]])
-    if flipped < straight:
+    if _pair_score(ia, list(reversed(ib))) < _pair_score(ia, ib):
         ib = list(reversed(ib))
     seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
@@ -755,7 +788,6 @@ cam_data.lens = 60
 cam = bpy.data.objects.new("cam", cam_data)
 bpy.context.collection.objects.link(cam)
 mid_z = (HEIGHT * S) * 0.5
-import os as _os
 if _os.environ.get("DRAPE_CAM") == "quarter":
     cam.location = (1.5, -1.5, mid_z + 0.15)
     cam.rotation_euler = (math.radians(83), 0, math.radians(45))
@@ -800,7 +832,7 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # fit classification is shown only where the garment touches the form —
 # free-hanging cloth has no "fit" (CLO does the same).
 #
-# CALIBRATION RECORD (and why DRAPE_FITMAP stays off by default): the
+# CALIBRATION RECORD: the
 # spring-only relax converged to a false floor (girth p95 +98% on the tee)
 # because Blender's sewing only pairs the sparse ORIGINAL pattern points —
 # the subdivision verts along piece boundaries were never sewn, welded, or
@@ -812,14 +844,15 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # (post-extrapolation hard contact projection was chaotically unstable;
 # in-sweep contact is not). Fitted blocks now grade credibly — bella reads
 # median +4% girth, snug at bust/waist, exactly what a darted bodice
-# should say. What remains is NOT a solver artifact: the tee still grades
-# hot in the neck-to-armscye band (p95 ~+64%) because the render pose
-# splays the arms 30deg for the airy tee stance, parking the pinned cap
-# rings ~92mm from where the panels' armscye edges live — the closed
-# garment genuinely cannot span that pose unstretched. Proven by freeing
-# every pin (and letting scaffold rings drift rigidly): the band persists
-# anchor-free. The fix is a pose calibration (arms at ~10deg for fit
-# grading, cap rings at the arm root), not more relaxation.
+# should say. What remains is NOT a solver artifact: the shoulder/armhole
+# join reads warmer than reality because the rigid stand's posed arms park
+# the pinned cap rings away from the panels' armscye edges — the closed
+# garment genuinely cannot span the pose unstretched (proven by freeing
+# every pin, even letting scaffold rings drift rigidly: the band persists
+# anchor-free). Lowering short-sleeve arms 30->12deg cut the tail nearly
+# in half (girth p95 +82% -> +49%); the residual is disclosed to the
+# designer in the fit-map legend, the same way fitters treat rigid-form
+# sleeve fit: judge the body here, judge shoulders on a live model.
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     import numpy as np
     from mathutils.bvhtree import BVHTree
