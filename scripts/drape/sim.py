@@ -797,6 +797,11 @@ if FRAMES > 0:
     scnt = [0] * n
     for e in me.edges:
         a, b = e.vertices
+        # Pinned verts are frozen at their PLACED positions — any spacing
+        # artifact from the initial wrap reads as permanent fake strain, so
+        # pinned regions are excluded from the measurement entirely.
+        if a in pin_indices or b in pin_indices:
+            continue
         fa, fb = all_flat[a], all_flat[b]
         dx, dy = fa[0] - fb[0], fa[1] - fb[1]
         # Tightness is GIRTH strain: only edges running mostly horizontally
@@ -825,10 +830,12 @@ if FRAMES > 0:
                 return tuple(a + (b - a) * t for a, b in zip(c0, c1))
         return stops[-1][1]
 
-    per_v = [ssum[i] / scnt[i] if scnt[i] else 0.0 for i in range(n)]
     attr = obj.data.color_attributes.new("strain_col", "FLOAT_COLOR", "POINT")
     for i in range(n):
-        r, g, b = strain_color(per_v[i])
+        if scnt[i]:
+            r, g, b = strain_color(ssum[i] / scnt[i])
+        else:
+            r, g, b = (0.72, 0.72, 0.72)  # unmeasured (pinned/edge) — neutral
         attr.data[i].color = (r, g, b, 1.0)
 
     fit_mat = bpy.data.materials.new("fit_map")
