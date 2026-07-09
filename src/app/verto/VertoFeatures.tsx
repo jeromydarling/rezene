@@ -658,11 +658,11 @@ const FEATURES: Feature[] = [
     id: "pattern-studio",
     eyebrow: "Cut",
     heading: "From picture to pattern you can actually cut.",
-    body: "Real, manufacturable sewing patterns drafted in the browser — over thirty blocks from tees to coats, graded to a size or drafted to a person's exact measurements. Open every drafting option the block defines (six cuff styles on the button-down, collar geometry, plackets), set your seam allowance, and print a true-scale tiled PDF with a scale-check bar on every page. Then see it before you sew it: thirteen blocks — tees to trousers, circle skirts to bodices — run through a true cloth-physics drape: your exact pattern, in your client's measurements, hung on a mannequin, and that drape anchors a photoreal render, so the picture shows how this pattern actually falls.",
+    body: "Real, manufacturable sewing patterns drafted in the browser — over thirty blocks from tees to coats, graded to a size or drafted to a person's exact measurements. Open every drafting option the block defines (six cuff styles on the button-down, collar geometry, plackets), set your seam allowance, and print a true-scale tiled PDF with a scale-check bar on every page. Then see it before you sew it: fourteen blocks — tees to trousers, circle skirts to bodices — run through a true cloth-physics drape: your exact pattern, in your client's measurements, hung on a mannequin, and that drape anchors a photoreal render, so the picture shows how this pattern actually falls.",
     points: [
       "31 pattern blocks — tops, shirts, dresses, trousers, coats, foundation blocks",
       "True made-to-measure: every measurement point the block drafts from, cm or inches",
-      "Cloth-physics drape preview on thirteen blocks — tees to circle skirts — that grounds a photoreal render",
+      "Cloth-physics drape preview on fourteen blocks — tees to circle skirts — that grounds a photoreal render",
       "Print-at-scale tiled PDF, SVG download, and a per-client pattern book",
     ],
     screen: MiniPatternStudio,
