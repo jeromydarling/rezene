@@ -888,7 +888,8 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # Averaged-Jacobi PBD relaxation toward the flat rest lengths (Macklin
     # et al. 2014 constraint averaging + SOR), with a weak tether to the
     # baked drape that fixes the sliding null-space like friction would.
-    OMEGA = float(_os.environ.get("DRAPE_FIT_OMEGA", "1.0"))
+    OMEGA = float(_os.environ.get("DRAPE_FIT_OMEGA", "1.7"))
+    N_ITER = int(_os.environ.get("DRAPE_FIT_ITERS", "1500"))
     TETHER = 1e-3
 
     def _edge_strain_stats(pos):
@@ -907,7 +908,14 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
                 f"  worst edge {a3}-{b3} piece={pc} rest={L0[k]*1000:.2f}mm cur={_L[k]*1000:.1f}mm "
                 f"flat_a=({all_flat[a3][0]:.1f},{all_flat[a3][1]:.1f}) flat_b=({all_flat[b3][0]:.1f},{all_flat[b3][1]:.1f})"
             )
-    for it in range(400):
+    # Chebyshev semi-iterative acceleration (Wang, SIGGRAPH Asia 2015) wraps
+    # the averaged-Jacobi sweep: unclosed seam gaps from the bake can be
+    # tens of mm, and plain Jacobi transports closure ~one vertex ring per
+    # sweep — Chebyshev makes that global.
+    RHO, GAMMA, WARMUP = 0.992, 0.7, 15
+    omega_ch = 1.0
+    x_prev = x.copy()
+    for it in range(N_ITER):
         if it % 10 == 0:
             q, nrm, _ = contact_planes(x)
         d = x[ei] - x[ej]
@@ -921,8 +929,17 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         np.add.at(dx, ej, invw[ej, None] * dvec)
         np.add.at(cnt, ei, 1.0)
         np.add.at(cnt, ej, 1.0)
-        x += OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
-        x += TETHER * (x_drape - x) * invw[:, None]
+        x_new = x + OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
+        x_new += TETHER * (x_drape - x_new) * invw[:, None]
+        if it < WARMUP:
+            omega_ch = 1.0
+        elif it == WARMUP:
+            omega_ch = 2.0 / (2.0 - RHO * RHO)
+        else:
+            omega_ch = 4.0 / (4.0 - RHO * RHO * omega_ch)
+        x_acc = omega_ch * (GAMMA * (x_new - x) + x - x_prev) + x_prev
+        x_prev = x
+        x = np.where(invw[:, None] > 0, x_acc, x)
         pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
         x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     print("fit relax post:", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x),
