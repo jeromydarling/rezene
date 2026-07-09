@@ -937,9 +937,9 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         order = np.argsort(best_s[on])
         return cand[on][order], best_s[on][order] / max(cum[-1], 1e-12)
 
-    cA, cB0, cB1, cT = [], [], [], []
+    cA, cB0, cB1, cT, cS = [], [], [], [], []
 
-    def _attach(si, sp, di, dp):
+    def _attach(si, sp, di, dp, sidx):
         for i in range(len(si)):
             k = min(max(int(np.searchsorted(dp, sp[i])), 1), len(di) - 1)
             t = (sp[i] - dp[k - 1]) / max(dp[k] - dp[k - 1], 1e-12)
@@ -947,30 +947,39 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             cB0.append(remap[di[k - 1]])
             cB1.append(remap[di[k]])
             cT.append(min(max(t, 0.0), 1.0))
+            cS.append(sidx)
 
-    for _sa, _sb in seam_sides:
+    for _si, (_sa, _sb) in enumerate(seam_sides):
         _ai, _ap = _dense_side(_sa)
         _bi, _bp = _dense_side(_sb)
         if len(_ai) >= 2 and len(_bi) >= 2:
-            _attach(_ai, _ap, _bi, _bp)
-            _attach(_bi, _bp, _ai, _ap)
-    cA, cB0, cB1 = np.array(cA), np.array(cB0), np.array(cB1)
+            _attach(_ai, _ap, _bi, _bp, _si)
+            _attach(_bi, _bp, _ai, _ap, _si)
+    cA, cB0, cB1, cS = np.array(cA), np.array(cB0), np.array(cB1), np.array(cS)
     cT = np.array(cT)
     # Drop constraints already welded onto their target endpoint — zero work,
     # and their zero-length segment direction is undefined.
     _dg = ((cA == cB0) & (cT < 1e-6)) | ((cA == cB1) & (cT > 1 - 1e-6)) | ((cA == cB0) & (cA == cB1))
     # ...and constraints whose every participant is pinned: nothing can move.
     _dg |= (invw[cA] + (1 - cT) ** 2 * invw[cB0] + cT ** 2 * invw[cB1]) < 1e-9
-    cA, cB0, cB1, cT = cA[~_dg], cB0[~_dg], cB1[~_dg], cT[~_dg]
+    cA, cB0, cB1, cT, cS = cA[~_dg], cB0[~_dg], cB1[~_dg], cT[~_dg], cS[~_dg]
 
     def _seam_gap(pos):
         tgt = (1 - cT)[:, None] * pos[cB0] + cT[:, None] * pos[cB1]
         return np.linalg.norm(pos[cA] - tgt, axis=1)
 
+    def _seam_name(si):
+        s = DATA["seams"][si]
+        return s.get("name") or f'{s["a"][0]}.{s["a"][1]}-{s["b"][0]}.{s["b"][1]}'
+
     if len(cA):
         _g = _seam_gap(x) * 1000
         print(f"fit seams: {len(cA)} closure constraints, pre gap mm p50={np.percentile(_g,50):.2f} "
               f"p95={np.percentile(_g,95):.2f} max={_g.max():.2f}")
+        if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+            for si in np.unique(cS):
+                gs = _g[cS == si]
+                print(f"  seam {_seam_name(si)}: n={len(gs)} gap p50={np.percentile(gs,50):.1f} max={gs.max():.1f}mm")
 
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
@@ -1084,6 +1093,23 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     if len(cA):
         _g = _seam_gap(x) * 1000
         print(f"fit seams post: gap mm p50={np.percentile(_g,50):.2f} p95={np.percentile(_g,95):.2f} max={_g.max():.2f}")
+    if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+        _pc = lambda gi: next(nm for nm, of in sorted(offsets.items(), key=lambda t: -t[1]) if of <= gi)
+        _L = np.linalg.norm(x[ei] - x[ej], axis=1)
+        _s = (_L - L0) / L0
+        for k in np.argsort(_s)[-6:]:
+            a3, b3 = ei[k], ej[k]
+            print(f"  post worst edge {a3}-{b3} piece={_pc(a3)} rest={L0[k]*1000:.2f}mm cur={_L[k]*1000:.1f}mm "
+                  f"flat_a=({all_flat[a3][0]:.1f},{all_flat[a3][1]:.1f}) flat_b=({all_flat[b3][0]:.1f},{all_flat[b3][1]:.1f})")
+    if _os.environ.get("DRAPE_FIT_DUMP"):
+        np.savez_compressed(
+            _os.environ["DRAPE_FIT_DUMP"],
+            x_drape=x_drape, x_relaxed=x, flat=flat, remap=remap, invw=invw,
+            ei=ei, ej=ej, L0=L0, tris=tris, cA=cA, cB0=cB0, cB1=cB1, cT=cT, cS=cS,
+            body_verts=np.array([v.co[:] for v in bm_body.vertices]),
+            body_tris=np.array([tuple(p.vertices)[:3] for p in bm_body.polygons if len(p.vertices) >= 3]),
+        )
+        print(f"fit dump written: {_os.environ['DRAPE_FIT_DUMP']}")
 
     # Per-triangle right Cauchy-Green from the 2D->3D deformation gradient:
     # C = F^T F with F = Ds Dm^-1; lambda_weft = sqrt(C00) is the girth
@@ -1123,6 +1149,15 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # (no measured area) also fall out here.
     _, _, dist = contact_planes(x)
     in_contact = (dist < 0.012) & (area_v > 0)
+    if _os.environ.get("DRAPE_FIT_DEBUG") == "1":
+        _pc = lambda gi: next(nm for nm, of in sorted(offsets.items(), key=lambda t: -t[1]) if of <= gi)
+        _tail_v = [i for i in range(nv) if in_contact[remap[i]] and tight[remap[i]] > 0.5]
+        from collections import Counter
+        _byp = Counter(_pc(i) for i in _tail_v)
+        print(f"  girth>50% contact verts: {len(_tail_v)} by piece {dict(_byp)}")
+        for i in _tail_v[:: max(1, len(_tail_v) // 6)][:6]:
+            print(f"    vert {i} piece={_pc(i)} flat=({all_flat[i][0]:.0f},{all_flat[i][1]:.0f}) "
+                  f"z={x[remap[i]][2]:.3f} girth={tight[remap[i]]:+.2f}")
 
     def strain_color(s, contact):
         if not contact:
