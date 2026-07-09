@@ -571,11 +571,12 @@ def build_body():
     o = bpy.data.objects.new("body", m)
     bpy.context.collection.objects.link(o)
     col = o.modifiers.new("collision", "COLLISION")
-    # Thick enough that sewing springs can't drag cloth through the shell in
-    # the first frames — tunneled verts get trapped inside and render as
-    # angular dark "holes" where the form occludes the garment.
-    col.settings.thickness_outer = 0.006
-    col.settings.thickness_inner = 0.004
+    # NOTE: thickening this shell (0.006/0.004) was tried against sew-spring
+    # tunneling and instead wrecked every sleeve — the fatter effective arm
+    # makes the snug tubes ruche and tear. The sew-force ramp alone prevents
+    # the tunneling.
+    col.settings.thickness_outer = 0.003
+    col.settings.thickness_inner = 0.002
     # The body stays in the render as a darker matte dress form: it gives the
     # reference anatomical context and hides the armscye seam gaps.
     for poly in m.polygons:
