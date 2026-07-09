@@ -255,6 +255,9 @@ def _phi_at(s):
     return _phis[lo]
 
 
+SLEEVE_FIT = {}  # piece name -> (twist about arm axis, slide along it) — see fit below
+
+
 def place(piece, x, y):
     """Pattern-space (x, y) -> world metres per the piece's placement hint."""
     pl = piece["placement"]
@@ -359,12 +362,15 @@ def place(piece, x, y):
     r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
     # Slightly less than a full wrap: the underarm edges must NOT start
     # coincident (self-collision fights zero-length sewing and explodes).
-    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
+    # SLEEVE_FIT twists the sleeve in its socket / slides it along the arm so
+    # the pinned cap ring lands ON the armscye line (fit below).
+    _dth, _du = SLEEVE_FIT.get(piece["name"], (0.0, 0.0))
+    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r))) + _dth
     # u: distance down the arm axis from the shoulder joint.
     if pl.get("raglan"):
         u = y + RAGLAN_U0  # biceps line lands at the armhole depth
     else:
-        u = y - sleeve_miny[piece["name"]]  # 0 at cap top
+        u = y - sleeve_miny[piece["name"]] + _du  # 0 at cap top
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]
@@ -384,6 +390,62 @@ def place(piece, x, y):
     wx, wy = clamp_out(wx, wy, HEIGHT - wz)
     return (wx * S, wy * S, wz * S)
 
+
+# ---- Set-in sleeve socket alignment -------------------------------------------
+# The cap ring is pinned, but the cone wrap places the cap top pointing
+# OUTWARD while the garment's armscye curve has its own azimuth around the
+# arm — the pinned cap ended up twisted ~90deg in its socket, freezing
+# ~92mm seam gaps that no sewing force could close (the gap vectors are
+# antisymmetric along the seam with zero mean: a pure rotation signature).
+# Fit a per-sleeve twist + slide from the seam correspondence at REST so
+# the pinned ring lands on the armscye line.
+def _seg_pattern_samples(piece_name, seg_name, k=24):
+    piece = next(p for p in DATA["pieces"] if p["name"] == piece_name)
+    start, end = piece["segments"][seg_name]
+    npts = len(piece["points"])
+    idxs = []
+    i = start
+    while True:
+        idxs.append(i % npts)
+        if i % npts == end % npts:
+            break
+        i += 1
+    pts = [piece["points"][j] for j in idxs]
+    return piece, [pts[round(j * (len(pts) - 1) / (k - 1))] for j in range(k)]
+
+
+_cap_pairs = {}
+for _seam in DATA["seams"]:
+    for (_sp, _ssg), (_op, _osg) in ((_seam["a"], _seam["b"]), (_seam["b"], _seam["a"])):
+        _pc = next(p for p in DATA["pieces"] if p["name"] == _sp)
+        if (_pc["placement"]["kind"] == "sleeve" and _ssg.startswith("cap")
+                and not _pc["placement"].get("raglan")):
+            _cap_pairs.setdefault(_sp, []).append((_ssg, _op, _osg))
+
+for _sname, _pairs in _cap_pairs.items():
+    _spiece = next(p for p in DATA["pieces"] if p["name"] == _sname)
+    _samples = []
+    for _ssg, _op, _osg in _pairs:
+        _, _spts = _seg_pattern_samples(_sname, _ssg)
+        _opiece, _opts = _seg_pattern_samples(_op, _osg)
+        _tgt = [place(_opiece, px, py) for px, py in _opts]
+        _samples.append((_spts, _tgt))
+    _best = None
+    for _dth_deg in range(-180, 180, 5):
+        for _du in range(-40, 50, 10):
+            SLEEVE_FIT[_sname] = (math.radians(_dth_deg), float(_du))
+            _res = 0.0
+            for _spts, _tgt in _samples:
+                _src = [place(_spiece, px, py) for px, py in _spts]
+                _fwd = sum(math.dist(a, b) for a, b in zip(_src, _tgt))
+                _rev = sum(math.dist(a, b) for a, b in zip(_src, reversed(_tgt)))
+                _res += min(_fwd, _rev)
+            if _best is None or _res < _best[0]:
+                _best = (_res, _dth_deg, float(_du))
+    SLEEVE_FIT[_sname] = (math.radians(_best[1]), _best[2])
+    _n = sum(len(s) for s, _ in _samples)
+    print(f"sleeve fit {_sname}: twist {_best[1]}deg slide {_best[2]:.0f}mm "
+          f"rest residual {_best[0] / _n * 1000:.1f}mm/pt")
 
 # ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
 all_verts = []
