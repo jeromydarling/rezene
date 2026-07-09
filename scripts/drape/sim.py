@@ -859,9 +859,17 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     mean_all = accp / np.maximum(accn, 1)[:, None]
     mean_pin = accp_pin / np.maximum(accn_pin, 1)[:, None]
     x = np.where(accn_pin[:, None] > 0, mean_pin, np.where(accn[:, None] > 0, mean_all, x))
-    welded_pin = np.zeros(nv, dtype=bool)
-    np.logical_or.at(welded_pin, remap, pinned_mask)
-    invw = np.where(welded_pin, 0.0, 1.0)
+    # Welded (seam) clusters relax FREE even when they contain pinned verts:
+    # the pins are placement scaffolding, and freezing seams at scaffold
+    # positions tears every dense seam's unpaired neighbours across the
+    # bake's residual gaps. Only unsewn pins (necklines, waistbands) stay
+    # anchored — they are the garment's true hang points.
+    in_weld = np.zeros(nv, dtype=bool)
+    for va, vb in sew_edges:
+        in_weld[remap[va]] = True
+        in_weld[remap[vb]] = True
+    invw = np.ones(nv)
+    invw[pinned_mask & ~in_weld[remap]] = 0.0
 
     ei = remap[edges[:, 0]]
     ej = remap[edges[:, 1]]
