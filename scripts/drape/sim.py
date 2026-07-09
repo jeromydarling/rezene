@@ -35,8 +35,18 @@ ARM_TILT = math.radians(30)  # arms hang tilted outward from the shoulder
 SHOULDER_X = 215.0  # arm axis origin distance from centre (mm)
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
 
-# Torso profile: (pattern-y, half-width a, half-depth b) from neck to below hem.
-TORSO = [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118), (740, 185, 125)]
+# Torso profile: (pattern-y, half-width a, half-depth b), neck to JUST below
+# the hem — the form must not continue far past the cloth, or the image model
+# can't tell where the garment ends.
+TORSO = [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118), (705, 182, 123)]
+
+# Arm stubs end just below the sleeve hem for the same reason.
+_sleeve_umax = max(
+    (max(y for _, y in p["points"]) - min(y for _, y in p["points"])
+     for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"),
+    default=335.0,
+)
+ARM_LEN = _sleeve_umax + 45.0
 
 
 def torso_ab(y):
@@ -310,7 +320,7 @@ def build_body():
     for d in (1, -1):
         o, ax, e1, e2 = arm_frame(d)
         top = arm_ring(o, ax, e1, e2, 10)
-        bot = arm_ring(o, ax, e1, e2, 380)
+        bot = arm_ring(o, ax, e1, e2, ARM_LEN)
         bridge(top, bot)
         c = len(verts)
         verts.append((o[0] * S, 0.0, (o[2] + 10) * S))
@@ -337,10 +347,12 @@ def build_body():
     # reference anatomical context and hides the armscye seam gaps.
     for poly in m.polygons:
         poly.use_smooth = True
+    # Dark charcoal: maximum contrast against the pale cloth so the image
+    # model can't confuse mannequin for garment.
     mat_b = bpy.data.materials.new("body_grey")
     mat_b.use_nodes = True
     nb = mat_b.node_tree.nodes["Principled BSDF"]
-    nb.inputs["Base Color"].default_value = (0.32, 0.32, 0.34, 1.0)
+    nb.inputs["Base Color"].default_value = (0.13, 0.13, 0.14, 1.0)
     nb.inputs["Roughness"].default_value = 0.85
     m.materials.append(mat_b)
     return o
@@ -386,7 +398,11 @@ except Exception:
     pass
 
 # Soften the harsh micro-folds the coarse sim leaves (esp. around the yoke) —
-# the reference should read as smooth jersey, not crinkled paper.
+# the reference should read as smooth jersey, not crinkled paper. Boundary
+# verts are excluded: smoothing them scallops the hems and necklines into a
+# false "lettuce edge" that the image model faithfully copies.
+# Uniform smoothing, boundary included — excluding the boundary pins the edge
+# verts while the interior contracts, which cuts sawtooth teeth into every hem.
 sm = obj.modifiers.new("smooth", "SMOOTH")
 sm.factor = 0.4
 sm.iterations = 2
@@ -410,7 +426,7 @@ scene.cycles.samples = 96
 mat = bpy.data.materials.new("cloth_grey")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
-bsdf.inputs["Base Color"].default_value = (0.62, 0.62, 0.62, 1.0)
+bsdf.inputs["Base Color"].default_value = (0.84, 0.84, 0.84, 1.0)
 bsdf.inputs["Roughness"].default_value = 0.9
 obj.data.materials.append(mat)
 world = bpy.data.worlds.new("w")

@@ -508,12 +508,13 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
       ? ""
       : body.referenceRole === "drape"
         ? ", matching EXACTLY the garment in the reference image — the reference is a 3D cloth simulation of " +
-          "THIS garment draped on a plain grey dress form: copy its true proportions precisely (where the hem " +
-          "sits on the torso, how far the sleeves reach down the arm, the overall width and ease) and the way " +
-          "the fabric hangs. Render it as real sewn fabric on a real person: the reference's grey colour, " +
-          "faceted surface, jagged edges and any small gaps at the seams are simulation artifacts — the real " +
-          "garment is cleanly finished, with fabric and colour taken from the description alone, and no dress " +
-          "form or mannequin may appear; add no clothing items beyond those described"
+          "THIS garment draped on a dark charcoal mannequin: the LIGHT PALE fabric is the garment, the dark " +
+          "form underneath is the mannequin's body and is NOT clothing. Copy the light garment's proportions " +
+          "precisely — the hem ends exactly where the pale cloth ends on the torso, each sleeve ends exactly " +
+          "where the pale cloth ends on the arm, and the width and ease match the pale cloth. Render it as " +
+          "real sewn fabric on a real person: the pale colour, faceted surface and any small gaps at the " +
+          "seams are simulation artifacts — fabric and colour come from the description alone, no mannequin " +
+          "may appear, and add no clothing items beyond those described"
         : body.referenceRole === "pattern"
         ? ", constructed exactly from the flat sewing-pattern pieces shown in the reference image — read the " +
           "pieces ONLY to infer the garment's true proportions (sleeve length relative to torso, hem width and " +
