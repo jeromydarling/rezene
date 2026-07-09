@@ -13,6 +13,7 @@ import bpy
 import bmesh
 import json
 import math
+import os as _os
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1 :]
@@ -53,7 +54,8 @@ _shoulder_s = float(_body.get("shoulder", 1.0))
 _torso_s = float(_body.get("torso", 1.0))
 
 ARM_R = 55.0 * _biceps_s  # arm stub radius — fills the sleeve tube so it can't ruffle
-SHOULDER_X = 215.0 * _shoulder_s  # arm axis origin distance from centre (mm)
+# Arm axis origin distance from centre (mm). Env override for pose experiments.
+SHOULDER_X = float(_os.environ.get("DRAPE_SHOULDER_X", "215.0")) * _shoulder_s
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
 
 def z_of_body(by):
@@ -92,6 +94,7 @@ else:
 # shoulder, not arm length.
 _sleeve_pl = next((p["placement"] for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"), None)
 _RAGLAN = bool(_sleeve_pl and _sleeve_pl.get("raglan"))
+_TILT_OVERRIDE = _os.environ.get("DRAPE_ARM_TILT")
 if _RAGLAN:
     ARM_TILT = math.radians(30 if _sleeve_pl["y1"] <= 300 else 16)
     RAGLAN_U0 = max(0.0, _sleeve_pl.get("armDepth", 250.0) - SHOULDER_PY) / math.cos(ARM_TILT)
@@ -105,6 +108,8 @@ else:
     ARM_TILT = math.radians(30 if _sleeve_umax <= 350 else 16)
     RAGLAN_U0 = 0.0
     ARM_LEN = _sleeve_umax + 45.0
+if _TILT_OVERRIDE:
+    ARM_TILT = math.radians(float(_TILT_OVERRIDE))
 WRIST_R = ARM_R * 0.6  # arm stubs taper toward the wrist
 
 
@@ -755,7 +760,6 @@ cam_data.lens = 60
 cam = bpy.data.objects.new("cam", cam_data)
 bpy.context.collection.objects.link(cam)
 mid_z = (HEIGHT * S) * 0.5
-import os as _os
 if _os.environ.get("DRAPE_CAM") == "quarter":
     cam.location = (1.5, -1.5, mid_z + 0.15)
     cam.rotation_euler = (math.radians(83), 0, math.radians(45))
