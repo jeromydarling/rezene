@@ -183,7 +183,10 @@ const BLOCKS = {
     // the whole point of draping a block: seeing the fit it encodes.
     bodice: true,
     parts: { front: "bella.frontSideDart", back: "bella.back" },
-    sim: { sewForce: 9 }, // the bust dart's ~12 cm mouth needs a strong pull
+    // Force 6 closes the darts into soft seam shadows. Stronger pulls pinch
+    // and tear the waist instead — the ghost form has no bust for the dart
+    // shaping to wrap, so past a point the springs fight the collision body.
+    sim: { sewForce: 6 },
   },
 };
 
