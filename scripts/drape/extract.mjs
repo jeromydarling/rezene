@@ -41,6 +41,10 @@ const BLOCKS = {
     design: "Teagan",
     parts: { front: "teagan.front", back: "teagan.back", sleeve: "teagan.sleeve" },
     sleeveAnchors: { hemL: "hemLeft", hemR: "hemRight" },
+    // At its true (longer) default length the tee's chest contact tunnels
+    // through the standard 3 mm collision shell; its short loose sleeves
+    // tolerate the thicker shell that long snug tubes can't.
+    sim: { shellMm: 6 },
   },
   aaron: {
     module: "@freesewing/aaron",

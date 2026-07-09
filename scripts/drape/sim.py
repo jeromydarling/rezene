@@ -571,12 +571,14 @@ def build_body():
     o = bpy.data.objects.new("body", m)
     bpy.context.collection.objects.link(o)
     col = o.modifiers.new("collision", "COLLISION")
-    # NOTE: thickening this shell (0.006/0.004) was tried against sew-spring
-    # tunneling and instead wrecked every sleeve — the fatter effective arm
-    # makes the snug tubes ruche and tear. The sew-force ramp alone prevents
-    # the tunneling.
-    col.settings.thickness_outer = 0.003
-    col.settings.thickness_inner = 0.002
+    # Shell thickness is a PER-BLOCK hint: heavy long drafts with tight chest
+    # contact (the tee at its true length) tunnel through a 3 mm shell and
+    # trap verts inside — they need 6 mm. But a fat shell also fattens the
+    # arms, and snug long-sleeve tubes (hugo, sven) ruche and tear on it, so
+    # thick can't be the default.
+    _shell = float(DATA.get("sim", {}).get("shellMm", 3.0)) / 1000.0
+    col.settings.thickness_outer = _shell
+    col.settings.thickness_inner = _shell * 2 / 3
     # The body stays in the render as a darker matte dress form: it gives the
     # reference anatomical context and hides the armscye seam gaps.
     for poly in m.polygons:
@@ -664,9 +666,7 @@ vg.add(list(pin_indices), 1.0, "REPLACE")
 
 mod = obj.modifiers.new("cloth", "CLOTH")
 st = mod.settings
-# Solver steps: at the blocks' true (longer, heavier) default lengths, 10
-# steps lets tight chest contact clip through the form as angular "holes".
-st.quality = 14
+st.quality = 10
 st.mass = 0.3
 st.air_damping = 2.0
 st.tension_stiffness = 40
@@ -685,18 +685,13 @@ if hasattr(st, "sewing_force_max"):
     # The garment starts nearly assembled — gentle stitching only. Strong
     # sewing forces whip the light cloth into permanent crumples. Darted
     # blocks ask for more via the sim hint (darts fight the side seams).
-    # A short ramp softens the first-frame snap (which can drag cloth through
-    # the collision shell) without starving seam closure: sleeve-heavy blocks
-    # need most of the bake at full force or the underarm/raglan seams never
-    # shut. (A 25-frame ramp was tried and left hugo/sven seams gaping.)
-    _sew_full = float(DATA.get("sim", {}).get("sewForce", 2))
-    st.sewing_force_max = _sew_full * 0.5
-    st.keyframe_insert("sewing_force_max", frame=1)
-    st.sewing_force_max = _sew_full
-    st.keyframe_insert("sewing_force_max", frame=8)
+    # (Sew-force ramps were tried against shell tunneling — 25 frames starved
+    # seam closure, 8 frames didn't stop the tunneling. The per-block shell
+    # thickness below is the actual cure; constant force stays.)
+    st.sewing_force_max = float(DATA.get("sim", {}).get("sewForce", 2))
 try:
     mod.collision_settings.distance_min = 0.003
-    mod.collision_settings.collision_quality = 6
+    mod.collision_settings.collision_quality = 4
     mod.collision_settings.use_self_collision = True
     mod.collision_settings.self_distance_min = 0.002
 except Exception:
