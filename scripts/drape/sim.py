@@ -800,18 +800,26 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # fit classification is shown only where the garment touches the form —
 # free-hanging cloth has no "fit" (CLO does the same).
 #
-# CALIBRATION RECORD (how the numbers got credible): the spring-only relax
-# converged to a false floor (girth p95 +98% on the tee) because Blender's
-# sewing only pairs the sparse ORIGINAL pattern points — the subdivision
-# verts along piece boundaries were never sewn, welded, or constrained, and
-# the bake leaves them up to 137mm from their seam (the armscye junctions
-# hide ~92mm median gaps under the sleeve caps). The densified closure
-# below (every boundary vert, subdivision verts included, arc-matched onto
-# the opposite side as a zero-rest point-on-segment constraint) removed
-# that floor: with 5000 sweeps at RHO 0.999 the tee probe lands at girth
-# median +0.5%, p95 +17%, seams closed to 0.1mm — the residual p95 lives
-# in ~20 verts at the armscye junction, which genuinely carries stretch on
-# a rigid form. 0.9995 diverges; 15000 sweeps buys only noise-level gains.
+# CALIBRATION RECORD (and why DRAPE_FITMAP stays off by default): the
+# spring-only relax converged to a false floor (girth p95 +98% on the tee)
+# because Blender's sewing only pairs the sparse ORIGINAL pattern points —
+# the subdivision verts along piece boundaries were never sewn, welded, or
+# constrained, and the bake leaves them up to 137mm from their seam. The
+# densified closure below (every boundary vert, subdivision verts included,
+# arc-matched onto the opposite side as a zero-rest point-on-segment
+# constraint) removed that floor: seams close from 137mm to ~0.1mm, darts
+# to 0.09mm, and every rho/refresh config converges to the same optimum
+# (post-extrapolation hard contact projection was chaotically unstable;
+# in-sweep contact is not). Fitted blocks now grade credibly — bella reads
+# median +4% girth, snug at bust/waist, exactly what a darted bodice
+# should say. What remains is NOT a solver artifact: the tee still grades
+# hot in the neck-to-armscye band (p95 ~+64%) because the render pose
+# splays the arms 30deg for the airy tee stance, parking the pinned cap
+# rings ~92mm from where the panels' armscye edges live — the closed
+# garment genuinely cannot span that pose unstretched. Proven by freeing
+# every pin (and letting scaffold rings drift rigidly): the band persists
+# anchor-free. The fix is a pose calibration (arms at ~10deg for fit
+# grading, cap rings at the arm root), not more relaxation.
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     import numpy as np
     from mathutils.bvhtree import BVHTree
