@@ -172,6 +172,7 @@ const BLOCKS = {
     trousers: true,
     parts: { front: "charlie.front", back: "charlie.back" },
     frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
+    riseTopPin: 0.35, // the deep back rise crumples at the seat if left to springs
     yOffset: 460,
     bodyKind: "lower",
   },
@@ -625,11 +626,18 @@ function trouserPanel(partName, pieceName, mirrored) {
   const waistPts = cut
     ? [...sliceShort(poly, P.styleWaistIn, P[cut.top]), ...line(P[cut.top], P.styleWaistOut)]
     : sliceShort(poly, P.styleWaistIn, P.styleWaistOut);
+  // Optionally pin the top of the rise (waistband grip continues down the
+  // CF/CB seam): blocks with a deep back rise (chinos) crumple at the seat
+  // when the whole rise must find its place by springs alone.
+  const risePin = Number(cfg.riseTopPin) || 0;
+  const crotchFull = sliceShort(poly, P.fork, P.styleWaistIn);
+  const [crotchPts, riseTopPts] = risePin ? splitAt(crotchFull, 1 - risePin) : [crotchFull, null];
   const piece = buildPiece(pieceName, [
     ["outseam", seg(outseamPts)],
     ["hem", seg(sliceShort(poly, P.floorOut, P.floorIn))],
     ["inseam", seg(sliceShort(poly, P.floorIn, P.fork))],
-    ["crotch", seg(sliceShort(poly, P.fork, P.styleWaistIn))],
+    ["crotch", seg(crotchPts)],
+    ...(riseTopPts ? [["riseTop", seg(riseTopPts)]] : []),
     ["waist", seg(waistPts)],
   ]);
   const BIN = 50;
@@ -965,6 +973,13 @@ const seams = cfg.trousers
       { name: "inseam_L", a: ["frontL", "inseam"], b: ["backL", "inseam"] },
       { name: "crotch_front", a: ["frontR", "crotch"], b: ["frontL", "crotch"] },
       { name: "crotch_back", a: ["backR", "crotch"], b: ["backL", "crotch"] },
+      // Deep-rise blocks pin the top of the rise like the waistband holds it.
+      ...(cfg.riseTopPin
+        ? [
+            { name: "rise_front", a: ["frontR", "riseTop"], b: ["frontL", "riseTop"], pin: true },
+            { name: "rise_back", a: ["backR", "riseTop"], b: ["backL", "riseTop"], pin: true },
+          ]
+        : []),
     ]
   : cfg.skirt
   ? [

@@ -610,7 +610,9 @@ st.air_damping = 2.0
 st.tension_stiffness = 40
 st.compression_stiffness = 40
 st.shear_stiffness = 20
-st.bending_stiffness = 1.0
+# Bending resists the fine accordion folds that read as "rings" on sleeves
+# and legs — per-block hint; higher = fewer, softer, larger folds.
+st.bending_stiffness = float(DATA.get("sim", {}).get("bending", 1.0))
 st.vertex_group_mass = "pin"
 for name in ("use_sewing_springs", "use_sewing"):
     if hasattr(st, name):
