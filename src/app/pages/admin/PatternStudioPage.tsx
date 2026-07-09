@@ -97,6 +97,10 @@ function stateFromFit(fit: Record<string, unknown>): Partial<PatternState> {
 
 const CM_PER_IN = 2.54;
 
+/** Blocks the cloth-sim drape pipeline can sew (mirrors the worker/extract
+ *  whitelist): tee, tank, sweatshirt. */
+const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie"]);
+
 /** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
  *  image-model reference. White background; the SVG's own mm dimensions set
  *  the aspect ratio. */
@@ -478,16 +482,23 @@ export function PatternStudioPage() {
    *  model gets a text description — the silhouette class, the fit buckets,
    *  and every NAMEABLE styling choice (cuffs, collar, plackets, buttons) —
    *  never the drafted geometry itself. */
-  /** True-drape preview (beta, tee only): dispatch the Blender cloth-sim
-   *  render and poll until the grey ghost-mannequin PNG lands. */
+  /** True-drape preview (beta): dispatch the Blender cloth-sim render and
+   *  poll until the grey ghost-mannequin PNG lands. The draft's effective
+   *  measurements ride along (mm) so the sim sews the client's actual
+   *  pattern and scales the mannequin to their body. */
   async function startDrape() {
     setDraping(true);
     setDrape(null);
     try {
+      const measurementsMm = Object.fromEntries(
+        Object.entries(effective).map(([k, cm]) => [k, Math.round(cm * 10)]),
+      );
       const res = await api.post<{ jobId: string }>("/api/admin/fitting/drape", {
+        block: blockId,
         easePct: state.easePct,
         lengthPct: state.lengthPct,
         sleevePct: state.sleevePct,
+        measurementsMm,
       });
       setDrape({ jobId: res.jobId, status: "queued" });
       // The Actions run takes ~4-6 min (installs Blender, sims, renders).
@@ -1089,13 +1100,13 @@ export function PatternStudioPage() {
             >
               {visualising ? "Rendering…" : "Render this cut on a model"}
             </button>
-            {blockId === "classic-tee" && (
+            {DRAPE_BLOCKS.has(blockId) && (
               <div className="space-y-2 rounded-md border border-navy/10 bg-white/60 p-2">
                 <p className="text-[11px] leading-snug text-warmgrey">
-                  <span className="font-medium text-ink/80">True-drape preview (beta, tee only).</span>{" "}
-                  Sews your exact draft in a cloth simulator and drapes it on a ghost mannequin — a
-                  physically true picture of the proportions, used as a stronger reference for the model
-                  render. Takes a few minutes.
+                  <span className="font-medium text-ink/80">True-drape preview (beta).</span>{" "}
+                  Sews your exact draft — your measurements included — in a cloth simulator and drapes
+                  it on a ghost mannequin scaled to the same body: a physically true picture of the
+                  proportions, used as a stronger reference for the model render. Takes a few minutes.
                 </p>
                 <button
                   type="button"
