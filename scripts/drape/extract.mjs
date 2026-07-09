@@ -179,9 +179,10 @@ const BLOCKS = {
     parts: { skirt: "sandy.skirt" },
     yOffset: 460,
     bodyKind: "lowerColumn",
-    // A real mid-weight circle skirt falls into ~7-9 broad uneven folds
-    // (Cusick drapemeter data); default stiffness flutes far too finely.
-    sim: { bending: 2.0 },
+    // NOTE: bending 2.0 was tried to match the ~7-9 broad folds a real
+    // mid-weight circle skirt falls into (Cusick drapemeter data) — it froze
+    // the fine flutes into knife pleats instead of merging them. Fold count
+    // is set by mesh density, not stiffness; the prompt clause carries it.
   },
   charlie: {
     module: "@freesewing/charlie",

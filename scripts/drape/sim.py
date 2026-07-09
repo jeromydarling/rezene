@@ -660,7 +660,9 @@ vg.add(list(pin_indices), 1.0, "REPLACE")
 
 mod = obj.modifiers.new("cloth", "CLOTH")
 st = mod.settings
-st.quality = 10
+# Solver steps: at the blocks' true (longer, heavier) default lengths, 10
+# steps lets tight chest contact clip through the form as angular "holes".
+st.quality = 14
 st.mass = 0.3
 st.air_damping = 2.0
 st.tension_stiffness = 40
@@ -682,7 +684,7 @@ if hasattr(st, "sewing_force_max"):
     st.sewing_force_max = float(DATA.get("sim", {}).get("sewForce", 2))
 try:
     mod.collision_settings.distance_min = 0.003
-    mod.collision_settings.collision_quality = 4
+    mod.collision_settings.collision_quality = 6
     mod.collision_settings.use_self_collision = True
     mod.collision_settings.self_distance_min = 0.002
 except Exception:
