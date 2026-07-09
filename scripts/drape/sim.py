@@ -899,7 +899,11 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # baked drape that fixes the sliding null-space like friction would.
     OMEGA = float(_os.environ.get("DRAPE_FIT_OMEGA", "1.7"))
     N_ITER = int(_os.environ.get("DRAPE_FIT_ITERS", "1500"))
-    TETHER = 1e-3
+    # No drape tether: over hundreds of sweeps even a 1e-3 pull is a strong
+    # anchor that drags the relax back toward the spring-tensioned bake —
+    # reintroducing exactly the assembly tension being removed. The pins fix
+    # the gauge; contact keeps the cloth on the body.
+    TETHER = float(_os.environ.get("DRAPE_FIT_TETHER", "0"))
 
     def _edge_strain_stats(pos):
         L = np.linalg.norm(pos[ei] - pos[ej], axis=1)
