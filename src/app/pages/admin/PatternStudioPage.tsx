@@ -98,8 +98,8 @@ function stateFromFit(fit: Record<string, unknown>): Partial<PatternState> {
 const CM_PER_IN = 2.54;
 
 /** Blocks the cloth-sim drape pipeline can sew (mirrors the worker/extract
- *  whitelist): tee, tank, sweatshirt. */
-const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie"]);
+ *  whitelist): tee, tank, sweatshirt, raglan hoodie (hood not simulated). */
+const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie", "hugo"]);
 
 /** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
  *  image-model reference. White background; the SVG's own mm dimensions set

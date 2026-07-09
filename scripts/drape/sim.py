@@ -52,14 +52,25 @@ TORSO = [
 
 # Arm stubs end just below the sleeve hem for the same reason. Long sleeves
 # hang closer to the body (a wide splay looks scarecrow-ish and crops out of
-# frame); short sleeves keep the wider, airier tank/tee stance.
-_sleeve_umax = max(
-    (max(y for _, y in p["points"]) - min(y for _, y in p["points"])
-     for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"),
-    default=335.0,
-)
-ARM_LEN = _sleeve_umax + 45.0
-ARM_TILT = math.radians(30 if _sleeve_umax <= 350 else 16)
+# frame); short sleeves keep the wider, airier tank/tee stance. For raglan
+# sleeves, arm distance u runs from the shoulder joint with the biceps line
+# landing at the body's armhole depth — the raglan zone above the biceps is
+# shoulder, not arm length.
+_sleeve_pl = next((p["placement"] for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"), None)
+_RAGLAN = bool(_sleeve_pl and _sleeve_pl.get("raglan"))
+if _RAGLAN:
+    ARM_TILT = math.radians(30 if _sleeve_pl["y1"] <= 300 else 16)
+    RAGLAN_U0 = max(0.0, _sleeve_pl.get("armDepth", 250.0) - SHOULDER_PY) / math.cos(ARM_TILT)
+    ARM_LEN = _sleeve_pl["y1"] + RAGLAN_U0 + 45.0
+else:
+    _sleeve_umax = max(
+        (max(y for _, y in p["points"]) - min(y for _, y in p["points"])
+         for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"),
+        default=335.0,
+    )
+    ARM_TILT = math.radians(30 if _sleeve_umax <= 350 else 16)
+    RAGLAN_U0 = 0.0
+    ARM_LEN = _sleeve_umax + 45.0
 WRIST_R = ARM_R * 0.6  # arm stubs taper toward the wrist
 
 
@@ -71,6 +82,49 @@ def torso_ab(y):
             t = (y - y0) / (y1 - y0)
             return a0 + (a1 - a0) * t, b0 + (b1 - b0) * t
     return TORSO[-1][1], TORSO[-1][2]
+
+
+def top_edge_y(piece, x):
+    """Pattern-y of the piece's top edge at this x, from the emitted profile
+    (linear interpolation between bins)."""
+    prof = piece.get("topProfile")
+    if not prof:
+        return 10.0 + 22.0 * min(1.0, max(0.0, (abs(x) - 125.0) / 98.0))
+    if x <= prof[0][0]:
+        return prof[0][1]
+    for (x0, y0), (x1, y1) in zip(prof, prof[1:]):
+        if x <= x1:
+            t = (x - x0) / max(1e-6, x1 - x0)
+            return y0 + (y1 - y0) * t
+    return prof[-1][1]
+
+
+_neck_w_cache = {}
+
+
+def neck_half_width(piece):
+    """|x| extent of the neckline segments — inside it, the top edge is the
+    collar and the panel stays on the wrapped surface."""
+    name = piece["name"]
+    if name not in _neck_w_cache:
+        w = 100.0
+        segs = piece.get("segments", {})
+        pts = piece["points"]
+        xs = []
+        n = len(pts)
+        for seg_name, (start, end) in segs.items():
+            if not seg_name.startswith("neck"):
+                continue
+            i = start
+            while True:
+                xs.append(abs(pts[i % n][0]))
+                if i % n == end % n:
+                    break
+                i += 1
+        if xs:
+            w = max(xs)
+        _neck_w_cache[name] = w
+    return _neck_w_cache[name]
 
 
 def clamp_out(wx, wy, y_level):
@@ -158,13 +212,15 @@ def place(piece, x, y):
         # line (near 0 depth) where the pins hold front and back together.
         _, tb = torso_ab(y)
         wrapped = side * (tb + 15.0) * math.cos(phi)
-        # The panel hangs from the shoulder ridge: at the seam line it sits at
-        # ~centre depth, sweeping forward/backward onto the wrapped chest as it
-        # descends. Blend by distance BELOW the seam line at this x — near the
-        # centre (|x| < neck) the top edge is the neckline, fully wrapped.
-        y_seam = 10.0 + 22.0 * min(1.0, max(0.0, (abs(x) - 125.0) / 98.0))
-        t_seam = min(1.0, max(0.08, (y - y_seam) / 120.0))
-        t = max(t_seam, min(1.0, max(0.0, (115.0 - abs(x)) / 10.0)))
+        # The panel hangs from its own top edge (shoulder seam, tank strap or
+        # raglan diagonal — extract emits the profile): at the top edge it
+        # sits near centre depth, sweeping onto the wrapped chest as it
+        # descends. Near the centre the top edge IS the neckline: fully
+        # wrapped so the collar lies on the body, not pinched to the axis.
+        y_top = top_edge_y(piece, x)
+        neck_w = neck_half_width(piece)
+        t_seam = min(1.0, max(0.08, (y - y_top) / 120.0))
+        t = max(t_seam, min(1.0, max(0.0, (neck_w - abs(x)) / 10.0)))
         wy = side * 8.0 * (1 - t) + wrapped * t
         wx, wy = clamp_out(wx, wy, y)
         return (wx * S, wy * S, (HEIGHT - y) * S)
@@ -179,13 +235,28 @@ def place(piece, x, y):
     r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
     # Slightly less than a full wrap: the underarm edges must NOT start
     # coincident (self-collision fights zero-length sewing and explodes).
-    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 10.0 / r)))
-    u = y - sleeve_miny[piece["name"]]  # 0 at cap top, growing down the arm
+    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
+    # u: distance down the arm axis from the shoulder joint.
+    if pl.get("raglan"):
+        u = y + RAGLAN_U0  # biceps line lands at the armhole depth
+    else:
+        u = y - sleeve_miny[piece["name"]]  # 0 at cap top
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]
     wy = c * e1[1] + s_ * e2[1]
     wz = o[2] + u * ax[2] + c * e1[2]
+    if pl.get("raglan") and y < -60.0:
+        # Raglan: the zone ABOVE the shoulder ball sweeps off the arm toward
+        # the neck — at the top (the sleeve's own neckline arc) it sits
+        # beside the neck stub. The deltoid zone (y in [-60, 0]) stays on the
+        # arm tube: sweeping it too gathers excess cloth into shoulder puffs.
+        span = max(1.0, -sleeve_miny[piece["name"]] - 60.0)
+        t = min(1.0, (-y - 60.0) / span)
+        tx = pl["dir"] * pl.get("neckX", 95.0)
+        wx = wx * (1 - t) + tx * t
+        wy = wy * (1 - t) + (s_ * 0.5) * t
+        wz = wz * (1 - t) + (HEIGHT - 10.0) * t
     wx, wy = clamp_out(wx, wy, HEIGHT - wz)
     return (wx * S, wy * S, wz * S)
 
@@ -288,10 +359,12 @@ for seam in DATA["seams"]:
 # Pin the sleeve-cap edges as well — they sit exactly where the armscye lies
 # on the body, and act as rigid anchors the body panels get stitched to.
 # Without this, the armscye springs ratchet the whole sleeve up the arm and
-# it bunches at the shoulder.
+# it bunches at the shoulder. Pieces can also request extra pinned segments
+# (e.g. ribbed cuffs gripping the wrist).
 for piece in DATA["pieces"]:
+    extra = set(piece.get("pinSegments", []))
     for seg_name in piece.get("segments", {}):
-        if seg_name.startswith("neck") or seg_name.startswith("cap"):
+        if seg_name.startswith("neck") or seg_name.startswith("cap") or seg_name in extra:
             pin_indices.update(seg_indices(piece["name"], seg_name))
 
 # ---- Invisible collision body (ghost mannequin) -------------------------------

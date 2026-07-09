@@ -513,10 +513,11 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
           "precisely — the hem ends exactly where the pale cloth ends on the torso, each sleeve ends exactly " +
           "where the pale cloth ends on the arm, and the width and ease match the pale cloth. Render it as " +
           "real sewn fabric on a real person: the pale colour, faceted surface and any small gaps at the " +
-          "seams are simulation artifacts, and the neckline is a clean, evenly-finished neck opening — any " +
+          "seams are simulation artifacts; the neckline is a clean, evenly-finished neck opening — any " +
           "notch, tear or raggedness at the neck edge in the reference is an artifact, never a design " +
-          "detail. Fabric and colour come from the description alone, no mannequin may appear, and add no " +
-          "clothing items beyond those described"
+          "detail; and the shoulders are soft and unstructured — any pointiness, puffiness or padded look " +
+          "at the shoulders in the reference is an artifact too. Fabric and colour come from the " +
+          "description alone, no mannequin may appear, and add no clothing items beyond those described"
         : body.referenceRole === "pattern"
         ? ", constructed exactly from the flat sewing-pattern pieces shown in the reference image — read the " +
           "pieces ONLY to infer the garment's true proportions (sleeve length relative to torso, hem width and " +
@@ -1044,7 +1045,7 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
      *  actual pattern and scales the ghost mannequin to their body. */
     measurementsMm?: Record<string, number>;
   };
-  const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie"]);
+  const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie", "hugo"]);
   const clamp = (v: unknown, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
   const measurements: Record<string, number> = {};
