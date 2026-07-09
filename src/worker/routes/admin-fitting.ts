@@ -517,9 +517,10 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
           "notch, tear or raggedness at the neck edge in the reference is an artifact, never a design " +
           "detail; the shoulders are soft and unstructured — any pointiness, puffiness or padded look at " +
           "the shoulders in the reference is an artifact too; and the sleeves hang smooth — any horizontal " +
-          "rings, ruching or accordion folds along the sleeves in the reference are artifacts, not a " +
-          "gathered design. Fabric and colour come from the description alone, no mannequin may appear, " +
-          "and add no clothing items beyond those described"
+          "rings, ruching or accordion folds along the sleeves or legs in the reference are artifacts, not " +
+          "a gathered design; and every edge (waist, hems, openings) is cleanly finished. Fabric and " +
+          "colour come from the description alone, no mannequin or dress form may appear, and add no " +
+          "clothing items beyond those described"
         : body.referenceRole === "pattern"
         ? ", constructed exactly from the flat sewing-pattern pieces shown in the reference image — read the " +
           "pieces ONLY to infer the garment's true proportions (sleeve length relative to torso, hem width and " +
@@ -1047,7 +1048,10 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
      *  actual pattern and scales the ghost mannequin to their body. */
     measurementsMm?: Record<string, number>;
   };
-  const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie", "hugo", "simon", "simone"]);
+  const DRAPE_BLOCKS = new Set([
+    "classic-tee", "aaron", "relaxed-hoodie", "hugo", "simon", "simone",
+    "slip-dress", "wahid", "wide-trouser", "pleated-skirt",
+  ]);
   const clamp = (v: unknown, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
   const measurements: Record<string, number> = {};

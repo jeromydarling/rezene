@@ -210,36 +210,67 @@ Virtual try-on, refits, and mood-board style-matching use a best-in-class engine
     updated: "2026-07-08",
     body: `# The Pattern Studio
 
-For the shops with a tailor or seamstress in the room: the Pattern Studio drafts **real, manufacturable 2D sewing patterns** in your browser — genuine flat pattern pieces (front, back, sleeve) you can print, cut, and sew. Not a picture of a pattern; the pattern.
+For the shops with a tailor or seamstress in the room — and for the designers who want to become one — the Pattern Studio drafts **real, manufacturable 2D sewing patterns** in your browser. Genuine flat pattern pieces (front, back, sleeve) you can print at true scale, cut, and sew. Not a picture of a pattern; the pattern. And from the same draft, a **physically simulated drape** and a **photoreal model render**, so one screen carries a design from measurements to a garment you can show a client.
 
-## Draft one
+## The five-minute path
 
-1. Pick a **pattern block** — the full FreeSewing apparel catalogue is in, over thirty blocks across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear (coats, jacket block, waistcoat, corset), foundation bodice blocks, underwear and swim.
-2. Choose a **size** (XS–XXL), or go **made-to-measure**: the four quick fields (chest, waist, hips, height) get you close fast, and **Full measurements** opens every point the block actually drafts from — neck, shoulder-to-wrist, bicep, waist-to-hip and the rest — for true bespoke input, in **cm or inches**. Greyed values show what the draft currently uses; type over any of them.
-3. **Adjust the cut.** The quick sliders cover ease, hem, and sleeve length — and **All drafting options** opens the block's complete native option set, straight from the design itself: on the button-down that means six cuff styles, collar geometry, plackets, split yoke, back darts, button count and more. Everything redrafts the actual pattern pieces, seams and all.
-4. Set the **seam allowance** to whatever your fabric and construction call for (in mm or inches; 0 draws none).
-5. **Dimensions on the pattern** (paperless mode) lets you measure and mark directly instead of printing at scale.
-6. **Download SVG** — hand it to your machinist, or open it in any vector tool to refine. **Save to library** keeps a copy with your shop files.
-7. **Print PDF** — a tiled, true-scale PDF (A4 or Letter). Print at 100%, check the **5 cm bar** on each page, tape the pages along the dashed glue guides, and cut. Overlaps and row/column labels are printed on every page.
+1. Pick a **block**, 2. pick a **size** (or type measurements), 3. move the **fit sliders**, 4. **Print PDF**, cut, sew. Everything below is depth on those four steps — none of it is required to get a working pattern in your hands.
+
+## 1 · Pick your block
+
+The full FreeSewing apparel catalogue is in — over thirty blocks across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear, foundation bodices, underwear and swim. Three ways in:
+
+- **Browse** the grouped picker (Tops, Shirts, Hoodies & Sweats, Dresses, Bottoms, Tailoring…).
+- **Describe it** to the ✨ assistant — *"a boxy cropped tee"* — and it picks the block, size and rough fit for you.
+- **Arrive from a fitting** — fit notes sent from the Fitting Studio land here with the right block preselected and the adjustments already on the sliders.
+
+## 2 · Size it — three levels of truth
+
+- **Standard sizes (XS–XXL).** A proportional grade from the size chart. Honest scope: good enough to cut a first toile, not an industrial graded nest.
+- **Quick made-to-measure.** Four fields — chest, waist, hips, height — get a draft that's already recognisably *that person's*.
+- **Full measurements.** Opens every measurement the block actually drafts from — neck, shoulder-to-wrist, bicep, waist-to-hip, the lot — in **cm or inches**. Greyed values show what the draft is currently using; type over any of them for true bespoke input. This is the level a made-to-measure atelier works at, and every downstream feature (including the drape simulation) uses these same numbers.
+
+## 3 · Shape the cut
+
+- **Quick sliders** — ease, hem length, sleeve length. Each redrafts the real pattern, so what the sliders say is what the seams do. Every slider has −/+ steppers sized for a tablet at the cutting table.
+- **All drafting options** — the block's complete native option tree, straight from the design itself. On the button-down that means six cuff styles, collar geometry, plackets, split yoke, back darts, button count and more; every block exposes its own set. Nothing here is a mock control: each option changes the drafted geometry.
+- **✨ Style this block** — tell the assistant *"french cuffs, split yoke, eight buttons"* and it sets those native options for you. Everything it chooses lands on the visible manual controls, yours to override — a concierge, never a gatekeeper.
+
+## 4 · Get it out of the screen
+
+- **Seam allowance** — whatever your fabric and construction call for, in mm or inches; 0 draws none.
+- **Paperless mode** — prints dimensions on the pattern so you can measure and mark directly without printing at scale.
+- **Download SVG** — for your machinist or any vector tool.
+- **Print PDF** — tiled at true scale on A4 or Letter. Print at 100%, check the **5 cm bar on every page**, tape along the dashed glue guides (overlaps and row/column labels are printed on each page), and cut.
 
 > [!TIP]
-> The **✨ pattern assistant** works two ways. **Draft it** — *"a boxy cropped tee"* — picks the block, size, and rough fit. **Style this block** goes deeper: *"french cuffs, split yoke, eight buttons"* sets the block's own drafting options. Everything the assistant chooses lands on the manual controls, visible and yours to override — it's a concierge, never a gatekeeper.
+> New to cutting? **✨ Explain this pattern** writes a plain-language guide to the drafted pieces — what each one is, how many to cut, grain lines, and the classic mistakes for that garment type.
 
-> [!TIP]
-> New to cutting? **✨ Explain this pattern** (under the viewer) writes a plain-language guide to the drafted pieces — what each is, how many to cut, grain lines, and the mistakes beginners make on that garment type. Use the **zoom controls** and the −/+ steppers on every slider when you're working from a tablet at the cutting table.
+## 5 · See it before you sew it — the two bridges
 
-## Both directions: picture ↔ pattern
+This is where the Pattern Studio becomes something genuinely new.
 
-- **Fitting → Pattern.** After refitting a look in the Fitting Studio (tighter, cropped, shorter sleeves…), tap **Fit notes → Pattern Studio** and those decisions arrive here as drafting adjustments, already on the sliders.
-- **Pattern → Model.** Working pattern-first, the traditional way? **Render this cut on a model** turns the block, your fit adjustments, and every styling choice it can name — cuffs, collar, plackets, buttons — into a photoreal look in the Fitting Studio's gallery. Honest scope: it's a **visual sketch** of the cut, not a render of your exact draft — seams and geometry live in the pattern, not the picture. For a physically true drape of the drafted seams, that's the 3D simulation bridge. There's also an **experimental toggle** — *show the engine the pattern sheet* — that sends a clean drawing of the pieces as a proportion reference. It's honestly experimental: render the same cut with and without, then judge with **Compare** and the **Grid** in the Fitting Studio.
-- **True-drape preview (beta).** For the t-shirt, tank top, sweatshirt, raglan hoodie, and Simon/Simone button-down blocks, **Simulate the real drape** goes further than the pattern sheet: (Hoods and collars aren't simulated — your description carries those; the simulation carries the body, sleeves, and for shirts a placket actually pinned shut at the button positions.) it sews your exact draft — your client's measurements included — in a cloth simulator and drapes it on a ghost mannequin scaled to the same body. The result is a physically true picture of the proportions: where the hem really sits, how far the sleeves really reach. It takes a few minutes on a render server; when it's done, **Render on a model from this drape** uses the simulated garment as the proportion reference for the photoreal picture. If the render backend isn't configured on your deployment, the button says so plainly and everything else keeps working.
+**True-drape preview (beta).** For a growing set of blocks — **t-shirt, tank, sweatshirt, raglan hoodie, the Simon/Simone button-downs, waistcoat, slip dress, trousers, and pencil skirt** — *Simulate the real drape* sews your exact draft together in a cloth simulator and drapes it on a ghost mannequin **scaled to the same measurements you drafted with**. The result is a physically true picture of the proportions: where the hem really sits, how far the sleeves really reach, how much ease really hangs at the waist. It takes a few minutes on a render server; when it's done, **Render on a model from this drape** feeds the simulated garment to the photoreal engine as a proportion reference — so the picture your client sees matches the pattern your cutter holds. Honest scope: hoods, collars and waistbands aren't simulated (your description carries those), and the sim's grey surface is deliberately rough — the render engine is told to read proportions from it, never texture.
 
-## A made-to-measure client book
+**Render this cut on a model.** The faster, looser bridge: your block, fit and every styling choice that has a name (cuffs, collar, plackets, buttons) become a written description for the photoreal engine. It's a **visual sketch** of the cut, not a render of your draft — use the drape bridge when the proportions themselves are the point. There's also an experimental *show the engine the pattern sheet* toggle that sends a clean drawing of the pieces as a reference; judge it with **Compare** and the **Grid** in the Fitting Studio.
 
-**Save this pattern** stores the whole recipe — block, size, measurements, adjustments. Name it after a client and their pattern reloads with one click next season; link it to a **style** to keep it with the rest of that piece's story. This is the quiet superpower for ateliers doing alterations and one-offs.
+**The loop closes both ways.** After a fitting session in the Fitting Studio (tighter, cropped, shorter sleeves…), tap **Fit notes → Pattern Studio** and those decisions arrive here as drafting adjustments, already on the sliders. Adjust, re-drape, re-render, re-fit: picture and pattern never drift apart.
+
+## A worked example: one client, one afternoon
+
+1. A client sends measurements — enter them under **Full measurements** on the Simone button-down.
+2. She wants it relaxed and cropped: ease slider up, hem slider down, *"rounded barrel cuffs, seven buttons"* to the assistant.
+3. **Simulate the real drape** — five minutes later you're looking at *her* shirt on *her* form.
+4. **Render on a model from this drape** — now it's a photograph you can send her.
+5. She approves; **Print PDF**, cut, sew.
+6. **Save this pattern** under her name — next season it reloads in one click.
+
+## The client book
+
+**Save this pattern** stores the whole recipe — block, size, measurements, adjustments — and reload is one click. Name patterns after clients, link them to a **style** to keep them with that piece's story. For ateliers doing alterations and one-offs, this quiet feature is the backbone: the pattern of record for every body you cut for.
 
 ## Honest limits
 
-Grading from a standard size is a proportional first pass — good enough to start cutting a toile, not an industrial graded nest. Made-to-measure drafts use your numbers directly and are correspondingly better. Foundation blocks (Brian, Bella, Breanna, Noble) are drafting bases for pattern-makers rather than finished garments.`,
+Grading from a standard size is a proportional first pass. Made-to-measure drafts use your numbers directly and are correspondingly better. Foundation blocks (Brian, Bella, Breanna, Noble) are drafting bases for pattern-makers rather than finished garments. The drape simulation is a proportions instrument, not a fabric-physics oracle — it won't show you how *your* twill behaves, only how the drafted shape hangs. And no render replaces a real fitting; it replaces the guesswork before one.`,
   },
 ];

@@ -16,6 +16,10 @@
  *   hugo (Hugo raglan)    raglan seams to the neckline; hood not simulated
  *   simon / simone        button-downs: two front panels pinned shut at the
  *                         buttons, back + yoke; collar not simulated
+ *   slip-dress (Sophie)   bias slip, top edge pinned; straps not simulated
+ *   wahid (waistcoat)     buttoned CF, waist darts sewn shut, sleeveless
+ *   wide-trouser (Titan)  leg tubes + hip sweep on the lower-body mannequin
+ *   pleated-skirt (Penelope) pencil skirt on the hip column, waist pinned
  *
  * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
@@ -90,6 +94,45 @@ const BLOCKS = {
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true,
   },
+  "slip-dress": {
+    module: "@freesewing/sophie",
+    design: "Sophie",
+    // Bias slip dress: front/back panels cut on fold, top edge pinned at
+    // chest height (straps come from the description, like collars/hoods).
+    dressPanels: true,
+    parts: { front: "sophie.frontPanel", back: "sophie.backPanel" },
+    yOffset: 350, // pattern y=0 sits ~mid-torso; +350 = body coords (HPS=0)
+  },
+  wahid: {
+    module: "@freesewing/wahid",
+    design: "Wahid",
+    // Waistcoat: one front part cut twice (mirrored), buttoned CF, waist
+    // darts sewn shut in the sim, sleeveless. Lapel-less V neck.
+    waistcoat: true,
+    parts: { front: "wahid.front", back: "wahid.back" },
+    sim: { sewForce: 5 }, // darts must close against the side-seam pull
+  },
+  "wide-trouser": {
+    module: "@freesewing/titan",
+    design: "Titan",
+    // Trousers: front + back drafted once, cut twice (mirrored per leg).
+    // Panels wrap half-tubes around the leg stubs, sweeping onto the hip
+    // shell above the fork; the waist is pinned (belt/waistband grip).
+    trousers: true,
+    parts: { front: "titan.front", back: "titan.back" },
+    yOffset: 460,
+    bodyKind: "lower",
+  },
+  "pleated-skirt": {
+    module: "@freesewing/penelope",
+    design: "Penelope",
+    // Pencil skirt: front/back on fold, waist darts pinned flat under the
+    // (described) waistband, hem vent left as drafted.
+    skirt: true,
+    parts: { front: "penelope.front", back: "penelope.back" },
+    yOffset: 460,
+    bodyKind: "lowerColumn",
+  },
 };
 
 const blockId = BLOCKS[spec.block] ? spec.block : "classic-tee";
@@ -98,10 +141,13 @@ const cfg = BLOCKS[blockId];
 // The studio's standard measurement set (mm) — any client measurement sent in
 // the spec overrides its entry.
 const M = {
-  biceps: 335, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080, head: 560, highBust: 1040,
-  hips: 1000, hpsToBust: 270, hpsToWaistBack: 460, neck: 400, shoulderSlope: 13,
-  shoulderToShoulder: 445, shoulderToWrist: 620, waist: 820, waistToArmpit: 230,
-  waistToHead: 670, waistToHips: 130, wrist: 170,
+  ankle: 230, biceps: 335, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080,
+  crossSeam: 800, crossSeamFront: 390, head: 560, heel: 330, highBust: 1040, hips: 1000,
+  hpsToBust: 270, hpsToWaistBack: 460, inseam: 790, knee: 420, neck: 400, seat: 1050,
+  seatBack: 520, shoulderSlope: 13, shoulderToShoulder: 445, shoulderToWrist: 620,
+  underbust: 900, upperLeg: 600, waist: 820, waistBack: 410, waistToArmpit: 230,
+  waistToFloor: 1040, waistToHead: 670, waistToHips: 130, waistToKnee: 590,
+  waistToSeat: 230, waistToUnderbust: 110, waistToUpperLeg: 280, wrist: 170,
 };
 for (const [k, v] of Object.entries(spec.measurements ?? {})) {
   const n = Number(v);
@@ -335,6 +381,20 @@ function topProfile(piece) {
   return [...bins.entries()].sort((a, b) => a[0] - b[0]);
 }
 
+// Width profile: max |x| per y-bin. The sim scales the wrap shell per height
+// so a flared dress wraps snug at the chest and full at the hem — one global
+// scale would bunch the excess wherever the garment is narrower.
+function widthProfile(piece) {
+  const BIN = 40;
+  const bins = new Map();
+  for (const [x, y] of piece.points) {
+    const b = Math.round(y / BIN) * BIN;
+    const w = Math.abs(x);
+    if (!bins.has(b) || w > bins.get(b)) bins.set(b, w);
+  }
+  return [...bins.entries()].sort((a, b) => a[0] - b[0]);
+}
+
 /** Button-front panel (Simon frontRight/frontLeft): drafted as a full panel
  *  with the centre front at x=0 and the button/buttonhole stand crossing it.
  *  The two panels are natural mirror complements, so pattern coordinates map
@@ -393,11 +453,183 @@ function yokePiece() {
   ]);
 }
 
+/** Slip-dress panel (Sophie): cut on fold, top edge pinned at chest height. */
+function dressPanel(partName, pieceName) {
+  const part = set[partName];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hemR = slice(poly, P.bottomCenterpoint, P.bottomSide);
+  const sideR = slice(poly, P.bottomSide, P.topSide);
+  const neckR = slice(poly, P.topSide, P.topCenterpoint);
+  return buildPiece(pieceName, [
+    ["hemR", hemR],
+    ["sideR", sideR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hemL", mirror([...hemR].reverse())],
+  ]);
+}
+
+/** Waistcoat front (Wahid): one drafted part, cut twice. The outline runs
+ *  side -> armhole -> shoulder -> V-neck -> buttoned CF -> pointed hem with a
+ *  waist dart slit (sewn shut in the sim). mirrored=true builds the other
+ *  panel. */
+function waistcoatFront(pieceName, mirrored) {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  return buildPiece(pieceName, [
+    ["side", seg(slice(poly, P.hem, P.armhole))],
+    ["armscye", seg(slice(poly, P.armhole, P.shoulder))],
+    ["shoulder", seg(slice(poly, P.shoulder, P.neck))],
+    ["neck", seg(slice(poly, P.neck, P.closureTop))],
+    ["placket", seg(slice(poly, P.closureTop, P.dartHemLeft))],
+    ["dartL", seg(slice(poly, P.dartHemLeft, P.dartTop))],
+    ["dartR", seg(slice(poly, P.dartTop, P.dartHemRight))],
+    ["hem2", seg(slice(poly, P.dartHemRight, P.hem))],
+  ]);
+}
+
+/** Waistcoat back (Wahid): half draft mirrored, CB fold excluded, one waist
+ *  dart per side. */
+function waistcoatBack() {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const cbNeckPt = { x: 0, y: P.neck.y + 22 };
+  const hem1R = slice(poly, P.cbHem, P.dartHemLeft);
+  const dartLR = slice(poly, P.dartHemLeft, P.dartTop);
+  const dartRR = slice(poly, P.dartTop, P.dartHemRight);
+  const hem2R = slice(poly, P.dartHemRight, P.hem);
+  const sideR = slice(poly, P.hem, P.armhole);
+  const armscyeR = slice(poly, P.armhole, P.shoulder);
+  const shoulderR = slice(poly, P.shoulder, P.neck);
+  const neckR = slice(poly, P.neck, cbNeckPt);
+  return buildPiece("back", [
+    ["hem1R", hem1R],
+    ["dartLR", dartLR],
+    ["dartRR", dartRR],
+    ["hem2R", hem2R],
+    ["sideR", sideR],
+    ["armscyeR", armscyeR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hem2L", mirror([...hem2R].reverse())],
+    ["dartRL", mirror([...dartRR].reverse())],
+    ["dartLL", mirror([...dartLR].reverse())],
+    ["hem1L", mirror([...hem1R].reverse())],
+  ]);
+}
+
+/** Slice that always takes the SHORT way between two anchors, regardless of
+ *  the part's path direction (Titan's back walks opposite to its front). */
+function sliceShort(poly, a, b) {
+  const fwd = slice(poly, a, b);
+  if (fwd.length <= poly.length / 2 + 1) return fwd;
+  return [...slice(poly, b, a)].reverse();
+}
+
+/** Trouser panel (Titan front/back): outseam on one edge, inseam + crotch
+ *  curve on the other, fork where they split. mirrored=true builds the other
+ *  leg's copy. Emits an edges profile [y, xMin, xMax] so the sim can wrap the
+ *  half-tube with the true local width. */
+function trouserPanel(partName, pieceName, mirrored) {
+  const part = set[partName];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  const piece = buildPiece(pieceName, [
+    ["outseam", seg(sliceShort(poly, P.styleWaistOut, P.floorOut))],
+    ["hem", seg(sliceShort(poly, P.floorOut, P.floorIn))],
+    ["inseam", seg(sliceShort(poly, P.floorIn, P.fork))],
+    ["crotch", seg(sliceShort(poly, P.fork, P.styleWaistIn))],
+    ["waist", seg(sliceShort(poly, P.styleWaistIn, P.styleWaistOut))],
+  ]);
+  const BIN = 50;
+  const bins = new Map();
+  for (const [x, y] of piece.points) {
+    const b = Math.round(y / BIN) * BIN;
+    const e = bins.get(b) ?? [x, x];
+    bins.set(b, [Math.min(e[0], x), Math.max(e[1], x)]);
+  }
+  piece.edgesProfile = [...bins.entries()].map(([y, [lo, hi]]) => [y, lo, hi]).sort((a, b) => a[0] - b[0]);
+  piece.forkY = P.fork.y;
+  return piece;
+}
+
+/** Skirt panel (Penelope front/back): cut on fold, CF/CB fold excluded,
+ *  waist edge (with its dart V's) pinned flat under the waistband. */
+function skirtPanel(partName, pieceName) {
+  const part = set[partName];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hemR = slice(poly, P.lHem, P.rHem);
+  const sideR = slice(poly, P.rHem, P.rWaist);
+  const waistR = slice(poly, P.rWaist, P.lWaist);
+  return buildPiece(pieceName, [
+    ["hemR", hemR],
+    ["sideR", sideR],
+    ["waistR", waistR],
+    ["waistL", mirror([...waistR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hemL", mirror([...hemR].reverse())],
+  ]);
+}
+
 const hasSleeves = Boolean(cfg.parts.sleeve);
 const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
 
 let bodyPieces;
-if (cfg.buttonFront) {
+if (cfg.trousers) {
+  // Right leg wears the drafted panels as-is; the left leg wears mirrors.
+  // (Titan's front is drafted with the outseam near x=0 and the inseam
+  // outboard; the sim's leg wrap reads the edges profile either way.)
+  const frontR = trouserPanel(cfg.parts.front, "frontR", false);
+  const backR = trouserPanel(cfg.parts.back, "backR", false);
+  const frontL = trouserPanel(cfg.parts.front, "frontL", true);
+  const backL = trouserPanel(cfg.parts.back, "backL", true);
+  frontR.placement = { kind: "leg", leg: 1, panel: "front" };
+  backR.placement = { kind: "leg", leg: 1, panel: "back" };
+  frontL.placement = { kind: "leg", leg: -1, panel: "front" };
+  backL.placement = { kind: "leg", leg: -1, panel: "back" };
+  for (const p of [frontR, backR, frontL, backL]) {
+    p.pinSegments = ["waist"]; // waistband grip; seams close by stitching
+  }
+  bodyPieces = [frontR, backR, frontL, backL];
+} else if (cfg.skirt) {
+  const front = skirtPanel(cfg.parts.front, "front");
+  const back = skirtPanel(cfg.parts.back, "back");
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  front.pinSegments = ["waistR", "waistL"];
+  back.pinSegments = ["waistR", "waistL"];
+  bodyPieces = [front, back];
+} else if (cfg.dressPanels) {
+  const front = dressPanel(cfg.parts.front, "front");
+  const back = dressPanel(cfg.parts.back, "back");
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  bodyPieces = [front, back];
+} else if (cfg.waistcoat) {
+  // The drafted front's body extends to +x (wearer's left panel).
+  const frontL = waistcoatFront("frontL", false);
+  const frontR = waistcoatFront("frontR", true);
+  const back = waistcoatBack();
+  frontL.placement = { kind: "plane", y: -160, outset: 5 };
+  frontR.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  frontL.pinSegments = ["placket"];
+  frontR.pinSegments = ["placket"];
+  frontL.pinStride = 4;
+  frontR.pinStride = 4;
+  bodyPieces = [frontL, frontR, back];
+} else if (cfg.buttonFront) {
   // Wearer's left panel (frontLeft, body on +x) carries the button stand and
   // lies on top; it gets a small outward offset so the closed placket layers
   // instead of interpenetrating. Both plackets are pinned shut (buttoned).
@@ -429,7 +661,10 @@ if (cfg.buttonFront) {
 // 3D placement hints. Body pieces wrap an elliptical shell (front/back sign);
 // sleeves wrap tubes around the mannequin's tilted arm stubs.
 const chestHalf = Math.max(...bodyPieces[0].points.map(([x]) => Math.abs(x)));
-for (const p of bodyPieces) p.topProfile = topProfile(p);
+for (const p of bodyPieces) {
+  p.topProfile = topProfile(p);
+  p.widthProfile = widthProfile(p);
+}
 
 if (hasSleeves) {
   // Taper hints: half-width at the biceps line (pattern y=0) and at the hem,
@@ -463,7 +698,41 @@ if (hasSleeves) {
  *  point-by-point after resampling both to the same count (the sim
  *  auto-orients direction from world-space endpoints). Shoulders are pinned
  *  — the garment hangs from them on the ghost mannequin. */
-const seams = cfg.buttonFront
+const seams = cfg.trousers
+  ? [
+      // Hangs from the pinned waist. Out/in seams close each leg's tube;
+      // crotch curves join the two legs at CF and CB.
+      { name: "outseam_R", a: ["frontR", "outseam"], b: ["backR", "outseam"] },
+      { name: "inseam_R", a: ["frontR", "inseam"], b: ["backR", "inseam"] },
+      { name: "outseam_L", a: ["frontL", "outseam"], b: ["backL", "outseam"] },
+      { name: "inseam_L", a: ["frontL", "inseam"], b: ["backL", "inseam"] },
+      { name: "crotch_front", a: ["frontR", "crotch"], b: ["frontL", "crotch"] },
+      { name: "crotch_back", a: ["backR", "crotch"], b: ["backL", "crotch"] },
+    ]
+  : cfg.skirt
+  ? [
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+    ]
+  : cfg.dressPanels
+  ? [
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+    ]
+  : cfg.waistcoat
+  ? [
+      // Hangs from pinned shoulders + pinned V-neck/CB + buttoned plackets;
+      // waist darts are sewn shut for the fitted silhouette.
+      { name: "shoulder_R", a: ["frontL", "shoulder"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["frontR", "shoulder"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R", a: ["frontL", "side"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["frontR", "side"], b: ["back", "sideL"] },
+      { name: "dartF_R", a: ["frontL", "dartL"], b: ["frontL", "dartR"] },
+      { name: "dartF_L", a: ["frontR", "dartL"], b: ["frontR", "dartR"] },
+      { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
+      { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
+    ]
+  : cfg.buttonFront
   ? [
       // Button-front: the garment hangs from pinned shoulders + necklines +
       // pinned plackets. The yoke bridges back and fronts; the yoke's own
@@ -517,6 +786,13 @@ const out = {
   spec,
   pieces: [...bodyPieces, ...sleeves],
   seams,
+  // Vertical anchor (pattern y=0 in body coordinates, HPS=0/waist=460) and
+  // which ghost-mannequin the sim should build.
+  yOffset: cfg.yOffset ?? 0,
+  bodyKind: cfg.bodyKind ?? "upper",
+  // Per-block solver hints (e.g. darted blocks need stronger stitching to
+  // pull the dart wedges shut against the side seams).
+  sim: cfg.sim ?? {},
   // Ghost-mannequin scale hints: ratios of this draft's measurements to the
   // studio-standard body the sim's torso profile was modelled on.
   body: {

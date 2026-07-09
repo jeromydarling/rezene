@@ -61,6 +61,13 @@ interface Supplier {
 
 const GARMENTS = ["", "trouser", "shirt", "overshirt", "dress", "knit", "coat", "skirt", "jacket", "set"];
 const PRESENTATION = ["on a model, full length", "on a model, editorial crop", "flat lay", "on a hanger", "ghost mannequin"];
+/** Garment-only presentations need people excluded outright, or the image
+ *  model drifts into "invisible model" shots with stray hands and feet. */
+const PRESENTATION_DIRECTIVE: Record<string, string> = {
+  "flat lay": "as a flat lay — the empty garment laid flat on a plain surface, shot from directly above, no person and no body parts",
+  "on a hanger": "hanging empty on a hanger against a plain backdrop, no person and no body parts",
+  "ghost mannequin": "as a ghost-mannequin product photo — the empty garment holding a worn shape with nobody inside, no person and no body parts",
+};
 
 export function DesignStudioPage() {
   const { data, loading, error, reload } = useFetch<ConceptRow[]>("/api/admin/ai/concepts");
@@ -248,7 +255,9 @@ function DesignWorkspace({
     fabric ? `in ${fabric}` : "",
     palette ? `in a ${palette} palette` : "",
     details ? `with ${details}` : "",
-    presentation, // already reads as a directive, e.g. "on a model, editorial crop"
+    // Model presentations read as directives on their own; the garment-only
+    // ones swap in an explicit no-people directive.
+    PRESENTATION_DIRECTIVE[presentation] ?? presentation,
   ]
     .filter(Boolean)
     .join(", ");
