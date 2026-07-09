@@ -1036,16 +1036,31 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
     );
   }
   const body = (await c.req.json().catch(() => ({}))) as {
+    block?: string;
     easePct?: number;
     lengthPct?: number;
     sleevePct?: number;
+    /** The draft's effective measurements (mm) so the sim sews the client's
+     *  actual pattern and scales the ghost mannequin to their body. */
+    measurementsMm?: Record<string, number>;
   };
+  const DRAPE_BLOCKS = new Set(["classic-tee", "aaron", "relaxed-hoodie"]);
   const clamp = (v: unknown, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
+  const measurements: Record<string, number> = {};
+  for (const [k, v] of Object.entries(body.measurementsMm ?? {})) {
+    const n = Number(v);
+    if (/^[a-zA-Z]{2,40}$/.test(k) && Number.isFinite(n) && n >= 50 && n <= 2500) {
+      measurements[k] = Math.round(n);
+    }
+    if (Object.keys(measurements).length >= 30) break;
+  }
   const spec = {
+    block: DRAPE_BLOCKS.has(body.block ?? "") ? body.block : "classic-tee",
     easePct: clamp(body.easePct, 0, 25),
     lengthPct: clamp(body.lengthPct, -15, 20),
     sleevePct: clamp(body.sleevePct, -30, 10),
+    measurements,
   };
 
   const jobId = newId("drape");

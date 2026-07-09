@@ -1,33 +1,67 @@
 /**
  * Drape extraction — FreeSewing draft → sewable piece geometry.
  *
- * Drafts the garment with the studio's measurement set + quick-fit options,
- * walks each piece's `seam` path into polylines (mm), mirrors cut-on-fold
- * pieces, and emits a pieces.json the Blender sim consumes: pieces as closed
- * point loops built from NAMED SEGMENTS (so seam correspondence is exact
- * point-index pairs, resampled to matching counts), plus 3D placement hints.
+ * Drafts the garment with the shop's measurements (falling back to the
+ * studio's standard set) + quick-fit options, walks each piece's `seam` path
+ * into polylines (mm), mirrors cut-on-fold pieces, and emits a pieces.json
+ * the Blender sim consumes: pieces as closed point loops built from NAMED
+ * SEGMENTS (so seam correspondence is exact point-index pairs, resampled to
+ * matching counts), plus 3D placement hints and body-scale hints for the
+ * ghost mannequin.
  *
- * V1 covers the classic tee (Teagan): front, back, two sleeves; shoulder,
- * side, armscye and underarm seams; pinned at the shoulder seam for a
- * ghost-mannequin drape.
+ * Supported blocks (all Brian-family, so they share anchor names):
+ *   classic-tee (Teagan)  front/back/sleeves, sewn armscyes
+ *   aaron (Aaron tank)    front/back only, armholes are free edges
+ *   relaxed-hoodie (Sven) front/back/long sleeves
  *
- * Usage: node scripts/drape/extract.mjs '{"easePct":8,"lengthPct":-12,"sleevePct":-25}' out/pieces.json
+ * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
-import { Teagan } from "@freesewing/teagan";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 const spec = JSON.parse(process.argv[2] ?? "{}");
 const outPath = process.argv[3] ?? "pieces.json";
 
+const BLOCKS = {
+  "classic-tee": {
+    module: "@freesewing/teagan",
+    design: "Teagan",
+    parts: { front: "teagan.front", back: "teagan.back", sleeve: "teagan.sleeve" },
+    sleeveAnchors: { hemL: "hemLeft", hemR: "hemRight" },
+  },
+  aaron: {
+    module: "@freesewing/aaron",
+    design: "Aaron",
+    parts: { front: "aaron.front", back: "aaron.back" },
+    // A tank's "shoulder seam" is the strap top; the Brian `shoulder` point
+    // isn't on Aaron's outline at all.
+    bodyAnchors: { armTop: "strapRight", neckSide: "strapLeft" },
+  },
+  "relaxed-hoodie": {
+    module: "@freesewing/sven",
+    design: "Sven",
+    parts: { front: "sven.front", back: "sven.back", sleeve: "sven.sleeve" },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+  },
+};
+
+const blockId = BLOCKS[spec.block] ? spec.block : "classic-tee";
+const cfg = BLOCKS[blockId];
+
+// The studio's standard measurement set (mm) — any client measurement sent in
+// the spec overrides its entry.
 const M = {
-  biceps: 335, chest: 1080, hips: 1000, hpsToWaistBack: 460, neck: 400,
+  biceps: 335, chest: 1080, hips: 1000, hpsToBust: 130, hpsToWaistBack: 460, neck: 400,
   shoulderSlope: 13, shoulderToShoulder: 445, shoulderToWrist: 620,
   waist: 820, waistToArmpit: 230, waistToHips: 130, wrist: 170,
 };
+for (const [k, v] of Object.entries(spec.measurements ?? {})) {
+  const n = Number(v);
+  if (Number.isFinite(n) && n >= 50 && n <= 2500) M[k] = n;
+}
 
 const clampPct = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || 0)) / 100;
-const options = {
+const wanted = {
   chestEase: clampPct(spec.easePct ?? 0, 0, 25),
   waistEase: clampPct(spec.easePct ?? 0, 0, 25),
   hipsEase: clampPct(spec.easePct ?? 0, 0, 25),
@@ -35,7 +69,12 @@ const options = {
   sleeveLengthBonus: clampPct(spec.sleevePct ?? 0, -30, 10),
 };
 
-const pattern = new Teagan({ measurements: M, options });
+const { [cfg.design]: Design } = await import(cfg.module);
+// Only pass options this design actually declares.
+const declared = Design.patternConfig?.options ?? {};
+const options = Object.fromEntries(Object.entries(wanted).filter(([k]) => k in declared));
+
+const pattern = new Design({ measurements: M, options });
 pattern.draft();
 const set = pattern.parts[0];
 
@@ -153,12 +192,14 @@ function bodyPiece(partName, pieceName) {
   const part = set[partName];
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
+  const isFront = pieceName === "front";
+  const A = cfg.bodyAnchors ?? { armTop: "shoulder", neckSide: "neck" };
   // Right-half segments (drafted half, fold at x=0).
-  const hemR = slice(poly, P.cfHem ?? P.gridAnchor, P.hem);
+  const hemR = slice(poly, P.cfHem ?? P.cbHem ?? P.gridAnchor, P.hem);
   const sideR = slice(poly, P.hem, P.armhole);
-  const armscyeR = slice(poly, P.armhole, P.shoulder);
-  const shoulderR = slice(poly, P.shoulder, P.neck);
-  const neckR = slice(poly, P.neck, partName.endsWith("front") ? P.cfNeck : P.cbNeck);
+  const armscyeR = slice(poly, P.armhole, P[A.armTop]);
+  const shoulderR = slice(poly, P[A.armTop], P[A.neckSide]);
+  const neckR = slice(poly, P[A.neckSide], isFront ? P.cfNeck : P.cbNeck);
   // Full outline: right half then mirrored left half walked back to start.
   return buildPiece(pieceName, [
     ["hemR", hemR],
@@ -175,14 +216,15 @@ function bodyPiece(partName, pieceName) {
 }
 
 function sleevePiece(side) {
-  const part = set["teagan.sleeve"];
+  const part = set[cfg.parts.sleeve];
   const P = part.points;
+  const A = cfg.sleeveAnchors;
   const poly = pathPolyline(part.paths.seam);
-  const hem = slice(poly, P.hemLeft, P.hemRight);
-  const edgeR = slice(poly, P.hemRight, P.bicepsRight);
+  const hem = slice(poly, P[A.hemL], P[A.hemR]);
+  const edgeR = slice(poly, P[A.hemR], P.bicepsRight);
   const capFront = slice(poly, P.bicepsRight, P.sleeveTop ?? P.top);
   const capBack = slice(poly, P.sleeveTop ?? P.top, P.bicepsLeft);
-  const edgeL = slice(poly, P.bicepsLeft, P.hemLeft);
+  const edgeL = slice(poly, P.bicepsLeft, P[A.hemL]);
   return buildPiece(`sleeve_${side}`, [
     ["hem", hem],
     ["edgeR", edgeR],
@@ -192,46 +234,65 @@ function sleevePiece(side) {
   ]);
 }
 
-const front = bodyPiece("teagan.front", "front");
-const back = bodyPiece("teagan.back", "back");
-const sleeveR = sleevePiece("R");
-const sleeveL = sleevePiece("L");
+const front = bodyPiece(cfg.parts.front, "front");
+const back = bodyPiece(cfg.parts.back, "back");
+const hasSleeves = Boolean(cfg.parts.sleeve);
+const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
 
-// 3D placement hints (mm). Body pieces are vertical planes (x→X, y→-Z);
-// sleeves are pre-curved around a vertical axis at the shoulder so the cap
-// faces the armscye on both front and back sides.
+// 3D placement hints. Body pieces wrap an elliptical shell (front/back sign);
+// sleeves wrap tubes around the mannequin's tilted arm stubs.
 const chestHalf = Math.max(...front.points.map(([x]) => Math.abs(x)));
-// Planes sit just outside the sim's collision torso (±~130mm deep); the side
-// seams' sewing springs pull them around it.
 front.placement = { kind: "plane", y: -160 };
 back.placement = { kind: "plane", y: 160 };
-sleeveR.placement = { kind: "sleeve", centerX: chestHalf - 20, dir: 1 };
-sleeveL.placement = { kind: "sleeve", centerX: -(chestHalf - 20), dir: -1 };
+if (hasSleeves) {
+  // Taper hints: half-width at the biceps line (pattern y=0) and at the hem,
+  // so the sim wraps a cone rather than a cylinder (a straight tube around a
+  // tapered sleeve leaves an open wedge along the forearm).
+  const sp = set[cfg.parts.sleeve].points;
+  const w0 = Math.abs(sp.bicepsRight.x);
+  const hemPt = sp[cfg.sleeveAnchors.hemR];
+  const taper = { w0, w1: Math.abs(hemPt.x), y1: hemPt.y };
+  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper };
+  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper };
+}
 
 /** A seam joins segment a of one piece to segment b of another, matched
- *  point-by-point after resampling both to the same count. `reverseB` flips
- *  b's direction so the point orders correspond. */
+ *  point-by-point after resampling both to the same count (the sim
+ *  auto-orients direction from world-space endpoints). Shoulders are pinned
+ *  — the garment hangs from them on the ghost mannequin. */
 const seams = [
-  { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], reverseB: false, pin: true },
-  { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], reverseB: false, pin: true },
-  { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"], reverseB: false },
-  { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"], reverseB: false },
-  { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["sleeve_R", "capFront"], reverseB: false },
-  { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"], reverseB: true },
-  { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["sleeve_L", "capFront"], reverseB: true },
-  { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"], reverseB: false },
-  { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"], reverseB: true },
-  { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"], reverseB: true },
+  { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
+  { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
+  { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+  { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+  ...(hasSleeves
+    ? [
+        { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["sleeve_R", "capFront"] },
+        { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
+        { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["sleeve_L", "capFront"] },
+        { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
+        { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
+        { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
+      ]
+    : []),
 ];
 
 const out = {
-  block: "classic-tee",
+  block: blockId,
   spec,
-  pieces: [front, back, sleeveR, sleeveL],
+  pieces: [front, back, ...sleeves],
   seams,
+  // Ghost-mannequin scale hints: ratios of this draft's measurements to the
+  // studio-standard body the sim's torso profile was modelled on.
+  body: {
+    chest: M.chest / 1080,
+    biceps: M.biceps / 335,
+    shoulder: M.shoulderToShoulder / 445,
+    torso: M.hpsToWaistBack / 460,
+  },
 };
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, JSON.stringify(out));
 console.log(
-  `pieces: ${out.pieces.map((p) => `${p.name}(${p.points.length})`).join(", ")} | seams: ${seams.length} | chestHalf: ${Math.round(chestHalf)}mm`,
+  `block: ${blockId} | pieces: ${out.pieces.map((p) => `${p.name}(${p.points.length})`).join(", ")} | seams: ${seams.length} | chestHalf: ${Math.round(chestHalf)}mm | body: ${JSON.stringify(out.body)}`,
 );

@@ -28,25 +28,39 @@ S = 0.001  # pattern mm -> metres
 HEIGHT = max(y for p in DATA["pieces"] if p["placement"]["kind"] == "plane" for _, y in p["points"])
 
 # Invisible ghost-mannequin body the cloth drapes over. Without it the sewing
-# springs simply crush the garment flat. Dimensions loosely follow the studio
-# measurement set (chest 1080mm, shoulders 445mm, biceps 335mm).
-ARM_R = 55.0  # arm stub radius (mm) — fills the sleeve tube so it can't ruffle
-ARM_TILT = math.radians(30)  # arms hang tilted outward from the shoulder
-SHOULDER_X = 215.0  # arm axis origin distance from centre (mm)
+# springs simply crush the garment flat. The base profile follows the studio
+# measurement set (chest 1080mm, shoulders 445mm, biceps 335mm); per-draft
+# body hints from extract.mjs scale it to the client's measurements.
+_body = DATA.get("body", {})
+_chest_s = float(_body.get("chest", 1.0))
+_biceps_s = float(_body.get("biceps", 1.0))
+_shoulder_s = float(_body.get("shoulder", 1.0))
+_torso_s = float(_body.get("torso", 1.0))
+
+ARM_R = 55.0 * _biceps_s  # arm stub radius — fills the sleeve tube so it can't ruffle
+SHOULDER_X = 215.0 * _shoulder_s  # arm axis origin distance from centre (mm)
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
 
 # Torso profile: (pattern-y, half-width a, half-depth b), neck to JUST below
 # the hem — the form must not continue far past the cloth, or the image model
-# can't tell where the garment ends.
-TORSO = [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118), (705, 182, 123)]
+# can't tell where the garment ends. The hem breakpoint follows THIS draft's
+# actual hem so the crop stays right for longer/shorter blocks.
+TORSO = [
+    (py * _torso_s, a * _chest_s, b * _chest_s)
+    for py, a, b in [(20, 55, 55), (38, 115, 85), (55, 185, 110), (240, 192, 128), (460, 175, 118)]
+] + [(HEIGHT + 26, 182 * _chest_s, 123 * _chest_s)]
 
-# Arm stubs end just below the sleeve hem for the same reason.
+# Arm stubs end just below the sleeve hem for the same reason. Long sleeves
+# hang closer to the body (a wide splay looks scarecrow-ish and crops out of
+# frame); short sleeves keep the wider, airier tank/tee stance.
 _sleeve_umax = max(
     (max(y for _, y in p["points"]) - min(y for _, y in p["points"])
      for p in DATA["pieces"] if p["placement"]["kind"] == "sleeve"),
     default=335.0,
 )
 ARM_LEN = _sleeve_umax + 45.0
+ARM_TILT = math.radians(30 if _sleeve_umax <= 350 else 16)
+WRIST_R = ARM_R * 0.6  # arm stubs taper toward the wrist
 
 
 def torso_ab(y):
@@ -154,14 +168,18 @@ def place(piece, x, y):
         wy = side * 8.0 * (1 - t) + wrapped * t
         wx, wy = clamp_out(wx, wy, y)
         return (wx * S, wy * S, (HEIGHT - y) * S)
-    # Sleeve: wrap into a tube around the tilted arm axis so the underarm
-    # edges meet on the inner side and the cap opening hugs the shoulder. Tube
-    # radius comes from the piece's own flat width (circumference = 2*halfW).
-    half = sleeve_half[piece["name"]]
-    r = half / math.pi + 1  # ~exact tube; slack only invites ruffling
+    # Sleeve: wrap into a CONE around the tilted arm axis — radius follows the
+    # piece's local width (biceps -> hem taper), else a straight tube leaves
+    # an open wedge along a tapered forearm. Underarm edges meet inner-side.
+    if y <= 0:
+        w = pl["w0"]  # cap region keeps the biceps width
+    else:
+        t = min(1.0, y / max(1.0, pl["y1"]))
+        w = pl["w0"] + (pl["w1"] - pl["w0"]) * t
+    r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
     # Slightly less than a full wrap: the underarm edges must NOT start
     # coincident (self-collision fights zero-length sewing and explodes).
-    theta = (x / half) * (math.pi - 10.0 / r)
+    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 10.0 / r)))
     u = y - sleeve_miny[piece["name"]]  # 0 at cap top, growing down the arm
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
@@ -304,12 +322,13 @@ def build_body():
         bridge(r0, r1)
     cap(rings[0], (HEIGHT - 10) * S)
 
-    # Arm stubs: cylinders hanging from the shoulder joints, tilted outward.
-    def arm_ring(o, ax, e1, e2, u):
+    # Arm stubs: tapered cones hanging from the shoulder joints, tilted
+    # outward — matching the sleeves' own biceps->wrist taper.
+    def arm_ring(o, ax, e1, e2, u, r):
         start = len(verts)
         for i in range(N):
             t = 2 * math.pi * i / N
-            c, s_ = ARM_R * math.cos(t), ARM_R * math.sin(t)
+            c, s_ = r * math.cos(t), r * math.sin(t)
             verts.append((
                 (o[0] + u * ax[0] + c * e1[0]) * S,
                 (s_ * e2[1]) * S,
@@ -319,8 +338,8 @@ def build_body():
 
     for d in (1, -1):
         o, ax, e1, e2 = arm_frame(d)
-        top = arm_ring(o, ax, e1, e2, 10)
-        bot = arm_ring(o, ax, e1, e2, ARM_LEN)
+        top = arm_ring(o, ax, e1, e2, 10, ARM_R)
+        bot = arm_ring(o, ax, e1, e2, ARM_LEN, WRIST_R)
         bridge(top, bot)
         c = len(verts)
         verts.append((o[0] * S, 0.0, (o[2] + 10) * S))
@@ -462,6 +481,10 @@ obj_eval = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
 cos = [obj_eval.matrix_world @ v.co for v in obj_eval.data.vertices]
 xs = sorted(c.x for c in cos); ys = sorted(c.y for c in cos); zs = sorted(c.z for c in cos)
 print(f"bbox x[{xs[0]:.2f},{xs[-1]:.2f}] y[{ys[0]:.2f},{ys[-1]:.2f}] z[{zs[0]:.2f},{zs[-1]:.2f}]")
+# Pull the camera back for wide garments (long splayed sleeves) so nothing
+# crops out of frame.
+if _os.environ.get("DRAPE_CAM") != "quarter":
+    cam.location.y = -max(2.0, (xs[-1] - xs[0]) * 1.9)
 extra = [int(f) for f in argv[3].split(",")] if len(argv) > 3 else []
 for f in extra:
     scene.frame_set(f)
