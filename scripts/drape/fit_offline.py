@@ -143,6 +143,8 @@ if MODE == "contact1":
     x = relax(x, N_ITER, contact_every=1)
 elif MODE == "noseams":
     x = relax(x, N_ITER, seams=False)
+elif MODE.startswith("rho"):
+    x = relax(x, N_ITER, rho=float("0." + MODE[3:]))
 else:
     x = relax(x, N_ITER)
 print("post:", "edges p50=%+.3f p95=%+.3f max=%.3f" % edge_stats(x))
