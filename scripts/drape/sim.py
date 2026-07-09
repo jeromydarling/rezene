@@ -1109,7 +1109,14 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             x_drape=x_drape, x_relaxed=x, flat=flat, remap=remap, invw=invw,
             ei=ei, ej=ej, L0=L0, tris=tris, cA=cA, cB0=cB0, cB1=cB1, cT=cT, cS=cS,
             body_verts=np.array([v.co[:] for v in bm_body.vertices]),
-            body_tris=np.array([tuple(p.vertices)[:3] for p in bm_body.polygons if len(p.vertices) >= 3]),
+            # fan-triangulate: quads truncated to one triangle would leave
+            # holes in the offline BVH and understate contact
+            body_tris=np.array([
+                (q[0], q[k], q[k + 1])
+                for p in bm_body.polygons
+                for q in [tuple(p.vertices)]
+                for k in range(1, len(q) - 1)
+            ]),
         )
         print(f"fit dump written: {_os.environ['DRAPE_FIT_DUMP']}")
 

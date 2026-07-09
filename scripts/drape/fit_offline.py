@@ -51,7 +51,8 @@ def edge_stats(pos):
     return np.percentile(s, 50), np.percentile(s, 95), np.abs(s).max()
 
 
-def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=15, seams=True):
+def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=15, seams=True,
+          contact_mode="post", damp=1.0):
     omega_ch = 1.0
     x_prev = x.copy()
     q = nrm = None
@@ -80,6 +81,13 @@ def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=1
             np.add.at(cnt, cA, 1.0)
             np.add.at(cnt, cB0, 1.0)
             np.add.at(cnt, cB1, 1.0)
+        if contact_mode == "sweep":
+            # contact as one more averaged constraint, accelerated with the
+            # rest — no post-step projection to destabilize Chebyshev
+            pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+            push = np.maximum(pen, 0.0)
+            dx += nrm * (push * invw)[:, None]
+            cnt += (push > 0).astype(float)
         x_new = x + omega * dx / np.maximum(cnt, 1.0)[:, None]
         if it < warmup:
             omega_ch = 1.0
@@ -90,6 +98,12 @@ def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=1
         x_acc = omega_ch * (gamma * (x_new - x) + x - x_prev) + x_prev
         x_prev = x
         x = np.where(invw[:, None] > 0, x_acc, x)
+        if contact_mode != "sweep":
+            pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+            x += nrm * (damp * np.maximum(pen, 0.0) * invw)[:, None]
+    if contact_mode == "sweep":
+        # one exact projection at the end so nothing renders inside the form
+        q, nrm, _ = contact_planes(x)
         pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
         x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     return x
@@ -139,14 +153,20 @@ for si in np.unique(cS):
     )
 
 print("pre :", "edges p50=%+.3f p95=%+.3f max=%.3f" % edge_stats(x))
-if MODE == "contact1":
-    x = relax(x, N_ITER, contact_every=1)
-elif MODE == "noseams":
-    x = relax(x, N_ITER, seams=False)
-elif MODE.startswith("rho"):
-    x = relax(x, N_ITER, rho=float("0." + MODE[3:]))
-else:
-    x = relax(x, N_ITER)
+# MODE: comma-separated tokens, e.g. "rho999,sweep" or "rho998,damp5,c1"
+kw = {}
+for tok in MODE.split(","):
+    if tok.startswith("rho"):
+        kw["rho"] = float("0." + tok[3:])
+    elif tok == "sweep":
+        kw["contact_mode"] = "sweep"
+    elif tok.startswith("damp"):
+        kw["damp"] = int(tok[4:]) / 10.0
+    elif tok.startswith("c") and tok[1:].isdigit():
+        kw["contact_every"] = int(tok[1:])
+    elif tok == "noseams":
+        kw["seams"] = False
+x = relax(x, N_ITER, **kw)
 print("post:", "edges p50=%+.3f p95=%+.3f max=%.3f" % edge_stats(x))
 g1 = seam_gap(x) * 1000
 print(f"seam gaps post: p50={np.percentile(g1,50):.2f} p95={np.percentile(g1,95):.2f} max={g1.max():.2f}mm")
