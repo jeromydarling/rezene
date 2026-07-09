@@ -322,11 +322,21 @@ function designOptions(garmentId: string, opts?: PatternOptions): Record<string,
   if (opts.easePct !== undefined && keys.ease) {
     for (const k of keys.ease) out[k] = clamp(opts.easePct, 0, 25);
   }
+  // Length and sleeve are RELATIVE to the design's own default: "+10%" means
+  // 10 points longer than the block's standard cut. Some designs use these
+  // options as their primary dial (Sandy's circle skirt drafts its whole
+  // length from lengthBonus, default 50) — overriding with the raw slider
+  // value would collapse the garment.
+  const defs = new Map(designNativeOptions(garmentId).map((d) => [d.key, d]));
+  const dflt = (k: string) => {
+    const n = Number(defs.get(k)?.dflt);
+    return Number.isFinite(n) ? n / 100 : 0;
+  };
   if (opts.lengthPct !== undefined && keys.length) {
-    for (const k of keys.length) out[k] = clamp(opts.lengthPct, -15, 20);
+    for (const k of keys.length) out[k] = dflt(k) + clamp(opts.lengthPct, -15, 20);
   }
   if (opts.sleevePct !== undefined && keys.sleeve) {
-    for (const k of keys.sleeve) out[k] = clamp(opts.sleevePct, -30, 10);
+    for (const k of keys.sleeve) out[k] = dflt(k) + clamp(opts.sleevePct, -30, 10);
   }
   return out;
 }

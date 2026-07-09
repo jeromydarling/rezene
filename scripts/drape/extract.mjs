@@ -179,7 +179,7 @@ const BLOCKS = {
     // the whole point of draping a block: seeing the fit it encodes.
     bodice: true,
     parts: { front: "bella.frontSideDart", back: "bella.back" },
-    sim: { sewForce: 6 }, // the bust dart's wide mouth needs a firm pull
+    sim: { sewForce: 9 }, // the bust dart's ~12 cm mouth needs a strong pull
   },
 };
 
@@ -215,6 +215,16 @@ const { [cfg.design]: Design } = await import(cfg.module);
 // Only pass options this design actually declares.
 const declared = Design.patternConfig?.options ?? {};
 const options = Object.fromEntries(Object.entries(wanted).filter(([k]) => k in declared));
+// Length/sleeve bonuses are RELATIVE to the design's own default (mirrors the
+// Pattern Studio's slider semantics): Sandy drafts its entire skirt length
+// from lengthBonus (default 50), so overriding with the raw slider value
+// would collapse the garment to nothing.
+for (const k of ["lengthBonus", "sleeveLengthBonus"]) {
+  if (k in options) {
+    const d = Number(declared[k]?.pct);
+    options[k] += Number.isFinite(d) ? d / 100 : 0;
+  }
+}
 
 const pattern = new Design({ measurements: M, options });
 pattern.draft();
