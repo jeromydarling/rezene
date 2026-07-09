@@ -51,33 +51,62 @@ def edge_stats(pos):
     return np.percentile(s, 50), np.percentile(s, 95), np.abs(s).max()
 
 
+def pin_components():
+    """Connected components of pinned verts over face edges + welds — each is
+    one scaffold ring (collar, cuff), which may drift rigidly."""
+    pinned = np.where(invw == 0)[0]
+    pset = set(pinned.tolist())
+    parent = {int(v): int(v) for v in pinned}
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for a, b in zip(ei, ej):
+        a, b = int(a), int(b)
+        if a in pset and b in pset:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
+    comps = {}
+    for v in pinned:
+        comps.setdefault(find(int(v)), []).append(int(v))
+    return [np.array(c) for c in comps.values()]
+
+
 def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=15, seams=True,
-          contact_mode="post", damp=1.0, grav=0.0):
+          contact_mode="post", damp=1.0, grav=0.0, rigid_pins=False):
     omega_ch = 1.0
     x_prev = x.copy()
     q = nrm = None
+    comps = pin_components() if rigid_pins else []
+    iw = invw.copy()
+    if rigid_pins:
+        iw = np.ones(nv)  # pins move too — but rigidified per component below
     for it in range(n_iter):
         if it % contact_every == 0:
             q, nrm, _ = contact_planes(x)
         d = x[ei] - x[ej]
         L = np.linalg.norm(d, axis=1) + 1e-12
-        wsum = invw[ei] + invw[ej] + 1e-12
+        wsum = iw[ei] + iw[ej] + 1e-12
         corr = (L - L0) / wsum
         dvec = d / L[:, None] * corr[:, None]
         dx = np.zeros_like(x)
         cnt = np.zeros(nv)
-        np.add.at(dx, ei, -invw[ei, None] * dvec)
-        np.add.at(dx, ej, invw[ej, None] * dvec)
+        np.add.at(dx, ei, -iw[ei, None] * dvec)
+        np.add.at(dx, ej, iw[ej, None] * dvec)
         np.add.at(cnt, ei, 1.0)
         np.add.at(cnt, ej, 1.0)
         if seams and len(cA):
             tgt = (1 - cT)[:, None] * x[cB0] + cT[:, None] * x[cB1]
             cd = x[cA] - tgt
-            cw = invw[cA] + (1 - cT) ** 2 * invw[cB0] + cT ** 2 * invw[cB1] + 1e-12
+            cw = iw[cA] + (1 - cT) ** 2 * iw[cB0] + cT ** 2 * iw[cB1] + 1e-12
             lam = cd / cw[:, None]
-            np.add.at(dx, cA, -invw[cA, None] * lam)
-            np.add.at(dx, cB0, ((1 - cT) * invw[cB0])[:, None] * lam)
-            np.add.at(dx, cB1, (cT * invw[cB1])[:, None] * lam)
+            np.add.at(dx, cA, -iw[cA, None] * lam)
+            np.add.at(dx, cB0, ((1 - cT) * iw[cB0])[:, None] * lam)
+            np.add.at(dx, cB1, (cT * iw[cB1])[:, None] * lam)
             np.add.at(cnt, cA, 1.0)
             np.add.at(cnt, cB0, 1.0)
             np.add.at(cnt, cB1, 1.0)
@@ -86,11 +115,14 @@ def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=1
             # rest — no post-step projection to destabilize Chebyshev
             pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
             push = np.maximum(pen, 0.0)
-            dx += nrm * (push * invw)[:, None]
+            dx += nrm * (push * iw)[:, None]
             cnt += (push > 0).astype(float)
         x_new = x + omega * dx / np.maximum(cnt, 1.0)[:, None]
+        for comp in comps:
+            # scaffold rings keep their shape but drift with the mean force
+            x_new[comp] = x[comp] + (x_new[comp] - x[comp]).mean(axis=0)
         if grav:
-            x_new[:, 2] -= grav * (invw > 0)
+            x_new[:, 2] -= grav * (iw > 0)
         if it < warmup:
             omega_ch = 1.0
         elif it == warmup:
@@ -99,15 +131,15 @@ def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=1
             omega_ch = 4.0 / (4.0 - rho * rho * omega_ch)
         x_acc = omega_ch * (gamma * (x_new - x) + x - x_prev) + x_prev
         x_prev = x
-        x = np.where(invw[:, None] > 0, x_acc, x)
+        x = np.where(iw[:, None] > 0, x_acc, x)
         if contact_mode != "sweep":
             pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
-            x += nrm * (damp * np.maximum(pen, 0.0) * invw)[:, None]
+            x += nrm * (damp * np.maximum(pen, 0.0) * iw)[:, None]
     if contact_mode == "sweep":
         # one exact projection at the end so nothing renders inside the form
         q, nrm, _ = contact_planes(x)
         pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
-        x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
+        x += nrm * (np.maximum(pen, 0.0) * iw)[:, None]
     return x
 
 
@@ -173,6 +205,10 @@ for tok in MODE.split(","):
         # the shoulder slope holds the garment up, like a real body does
         kw["grav"] = int(tok[4:]) * 1e-4
         invw = np.ones(nv)
+    elif tok == "rigidpins":
+        # scaffold rings (collar, cuffs) keep their shape but drift to where
+        # the closed garment wants them — releases false anchor tension
+        kw["rigid_pins"] = True
 x = relax(x, N_ITER, **kw)
 print("post:", "edges p50=%+.3f p95=%+.3f max=%.3f" % edge_stats(x))
 g1 = seam_gap(x) * 1000
