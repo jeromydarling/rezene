@@ -684,14 +684,15 @@ if hasattr(st, "sewing_force_max"):
     # The garment starts nearly assembled — gentle stitching only. Strong
     # sewing forces whip the light cloth into permanent crumples. Darted
     # blocks ask for more via the sim hint (darts fight the side seams).
-    # The force RAMPS IN over the first frames: snapping seams shut at full
-    # strength drags cloth through the collision shell (trapped-inside verts
-    # render as dark angular holes).
+    # A short ramp softens the first-frame snap (which can drag cloth through
+    # the collision shell) without starving seam closure: sleeve-heavy blocks
+    # need most of the bake at full force or the underarm/raglan seams never
+    # shut. (A 25-frame ramp was tried and left hugo/sven seams gaping.)
     _sew_full = float(DATA.get("sim", {}).get("sewForce", 2))
-    st.sewing_force_max = _sew_full * 0.25
+    st.sewing_force_max = _sew_full * 0.5
     st.keyframe_insert("sewing_force_max", frame=1)
     st.sewing_force_max = _sew_full
-    st.keyframe_insert("sewing_force_max", frame=25)
+    st.keyframe_insert("sewing_force_max", frame=8)
 try:
     mod.collision_settings.distance_min = 0.003
     mod.collision_settings.collision_quality = 6
