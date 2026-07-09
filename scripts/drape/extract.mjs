@@ -936,8 +936,9 @@ if (cfg.trousers) {
   frontL.placement = { kind: "plane", y: -160 };
   frontR.placement = { kind: "plane", y: -160 };
   back.placement = { kind: "plane", y: 160 };
-  frontL.pinSegments = ["zip"];
-  frontR.pinSegments = ["zip"];
+  // The zip is SEWN (springs), not pinned: both edges place coincident at
+  // CF, and pinning two coincident cloth layers makes self-collision fight
+  // the pins into a dark trench down the front.
   bodyPieces = [frontL, frontR, back];
 } else if (cfg.buttonFront) {
   // Wearer's left panel (frontLeft, body on +x) carries the button stand and
@@ -1074,7 +1075,8 @@ const seams = cfg.trousers
     ]
   : cfg.zipFront
   ? [
-      // Hangs from pinned shoulders + necklines + the pinned zip edges.
+      // Hangs from pinned shoulders + necklines; the CF zip is sewn shut.
+      { name: "zip", a: ["frontL", "zip"], b: ["frontR", "zip"] },
       { name: "shoulder_R", a: ["frontL", "shoulder"], b: ["back", "shoulderR"], pin: true },
       { name: "shoulder_L", a: ["frontR", "shoulder"], b: ["back", "shoulderL"], pin: true },
       { name: "side_R", a: ["frontL", "side"], b: ["back", "sideR"] },
