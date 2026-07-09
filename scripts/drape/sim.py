@@ -466,14 +466,25 @@ def match(a, b):
 sew_edges = []
 seam_sides = []  # oriented FULL-density sides per seam — the fit map's densified pairing
 pin_indices = set()
+
+
+def _pair_score(ia, ib):
+    """Total rest-position distance over an arc-fraction pairing — the flip
+    test must consider the WHOLE seam: endpoint distances alone mis-orient
+    armscye seams (panel edge and sleeve cap endpoints sit nearly symmetric),
+    which reversed the sewing around the ring — springs pulled tangentially
+    against each other, the armscye never closed at any force, and the
+    rotated sleeve tube looked normal so it was invisible for seven waves."""
+    n = 24
+    sa = [ia[round(i * (len(ia) - 1) / (n - 1))] for i in range(n)]
+    sb = [ib[round(i * (len(ib) - 1) / (n - 1))] for i in range(n)]
+    return sum(math.dist(all_verts[a], all_verts[b]) for a, b in zip(sa, sb))
+
+
 for seam in DATA["seams"]:
     ia = seg_indices(*seam["a"])
     ib = seg_indices(*seam["b"])
-    # Auto-orient: flip b if that brings matched endpoints closer in world
-    # space (rest positions) — more reliable than hand-set direction flags.
-    straight = math.dist(all_verts[ia[0]], all_verts[ib[0]]) + math.dist(all_verts[ia[-1]], all_verts[ib[-1]])
-    flipped = math.dist(all_verts[ia[0]], all_verts[ib[-1]]) + math.dist(all_verts[ia[-1]], all_verts[ib[0]])
-    if flipped < straight:
+    if _pair_score(ia, list(reversed(ib))) < _pair_score(ia, ib):
         ib = list(reversed(ib))
     seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
