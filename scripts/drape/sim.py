@@ -798,7 +798,13 @@ if FRAMES > 0:
     for e in me.edges:
         a, b = e.vertices
         fa, fb = all_flat[a], all_flat[b]
-        rest = math.hypot(fa[0] - fb[0], fa[1] - fb[1]) * S
+        dx, dy = fa[0] - fb[0], fa[1] - fb[1]
+        # Tightness is GIRTH strain: only edges running mostly horizontally
+        # in the flat pattern count. Vertical edges stretch under plain
+        # gravity in any hanging cloth — that's weight, not fit.
+        if abs(dx) < abs(dy):
+            continue
+        rest = math.hypot(dx, dy) * S
         if rest < 1e-9:
             continue
         cur = (me.vertices[a].co - me.vertices[b].co).length
@@ -809,8 +815,8 @@ if FRAMES > 0:
         scnt[b] += 1
 
     def strain_color(s):
-        stops = [(-0.08, (0.45, 0.62, 0.85)), (0.0, (0.30, 0.65, 0.34)),
-                 (0.05, (0.92, 0.85, 0.25)), (0.13, (0.85, 0.13, 0.10))]
+        stops = [(-0.05, (0.45, 0.62, 0.85)), (0.0, (0.30, 0.65, 0.34)),
+                 (0.035, (0.92, 0.85, 0.25)), (0.09, (0.85, 0.13, 0.10))]
         if s <= stops[0][0]:
             return stops[0][1]
         for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
@@ -819,10 +825,10 @@ if FRAMES > 0:
                 return tuple(a + (b - a) * t for a, b in zip(c0, c1))
         return stops[-1][1]
 
+    per_v = [ssum[i] / scnt[i] if scnt[i] else 0.0 for i in range(n)]
     attr = obj.data.color_attributes.new("strain_col", "FLOAT_COLOR", "POINT")
     for i in range(n):
-        s = ssum[i] / scnt[i] if scnt[i] else 0.0
-        r, g, b = strain_color(s)
+        r, g, b = strain_color(per_v[i])
         attr.data[i].color = (r, g, b, 1.0)
 
     fit_mat = bpy.data.materials.new("fit_map")
