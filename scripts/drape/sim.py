@@ -797,6 +797,21 @@ print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(
 # (lambda_weft - 1), clamped at zero: compression is slack, not fit. The
 # fit classification is shown only where the garment touches the form —
 # free-hanging cloth has no "fit" (CLO does the same).
+#
+# R&D STATUS (why this stays behind DRAPE_FITMAP=1): the relaxation is
+# converged — 1500 and 5000 sweeps give identical stats — and each fix so
+# far peeled a real layer (welding seams, freeing welded clusters from pin
+# anchors, dropping the tether that re-introduced assembly tension:
+# edge-strain p95 went 146%→49%, girth p95 288%→98% on the tee probe).
+# But the floor it converged to is still not credible: ~2x girth stretch
+# near seams/shoulders is residual assembly geometry, not fit. Root cause
+# hypothesis: Blender's match() resampling pairs only the shorter side of
+# each seam, so welding closes the paired verts while their unpaired 3mm
+# neighbours keep the seam gap baked in as local stretch. Springs can't
+# fix that — the next step is hard equality constraints over a DENSIFIED
+# pairing (every boundary vert on both sides projected onto the opposite
+# seam polyline, position-constrained, then relax). Until magnitudes are
+# credible, this map must not be shown to designers.
 if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     import numpy as np
     from mathutils.bvhtree import BVHTree
