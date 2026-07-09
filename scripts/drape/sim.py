@@ -571,8 +571,11 @@ def build_body():
     o = bpy.data.objects.new("body", m)
     bpy.context.collection.objects.link(o)
     col = o.modifiers.new("collision", "COLLISION")
-    col.settings.thickness_outer = 0.003
-    col.settings.thickness_inner = 0.002
+    # Thick enough that sewing springs can't drag cloth through the shell in
+    # the first frames — tunneled verts get trapped inside and render as
+    # angular dark "holes" where the form occludes the garment.
+    col.settings.thickness_outer = 0.006
+    col.settings.thickness_inner = 0.004
     # The body stays in the render as a darker matte dress form: it gives the
     # reference anatomical context and hides the armscye seam gaps.
     for poly in m.polygons:
@@ -681,7 +684,14 @@ if hasattr(st, "sewing_force_max"):
     # The garment starts nearly assembled — gentle stitching only. Strong
     # sewing forces whip the light cloth into permanent crumples. Darted
     # blocks ask for more via the sim hint (darts fight the side seams).
-    st.sewing_force_max = float(DATA.get("sim", {}).get("sewForce", 2))
+    # The force RAMPS IN over the first frames: snapping seams shut at full
+    # strength drags cloth through the collision shell (trapped-inside verts
+    # render as dark angular holes).
+    _sew_full = float(DATA.get("sim", {}).get("sewForce", 2))
+    st.sewing_force_max = _sew_full * 0.25
+    st.keyframe_insert("sewing_force_max", frame=1)
+    st.sewing_force_max = _sew_full
+    st.keyframe_insert("sewing_force_max", frame=25)
 try:
     mod.collision_settings.distance_min = 0.003
     mod.collision_settings.collision_quality = 6
