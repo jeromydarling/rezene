@@ -131,6 +131,7 @@ const BLOCKS = {
     dressPanels: true,
     parts: { front: "sophie.frontPanel", back: "sophie.backPanel" },
     yOffset: 350, // pattern y=0 sits ~mid-torso; +350 = body coords (HPS=0)
+    sim: { shellMm: 6 }, // long heavy panels tunnel a 3 mm shell (no sleeves to harm)
   },
   wahid: {
     module: "@freesewing/wahid",
