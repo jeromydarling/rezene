@@ -12,7 +12,8 @@
  * Supported blocks (all Brian-family, so they share anchor names):
  *   classic-tee (Teagan)  front/back/sleeves, sewn armscyes
  *   aaron (Aaron tank)    front/back only, armholes are free edges
- *   relaxed-hoodie (Sven) front/back/long sleeves
+ *   relaxed-hoodie (Sven) front/back/long cuffed sleeves
+ *   hugo (Hugo raglan)    raglan seams to the neckline; hood not simulated
  *
  * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
@@ -42,6 +43,18 @@ const BLOCKS = {
     design: "Sven",
     parts: { front: "sven.front", back: "sven.back", sleeve: "sven.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    cuffed: true, // ribbed cuffs grip the wrist — the sim pins the sleeve hems
+  },
+  hugo: {
+    module: "@freesewing/hugo",
+    design: "Hugo",
+    parts: { front: "hugo.front", back: "hugo.back", sleeve: "hugo.sleeve" },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    cuffed: true,
+    // Raglan: no shoulder seam — the sleeve runs to the neckline and the
+    // raglan seam replaces both shoulder seam and armscye. The hood is NOT
+    // simulated; the text description carries it, the sim carries the body.
+    raglan: true,
   },
 };
 
@@ -51,9 +64,9 @@ const cfg = BLOCKS[blockId];
 // The studio's standard measurement set (mm) — any client measurement sent in
 // the spec overrides its entry.
 const M = {
-  biceps: 335, chest: 1080, hips: 1000, hpsToBust: 130, hpsToWaistBack: 460, neck: 400,
-  shoulderSlope: 13, shoulderToShoulder: 445, shoulderToWrist: 620,
-  waist: 820, waistToArmpit: 230, waistToHips: 130, wrist: 170,
+  biceps: 335, chest: 1080, head: 560, hips: 1000, hpsToBust: 130, hpsToWaistBack: 460,
+  neck: 400, shoulderSlope: 13, shoulderToShoulder: 445, shoulderToWrist: 620,
+  waist: 820, waistToArmpit: 230, waistToHead: 670, waistToHips: 130, wrist: 170,
 };
 for (const [k, v] of Object.entries(spec.measurements ?? {})) {
   const n = Number(v);
@@ -193,6 +206,25 @@ function bodyPiece(partName, pieceName) {
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
   const isFront = pieceName === "front";
+  if (cfg.raglan) {
+    // Raglan body: hem -> side -> raglan seam (underarm to neck) -> neckline.
+    // The seam path uses the ribbing attachment line as its hem.
+    const raglanTip = isFront ? P.raglanTipFront : P.raglanTipBack;
+    const hemR = slice(poly, isFront ? P.cfRibbing : P.cbRibbing, P.ribbing ?? P.hem);
+    const sideR = slice(poly, P.ribbing ?? P.hem, P.armhole);
+    const raglanR = slice(poly, P.armhole, raglanTip);
+    const neckR = slice(poly, raglanTip, isFront ? P.cfNeck : P.cbNeck);
+    return buildPiece(pieceName, [
+      ["hemR", hemR],
+      ["sideR", sideR],
+      ["raglanR", raglanR],
+      ["neckR", neckR],
+      ["neckL", mirror([...neckR].reverse())],
+      ["raglanL", mirror([...raglanR].reverse())],
+      ["sideL", mirror([...sideR].reverse())],
+      ["hemL", mirror([...hemR].reverse())],
+    ]);
+  }
   const A = cfg.bodyAnchors ?? { armTop: "shoulder", neckSide: "neck" };
   // Right-half segments (drafted half, fold at x=0).
   const hemR = slice(poly, P.cfHem ?? P.cbHem ?? P.gridAnchor, P.hem);
@@ -222,6 +254,26 @@ function sleevePiece(side) {
   const poly = pathPolyline(part.paths.seam);
   const hem = slice(poly, P[A.hemL], P[A.hemR]);
   const edgeR = slice(poly, P[A.hemR], P.bicepsRight);
+  if (cfg.raglan) {
+    // Raglan sleeve: the cap is replaced by two raglan edges meeting in a
+    // short neckline arc at the top ("neck"/"cap" names keep the sim's
+    // pinning rules working). Front raglan is on the piece's -x side.
+    // Raglan sleeve edges are PINNED ("cap*") like set-in caps: left free,
+    // the tube rotates on the arm and tears the raglan seams open. The free
+    // body edges travel to meet them.
+    const capRaglanBack = slice(poly, P.bicepsRight, P.raglanTipBack);
+    const neckTop = slice(poly, P.raglanTipBack, P.raglanTipFront);
+    const capRaglanFront = slice(poly, P.raglanTipFront, P.bicepsLeft);
+    const edgeL = slice(poly, P.bicepsLeft, P[A.hemL]);
+    return buildPiece(`sleeve_${side}`, [
+      ["hem", hem],
+      ["edgeR", edgeR],
+      ["capRaglanBack", capRaglanBack],
+      ["neckTop", neckTop],
+      ["capRaglanFront", capRaglanFront],
+      ["edgeL", edgeL],
+    ]);
+  }
   const capFront = slice(poly, P.bicepsRight, P.sleeveTop ?? P.top);
   const capBack = slice(poly, P.sleeveTop ?? P.top, P.bicepsLeft);
   const edgeL = slice(poly, P.bicepsLeft, P[A.hemL]);
@@ -244,6 +296,23 @@ const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
 const chestHalf = Math.max(...front.points.map(([x]) => Math.abs(x)));
 front.placement = { kind: "plane", y: -160 };
 back.placement = { kind: "plane", y: 160 };
+
+// Top-edge profile per body piece: min pattern-y per x-bin along the
+// boundary. The sim hangs the panel from this line (collapsing depth toward
+// the seam/neck line above it), whatever shape the block's top edge takes —
+// shoulder seam, tank strap, or raglan diagonal.
+function topProfile(piece) {
+  const BIN = 25;
+  const bins = new Map();
+  for (const [x, y] of piece.points) {
+    const b = Math.round(x / BIN) * BIN;
+    if (!bins.has(b) || y < bins.get(b)) bins.set(b, y);
+  }
+  return [...bins.entries()].sort((a, b) => a[0] - b[0]);
+}
+front.topProfile = topProfile(front);
+back.topProfile = topProfile(back);
+
 if (hasSleeves) {
   // Taper hints: half-width at the biceps line (pattern y=0) and at the hem,
   // so the sim wraps a cone rather than a cylinder (a straight tube around a
@@ -252,30 +321,59 @@ if (hasSleeves) {
   const w0 = Math.abs(sp.bicepsRight.x);
   const hemPt = sp[cfg.sleeveAnchors.hemR];
   const taper = { w0, w1: Math.abs(hemPt.x), y1: hemPt.y };
-  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper };
-  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper };
+  // Raglan sleeves sweep their above-biceps zone toward the neck; neckX is
+  // where the raglan tips land on the body (the neckline edge).
+  const raglan = cfg.raglan
+    ? {
+        raglan: true,
+        neckX: Math.abs(set[cfg.parts.front].points.raglanTipFront.x) + 15,
+        // Where the biceps line sits below the shoulder: the body armhole
+        // depth. (For raglan, pattern-y above 0 is shoulder, not arm length.)
+        armDepth: set[cfg.parts.front].points.armhole.y,
+      }
+    : {};
+  // Ribbed cuffs grip the wrist: pin the sleeve hem ring so the sleeve
+  // blouses naturally instead of accordion-sliding down the arm.
+  const pinSegments = cfg.cuffed ? ["hem"] : [];
+  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper, ...raglan };
+  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper, ...raglan };
+  sleeves[0].pinSegments = pinSegments;
+  sleeves[1].pinSegments = pinSegments;
 }
 
 /** A seam joins segment a of one piece to segment b of another, matched
  *  point-by-point after resampling both to the same count (the sim
  *  auto-orients direction from world-space endpoints). Shoulders are pinned
  *  — the garment hangs from them on the ghost mannequin. */
-const seams = [
-  { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
-  { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
-  { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
-  { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
-  ...(hasSleeves
-    ? [
-        { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["sleeve_R", "capFront"] },
-        { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
-        { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["sleeve_L", "capFront"] },
-        { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
-        { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
-        { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
-      ]
-    : []),
-];
+const seams = cfg.raglan
+  ? [
+      // Raglan: no shoulder seam — the garment hangs from the pinned
+      // necklines (body + sleeve tops) and pinned raglan sleeve edges.
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+      { name: "raglan_R_front", a: ["front", "raglanR"], b: ["sleeve_R", "capRaglanFront"] },
+      { name: "raglan_R_back", a: ["back", "raglanR"], b: ["sleeve_R", "capRaglanBack"] },
+      { name: "raglan_L_front", a: ["front", "raglanL"], b: ["sleeve_L", "capRaglanFront"] },
+      { name: "raglan_L_back", a: ["back", "raglanL"], b: ["sleeve_L", "capRaglanBack"] },
+      { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
+      { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
+    ]
+  : [
+      { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+      ...(hasSleeves
+        ? [
+            { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["sleeve_R", "capFront"] },
+            { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
+            { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["sleeve_L", "capFront"] },
+            { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
+            { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
+            { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
+          ]
+        : []),
+    ];
 
 const out = {
   block: blockId,
