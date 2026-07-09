@@ -182,3 +182,19 @@ if len(tail):
     print(f"  dist-to-body mm: p50={np.percentile(dist[tail],50)*1000:.1f} max={dist[tail].max()*1000:.1f}")
     zs = x[tail][:, 2]
     print(f"  z: {np.percentile(zs,5):.3f}..{np.percentile(zs,95):.3f} (garment {x[:,2].min():.3f}..{x[:,2].max():.3f})")
+    # seam shadow: how much of the tail hugs a seam? (1-ring adjacency)
+    seam_verts = set(np.concatenate([cA, cB0, cB1]).tolist())
+    ring1 = set(seam_verts)
+    for t in tris:
+        rs = [int(remap[v]) for v in t]
+        if any(r in seam_verts for r in rs):
+            ring1.update(rs)
+    in_shadow = np.array([int(v) in ring1 for v in tail])
+    print(f"  tail in 1-ring seam shadow: {int(in_shadow.sum())}/{len(tail)}")
+    # grading with the seam shadow excluded (doubled fabric there anyway)
+    shadow_arr = np.zeros(nv, dtype=bool)
+    shadow_arr[list(ring1)] = True
+    keep_g = in_contact & ~shadow_arr
+    kg = tight[keep_g]
+    print(f"  girth excl. shadow: p50={np.percentile(kg,50):+.3f} p95={np.percentile(kg,95):+.3f} "
+          f">15%: {int((kg > 0.15).sum())}/{len(kg)}")
