@@ -897,35 +897,63 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     ei, ej, L0 = ei[ok], ej[ok], L0[ok]
     x_drape = x.copy()
 
-    # Densified seam closure. Blender's match() resampling pairs only the
-    # SHORTER side of each seam, so the welds close the paired verts while
-    # every unpaired neighbour on the longer side keeps the bake's seam gap
-    # frozen in as local stretch — the converged floor of the spring-only
-    # relax. Fix: parameterize both sides of every seam by flat-pattern arc
-    # length and constrain EVERY boundary vert to the point at the same arc
-    # fraction on the opposite side (zero-rest point-on-segment constraints,
-    # both directions). That is the hard pairing garment CAD uses.
-    def _arc_params(idxs):
-        pts = flat[np.asarray(idxs)]
-        d = np.linalg.norm(np.diff(pts, axis=0), axis=1)
-        s = np.concatenate([[0.0], np.cumsum(d)])
-        return s / max(s[-1], 1e-12)
+    # Densified seam closure. The seam springs/welds only cover the ORIGINAL
+    # pattern points: subdivide_edges quadruples the boundary density with
+    # verts that boundary_index never sees, and those unpaired verts keep
+    # the bake's seam gap frozen in as local stretch — the converged floor
+    # of the spring-only relax. Fix: recover each seam side's TRUE dense
+    # vertex list geometrically (every mesh vert lying on the side's flat
+    # polyline — subdivision verts sit exactly on it), parameterize both
+    # sides by flat arc length, and constrain every vert to the point at
+    # the same arc fraction on the opposite side (zero-rest point-on-
+    # segment constraints, both directions) — the hard pairing garment
+    # CAD uses.
+    _pnames = [p["name"] for p in DATA["pieces"]]
+    _pr = {}
+    for _k, _nm in enumerate(_pnames):
+        _pr[_nm] = (offsets[_nm], offsets[_pnames[_k + 1]] if _k + 1 < len(_pnames) else len(all_verts))
+
+    def _dense_side(idxs):
+        """(indices, arc params in [0,1]) of ALL piece verts on the side's
+        flat polyline, subdivision verts included, ordered by arc length."""
+        poly = flat[np.asarray(idxs)]
+        s0p, s1p = next(r for nm, r in _pr.items() if r[0] <= idxs[0] < r[1])
+        cand = np.arange(s0p, s1p)
+        pts = flat[cand]
+        seg = np.diff(poly, axis=0)
+        seglen = np.linalg.norm(seg, axis=1)
+        cum = np.concatenate([[0.0], np.cumsum(seglen)])
+        best_d = np.full(len(cand), 1e9)
+        best_s = np.zeros(len(cand))
+        for k in range(len(seg)):
+            if seglen[k] < 1e-12:
+                continue
+            t = np.clip((pts - poly[k]) @ seg[k] / seglen[k] ** 2, 0.0, 1.0)
+            dk = np.linalg.norm(pts - (poly[k] + t[:, None] * seg[k]), axis=1)
+            upd = dk < best_d
+            best_d[upd] = dk[upd]
+            best_s[upd] = cum[k] + t[upd] * seglen[k]
+        on = best_d < 0.0005  # within 0.5 mm of the seam line
+        order = np.argsort(best_s[on])
+        return cand[on][order], best_s[on][order] / max(cum[-1], 1e-12)
 
     cA, cB0, cB1, cT = [], [], [], []
 
-    def _attach(src, dst):
-        sp, dp = _arc_params(src), _arc_params(dst)
-        for i, sv in enumerate(src):
-            k = min(max(int(np.searchsorted(dp, sp[i])), 1), len(dst) - 1)
+    def _attach(si, sp, di, dp):
+        for i in range(len(si)):
+            k = min(max(int(np.searchsorted(dp, sp[i])), 1), len(di) - 1)
             t = (sp[i] - dp[k - 1]) / max(dp[k] - dp[k - 1], 1e-12)
-            cA.append(remap[sv])
-            cB0.append(remap[dst[k - 1]])
-            cB1.append(remap[dst[k]])
+            cA.append(remap[si[i]])
+            cB0.append(remap[di[k - 1]])
+            cB1.append(remap[di[k]])
             cT.append(min(max(t, 0.0), 1.0))
 
     for _sa, _sb in seam_sides:
-        _attach(_sa, _sb)
-        _attach(_sb, _sa)
+        _ai, _ap = _dense_side(_sa)
+        _bi, _bp = _dense_side(_sb)
+        if len(_ai) >= 2 and len(_bi) >= 2:
+            _attach(_ai, _ap, _bi, _bp)
+            _attach(_bi, _bp, _ai, _ap)
     cA, cB0, cB1 = np.array(cA), np.array(cB0), np.array(cB1)
     cT = np.array(cT)
     # Drop constraints already welded onto their target endpoint — zero work,
