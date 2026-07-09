@@ -382,6 +382,7 @@ def place(piece, x, y):
 
 # ---- Build per-piece triangulated meshes, tracking boundary vertex order ----
 all_verts = []
+all_flat = []
 all_faces = []
 offsets = {}
 boundary_index = {}  # piece -> list of global indices for its ORIGINAL boundary points
@@ -425,6 +426,9 @@ for piece in DATA["pieces"]:
         return best
     boundary_index[piece["name"]] = [off + find(x, y) for x, y in boundary2d]
     for v in bm.verts:
+        # Flat pattern coordinates are the cloth's TRUE rest state (the cut
+        # pieces) — kept per vertex so the fit map can measure real strain.
+        all_flat.append((v.co.x, v.co.y))
         all_verts.append(place(piece, v.co.x, v.co.y))
     for f in bm.faces:
         all_faces.append(tuple(off + v.index for v in f.verts))
@@ -779,3 +783,89 @@ if FRAMES > 0:
 scene.render.filepath = OUT_PNG
 bpy.ops.render.render(write_still=True)
 print(f"drape render written: {OUT_PNG} (verts {len(all_verts)}, sew edges {len(sew_edges)}, pins {len(pin_indices)})")
+
+# ---- Fit map: strain vs the FLAT pattern, industry green→red convention -------
+# Real strain is measured against the cut pieces (the pattern), not the
+# assembled start pose: every mesh edge's simulated length is compared to its
+# flat length. Tight zones ramp green → yellow → red (the same reading a
+# fitter takes from drag lines on a toile); pooling slack shows pale blue.
+# PARKED behind DRAPE_FITMAP=1: the measurement is not yet honest. After
+# excluding pins, vertical gravity stretch, and smoothing distortion, the
+# remaining "strain" is dominated by assembly tension — the sewing springs
+# that close the panel gaps leave real horizontal tension that has nothing
+# to do with fit. A truthful map needs welded seams or a long relaxation
+# phase (R&D). The delivery plumbing (workflow upload, callback, fitUrl,
+# studio toggle) ships dormant and activates the moment this writes a file.
+if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
+    # Measure the RAW cloth result: the cosmetic smooth pass distorts edge
+    # lengths by a few percent exactly where curvature is high, which reads
+    # as phantom strain across every wrinkled zone.
+    sm.show_viewport = False
+    sm.show_render = False
+    bpy.context.view_layer.update()
+    deps = bpy.context.evaluated_depsgraph_get()
+    me = obj.evaluated_get(deps).to_mesh()
+    n = len(me.vertices)
+    ssum = [0.0] * n
+    scnt = [0] * n
+    for e in me.edges:
+        a, b = e.vertices
+        # Pinned verts are frozen at their PLACED positions — any spacing
+        # artifact from the initial wrap reads as permanent fake strain, so
+        # pinned regions are excluded from the measurement entirely.
+        if a in pin_indices or b in pin_indices:
+            continue
+        fa, fb = all_flat[a], all_flat[b]
+        dx, dy = fa[0] - fb[0], fa[1] - fb[1]
+        # Tightness is GIRTH strain: only edges running mostly horizontally
+        # in the flat pattern count. Vertical edges stretch under plain
+        # gravity in any hanging cloth — that's weight, not fit.
+        if abs(dx) < abs(dy):
+            continue
+        rest = math.hypot(dx, dy) * S
+        if rest < 1e-9:
+            continue
+        cur = (me.vertices[a].co - me.vertices[b].co).length
+        s = (cur - rest) / rest
+        ssum[a] += s
+        scnt[a] += 1
+        ssum[b] += s
+        scnt[b] += 1
+
+    def strain_color(s):
+        stops = [(-0.05, (0.45, 0.62, 0.85)), (0.0, (0.30, 0.65, 0.34)),
+                 (0.035, (0.92, 0.85, 0.25)), (0.09, (0.85, 0.13, 0.10))]
+        if s <= stops[0][0]:
+            return stops[0][1]
+        for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
+            if s <= s1:
+                t = (s - s0) / (s1 - s0)
+                return tuple(a + (b - a) * t for a, b in zip(c0, c1))
+        return stops[-1][1]
+
+    attr = obj.data.color_attributes.new("strain_col", "FLOAT_COLOR", "POINT")
+    for i in range(n):
+        if scnt[i]:
+            r, g, b = strain_color(ssum[i] / scnt[i])
+        else:
+            r, g, b = (0.72, 0.72, 0.72)  # unmeasured (pinned/edge) — neutral
+        attr.data[i].color = (r, g, b, 1.0)
+    sm.show_viewport = True
+    sm.show_render = True
+
+    fit_mat = bpy.data.materials.new("fit_map")
+    fit_mat.use_nodes = True
+    fnodes = fit_mat.node_tree.nodes
+    flinks = fit_mat.node_tree.links
+    fb = fnodes["Principled BSDF"]
+    ca = fnodes.new("ShaderNodeVertexColor")
+    ca.layer_name = "strain_col"
+    flinks.new(ca.outputs["Color"], fb.inputs["Base Color"])
+    fb.inputs["Roughness"].default_value = 1.0
+    obj.data.materials.clear()
+    obj.data.materials.append(fit_mat)
+    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.55
+    FIT_PNG = OUT_PNG.replace(".png", "-fit.png")
+    scene.render.filepath = FIT_PNG
+    bpy.ops.render.render(write_still=True)
+    print(f"fit map written: {FIT_PNG}")

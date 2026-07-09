@@ -520,7 +520,9 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
           "the shoulders in the reference is an artifact too; and the sleeves hang smooth — any horizontal " +
           "rings, ruching or accordion folds along the sleeves or legs in the reference are artifacts, not " +
           "a gathered design; fine regular vertical fluting on a skirt is the simulator's stiffness, not " +
-          "pleating — real cloth falls in fewer, softer folds; and every edge (waist, hems, openings) is " +
+          "pleating — real cloth falls in fewer, softer folds; a dark line down the centre front is a CLOSED " +
+          "seam or zip, not an opening — the garment is worn closed unless the description says otherwise; " +
+          "and every edge (waist, hems, openings) is " +
           "cleanly finished. Fabric and " +
           "colour come from the description alone, no mannequin or dress form may appear, and add no " +
           "clothing items beyond those described"
@@ -1108,11 +1110,13 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
 adminFittingRoutes.get("/drape/:jobId", async (c) => {
   const raw = await c.env.KV.get(drapeKey(c.var.shopId, c.req.param("jobId")));
   if (!raw) return c.json({ error: "Drape job not found (it may have expired)." }, 404);
-  const job = JSON.parse(raw) as { status: string; fileId?: string; error?: string };
+  const job = JSON.parse(raw) as { status: string; fileId?: string; fitFileId?: string | null; error?: string };
   return c.json({
     status: job.status,
     fileId: job.fileId,
     url: job.fileId ? `/media/${job.fileId}` : undefined,
+    // Strain fit map (green = comfortable → red = tight vs the flat pattern).
+    fitUrl: job.fitFileId ? `/media/${job.fitFileId}` : undefined,
     error: job.error,
   });
 });

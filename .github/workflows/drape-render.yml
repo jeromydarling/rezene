@@ -55,7 +55,10 @@ jobs:
           blender -b -noaudio -P scripts/drape/sim.py -- "$PWD/out/pieces.json" "$PWD/out/drape.png" 80 \
             || fail "cloth simulation failed"
           [ -f out/drape.png ] || fail "no render produced"
+          FIT_ARG=()
+          [ -f out/drape-fit.png ] && FIT_ARG=(-F "fit=@out/drape-fit.png;type=image/png")
           curl -sS --fail -X POST "$CALLBACK_BASE/drape/$SHOP_ID/$JOB_ID/complete" \
             -F "secret=$RENDER_CALLBACK_SECRET" \
             -F "image=@out/drape.png;type=image/png" \
+            "${FIT_ARG[@]}" \
             || fail "callback upload failed"

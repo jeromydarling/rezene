@@ -274,8 +274,11 @@ export function PatternStudioPage() {
     status: string;
     url?: string;
     fileId?: string;
+    /** Strain fit map (green = comfortable → red = tight vs the pattern). */
+    fitUrl?: string;
     error?: string;
   } | null>(null);
+  const [drapeView, setDrapeView] = useState<"drape" | "fit">("drape");
   const [draping, setDraping] = useState(false);
   const [styling, setStyling] = useState(false);
   const [explaining, setExplaining] = useState(false);
@@ -506,10 +509,11 @@ export function PatternStudioPage() {
         measurementsMm,
       });
       setDrape({ jobId: res.jobId, status: "queued" });
+      setDrapeView("drape");
       // The Actions run takes ~4-6 min (installs Blender, sims, renders).
       for (let i = 0; i < 100; i++) {
         await new Promise((r) => setTimeout(r, 6000));
-        const s = await api.get<{ status: string; url?: string; fileId?: string; error?: string }>(
+        const s = await api.get<{ status: string; url?: string; fileId?: string; fitUrl?: string; error?: string }>(
           `/api/admin/fitting/drape/${res.jobId}`,
         );
         setDrape({ jobId: res.jobId, ...s });
@@ -1127,11 +1131,44 @@ export function PatternStudioPage() {
                 </button>
                 {drape?.status === "done" && drape.url && (
                   <div className="space-y-2">
+                    {drape.fitUrl && (
+                      <div className="flex gap-1">
+                        {(["drape", "fit"] as const).map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            className={`flex-1 rounded px-2 py-1 text-[11px] font-medium ${
+                              drapeView === v ? "bg-navy text-white" : "bg-ink/5 text-ink/70"
+                            }`}
+                            onClick={() => setDrapeView(v)}
+                          >
+                            {v === "drape" ? "Drape" : "Fit map"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <img
-                      src={drape.url}
-                      alt="Simulated drape of this draft on a ghost mannequin"
+                      src={drapeView === "fit" && drape.fitUrl ? drape.fitUrl : drape.url}
+                      alt={
+                        drapeView === "fit"
+                          ? "Strain fit map of this draft — green comfortable, red tight"
+                          : "Simulated drape of this draft on a ghost mannequin"
+                      }
                       className="w-full rounded-md border border-ink/10"
                     />
+                    {drapeView === "fit" && drape.fitUrl && (
+                      <p className="text-[10px] leading-snug text-warmgrey">
+                        How hard the fabric is working against your pattern:{" "}
+                        <span className="font-medium" style={{ color: "#3f9e4d" }}>green</span> skims
+                        comfortably,{" "}
+                        <span className="font-medium" style={{ color: "#c9a12b" }}>yellow</span> is
+                        snug,{" "}
+                        <span className="font-medium" style={{ color: "#c22" }}>red</span> is pulling
+                        tight (a real toile would show drag lines there), and{" "}
+                        <span className="font-medium" style={{ color: "#6b93c9" }}>blue</span> is
+                        pooling slack you could pinch out.
+                      </p>
+                    )}
                     <button
                       type="button"
                       className="btn btn-primary w-full !py-1.5 text-xs"
