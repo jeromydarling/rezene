@@ -28,6 +28,14 @@ S = 0.001  # pattern mm -> metres
 HEIGHT = max(y for p in DATA["pieces"] if p["placement"]["kind"] in ("plane",) for _, y in p["points"]) if any(
     p["placement"]["kind"] == "plane" for p in DATA["pieces"]
 ) else max(y for p in DATA["pieces"] for _, y in p["points"])
+# A circle skirt cones outward as it falls: its flat radial length maps to a
+# SHORTER vertical drop (the rest goes sideways), so the effective garment
+# height is the worn drop, not the flat length — the hem then lands at z≈0
+# and the collision column is cropped just below it like every other block.
+_circle_pl = next((p["placement"] for p in DATA["pieces"] if p["placement"]["kind"] == "circle"), None)
+if _circle_pl:
+    _circle_k = _circle_pl["thetaSpan"] / (2 * math.pi)
+    HEIGHT = (_circle_pl["rOut"] - _circle_pl["rIn"]) * math.sqrt(max(0.0, 1.0 - _circle_k**2))
 # Vertical anchor: pattern y + Y_OFF = body coordinate (0 = high point
 # shoulder, 460 = waist on the standard form). Brian-family tops use 0;
 # dresses and lower-body garments anchor their own y=0 elsewhere.
@@ -277,6 +285,21 @@ def place(piece, x, y):
         wy = side * 8.0 * (1 - t) + wrapped * t
         wx, wy = clamp_out(wx, wy, y)
         return (wx * S, wy * S, (HEIGHT - y) * S)
+    if pl["kind"] == "circle":
+        # Circle skirt: the flat piece is a ring sector whose inner arc IS the
+        # waist. Worn, that arc wraps the full 2π of the body, so a flat
+        # radius r lands on a circle of radius k*r (k = flat angle / 2π) and
+        # the leftover radial length becomes vertical drop — a perfect cone
+        # the solver then relaxes into folds.
+        k = pl["thetaSpan"] / (2 * math.pi)
+        r = pl["rIn"] + y
+        frac = min(1.0, max(0.0, x / (pl["thetaSpan"] * pl["rMid"])))
+        psi = frac * 2 * math.pi - math.pi  # seam edges meet at centre back
+        R = k * r
+        wx = R * math.sin(psi)
+        wy = -R * math.cos(psi)
+        drop = y * math.sqrt(max(0.0, 1.0 - k * k))
+        return (wx * S, wy * S, (HEIGHT - drop) * S)
     if pl["kind"] == "leg":
         # Trouser panel: half-tube around a leg stub, sweeping onto the hip
         # shell above the fork (the same tube+joint-sweep idea as sleeves).
