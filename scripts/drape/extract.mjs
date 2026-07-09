@@ -115,6 +115,9 @@ const BLOCKS = {
     parts: { front: "huey.front", back: "huey.back", sleeve: "huey.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true,
+    // The side seams pull each front half outward; the zip springs need the
+    // same firmer stitch as the button-downs to hold CF fully shut.
+    sim: { sewForce: 4 },
   },
   "slip-dress": {
     module: "@freesewing/sophie",
