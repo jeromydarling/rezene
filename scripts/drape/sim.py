@@ -841,15 +841,24 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         if ra != rb:
             parent[rb] = ra
     remap = np.array([_find(i) for i in range(nv)])
-    # Welded representative takes the mean position; pins dominate (a welded
-    # pair with one pinned side stays pinned).
+    # Welded representative position: clusters that contain a PINNED member
+    # sit exactly at the mean of their pinned members — that is where the
+    # garment truly hangs. Averaging free members in too (and then freezing
+    # the cluster) would permanently bake half of any unclosed seam gap into
+    # the measurement.
+    pinned_mask = np.zeros(nv, dtype=bool)
+    pinned_mask[list(pin_indices)] = True
     accp = np.zeros((nv, 3))
     accn = np.zeros(nv)
     np.add.at(accp, remap, x)
     np.add.at(accn, remap, 1.0)
-    x = np.where(accn[:, None] > 0, accp / np.maximum(accn, 1)[:, None], x)
-    pinned_mask = np.zeros(nv, dtype=bool)
-    pinned_mask[list(pin_indices)] = True
+    accp_pin = np.zeros((nv, 3))
+    accn_pin = np.zeros(nv)
+    np.add.at(accp_pin, remap[pinned_mask], x[pinned_mask])
+    np.add.at(accn_pin, remap[pinned_mask], 1.0)
+    mean_all = accp / np.maximum(accn, 1)[:, None]
+    mean_pin = accp_pin / np.maximum(accn_pin, 1)[:, None]
+    x = np.where(accn_pin[:, None] > 0, mean_pin, np.where(accn[:, None] > 0, mean_all, x))
     welded_pin = np.zeros(nv, dtype=bool)
     np.logical_or.at(welded_pin, remap, pinned_mask)
     invw = np.where(welded_pin, 0.0, 1.0)
