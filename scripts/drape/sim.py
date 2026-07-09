@@ -1077,6 +1077,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             np.add.at(cnt, cA, 1.0)
             np.add.at(cnt, cB0, 1.0)
             np.add.at(cnt, cB1, 1.0)
+        # Contact joins the averaged sweep as one more constraint, so the
+        # Chebyshev extrapolation sees a consistent operator. Hard-projecting
+        # AFTER the accelerated step is chaotically unstable (identical
+        # configs scattered girth p95 anywhere from +0.6 to +1.8 depending
+        # on BVH normal noise); in-sweep contact converges to the same
+        # optimum from every rho/refresh setting tested.
+        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+        push = np.maximum(pen, 0.0)
+        dx += nrm * (push * invw)[:, None]
+        cnt += (push > 0).astype(float)
         x_new = x + OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
         x_new += TETHER * (x_drape - x_new) * invw[:, None]
         if it < WARMUP:
@@ -1088,8 +1098,10 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         x_acc = omega_ch * (GAMMA * (x_new - x) + x - x_prev) + x_prev
         x_prev = x
         x = np.where(invw[:, None] > 0, x_acc, x)
-        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
-        x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
+    # one exact projection at the end so nothing renders inside the form
+    q, nrm, _ = contact_planes(x)
+    pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+    x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     print("fit relax post:", "p50=%+.3f p95=%+.3f max=%.3f" % _edge_strain_stats(x),
           "maxdisp=%.4f" % np.abs(x - x_drape).max())
     if len(cA):
