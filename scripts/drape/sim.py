@@ -211,7 +211,9 @@ def place(piece, x, y):
         # the neck stub exists, so the shoulder region collapses to the seam
         # line (near 0 depth) where the pins hold front and back together.
         _, tb = torso_ab(y)
-        wrapped = side * (tb + 15.0) * math.cos(phi)
+        # `outset` layers overlapping panels (a shirt's button stand) so the
+        # closed placket stacks instead of interpenetrating.
+        wrapped = side * (tb + 15.0 + float(pl.get("outset", 0.0))) * math.cos(phi)
         # The panel hangs from its own top edge (shoulder seam, tank strap or
         # raglan diagonal — extract emits the profile): at the top edge it
         # sits near centre depth, sweeping onto the wrapped chest as it
@@ -363,9 +365,14 @@ for seam in DATA["seams"]:
 # (e.g. ribbed cuffs gripping the wrist).
 for piece in DATA["pieces"]:
     extra = set(piece.get("pinSegments", []))
+    stride = max(1, int(piece.get("pinStride", 1)))
     for seg_name in piece.get("segments", {}):
-        if seg_name.startswith("neck") or seg_name.startswith("cap") or seg_name in extra:
+        if seg_name.startswith("neck") or seg_name.startswith("cap"):
             pin_indices.update(seg_indices(piece["name"], seg_name))
+        elif seg_name in extra:
+            idxs = seg_indices(piece["name"], seg_name)
+            pin_indices.update(idxs[::stride])
+            pin_indices.add(idxs[-1])
 
 # ---- Invisible collision body (ghost mannequin) -------------------------------
 def build_body():
