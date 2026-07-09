@@ -82,6 +82,9 @@ const BLOCKS = {
     },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true,
+    // At the true (shirt-tail) default length the heavier panels strain the
+    // armscye springs open — stitch harder than the default force 2.
+    sim: { sewForce: 4 },
   },
   simone: {
     module: "@freesewing/simone",
@@ -97,6 +100,7 @@ const BLOCKS = {
     },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true,
+    sim: { sewForce: 4 },
   },
   "slip-dress": {
     module: "@freesewing/sophie",
