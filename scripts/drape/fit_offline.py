@@ -52,7 +52,7 @@ def edge_stats(pos):
 
 
 def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=15, seams=True,
-          contact_mode="post", damp=1.0):
+          contact_mode="post", damp=1.0, grav=0.0):
     omega_ch = 1.0
     x_prev = x.copy()
     q = nrm = None
@@ -89,6 +89,8 @@ def relax(x, n_iter, contact_every=10, omega=1.7, rho=0.992, gamma=0.7, warmup=1
             dx += nrm * (push * invw)[:, None]
             cnt += (push > 0).astype(float)
         x_new = x + omega * dx / np.maximum(cnt, 1.0)[:, None]
+        if grav:
+            x_new[:, 2] -= grav * (invw > 0)
         if it < warmup:
             omega_ch = 1.0
         elif it == warmup:
@@ -166,6 +168,11 @@ for tok in MODE.split(","):
         kw["contact_every"] = int(tok[1:])
     elif tok == "noseams":
         kw["seams"] = False
+    elif tok.startswith("grav"):
+        # gravity per-sweep displacement in tenths of a mm; frees ALL pins —
+        # the shoulder slope holds the garment up, like a real body does
+        kw["grav"] = int(tok[4:]) * 1e-4
+        invw = np.ones(nv)
 x = relax(x, N_ITER, **kw)
 print("post:", "edges p50=%+.3f p95=%+.3f max=%.3f" % edge_stats(x))
 g1 = seam_gap(x) * 1000
