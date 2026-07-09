@@ -689,12 +689,20 @@ function crossFrontPanel(pieceName, mirrored) {
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
   const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  // The opening edge from the neck point to the button crosses CF on its
+  // way down. Its neck-side portion IS the front neckline — name it neck*
+  // so the sim pins it like every collar (unpinned, the neck gapes open
+  // and the fronts slump off the shoulders).
+  const crossAll = slice(poly, P.hps, P.button);
+  let k = crossAll.findIndex(([px]) => px <= 0);
+  if (k < 1) k = Math.min(8, crossAll.length - 1);
   return buildPiece(pieceName, [
     ["hem", seg(slice(poly, P.cfBottom, P.bottom))],
     ["side", seg(slice(poly, P.bottom, P.armhole))],
     ["armscye", seg(slice(poly, P.armhole, P.shoulder))],
     ["shoulder", seg(slice(poly, P.shoulder, P.hps))],
-    ["cross", seg(slice(poly, P.hps, P.button))],
+    ["neckCross", seg(crossAll.slice(0, k + 1))],
+    ["cross", seg(crossAll.slice(k))],
     ["crossLow", seg(slice(poly, P.button, P.cfBottom))],
   ]);
 }
