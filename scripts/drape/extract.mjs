@@ -21,7 +21,7 @@
  *   wide-trouser (Titan)  leg tubes + hip sweep on the lower-body mannequin
  *   pleated-skirt (Penelope) pencil skirt on the hip column, waist pinned
  *   paco (Paco)           summer trousers on the Titan topology
- *   charlie (Charlie)     chinos; slant-pocket edge pinned like the waist
+ *   charlie (Charlie)     chinos; slant-pocket corner restored synthetically
  *   sandy (Sandy)         circle skirt: one ring sector, polar "circle" wrap
  *   bella (Bella)         foundation bodice; waist + side bust darts sewn
  *
@@ -163,8 +163,8 @@ const BLOCKS = {
     module: "@freesewing/charlie",
     design: "Charlie",
     // Chinos on the Titan draft. The slant pocket cuts the front panel's
-    // waist-side corner, so the outseam starts at the pocket's lower end and
-    // the slant edge itself is pinned (a real pocket bag holds it closed).
+    // waist-side corner; the extractor restores that corner synthetically
+    // (the pocket bag fills it in the worn garment).
     trousers: true,
     parts: { front: "charlie.front", back: "charlie.back" },
     frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
@@ -602,19 +602,28 @@ function trouserPanel(partName, pieceName, mirrored) {
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
   const seg = (pts) => (mirrored ? mirror(pts) : pts);
-  // A slant front pocket (chinos) cuts the waist-side corner away: the
-  // outseam then starts at the pocket's lower end and the slant edge itself
-  // is a pinned opening (the pocket bag holds it in a real pair).
+  // A slant front pocket (chinos) cuts the waist-side corner off the panel.
+  // Restore that corner synthetically — in the worn garment the pocket bag
+  // fills it, and simulating the hole instead leaves the front panel
+  // narrower than the back so the leg tubes misalign and the seams gape.
   const cut = cfg.frontWaistCut && pieceName.startsWith("front") ? cfg.frontWaistCut : null;
-  const outTop = cut ? P[cut.bottom] : P.styleWaistOut;
-  const waistEnd = cut ? P[cut.top] : P.styleWaistOut;
+  const line = (p1, p2, n = 8) =>
+    Array.from({ length: n + 1 }, (_, i) => [
+      p1.x + ((p2.x - p1.x) * i) / n,
+      p1.y + ((p2.y - p1.y) * i) / n,
+    ]);
+  const outseamPts = cut
+    ? [...line(P.styleWaistOut, P[cut.bottom]), ...sliceShort(poly, P[cut.bottom], P.floorOut)]
+    : sliceShort(poly, P.styleWaistOut, P.floorOut);
+  const waistPts = cut
+    ? [...sliceShort(poly, P.styleWaistIn, P[cut.top]), ...line(P[cut.top], P.styleWaistOut)]
+    : sliceShort(poly, P.styleWaistIn, P.styleWaistOut);
   const piece = buildPiece(pieceName, [
-    ["outseam", seg(sliceShort(poly, outTop, P.floorOut))],
+    ["outseam", seg(outseamPts)],
     ["hem", seg(sliceShort(poly, P.floorOut, P.floorIn))],
     ["inseam", seg(sliceShort(poly, P.floorIn, P.fork))],
     ["crotch", seg(sliceShort(poly, P.fork, P.styleWaistIn))],
-    ["waist", seg(sliceShort(poly, P.styleWaistIn, waistEnd))],
-    ...(cut ? [["slant", seg(sliceShort(poly, P[cut.top], P[cut.bottom]))]] : []),
+    ["waist", seg(waistPts)],
   ]);
   const BIN = 50;
   const bins = new Map();
@@ -829,8 +838,7 @@ if (cfg.trousers) {
   frontL.placement = { kind: "leg", leg: -1, panel: "front" };
   backL.placement = { kind: "leg", leg: -1, panel: "back" };
   for (const p of [frontR, backR, frontL, backL]) {
-    // Waistband grip; a slant pocket edge is pinned too (its bag holds it).
-    p.pinSegments = p.segments.slant ? ["waist", "slant"] : ["waist"];
+    p.pinSegments = ["waist"]; // waistband grip; seams close by stitching
   }
   bodyPieces = [frontR, backR, frontL, backL];
 } else if (cfg.skirt) {

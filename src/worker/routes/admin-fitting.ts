@@ -518,7 +518,9 @@ adminFittingRoutes.post("/generate", requireAdminWrite, async (c) => {
           "detail; the shoulders are soft and unstructured — any pointiness, puffiness or padded look at " +
           "the shoulders in the reference is an artifact too; and the sleeves hang smooth — any horizontal " +
           "rings, ruching or accordion folds along the sleeves or legs in the reference are artifacts, not " +
-          "a gathered design; and every edge (waist, hems, openings) is cleanly finished. Fabric and " +
+          "a gathered design; fine regular vertical fluting on a skirt is the simulator's stiffness, not " +
+          "pleating — real cloth falls in fewer, softer folds; and every edge (waist, hems, openings) is " +
+          "cleanly finished. Fabric and " +
           "colour come from the description alone, no mannequin or dress form may appear, and add no " +
           "clothing items beyond those described"
         : body.referenceRole === "pattern"
