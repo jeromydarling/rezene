@@ -1,0 +1,61 @@
+name: Render pattern drape
+
+# Triggered by the Worker via repository_dispatch when a shop asks for a
+# true-drape preview of a Pattern Studio draft. FreeSewing drafts the pieces,
+# Blender's cloth solver drapes them on a ghost mannequin, and the grey render
+# is posted back to the Worker (which stores it and hands it to the Fitting
+# Studio as a proportions reference).
+on:
+  repository_dispatch:
+    types: [render_drape]
+
+concurrency:
+  group: drape-${{ github.event.client_payload.jobId }}
+  cancel-in-progress: true
+
+jobs:
+  drape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (for scripts/drape)
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install FreeSewing (drafting only — skip the full app install)
+        run: npm install --no-save --no-audit --no-fund @freesewing/core @freesewing/teagan
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender > /dev/null
+
+      - name: Draft, simulate, render, deliver
+        env:
+          SHOP_ID: ${{ github.event.client_payload.shopId }}
+          JOB_ID: ${{ github.event.client_payload.jobId }}
+          CALLBACK_BASE: ${{ github.event.client_payload.callbackBase }}
+          SPEC: ${{ toJSON(github.event.client_payload.spec) }}
+          RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
+        run: |
+          set -o pipefail
+          fail() {
+            curl -sS -X POST "$CALLBACK_BASE/drape/$SHOP_ID/$JOB_ID/fail" \
+              -H "x-render-secret: $RENDER_CALLBACK_SECRET" \
+              -H "content-type: application/json" \
+              -d "{\"error\": \"$1\"}" || true
+            exit 1
+          }
+          node scripts/drape/extract.mjs "$SPEC" "$PWD/out/pieces.json" || fail "pattern extraction failed"
+          blender -b -noaudio -P scripts/drape/sim.py -- "$PWD/out/pieces.json" "$PWD/out/drape.png" 60 \
+            || fail "cloth simulation failed"
+          [ -f out/drape.png ] || fail "no render produced"
+          curl -sS --fail -X POST "$CALLBACK_BASE/drape/$SHOP_ID/$JOB_ID/complete" \
+            -F "secret=$RENDER_CALLBACK_SECRET" \
+            -F "image=@out/drape.png;type=image/png" \
+            || fail "callback upload failed"

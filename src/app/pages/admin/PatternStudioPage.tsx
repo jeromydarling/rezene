@@ -260,6 +260,14 @@ export function PatternStudioPage() {
   const [visualising, setVisualising] = useState(false);
   const [visualised, setVisualised] = useState(false);
   const [usePatternRef, setUsePatternRef] = useState(false);
+  const [drape, setDrape] = useState<{
+    jobId: string;
+    status: string;
+    url?: string;
+    fileId?: string;
+    error?: string;
+  } | null>(null);
+  const [draping, setDraping] = useState(false);
   const [styling, setStyling] = useState(false);
   const [explaining, setExplaining] = useState(false);
   const [explainText, setExplainText] = useState<string | null>(null);
@@ -470,7 +478,40 @@ export function PatternStudioPage() {
    *  model gets a text description — the silhouette class, the fit buckets,
    *  and every NAMEABLE styling choice (cuffs, collar, plackets, buttons) —
    *  never the drafted geometry itself. */
-  async function seeOnModel() {
+  /** True-drape preview (beta, tee only): dispatch the Blender cloth-sim
+   *  render and poll until the grey ghost-mannequin PNG lands. */
+  async function startDrape() {
+    setDraping(true);
+    setDrape(null);
+    try {
+      const res = await api.post<{ jobId: string }>("/api/admin/fitting/drape", {
+        easePct: state.easePct,
+        lengthPct: state.lengthPct,
+        sleevePct: state.sleevePct,
+      });
+      setDrape({ jobId: res.jobId, status: "queued" });
+      // The Actions run takes ~4-6 min (installs Blender, sims, renders).
+      for (let i = 0; i < 100; i++) {
+        await new Promise((r) => setTimeout(r, 6000));
+        const s = await api.get<{ status: string; url?: string; fileId?: string; error?: string }>(
+          `/api/admin/fitting/drape/${res.jobId}`,
+        );
+        setDrape({ jobId: res.jobId, ...s });
+        if (s.status === "done" || s.status === "failed") {
+          if (s.status === "failed") toast.error("Drape simulation failed", s.error);
+          return;
+        }
+      }
+      toast.error("Drape render timed out", "The job may still finish — check back in a minute.");
+    } catch (e) {
+      setDrape(null);
+      toast.error("Couldn't start the drape render", e instanceof Error ? e.message : undefined);
+    } finally {
+      setDraping(false);
+    }
+  }
+
+  async function seeOnModel(drapeFileId?: string) {
     setVisualising(true);
     try {
       const bits: string[] = [];
@@ -510,7 +551,13 @@ export function PatternStudioPage() {
       // reference, with a server-side clause that frames it as a technical
       // diagram — proportions only, never a print.
       let referenceFileIds: string[] | undefined;
-      if (usePatternRef) {
+      let referenceRole: "pattern" | "drape" | undefined;
+      if (drapeFileId) {
+        // True-drape bridge: the physically-simulated grey render carries the
+        // draft's real proportions — stronger signal than the flat sheet.
+        referenceFileIds = [drapeFileId];
+        referenceRole = "drape";
+      } else if (usePatternRef) {
         const clean = draftPatternSvg(blockId, state.size, state.measurements, {
           easePct: state.easePct,
           lengthPct: state.lengthPct,
@@ -527,13 +574,14 @@ export function PatternStudioPage() {
           form.set("isPublic", "1");
           const up = await api.upload<{ id: string }>("/api/admin/files/upload", form);
           referenceFileIds = [up.id];
+          referenceRole = "pattern";
         }
       }
 
       await api.post("/api/admin/fitting/generate", {
         description,
         referenceFileIds,
-        referenceRole: referenceFileIds ? "pattern" : undefined,
+        referenceRole,
         fit: {
           ease: 1 + state.easePct / 100,
           length: 1 + state.lengthPct / 100,
@@ -1035,11 +1083,55 @@ export function PatternStudioPage() {
             <button
               type="button"
               className="btn btn-secondary w-full"
-              onClick={seeOnModel}
+              onClick={() => seeOnModel()}
               disabled={visualising}
             >
               {visualising ? "Rendering…" : "Render this cut on a model"}
             </button>
+            {blockId === "classic-tee" && (
+              <div className="space-y-2 rounded-md border border-navy/10 bg-white/60 p-2">
+                <p className="text-[11px] leading-snug text-warmgrey">
+                  <span className="font-medium text-ink/80">True-drape preview (beta, tee only).</span>{" "}
+                  Sews your exact draft in a cloth simulator and drapes it on a ghost mannequin — a
+                  physically true picture of the proportions, used as a stronger reference for the model
+                  render. Takes a few minutes.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-secondary w-full !py-1.5 text-xs"
+                  onClick={startDrape}
+                  disabled={draping}
+                >
+                  {draping
+                    ? drape?.status === "queued"
+                      ? "Simulating cloth… (takes ~5 min)"
+                      : "Simulating cloth…"
+                    : "Simulate the real drape"}
+                </button>
+                {drape?.status === "done" && drape.url && (
+                  <div className="space-y-2">
+                    <img
+                      src={drape.url}
+                      alt="Simulated drape of this draft on a ghost mannequin"
+                      className="w-full rounded-md border border-ink/10"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary w-full !py-1.5 text-xs"
+                      onClick={() => seeOnModel(drape.fileId)}
+                      disabled={visualising}
+                    >
+                      {visualising ? "Rendering…" : "Render on a model from this drape"}
+                    </button>
+                  </div>
+                )}
+                {drape?.status === "failed" && (
+                  <p className="text-[11px] text-red-700">
+                    The simulation didn&apos;t finish: {drape.error || "unknown error"}. Try again.
+                  </p>
+                )}
+              </div>
+            )}
             <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-warmgrey">
               <input
                 type="checkbox"
