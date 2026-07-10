@@ -1225,8 +1225,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # Pinned verts are artificial hanging scaffolding frozen at placed
     # positions — triangles touching them measure the scaffold, not relaxed
     # cloth, and junctions between two pinned clusters can never relax at
-    # all. Exclude them like the free-hanging regions.
-    free_tri = (invw[t0] > 0) & (invw[t1] > 0) & (invw[t2] > 0)
+    # all. Exclude them like the free-hanging regions — and their one-ring
+    # SHADOW too: the ring of triangles just outside a pinned collar still
+    # measures the scaffold's pull, painting a phantom necklace.
+    _scaffold = invw == 0
+    _shadow = _scaffold.copy()
+    for _k in range(3):
+        _corner = _scaffold[remap[tris[:, _k]]]
+        for _j in range(3):
+            _shadow[remap[tris[_corner, _j]]] = True
+    free_tri = ~_shadow[t0] & ~_shadow[t1] & ~_shadow[t2]
     tight_tri = np.where(good & free_tri, lam_weft - 1.0, 0.0)
     areaT = np.where(free_tri, np.abs(detDm) * 0.5, 0.0)
 
