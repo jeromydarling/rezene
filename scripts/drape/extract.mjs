@@ -232,15 +232,15 @@ const BLOCKS = {
     trousers: true,
     parts: { front: "charlie.front", back: "charlie.back" },
     frontWaistCut: { top: "slantTop", bottom: "slantBottom" },
-    // SEAT RECIPE STATUS: the crumple's root cause was the slant-pocket
-    // waist cut collapsing the top edgesProfile rows to a corner — the
-    // sim's leg placement now clamps those (front crotch closes to ~13mm,
-    // legs drape well). Remaining: the BACK rise tops place ~340mm apart
-    // at rest, so the CB seam can't close in the bake. riseTopPin (0.35
-    // and 0.2 both tried) makes it WORSE — pinning non-coincident seam
-    // sides freezes the gap open (the armscye lesson). The next fix is
-    // placement-side: the deep-seat sweep must land both back rise tops
-    // coincident at CB. Charlie stays off the whitelist until then.
+    // SEAT RECIPE (solved in three layers): the crumple was the slant-pocket
+    // waist cut collapsing the top edgesProfile rows to a corner (the sim
+    // clamps those); the CB hole was the back-panel hip sweep sending the
+    // rise to the hip SIDE (s_n convention flips on mirrored panels — fixed
+    // in the sim); and with placement finally coincident, pinning the rise
+    // top (the waistband's grip) closes the seat: crotch_back 197mm -> 12mm.
+    // Pins only help when the pinned sides land together — the armscye
+    // lesson, both directions.
+    riseTopPin: 0.2,
     yOffset: 460,
     bodyKind: "lower",
   },
