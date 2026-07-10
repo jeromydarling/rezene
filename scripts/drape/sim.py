@@ -83,8 +83,53 @@ else:
         TORSO = [(by, a * _hip_s, b * _hip_s) for by, a, b in _LOWER] + [
             (_HEM_BY, 166 * _hip_s, 136 * _hip_s)
         ]
+    elif BODY_KIND == "brief":
+        # Briefs are the first blocks whose cloth must CROSS the crotch: the
+        # trouser form's full hip ellipse runs to the fork (276mm front-to-
+        # back) with thigh stubs that overlap the centreline — no gap a
+        # ~127mm gusset could ever span, and a fit map measured against that
+        # keel-less hull would scream tension the real body never produces.
+        # This variant pinches the fork into a crotch keel and parts
+        # slightly slimmer mid-thigh stubs so a real crotch channel exists.
+        # Three keel rows round the under-curve: with a single sharp "chin"
+        # the gusset leaves the front face as a taut chord and the render
+        # shows a dark void band above the crotch.
+        TORSO = [(by, a * _hip_s, b * _hip_s) for by, a, b in _LOWER] + [
+            (700, 165 * _hip_s, 122 * _hip_s),
+            (722, 160 * _hip_s, 92 * _hip_s),
+            (742, 156 * _hip_s, 62 * _hip_s),
+        ]
     else:
         TORSO = [(by, a * _hip_s, b * _hip_s) for by, a, b in _LOWER] + [(742, 168 * _hip_s, 138 * _hip_s)]
+
+# Brief-body thigh stubs (used by both the gusset placement and the collision
+# body): parted at the crotch — inner faces at ±12mm of centre — and cut
+# mid-thigh just past the leg openings.
+BRIEF_LEG_X = 100.0 * _chest_s
+BRIEF_LEG_TOP = 710.0
+BRIEF_LEG_R0 = 88.0 * _chest_s
+BRIEF_LEG_R1 = 80.0 * _chest_s
+BRIEF_LEG_BOT = _HEM_BY + 80.0
+
+
+def brief_leg_r(by):
+    t = (by - BRIEF_LEG_TOP) / max(1.0, BRIEF_LEG_BOT - BRIEF_LEG_TOP)
+    return BRIEF_LEG_R0 + (BRIEF_LEG_R1 - BRIEF_LEG_R0) * min(1.0, max(0.0, t))
+
+
+def leg_r_at(by):
+    """ANATOMICAL trouser leg-stub radius at a body height: thigh at the
+    crotch, knee at the knee line, ankle at the floor. The old straight
+    thigh->ankle taper ran over the GARMENT's length, so a mid-thigh hem
+    (swim trunks) ended in an ankle-width carrot where a thigh should be;
+    full-length trousers see the same radius at their hem as before."""
+    pts = [(700.0, 95.0), (1050.0, 67.0), (1500.0, 42.0)]
+    if by <= pts[0][0]:
+        return pts[0][1] * _chest_s
+    for (y0, r0), (y1, r1) in zip(pts, pts[1:]):
+        if by <= y1:
+            return (r0 + (r1 - r0) * (by - y0) / (y1 - y0)) * _chest_s
+    return pts[-1][1] * _chest_s
 
 # Arm stubs end just below the sleeve hem for the same reason. Long sleeves
 # hang closer to the body (a wide splay looks scarecrow-ish and crops out of
@@ -336,6 +381,27 @@ def place(piece, x, y):
             lo, hi = prof[-1][1], prof[-1][2]
         w = max(1.0, hi - lo)
         r = w / math.pi + 2.0
+        # Short snug blocks (swim trunks) drape on the "brief" body — parted
+        # thighs with a real crotch channel — because their inseams and rise
+        # seams must MEET between the legs, and the trouser stubs (thighs
+        # overlapping the centreline) leave no gap for that. Long trousers
+        # keep the classic stubs.
+        if BODY_KIND == "brief":
+            _legx, _leg_top = BRIEF_LEG_X, BRIEF_LEG_TOP
+            _stub_r = brief_leg_r
+        else:
+            _legx, _leg_top = 92.0 * _chest_s, 700.0
+            _stub_r = leg_r_at
+        # Negative-ease knits cut the leg tube TIGHTER than the thigh stub —
+        # never start the wrap inside the collider: wrap at the stub's own
+        # radius and let the strain be real instead. But cap the inflation
+        # so the tube's inseam edge (lx = LEG_X - r) never crosses the body
+        # centreline — an uncapped clamp put the two legs' inseam edges
+        # INSIDE each other's territory and the self-collision fight flipped
+        # the hems into pleats.
+        _lby = Y_OFF + y
+        if _lby >= _leg_top:
+            r = max(r, min(_stub_r(_lby) + 4.0, _legx - 6.0))
         leg = pl["leg"]
         # s: 0 at the OUTSEAM edge, 1 at the INSEAM edge (mirrored panels
         # walk their profile the other way).
@@ -344,11 +410,11 @@ def place(piece, x, y):
         gap = 4.0 / r
         if pl["panel"] == "front":
             phi = (math.pi / 2 - gap) - s_n * (math.pi - 2 * gap)
-            lx = 92.0 * _chest_s + r * math.sin(phi)
+            lx = _legx + r * math.sin(phi)
             ly = -r * math.cos(phi)
         else:
             phi = (-math.pi / 2 + gap) + s_n * (math.pi - 2 * gap)
-            lx = 92.0 * _chest_s + r * math.sin(phi)
+            lx = _legx + r * math.sin(phi)
             ly = r * math.cos(phi)
         fork_y = float(piece.get("forkY", 280.0))
         if y < fork_y:
@@ -369,6 +435,33 @@ def place(piece, x, y):
             lx = lx * (1 - t) + hx * t
             ly = ly * (1 - t) + hy * t
         return (leg * lx * S, ly * S, (HEIGHT - y) * S)
+    if pl["kind"] == "gusset":
+        # Brief gusset: a sagittal strip from the front panel's bottom edge,
+        # under the crotch keel, up to the back panel's bottom edge. t walks
+        # front (0) to back (1); depth sweeps front face to back face with a
+        # cosine ramp whose amplitude matches each panel's wrapped depth at
+        # its attach height, and the drop sags just under the fork so the
+        # strip starts clear of the keel. Anything that would still start
+        # inside a thigh stub is pushed out sagittally toward its own face —
+        # the gusset's outer strips genuinely ride the inner thighs.
+        t = min(1.0, max(0.0, (y - pl["y0"]) / max(1e-6, pl["y1"] - pl["y0"])))
+        hF, hB = Y_OFF + pl["yF"], Y_OFF + pl["yB"]
+        sag = max(0.0, TORSO[-1][0] + 14.0 - (hF + hB) / 2.0)
+        h = hF + (hB - hF) * t + sag * math.sin(math.pi * t)
+        _, dF = torso_ab(pl["yF"])
+        _, dB = torso_ab(pl["yB"])
+        amp = (dF + 15.0) * (1 - t) + (dB + 15.0) * t
+        ly = -amp * math.cos(math.pi * t)
+        lx = x
+        rr = brief_leg_r(h) + 6.0
+        if h >= BRIEF_LEG_TOP:
+            for d in (1.0, -1.0):
+                dx = lx - d * BRIEF_LEG_X
+                if dx * dx < rr * rr:
+                    need = math.sqrt(rr * rr - dx * dx)
+                    if abs(ly) < need:
+                        ly = need if t >= 0.5 else -need
+        return (lx * S, ly * S, z_of_body(h))
 
     # Sleeve: wrap into a CONE around the tilted arm axis — radius follows the
     # piece's local width (biceps -> hem taper), else a straight tube leaves
@@ -658,18 +751,35 @@ def body_geometry(include_arms=True):
     cap(rings[0], z_of_body(TORSO[0][0] - 10))
 
     if BODY_KIND == "lower":
-        # Leg stubs: tapered cones from the crotch to just past the hem.
+        # Leg stubs: tapered cones from the crotch to just past the hem,
+        # ending at the ANATOMICAL radius for that height (thigh/knee/ankle)
+        # so short blocks end at a thigh, not an ankle-width carrot.
         LEG_X = 92.0 * _chest_s
         R_THIGH = 95.0 * _chest_s
-        R_ANKLE = 42.0 * _chest_s
         for d in (1, -1):
             top = ring(LEG_X * d, R_THIGH, R_THIGH, z_of_body(700))
-            bot = ring(LEG_X * d, R_ANKLE, R_ANKLE, z_of_body(_HEM_BY + 6))
+            _rb = leg_r_at(_HEM_BY + 6)
+            bot = ring(LEG_X * d, _rb, _rb, z_of_body(_HEM_BY + 6))
             bridge(top, bot)
             c = len(verts)
             verts.append((LEG_X * d * S, 0.0, z_of_body(690)))
             for i in range(N):
                 faces.append((top + i, top + (i + 1) % N, c))
+    if BODY_KIND == "brief":
+        # Parted mid-thigh stubs (see the TORSO note): unlike the trouser
+        # legs these end IN frame, so cap both ends.
+        for d in (1, -1):
+            top = ring(BRIEF_LEG_X * d, BRIEF_LEG_R0, BRIEF_LEG_R0, z_of_body(BRIEF_LEG_TOP))
+            bot = ring(BRIEF_LEG_X * d, BRIEF_LEG_R1, BRIEF_LEG_R1, z_of_body(BRIEF_LEG_BOT))
+            bridge(top, bot)
+            c = len(verts)
+            verts.append((BRIEF_LEG_X * d * S, 0.0, z_of_body(BRIEF_LEG_TOP - 12)))
+            for i in range(N):
+                faces.append((top + i, top + (i + 1) % N, c))
+            c2 = len(verts)
+            verts.append((BRIEF_LEG_X * d * S, 0.0, z_of_body(BRIEF_LEG_BOT + 12)))
+            for i in range(N):
+                faces.append((bot + (i + 1) % N, bot + i, c2))
 
     # Arm stubs: tapered cones hanging from the shoulder joints, tilted
     # outward — matching the sleeves' own biceps->wrist taper.
