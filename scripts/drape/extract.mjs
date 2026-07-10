@@ -23,7 +23,7 @@
  *   wide-trouser (Titan)  leg tubes + hip sweep on the lower-body mannequin
  *   pleated-skirt (Penelope) pencil skirt on the hip column, waist pinned
  *   paco (Paco)           summer trousers on the Titan topology
- *   charlie (Charlie)     chinos; slant-pocket corner restored synthetically
+ *   charlie (Charlie)     chinos; slant-pocket corner restored, waistband-grip rise pin
  *   sandy (Sandy)         circle skirt: one ring sector, polar "circle" wrap
  *   bella (Bella)         foundation bodice; waist + side bust darts sewn
  *   yuri (Yuri)           zipless crossover hoodie: overlapping wrap fronts,
@@ -186,7 +186,6 @@ const BLOCKS = {
     // shell above the fork; the waist is pinned (belt/waistband grip).
     trousers: true,
     parts: { front: "titan.front", back: "titan.back" },
-    riseTopPin: 0.2, // waistband grip: closes the CF/CB rise-top gaps (charlie recipe)
     yOffset: 460,
     bodyKind: "lower",
   },
@@ -208,7 +207,6 @@ const BLOCKS = {
     // simulated (same honesty as collars and hoods).
     trousers: true,
     parts: { front: "paco.front", back: "paco.back" },
-    riseTopPin: 0.2, // waistband grip: closes the CF/CB rise-top gaps (charlie recipe)
     yOffset: 460,
     bodyKind: "lower",
   },
