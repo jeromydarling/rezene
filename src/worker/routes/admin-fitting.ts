@@ -38,6 +38,7 @@ interface LookRow {
   fit_json: string;
   style_id: string | null;
   style_name: string | null;
+  client_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,7 @@ function mapLook(r: LookRow) {
     fit,
     styleId: r.style_id,
     styleName: r.style_name,
+    clientId: r.client_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -85,6 +87,7 @@ adminFittingRoutes.post("/looks", requireAdminWrite, async (c) => {
     color?: string;
     fit?: unknown;
     styleId?: string | null;
+    clientId?: string | null;
   };
   const garment = GARMENT_LIBRARY.find((g) => g.id === body.garmentId);
   if (!garment) return c.json({ error: "Unknown garment" }, 400);
@@ -92,8 +95,8 @@ adminFittingRoutes.post("/looks", requireAdminWrite, async (c) => {
   const id = newId("look");
   await run(
     c.var.db,
-    `INSERT INTO fitting_looks (id, name, garment_id, fabric_id, color, fit_json, style_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO fitting_looks (id, name, garment_id, fabric_id, color, fit_json, style_id, client_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     name.slice(0, 120),
     garment.id,
@@ -101,6 +104,7 @@ adminFittingRoutes.post("/looks", requireAdminWrite, async (c) => {
     typeof body.color === "string" ? body.color.slice(0, 16) : null,
     JSON.stringify(body.fit ?? {}).slice(0, 2000),
     body.styleId || null,
+    typeof body.clientId === "string" && body.clientId ? body.clientId : null,
   );
   const row = await first<LookRow>(c.var.db, `${LOOK_SELECT} WHERE l.id = ?`, id);
   return c.json(mapLook(row!), 201);
@@ -764,6 +768,7 @@ interface ModelRow {
   label: string;
   preset_id: string | null;
   source: string;
+  client_id?: string | null;
   created_at: string;
 }
 const mapModel = (r: ModelRow) => ({
@@ -773,6 +778,7 @@ const mapModel = (r: ModelRow) => ({
   label: r.label,
   presetId: r.preset_id,
   source: r.source,
+  clientId: r.client_id ?? null,
   createdAt: r.created_at,
 });
 

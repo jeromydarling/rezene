@@ -1101,6 +1101,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
   {
     group: "Grow & run it",
     items: [
+      ["Client Book for tailors & stylists", "Each client's dated measurement history, style notes, fittings timeline — and their patterns and photos."],
       ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
       ["Cash flow & open-to-buy", "Money in vs. out and how much of your season budget is left, from real POs and invoices."],
       ["Multi-location stock", "Track a studio, warehouse, or shopfront and move stock between them."],

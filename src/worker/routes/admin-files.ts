@@ -22,6 +22,7 @@ const ENTITY_TYPES = new Set([
   "emblem",
   "import",
   "fitting_model",
+  "client",
   "fitting_render",
 ]);
 

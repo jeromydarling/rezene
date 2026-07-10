@@ -105,6 +105,39 @@ When a concept is ready to become a physical sample, **ship it to a saved maker*
 > That whole design → maker handoff is one action and is race-free — the maker gets a working link to a real spec, not a screenshot.`,
   },
   {
+    slug: "client-book",
+    title: "The Client Book: the people behind the patterns",
+    summary: "Measurement history, style notes, fittings, and every pattern and photo a client owns — in one place.",
+    part: "design",
+    moduleRoute: "/admin/clients",
+    keywords: "client book made to measure mtm measurements history fitting timeline tailor stylist notes adopt",
+    updated: "2026-07-10",
+    body: `# The Client Book
+
+If you sew or style for individual people — made-to-measure clients, styling clients, alterations — the Client Book is where each person lives. One page per client, holding everything that used to be scattered across the studio tools:
+
+- **Measurement history.** Every set is **dated and kept** — bodies change, and a tailor needs to see "measured last autumn" next to "measured this week", not have one overwrite the other. The fields use the same names the Pattern Studio drafts from, so a set is ready to become a pattern.
+- **Style notes.** Plain language: colours they love, fits they avoid, brands whose sizes run true for them, the wedding they need an outfit for in June.
+- **Timeline.** Notes, consults, fittings, deliveries and occasions, newest first — "first fitting: take in left shoulder 1 cm" lives with the client, not in your head.
+- **Patterns & photos.** Saved patterns from the Pattern Studio and uploaded model photos from the Fitting Studio link to the client who owns them.
+
+## Building the book from what you already have
+
+If you've been naming saved patterns after clients (the old made-to-measure convention), press **Adopt existing patterns** on the Client Book page. Every saved pattern that carries measurements but belongs to no one becomes (or joins) a client with that name, and its measurements arrive as that client's first dated set. Nothing is deleted or changed about the patterns themselves.
+
+## Linking work to a client
+
+- **Patterns** — on a client's page, use *Link a saved pattern*. Newly saved patterns can be linked the same way.
+- **Model photos** — upload the client's photo in the **Fitting Studio** as a model, then link it on their page. From there, their own designs can be tried on their own body, and the drape preview can hang a pattern on their exact measurements.
+
+## Privacy
+
+A client's measurements and body photos are theirs. **Delete client & their data** removes the client, their entire measurement history and timeline in one action; their saved patterns and photos are kept in your studio but unlinked from any person.
+
+> [!NOTE]
+> On the demo shop the Client Book is read-only, like every write surface.`,
+  },
+  {
     slug: "three-d",
     title: "The 3D simulation bridge",
     summary: "Track CLO/Browzwear/Style3D projects, fit status, and turn fit issues into tasks.",
