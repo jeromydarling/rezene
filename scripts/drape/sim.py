@@ -396,15 +396,25 @@ def place(piece, x, y):
             xlt, xrt, xlu, xru = prof[-1][1:]
         C = max(1.0, (xrt - xlt) + (xru - xlu))
         r = C / (2 * math.pi) + 1
-        k = 2 * math.pi / C
+        # SEAM LINES RUN STRAIGHT DOWN THE ARM. Mapping x through the local
+        # circumference (theta = k*x) made the seam angles spiral ~40deg
+        # from biceps to wrist (the pieces' midlines drift as the ring
+        # tapers); the bake untwists that spiral and slides the paired
+        # edges ~100mm apart — the back seam never closed, in any variant.
+        # Instead both seams keep their BICEPS angles at every height and
+        # each piece's arc stretches linearly between them (a straight
+        # tailored seam; worst arc-vs-width distortion is ~2% at the
+        # wrist, which the cloth absorbs invisibly).
+        xlt0, xrt0, xlu0, xru0 = prof[0][1:]
+        k0 = 2 * math.pi / max(1.0, (xrt0 - xlt0) + (xru0 - xlu0))
+        tF0, tB0 = k0 * xlt0, k0 * xrt0
         if pl["role"] == "top":
-            theta = k * x
-            tc = k * (xlt + xrt) / 2.0
-            half = k * (xrt - xlt) / 2.0
+            theta = tF0 + (x - xlt) / max(1e-6, xrt - xlt) * (tB0 - tF0)
+            tc, half = (tF0 + tB0) / 2.0, (tB0 - tF0) / 2.0
         else:
-            theta = k * xlt - k * (x - xlu)
-            tc = k * xlt - k * (xru - xlu) / 2.0
-            half = k * (xru - xlu) / 2.0
+            span = 2 * math.pi - (tB0 - tF0)
+            theta = tF0 - (x - xlu) / max(1e-6, xru - xlu) * span
+            tc, half = tF0 - span / 2.0, span / 2.0
         # The paired edges must NOT start exactly coincident — the one-piece
         # underarm lesson: self-collision fights zero-length sewing and the
         # seams ruffle. Shrink each piece's arc ~3mm per edge (6mm gap for
