@@ -88,6 +88,68 @@ function MiniPatternStudio() {
 
 // ---------- Mini screens, one per module ----------
 
+function MiniClientBook() {
+  return (
+    <MiniShell title="Client Book — Maya Okafor">
+      <div className="flex gap-2">
+        <div className="flex-1 space-y-1.5">
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-semibold text-ink">Wedding-guest coat</p>
+            <div className="mt-1 flex items-center gap-1">
+              {["Consult", "Design", "Fabric", "Cutting", "Fittings"].map((st, i) => (
+                <span
+                  key={st}
+                  className={
+                    "rounded-full px-1 py-0.5 text-[6.5px] " +
+                    (i <= 2 ? "bg-palm/20 text-palm" : i === 3 ? "bg-terracotta/20 text-terracotta" : "bg-ink/5 text-warmgrey")
+                  }
+                >
+                  {st}
+                </span>
+              ))}
+            </div>
+            <p className="mt-1 text-[7.5px] text-warmgrey">Deposit $240 · paid — client approved from her portal ✓</p>
+          </div>
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-semibold text-ink">Timeline</p>
+            {[
+              ["Fitting", "Take in left shoulder 1 cm"],
+              ["Note", "Loves jewel tones, never sleeveless"],
+              ["Consult", "Booked from /book — “a coat for autumn”"],
+            ].map(([k, v]) => (
+              <p key={v} className="mt-0.5 truncate text-[7.5px] text-warmgrey">
+                <span className="font-medium text-ink">{k}</span> · {v}
+              </p>
+            ))}
+          </div>
+        </div>
+        <div className="w-28 space-y-1">
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-semibold text-ink">Measurements</p>
+            <p className="text-[7px] text-warmgrey">Jun 2026 · Nov 2025</p>
+            {[
+              ["Chest", "96 cm"],
+              ["Waist", "78 cm"],
+              ["Shoulder", "41 cm"],
+            ].map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between">
+                <span className="text-[7.5px] text-warmgrey">{k}</span>
+                <span className="text-[7.5px] font-medium text-ink">{v}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <span className={badge("bg-navy/10 text-navy")}>2 patterns</span>
+            <span className={badge("bg-palm/15 text-palm")}>portal ✓</span>
+          </div>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+
+
 function MiniProduction() {
   const cols: [string, { t: string; sub: string; late?: boolean }[]][] = [
     ["To do", [
@@ -668,6 +730,21 @@ const FEATURES: Feature[] = [
     ],
     screen: MiniPatternStudio,
     url: "verto.style/maison/admin/patterns",
+  },
+  {
+    id: "client-book",
+    eyebrow: "Clients",
+    heading: "Built for stylists and custom tailors.",
+    body: "If your business is people, not just products, every client gets one page holding everything: a dated measurement history (bodies change — sets never overwrite), style notes, and a timeline of consults, fittings and deliveries. Track each piece as a commission from consult to delivery, share a passwordless portal where the client sees their renders on their own body and approves the design before you cut, and take deposits and consult bookings without any extra tools.",
+    points: [
+      "Client Book: measurement history, style notes, and every pattern and photo they own",
+      "Commissions: consult → design → fabric → cutting → fittings → delivery (alterations too)",
+      "Client portal: passwordless, shows their pieces and renders, records their design approval",
+      "Deposits & milestone payments per commission, marked paid the way studios actually take money",
+      "A public “Book a consult” page that turns visitors into clients with one click",
+    ],
+    screen: MiniClientBook,
+    url: "verto.style/maison/admin/clients",
   },
   {
     id: "sourcing",
