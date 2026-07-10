@@ -2,6 +2,7 @@ import type { KbArticle, KbPart } from "./types";
 import { gettingStarted } from "./content/gettingStarted";
 import { catalog } from "./content/catalog";
 import { design } from "./content/design";
+import { clients } from "./content/clients";
 import { sourcing } from "./content/sourcing";
 import { finance } from "./content/finance";
 import { marketing } from "./content/marketing";
@@ -15,6 +16,7 @@ export const KB_PARTS: KbPart[] = [
   { slug: "getting-started", title: "Getting started", description: "What Verto is and how to find your way around.", icon: "🧭" },
   { slug: "catalog", title: "Catalog & inventory", description: "Products, variants, stock, collections, and bulk import.", icon: "🏷️" },
   { slug: "design", title: "Design & development", description: "Styles, tech packs, the LLM Design Studio, and 3D.", icon: "✏️" },
+  { slug: "clients", title: "Clients & commissions", description: "The Client Book, made-to-measure commissions, the client portal, deposits and booking.", icon: "🧵" },
   { slug: "sourcing", title: "Sourcing & production", description: "Makers, materials, samples, purchase orders, the board.", icon: "🏭" },
   { slug: "finance", title: "Costing & finance", description: "Cost sheets, duties & landed cost, shipping, analytics.", icon: "📊" },
   { slug: "marketing", title: "Marketing & content", description: "Campaigns, promo video, your CMS, and SEO.", icon: "📣" },
@@ -27,6 +29,7 @@ export const KB_ARTICLES: KbArticle[] = [
   ...gettingStarted,
   ...catalog,
   ...design,
+  ...clients,
   ...sourcing,
   ...finance,
   ...marketing,
