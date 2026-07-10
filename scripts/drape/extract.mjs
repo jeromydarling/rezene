@@ -326,6 +326,24 @@ const BLOCKS = {
     // shaping to wrap, so past a point the springs fight the collision body.
     sim: { sewForce: 6 },
   },
+  noble: {
+    module: "@freesewing/noble",
+    design: "Noble",
+    // Princess-seam bodice: the bust shaping lives in curved seams running
+    // through the shoulder, splitting front and back into inside/outside
+    // panels (the back's princess seam is a converted dart — its edges
+    // coincide above the waist dart's old tip). Inside panels cut on the
+    // fold; outside panels cut in pairs, drafted in their own frame.
+    noble: true,
+    parts: {
+      frontInside: "noble.frontInside", frontOutside: "noble.frontOutside",
+      backInside: "noble.backInside", backOutside: "noble.backOutside",
+    },
+    // Princess seams behave like Bella's darts: they shape against a form
+    // with no bust, so they need Bella's dart force — at 4 the bake leaves
+    // them as open ruffled gashes even though the relax closes them.
+    sim: { sewForce: 6 },
+  },
   breanna: {
     module: "@freesewing/breanna",
     design: "Breanna",
@@ -1295,6 +1313,70 @@ function circleSkirtPiece() {
 
 /** Bodice front (Bella "frontSideDart"): cut on fold at CF, a waist dart in
  *  the hem and a side bust dart splitting the side seam — both sewn shut. */
+/** Noble inside panels: cut on the fold (CF/CB), carrying the neckline and
+ *  the inner shoulder segment; the princess seam is their outer edge. The
+ *  back's slight CB shaping folds flat (the Bella 12mm fudge). */
+function nobleFrontInside() {
+  const part = set[cfg.parts.frontInside];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const princessR = slice(poly, P.waistDartLeft, P.shoulderDartInside);
+  const shoulderR = slice(poly, P.shoulderDartInside, P.hps);
+  const neckR = slice(poly, P.hps, P.cfNeck);
+  const hemR = slice(poly, P.cfHem, P.waistDartLeft);
+  return buildPiece("frontInside", [
+    ["princessR", princessR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["princessL", mirror([...princessR].reverse())],
+    ["hemL", mirror([...hemR].reverse())],
+    ["hemR", hemR],
+  ]);
+}
+
+function nobleBackInside() {
+  const part = set[cfg.parts.backInside];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.insideSeam);
+  const hemR = slice(poly, P.waistCenter, P.dartBottomLeft);
+  const princessR = slice(poly, P.dartBottomLeft, P.shoulderDart);
+  const shoulderR = slice(poly, P.shoulderDart, P.hps);
+  const neckR = slice(poly, P.hps, P.cbNeck);
+  return buildPiece("backInside", [
+    ["hemR", hemR],
+    ["princessR", princessR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["princessL", mirror([...princessR].reverse())],
+    ["hemL", mirror([...hemR].reverse())],
+  ]);
+}
+
+/** Noble outside panels: cut in pairs, drafted in their own frame. Shift x
+ *  so the princess foot butts the inside panel's foot for the plane wrap
+ *  (the Carlita side-panel lesson); mirror for the left side. */
+function nobleOutside(partName, pieceName, mirrored, A, insideFootX) {
+  const part = set[partName];
+  const P = part.points;
+  const poly = pathPolyline(part.paths[A.path]);
+  const dx = insideFootX - P[A.foot].x;
+  const seg = (pts) => {
+    const shifted = pts.map(([x, y]) => [x + dx, y]);
+    return mirrored ? mirror(shifted) : shifted;
+  };
+  return buildPiece(pieceName, [
+    ["hem", seg(slice(poly, P[A.foot], P[A.sideHem]))],
+    ["side", seg(slice(poly, P[A.sideHem], P.armhole))],
+    ["armscye", seg(slice(poly, P.armhole, P[A.shoulderOut]))],
+    ["shoulder", seg(slice(poly, P[A.shoulderOut], P[A.shoulderIn]))],
+    ["princess", seg(slice(poly, P[A.shoulderIn], P[A.foot]))],
+  ]);
+}
+
 /** Breanna front: half draft with the CF a couple of mm off x=0 (shift it
  *  back before mirroring) and TWO rotatable bust darts. With the studio's
  *  small-cup measurement set (bustFront barely past highBustFront) both
@@ -1583,6 +1665,109 @@ if (cfg.trousers) {
   front.placement = { kind: "plane", y: -160 };
   back.placement = { kind: "plane", y: 160 };
   bodyPieces = [front, back];
+} else if (cfg.noble) {
+  const frontIn = nobleFrontInside();
+  const backIn = nobleBackInside();
+  const fiFoot = set[cfg.parts.frontInside].points.waistDartLeft.x;
+  const biFoot = set[cfg.parts.backInside].points.dartBottomLeft.x;
+  const FO = {
+    path: "seam", foot: "waistDartRight", sideHem: "sideHemInitial",
+    shoulderOut: "shoulder", shoulderIn: "shoulderDartOutside",
+  };
+  const BO = {
+    path: "outsideSeam", foot: "dartBottomRight", sideHem: "waistSide",
+    shoulderOut: "shoulder", shoulderIn: "shoulderDart",
+  };
+  const frontOutR = nobleOutside(cfg.parts.frontOutside, "frontOutR", false, FO, fiFoot);
+  const frontOutL = nobleOutside(cfg.parts.frontOutside, "frontOutL", true, FO, fiFoot);
+  const backOutR = nobleOutside(cfg.parts.backOutside, "backOutR", false, BO, biFoot);
+  const backOutL = nobleOutside(cfg.parts.backOutside, "backOutL", true, BO, biFoot);
+  frontIn.placement = { kind: "plane", y: -160 };
+  // The outside panels' TOP edge (min-y per x-bin) is mostly their princess
+  // curve, and the hang-line collapse would drag that whole seam edge to
+  // the mid-plane while the inside panel's edge sits at wrapped depth —
+  // ~100mm of pure depth mismatch. They hang from seams, not a shoulder
+  // line: keep them at wrapped depth (the coat-tail rule).
+  frontOutR.placement = { kind: "plane", y: -160, hangCollapse: false };
+  frontOutL.placement = { kind: "plane", y: -160, hangCollapse: false };
+  backIn.placement = { kind: "plane", y: 160 };
+  backOutR.placement = { kind: "plane", y: 160, hangCollapse: false };
+  backOutL.placement = { kind: "plane", y: 160, hangCollapse: false };
+  // Rigidly align each outside panel onto its inside partner's princess
+  // edge (2D Kabsch over arc-fraction-paired edge samples). The two edge
+  // curves bow in OPPOSITE directions and spread their length over
+  // different heights — the bust shaping — so no axis shift can butt them;
+  // a rotation+translation is rest-length-legal and leaves the springs
+  // only the true shaping residual. Seam pairs match by arc fraction, and
+  // the inside edge walks waist→shoulder while the outside walks
+  // shoulder→waist, hence the reverse.
+  const segPts = (piece, segName) => {
+    const [s, e] = piece.segments[segName];
+    const n = piece.points.length;
+    const out = [];
+    let i = s;
+    for (;;) {
+      out.push(piece.points[i % n]);
+      if (i % n === e % n) break;
+      i++;
+    }
+    return out;
+  };
+  const rigidAlign = (piece, segName, targetPts) => {
+    const src = resample(segPts(piece, segName), 40);
+    const cx = (pts) => pts.reduce((s, p) => s + p[0], 0) / pts.length;
+    const cy = (pts) => pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    const sx = cx(src), sy = cy(src);
+    // The seam walk direction differs between R pieces and their mirrored
+    // L twins — fit both pairings and keep the one that actually matches.
+    const fit = (dst) => {
+      const tx = cx(dst), ty = cy(dst);
+      let dot = 0, cross = 0;
+      for (let i = 0; i < src.length; i++) {
+        const ax = src[i][0] - sx, ay = src[i][1] - sy;
+        const bx = dst[i][0] - tx, by = dst[i][1] - ty;
+        dot += ax * bx + ay * by;
+        cross += ax * by - ay * bx;
+      }
+      const ang = Math.atan2(cross, dot);
+      const c = Math.cos(ang), s = Math.sin(ang);
+      let res = 0;
+      for (let i = 0; i < src.length; i++) {
+        const ax = src[i][0] - sx, ay = src[i][1] - sy;
+        res += Math.hypot(tx + ax * c - ay * s - dst[i][0], ty + ax * s + ay * c - dst[i][1]);
+      }
+      return { tx, ty, c, s, res };
+    };
+    const f1 = fit(resample(targetPts, 40));
+    const f2 = fit(resample([...targetPts].reverse(), 40));
+    // A near-straight seam fits both walk directions almost equally well,
+    // and the wrong one lands the panel body on the WRONG side of the seam
+    // (across the centre front). The body must stay on the same side of
+    // the seam as the builder placed it — outboard — so decide by side,
+    // residual only as tie-break.
+    const pcx = cx(piece.points), pcy = cy(piece.points);
+    const sideBefore = Math.sign(pcx - sx);
+    const tgx = cx(targetPts);
+    const sideAfter = (f) => {
+      const rx = pcx - sx, ry = pcy - sy;
+      return Math.sign(f.tx + rx * f.c - ry * f.s - tgx);
+    };
+    const ok1 = sideAfter(f1) === sideBefore;
+    const ok2 = sideAfter(f2) === sideBefore;
+    const f = ok1 && ok2 ? (f1.res <= f2.res ? f1 : f2) : ok1 ? f1 : f2;
+    piece.points = piece.points.map(([x, y]) => {
+      const rx = x - sx, ry = y - sy;
+      return [f.tx + rx * f.c - ry * f.s, f.ty + rx * f.s + ry * f.c];
+    });
+  };
+  rigidAlign(frontOutR, "princess", segPts(frontIn, "princessR"));
+  rigidAlign(frontOutL, "princess", segPts(frontIn, "princessL"));
+  rigidAlign(backOutR, "princess", segPts(backIn, "princessR"));
+  rigidAlign(backOutL, "princess", segPts(backIn, "princessL"));
+  for (const piece of [frontIn, frontOutR, frontOutL, backIn, backOutR, backOutL]) {
+    piece.uniformWrap = true;
+  }
+  bodyPieces = [frontIn, frontOutR, frontOutL, backIn, backOutR, backOutL];
 } else if (cfg.dressPanels) {
   const front = dressPanel(cfg.parts.front, "front");
   const back = dressPanel(cfg.parts.back, "back");
@@ -1711,7 +1896,10 @@ if (cfg.trousers) {
 const chestHalf = Math.max(...bodyPieces[0].points.map(([x]) => Math.abs(x)));
 for (const p of bodyPieces) {
   p.topProfile = topProfile(p);
-  p.widthProfile = widthProfile(p);
+  // Multi-panel faces (princess bodices) must share ONE wrap scale: with
+  // per-piece width profiles, the same pattern x maps to different arc
+  // positions on neighbouring panels and their sewn seam edges land apart.
+  if (!p.uniformWrap) p.widthProfile = widthProfile(p);
 }
 
 if (hasSleeves) {
@@ -1830,6 +2018,27 @@ const seams = cfg.trousers
         : []),
       { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
       { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
+    ]
+  : cfg.noble
+  ? [
+      // Hangs from pinned shoulders (split by the princess seams into
+      // inner + outer segments) + necklines; the princess seams and sides
+      // are sewn.
+      { name: "shoulder_in_R", a: ["frontInside", "shoulderR"], b: ["backInside", "shoulderR"], pin: true },
+      { name: "shoulder_in_L", a: ["frontInside", "shoulderL"], b: ["backInside", "shoulderL"], pin: true },
+      // Outer shoulder segments are SEWN but not pinned: their wrap
+      // positions sit off the shoulder line (the arc past the neck stub),
+      // and pinning them there froze the upper princess seams open. The
+      // inside pair carries the hang; the outer panels settle onto the
+      // shoulder through their seams.
+      { name: "shoulder_out_R", a: ["frontOutR", "shoulder"], b: ["backOutR", "shoulder"] },
+      { name: "shoulder_out_L", a: ["frontOutL", "shoulder"], b: ["backOutL", "shoulder"] },
+      { name: "princess_front_R", a: ["frontInside", "princessR"], b: ["frontOutR", "princess"] },
+      { name: "princess_front_L", a: ["frontInside", "princessL"], b: ["frontOutL", "princess"] },
+      { name: "princess_back_R", a: ["backInside", "princessR"], b: ["backOutR", "princess"] },
+      { name: "princess_back_L", a: ["backInside", "princessL"], b: ["backOutL", "princess"] },
+      { name: "side_R", a: ["frontOutR", "side"], b: ["backOutR", "side"] },
+      { name: "side_L", a: ["frontOutL", "side"], b: ["backOutL", "side"] },
     ]
   : cfg.dressPanels
   ? [

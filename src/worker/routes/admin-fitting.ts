@@ -1063,7 +1063,7 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
     "classic-tee", "aaron", "relaxed-hoodie", "hugo", "simon", "simone",
     "slip-dress", "wahid", "wide-trouser", "pleated-skirt",
     "paco", "sandy", "bella", "huey", "yuri", "walburga", "charlie",
-    "carlton", "carlita", "brian", "bent", "uma", "shin", "breanna",
+    "carlton", "carlita", "brian", "bent", "uma", "shin", "breanna", "noble",
   ]);
   const clamp = (v: unknown, lo: number, hi: number) =>
     Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
