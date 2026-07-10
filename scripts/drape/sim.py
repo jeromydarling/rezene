@@ -544,10 +544,12 @@ for piece in DATA["pieces"]:
             pin_indices.add(idxs[-1])
 
 # ---- Invisible collision body (ghost mannequin) -------------------------------
-def body_geometry(arm_tilt=None):
-    """Mannequin verts/faces. arm_tilt overrides the render pose — the fit
-    map grades against a natural fitting stance (arms nearly down) without
-    touching what the designer sees."""
+def body_geometry(include_arms=True):
+    """Mannequin verts/faces. include_arms=False builds the ARMLESS grading
+    form the fit map measures against — like a professional dress form —
+    without touching what the designer sees. (A lowered-arm grading pose was
+    tried first: below ~9deg the arm cones intersect the torso and the
+    overlapping colliders' contradictory normals blow up the relax.)"""
     verts, faces = [], []
     N = 24
 
@@ -602,8 +604,8 @@ def body_geometry(arm_tilt=None):
             ))
         return start
 
-    for d in (1, -1) if BODY_KIND == "upper" else ():
-        o, ax, e1, e2 = arm_frame(d, arm_tilt)
+    for d in (1, -1) if (BODY_KIND == "upper" and include_arms) else ():
+        o, ax, e1, e2 = arm_frame(d)
         top = arm_ring(o, ax, e1, e2, 10, ARM_R)
         bot = arm_ring(o, ax, e1, e2, ARM_LEN, WRIST_R)
         bridge(top, bot)
@@ -1042,14 +1044,13 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
 
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
-    # exactly in the tight zones being graded). The GRADING body poses the
-    # arms at a natural fitting stance (~5deg) regardless of the render
-    # pose: the splayed presentation arms manufactured phantom tightness in
-    # the neck-to-armscye band (the closed garment can't span the splay
-    # unstretched), which is a fact about the pose, not the pattern. Sleeves
-    # far from the fitting-pose arms simply grade as hanging free.
-    _fit_tilt = math.radians(float(_os.environ.get("DRAPE_FIT_TILT", "5")))
-    _fb_verts, _fb_faces = body_geometry(arm_tilt=_fit_tilt)
+    # exactly in the tight zones being graded). The GRADING form is ARMLESS,
+    # like a professional dress form: the splayed presentation arms
+    # manufactured phantom tightness in the neck-to-armscye band (the closed
+    # garment can't span the splay unstretched) — a fact about the pose, not
+    # the pattern. Sleeves simply grade as hanging free, which is how rigid
+    # forms treat sleeve fit anyway (that's what live models are for).
+    _fb_verts, _fb_faces = body_geometry(include_arms=False)
     bvh = BVHTree.FromPolygons(_fb_verts, [tuple(f) for f in _fb_faces])
     OFFSET = 0.003
 
@@ -1112,6 +1113,14 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # 0.992 needs 3x the sweeps for the same depth.
     RHO = float(_os.environ.get("DRAPE_FIT_RHO", "0.999"))
     GAMMA, WARMUP = 0.7, 15
+    # The grading pose differs from the render pose, so baked sleeve cloth
+    # can start INSIDE the fitting-pose arms. Evacuate it with plain
+    # (unaccelerated) projections first — deep penetration inside the
+    # accelerated sweep runs away.
+    for _k in range(4):
+        q, nrm, _ = contact_planes(x)
+        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+        x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     omega_ch = 1.0
     x_prev = x.copy()
     for it in range(N_ITER):
@@ -1146,9 +1155,10 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         # AFTER the accelerated step is chaotically unstable (identical
         # configs scattered girth p95 anywhere from +0.6 to +1.8 depending
         # on BVH normal noise); in-sweep contact converges to the same
-        # optimum from every rho/refresh setting tested.
+        # optimum from every rho/refresh setting tested. The push is capped:
+        # an accelerated arm-radius-deep correction runs away.
         pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
-        push = np.maximum(pen, 0.0)
+        push = np.minimum(np.maximum(pen, 0.0), 0.015)
         dx += nrm * (push * invw)[:, None]
         cnt += (push > 0).astype(float)
         x_new = x + OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
