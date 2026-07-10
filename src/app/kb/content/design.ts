@@ -170,6 +170,33 @@ During the fitting stage, record each session against the commission: *"take in 
 > Deposits and milestone payments are coming next in this lane — for now the price field is a record, not an invoice.`,
   },
   {
+    slug: "client-portal",
+    title: "The client portal: share the work, get the sign-off",
+    summary: "A passwordless page where a client sees their commissions, renders and measurements — and approves designs.",
+    part: "design",
+    moduleRoute: "/admin/clients",
+    keywords: "client portal invite link approve design passwordless magic link share renders measurements",
+    updated: "2026-07-10",
+    body: `# The client portal
+
+Your client doesn't need an account, a password, or the admin panel to follow their piece. From their page in the **Client Book**, press **Copy portal invite link** and share it — the link signs them in once and lasts 14 days.
+
+## What the client sees
+
+- **Their pieces** — every commission with its stage in plain words ("being cut", "in fittings", "ready for delivery"), and the expected date if you've set one.
+- **Approve this design** — one button. Their approval is stamped on the commission and written to their timeline, so the sign-off is on record before you cut cloth.
+- **Their renders** — try-on renders made with their model photos, so they can see the piece on their own body.
+- **Their latest measurements** — the set you most recently recorded.
+
+## Sharing the link
+
+If the client has an email on file **and** buyer email is switched on for your shop, the invite is also emailed in your brand shell. Without email configured, nothing breaks — the link is copied to your clipboard and you can send it however you like.
+
+## Privacy
+
+The portal shows a client **only their own** work — nothing about your other clients or your studio's internals. And as everywhere in the Client Book: their measurements and photos are theirs, and deleting the client removes them.`,
+  },
+  {
     slug: "three-d",
     title: "The 3D simulation bridge",
     summary: "Track CLO/Browzwear/Style3D projects, fit status, and turn fit issues into tasks.",

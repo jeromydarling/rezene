@@ -30,6 +30,7 @@ import { admin3dRoutes } from "./routes/admin-3d";
 import { adminFittingRoutes } from "./routes/admin-fitting";
 import { adminClientRoutes } from "./routes/admin-clients";
 import { adminCommissionRoutes } from "./routes/admin-commissions";
+import { clientPortalRoutes } from "./routes/client-portal";
 import { adminFileRoutes } from "./routes/admin-files";
 import { adminSettingsRoutes } from "./routes/admin-settings";
 import { adminBrandRoutes } from "./routes/admin-brand";
@@ -278,6 +279,7 @@ app.get("/llms.txt", async (c) => {
 app.route("/api/public", publicRoutes);
 app.route("/api/public", commerceRoutes);
 app.route("/api/public/account", accountRoutes);
+app.route("/api/public/portal", clientPortalRoutes);
 app.route("/api/wholesale", wholesalePortalRoutes);
 
 // Verto platform — shop signup + slug availability (public).
