@@ -816,18 +816,19 @@ function twoPieceSleeve(partKey, pieceName) {
   const edgeR = isTop ? P.tsRightEdge : P.usRightEdge;
   const wristL = isTop ? P.tsWristLeft : P.usWristLeft;
   const wristR = isTop ? P.tsWristRight : P.usWristRight;
-  // The undersleeve's short top curve is NOT pinned (no cap* name): pinned
-  // at a guessed ring position AND sewn along both long edges it would be
-  // over-constrained — the sewn equilibrium wants the tube rotated a touch
-  // (the elbow-forward curve), and frozen pins make the springs lose that
-  // fight, holding the back seam ~90mm open. Hanging from its two sewn
-  // edges, the piece can follow them. (Armscye lesson, third form.)
+  // The undersleeve's short top curve IS pinned (cap* name), same as the
+  // topsleeve cap: the whole top ring of the tube anchors like a one-piece
+  // sleeve cap. (Unpinned was tried when the seams wouldn't close — the
+  // free undersleeve just collapsed down the tilted arm into horizontal
+  // accordion pleats instead; the real closure fix was the straight,
+  // spiral-free seam placement, which makes the pinned ring coincident-
+  // compatible with the sewn equilibrium — the armscye lesson satisfied.)
   const capSegs = isTop
     ? [
         ["capBack", slice(poly, edgeR, P.top)],
         ["capFront", slice(poly, P.top, edgeL)],
       ]
-    : [["underTop", slice(poly, edgeR, edgeL)]];
+    : [["capUnder", slice(poly, edgeR, edgeL)]];
   return buildPiece(pieceName, [
     ["edgeFront", slice(poly, edgeL, wristL)],
     ["hem", [[wristL.x, wristL.y], [wristR.x, wristR.y]]],

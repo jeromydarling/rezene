@@ -1099,6 +1099,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             for si in np.unique(cS):
                 gs = _g[cS == si]
                 print(f"  seam {_seam_name(si)}: n={len(gs)} gap p50={np.percentile(gs,50):.1f} max={gs.max():.1f}mm")
+                if np.percentile(gs, 50) > 60:
+                    # Anatomy of a failed seam: sampled world positions and
+                    # gap vectors along it (is the miss azimuthal, radial,
+                    # or longitudinal?).
+                    _w = np.where(cS == si)[0]
+                    for ci in _w[:: max(1, len(_w) // 8)]:
+                        a = x[cA[ci]]
+                        b = (1 - cT[ci]) * x[cB0[ci]] + cT[ci] * x[cB1[ci]]
+                        v = (a - b) * 1000
+                        print(f"    A=({a[0]*1000:+.0f},{a[1]*1000:+.0f},{a[2]*1000:+.0f}) d=({v[0]:+.0f},{v[1]:+.0f},{v[2]:+.0f})")
 
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
