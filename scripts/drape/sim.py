@@ -309,6 +309,23 @@ def place(piece, x, y):
     """Pattern-space (x, y) -> world metres per the piece's placement hint."""
     pl = piece["placement"]
     if pl["kind"] == "plane":
+        # Panel pieces (princess bodices) carry a per-height x shift that
+        # butts their seam edge against the neighbour panel's TRUE edge at
+        # every height: the two seam curves bow in opposite directions (that
+        # is what shapes a bust), so a single rigid shift leaves the panels
+        # overlapping mid-seam and the overlap gathers into ruching as the
+        # sewing springs fight the wrap.
+        _xs = pl.get("xShift")
+        if _xs:
+            if y <= _xs[0][0]:
+                x = x + _xs[0][1]
+            else:
+                for (ya, da), (yb, db) in zip(_xs, _xs[1:]):
+                    if y <= yb:
+                        x = x + da + (db - da) * (y - ya) / max(1e-6, yb - ya)
+                        break
+                else:
+                    x = x + _xs[-1][1]
         # Wrap pattern x around the shell by arc length. Front centre sits at
         # (0, -B), back centre at (0, +B); both walk toward the sides so the
         # side seams nearly meet. side = -1 for front, +1 for back.
