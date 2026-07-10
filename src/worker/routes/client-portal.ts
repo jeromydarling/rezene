@@ -122,6 +122,15 @@ clientPortalRoutes.get("/me", async (c) => {
     ).catch(() => []),
     first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = 'brand_name'`).catch(() => null),
   ]);
+  const payments = commissions.length
+    ? await all<{ commission_id: string; id: string; label: string; amount_cents: number; status: string; paid_at: string | null }>(
+        c.var.db,
+        `SELECT commission_id, id, label, amount_cents, status, paid_at FROM commission_payments
+         WHERE commission_id IN (SELECT id FROM commissions WHERE client_id = ?) AND status != 'void'
+         ORDER BY created_at`,
+        me.id,
+      ).catch(() => [])
+    : [];
   return c.json({
     name: me.name,
     studio: brand?.value ?? null,
@@ -133,6 +142,9 @@ clientPortalRoutes.get("/me", async (c) => {
       dueAt: co.due_at,
       approvedAt: co.client_approved_at,
       updatedAt: co.updated_at,
+      payments: payments
+        .filter((pm) => pm.commission_id === co.id)
+        .map((pm) => ({ id: pm.id, label: pm.label, amountCents: pm.amount_cents, status: pm.status, paidAt: pm.paid_at })),
     })),
     measurements: latestMeasurement
       ? { takenAt: latestMeasurement.taken_at, values: JSON.parse(latestMeasurement.measurements_json || "{}") }

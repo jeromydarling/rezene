@@ -17,6 +17,18 @@ import {
  * conversations, and links to their saved patterns and model photos.
  */
 
+interface BookingRequest {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  note: string | null;
+  preferredAt: string | null;
+  status: string;
+  clientId: string | null;
+  createdAt: string;
+}
+
 interface ClientSummary {
   id: string;
   name: string;
@@ -45,6 +57,14 @@ interface ClientEvent {
   eventAt: string;
 }
 
+interface CommissionPayment {
+  id: string;
+  label: string;
+  amountCents: number;
+  status: string;
+  paidAt: string | null;
+}
+
 interface Commission {
   id: string;
   title: string;
@@ -53,6 +73,7 @@ interface Commission {
   dueAt: string | null;
   priceCents: number | null;
   updatedAt: string;
+  payments: CommissionPayment[];
 }
 
 interface ClientDetail {
@@ -72,6 +93,7 @@ interface ClientDetail {
 
 export function ClientBookPage() {
   const { data, loading, error, reload } = useFetch<ClientSummary[]>("/api/admin/clients");
+  const bookings = useFetch<BookingRequest[]>("/api/admin/bookings");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -135,6 +157,62 @@ export function ClientBookPage() {
         </button>
       </form>
       {note && <p className="mb-4 text-sm text-warmgrey">{note}</p>}
+      {(bookings.data ?? []).some((b) => b.status === "new") && (
+        <section className="admin-card mb-4 p-4">
+          <h2 className="mb-2 font-medium">Consult requests</h2>
+          <p className="mb-2 text-xs text-warmgrey">
+            From your public “Book a consult” page (/book). Confirming creates or matches a client and puts the
+            consult on their timeline.
+          </p>
+          <ul className="space-y-2">
+            {(bookings.data ?? [])
+              .filter((b) => b.status === "new")
+              .map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-black/5 p-3 text-sm">
+                  <span>
+                    <span className="font-medium">{b.name}</span>{" "}
+                    <span className="text-xs text-warmgrey">
+                      {[b.email, b.phone, b.preferredAt].filter(Boolean).join(" · ")}
+                    </span>
+                    {b.note && <span className="block text-xs text-warmgrey">{b.note}</span>}
+                  </span>
+                  <span className="flex gap-2">
+                    <button
+                      className="admin-btn"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          const r = await api.post<{ clientId: string }>(`/api/admin/bookings/${b.id}/confirm`, {});
+                          navigate(`/admin/clients/${r.clientId}`);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      className="admin-btn text-red-700"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await api.post(`/api/admin/bookings/${b.id}/decline`, {});
+                          bookings.reload();
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Decline
+                    </button>
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
       {loading && <LoadingTable />}
       {data && data.length === 0 && (
         <EmptyState
@@ -234,6 +312,8 @@ export function ClientDetailPage() {
   const [commPrice, setCommPrice] = useState("");
   // Per-commission fitting note drafts, keyed by commission id
   const [fitDraft, setFitDraft] = useState<Record<string, string>>({});
+  // Per-commission payment drafts: "label|amount"
+  const [payDraft, setPayDraft] = useState<Record<string, { label: string; amount: string }>>({});
   const [portalNote, setPortalNote] = useState<string | null>(null);
 
   const unlinkedLooks = useFetch<{ id: string; name: string; clientId: string | null }[]>(
@@ -459,6 +539,81 @@ export function ClientDetailPage() {
                     </select>
                   </span>
                 </div>
+                {co.payments.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {co.payments.map((pm) => (
+                      <li key={pm.id} className="flex items-center justify-between gap-2">
+                        <span>
+                          {pm.label} · {formatMoney(pm.amountCents)}{" "}
+                          {pm.status === "paid" ? (
+                            <span className="text-green-700">paid {pm.paidAt ? formatDate(pm.paidAt) : ""}</span>
+                          ) : (
+                            <span className="text-warmgrey">requested</span>
+                          )}
+                        </span>
+                        {pm.status === "requested" && (
+                          <span className="flex gap-2">
+                            <button
+                              className="text-green-700 hover:underline"
+                              disabled={busy}
+                              onClick={() =>
+                                void wrap(() =>
+                                  api.post(`/api/admin/commissions/${co.id}/payments/${pm.id}/mark-paid`, {}),
+                                )
+                              }
+                            >
+                              mark paid
+                            </button>
+                            <button
+                              className="text-red-700 hover:underline"
+                              disabled={busy}
+                              onClick={() =>
+                                void wrap(() => api.delete(`/api/admin/commissions/${co.id}/payments/${pm.id}`))
+                              }
+                            >
+                              void
+                            </button>
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!["done", "cancelled"].includes(co.stage) && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      className="admin-input w-40 text-xs"
+                      value={payDraft[co.id]?.label ?? ""}
+                      onChange={(e) => setPayDraft((d) => ({ ...d, [co.id]: { label: e.target.value, amount: d[co.id]?.amount ?? "" } }))}
+                      placeholder="e.g. Deposit"
+                    />
+                    <input
+                      className="admin-input w-24 text-xs"
+                      inputMode="decimal"
+                      value={payDraft[co.id]?.amount ?? ""}
+                      onChange={(e) => setPayDraft((d) => ({ ...d, [co.id]: { label: d[co.id]?.label ?? "", amount: e.target.value } }))}
+                      placeholder="240"
+                    />
+                    <button
+                      className="admin-btn"
+                      disabled={busy || !(payDraft[co.id]?.label ?? "").trim() || !Number(payDraft[co.id]?.amount)}
+                      onClick={() => {
+                        const d = payDraft[co.id];
+                        if (!d) return;
+                        const cents = Math.round(Number(d.amount) * 100);
+                        if (!Number.isFinite(cents) || cents <= 0) return;
+                        void wrap(() =>
+                          api.post(`/api/admin/commissions/${co.id}/payments`, {
+                            label: d.label.trim(),
+                            amountCents: cents,
+                          }),
+                        ).then(() => setPayDraft((pd) => ({ ...pd, [co.id]: { label: "", amount: "" } })));
+                      }}
+                    >
+                      Request payment
+                    </button>
+                  </div>
+                )}
                 {!["done", "cancelled"].includes(co.stage) && (
                   <div className="mt-2 flex gap-2">
                     <input

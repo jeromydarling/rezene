@@ -197,6 +197,34 @@ If the client has an email on file **and** buyer email is switched on for your s
 The portal shows a client **only their own** work — nothing about your other clients or your studio's internals. And as everywhere in the Client Book: their measurements and photos are theirs, and deleting the client removes them.`,
   },
   {
+    slug: "deposits-and-booking",
+    title: "Deposits, milestone payments and booking",
+    summary: "Request a deposit against a commission, mark it paid, and take consult requests from a public page.",
+    part: "design",
+    moduleRoute: "/admin/commissions",
+    keywords: "deposit milestone payment paid booking consult request book appointment money",
+    updated: "2026-07-10",
+    body: `# Deposits, milestone payments & booking
+
+## Payments on a commission
+
+From a client's page, request a payment against any active commission — *Deposit*, *Final payment*, whatever you call it — with an amount. It appears on the client's portal so there's never confusion about what's owed, and both the request and the receipt are written to their timeline.
+
+When the money arrives — bank transfer, cash, a card reader at the fitting — press **mark paid**. That's the whole flow, on purpose: it matches how small studios actually take money.
+
+> [!NOTE]
+> Online payment straight from the portal is coming — it needs your shop's Stripe checkout wired to commissions, which ships as its own upgrade. Requests and receipts you record now will carry over.
+
+## Book a consult
+
+Your shop has a public page at **/book** — link it from your site's navigation or an Instagram bio. A visitor leaves their name, how to reach them, and what they have in mind. Requests appear at the top of your **Client Book**:
+
+- **Confirm** — the visitor becomes a client (or is matched to an existing one by email), and the consult lands on their timeline with their own words attached.
+- **Decline** — the request is closed, nothing else happens.
+
+Email confirmations and reminders arrive with the email wave; nothing here depends on them.`,
+  },
+  {
     slug: "three-d",
     title: "The 3D simulation bridge",
     summary: "Track CLO/Browzwear/Style3D projects, fit status, and turn fit issues into tasks.",

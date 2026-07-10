@@ -20,6 +20,7 @@ interface PortalMe {
     dueAt: string | null;
     approvedAt: string | null;
     updatedAt: string;
+    payments: { id: string; label: string; amountCents: number; status: string; paidAt: string | null }[];
   }[];
   measurements: { takenAt: string; values: Record<string, number | string> } | null;
   renders: { url: string; createdAt: string }[];
@@ -127,6 +128,18 @@ export function ClientPortalPage() {
                   <span className="font-medium">{co.title}</span>
                   <span className="text-sm text-warmgrey">{STAGE_LABELS[co.stage] ?? co.stage}</span>
                 </div>
+                {co.payments.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs text-warmgrey">
+                    {co.payments.map((pm) => (
+                      <li key={pm.id}>
+                        {pm.label}: {(pm.amountCents / 100).toLocaleString(undefined, { style: "currency", currency: "USD" })}{" "}
+                        {pm.status === "paid"
+                          ? `— received${pm.paidAt ? ` ${fmtDate(pm.paidAt)}` : ""}, thank you`
+                          : "— your studio will take this at your next visit or by bank transfer"}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-warmgrey">
                   <span>
                     {co.kind === "alteration" ? "Alteration" : "Made to measure"}
