@@ -415,11 +415,12 @@ def place(piece, x, y):
             span = 2 * math.pi - (tB0 - tF0)
             theta = tF0 - (x - xlu) / max(1e-6, xru - xlu) * span
             tc, half = tF0 - span / 2.0, span / 2.0
-        # The paired edges must NOT start exactly coincident — the one-piece
-        # underarm lesson: self-collision fights zero-length sewing and the
-        # seams ruffle. Shrink each piece's arc ~3mm per edge (6mm gap for
-        # the springs to close) by pulling theta toward the piece's centre.
-        theta = tc + (theta - tc) * max(0.5, 1.0 - (3.0 / r) / max(1e-6, half))
+        # A slim start gap between the paired edges: the 6mm gap of the
+        # sprung-seam era was anti-collision headroom, but bridged edges
+        # are one continuous sheet (adjacent faces don't self-collide), so
+        # 1.5mm per edge is enough — and the visible seam band narrows to
+        # a stitch line instead of a slit.
+        theta = tc + (theta - tc) * max(0.5, 1.0 - (1.5 / r) / max(1e-6, half))
     elif y <= 0:
         w = pl["w0"]  # cap region keeps the biceps width
         r = w / math.pi + 1
