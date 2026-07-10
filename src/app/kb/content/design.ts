@@ -138,6 +138,38 @@ A client's measurements and body photos are theirs. **Delete client & their data
 > On the demo shop the Client Book is read-only, like every write surface.`,
   },
   {
+    slug: "commissions",
+    title: "Commissions: client work from consult to delivery",
+    summary: "A staged pipeline for made-to-measure pieces and alterations, with fittings on the client's timeline.",
+    part: "design",
+    moduleRoute: "/admin/commissions",
+    keywords: "commission pipeline made to measure alteration fitting stages consult delivery tailor bespoke",
+    updated: "2026-07-10",
+    body: `# Commissions
+
+A commission is one piece of client work — a made-to-measure garment or an alteration — tracked from the first conversation to the day it's handed over.
+
+## The stages
+
+**Consult → Design approved → Fabric sourced → Cutting → Fittings → Delivery.** Move a commission along from the client's page (or see everything at once on the **Commissions** pipeline). Every stage change is written to the client's timeline automatically, so their page reads as one story.
+
+**Alterations** use a shorter path — consult → fitting → delivery — because there's nothing to design or cut from scratch.
+
+## Fittings
+
+During the fitting stage, record each session against the commission: *"take in left shoulder 1 cm"* lands on the client's timeline, tagged with the piece it belongs to. Photos can attach to the commission through the media library.
+
+## What a commission links to
+
+- **The client** — always. A commission belongs to exactly one person in your Client Book.
+- **A saved pattern** — the made-to-measure draft from the Pattern Studio.
+- **A style** — if the piece has a full tech pack, link the style and the factory spec travels with it.
+- **A quoted price** — optional, shown on the pipeline so you can see the value of work in progress.
+
+> [!NOTE]
+> Deposits and milestone payments are coming next in this lane — for now the price field is a record, not an invoice.`,
+  },
+  {
     slug: "three-d",
     title: "The 3D simulation bridge",
     summary: "Track CLO/Browzwear/Style3D projects, fit status, and turn fit issues into tasks.",

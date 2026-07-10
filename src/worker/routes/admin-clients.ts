@@ -161,16 +161,16 @@ adminClientRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
   const client = await first<ClientRow>(c.var.db, `SELECT * FROM clients WHERE id = ?`, id);
   if (!client) return c.json({ error: "Client not found" }, 404);
-  const [measurements, events, looks, models, customer] = await Promise.all([
+  const [measurements, events, looks, models, customer, commissions] = await Promise.all([
     all<{ id: string; taken_at: string; measurements_json: string; note: string | null }>(
       c.var.db,
       `SELECT id, taken_at, measurements_json, note FROM client_measurements
        WHERE client_id = ? ORDER BY taken_at DESC`,
       id,
     ),
-    all<{ id: string; kind: string; subject: string | null; body_md: string | null; event_at: string }>(
+    all<{ id: string; kind: string; subject: string | null; body_md: string | null; event_at: string; commission_id?: string | null }>(
       c.var.db,
-      `SELECT id, kind, subject, body_md, event_at FROM client_events
+      `SELECT id, kind, subject, body_md, event_at, commission_id FROM client_events
        WHERE client_id = ? ORDER BY event_at DESC`,
       id,
     ),
@@ -193,6 +193,12 @@ adminClientRoutes.get("/:id", async (c) => {
           client.customer_id,
         )
       : Promise.resolve(null),
+    all<{ id: string; title: string; kind: string; stage: string; due_at: string | null; price_cents: number | null; updated_at: string }>(
+      c.var.db,
+      `SELECT id, title, kind, stage, due_at, price_cents, updated_at FROM commissions
+       WHERE client_id = ? ORDER BY stage IN ('done','cancelled'), updated_at DESC`,
+      id,
+    ).catch(() => []),
   ]);
   return c.json({
     ...mapClient(client),
@@ -208,6 +214,16 @@ adminClientRoutes.get("/:id", async (c) => {
       subject: e.subject,
       body: e.body_md,
       eventAt: e.event_at,
+      commissionId: e.commission_id ?? null,
+    })),
+    commissions: commissions.map((co) => ({
+      id: co.id,
+      title: co.title,
+      kind: co.kind,
+      stage: co.stage,
+      dueAt: co.due_at,
+      priceCents: co.price_cents,
+      updatedAt: co.updated_at,
     })),
     looks: looks.map((l) => ({
       id: l.id,

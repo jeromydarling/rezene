@@ -136,6 +136,7 @@ const NAV_SECTIONS: {
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
       { to: "/admin/clients", label: "Client Book", icon: BookUser },
+      { to: "/admin/commissions", label: "Commissions", icon: ClipboardList },
       { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },
       { to: "/admin/patterns", label: "Pattern Studio", icon: Ruler },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
