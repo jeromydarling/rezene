@@ -52,11 +52,12 @@ adminDomainRoutes.put("/", requireAdminOnly, async (c) => {
     await c.env.KV.put(`pending_domain:${clean}`, c.var.shopId, { expirationTtl: 90 * 24 * 3600 }).catch(() => {});
     const { customHostnamesConfigured, ensureCustomHostname } = await import("../services/custom-hostnames");
     if (customHostnamesConfigured(c.env)) {
-      // Fully automated: register the hostname now; Cloudflare validates it
-      // over the merchant's CNAME and issues the certificate on its own —
-      // the /check endpoint flips the registry the moment TLS is live.
+      // Fully automated: register the hostname (apex + www) now; Cloudflare
+      // validates over the merchant's CNAME and issues certificates on its
+      // own — the /check endpoint flips the registry the moment TLS is live.
       const r = await ensureCustomHostname(c.env, clean).catch(() => null);
       if (r && !r.ok) console.log(`custom hostname ${clean}: ${r.error}`);
+      await ensureCustomHostname(c.env, `www.${clean}`).catch(() => null);
     } else {
       // Manual fallback: let the platform operator know.
       const brand = await first<{ value: string }>(c.var.db, `SELECT value FROM settings WHERE key = 'brand_name'`);
@@ -88,30 +89,36 @@ adminDomainRoutes.get("/check", async (c) => {
       }),
     );
     const ok = lookups.some((l) => l.ok);
-    // Layer 2: is HTTPS actually live? DNS can point at us while the
-    // certificate for the merchant's hostname hasn't been issued yet —
-    // the browser shows a security error until it is. Probe it the way a
-    // browser would; with automation configured, also nudge Cloudflare and
-    // flip the registry the moment the certificate goes active.
+    // Layer 2: is HTTPS actually live? With automation configured, ask
+    // Cloudflare directly — its certificate status is the authoritative
+    // truth. (A fetch probe CANNOT work here: a Worker fetching a custom
+    // hostname on its own zone is blocked as a self-loop, so the probe
+    // reads "down" forever even when the domain is fully live.) The fetch
+    // probe remains only as the unconfigured fallback, where the domain
+    // points at some other stack we genuinely can reach from outside.
     let https = false;
     if (ok) {
       const { customHostnamesConfigured, ensureCustomHostname, customHostnameActive, activateShopDomain } =
         await import("../services/custom-hostnames");
       if (customHostnamesConfigured(c.env)) {
+        // Cover the www variant too — visitors type both.
         await ensureCustomHostname(c.env, domain).catch(() => null);
-        if (await customHostnameActive(c.env, domain).catch(() => false)) {
+        await ensureCustomHostname(c.env, `www.${domain}`).catch(() => null);
+        https = await customHostnameActive(c.env, domain).catch(() => false);
+        if (https) {
           await activateShopDomain(c.env, c.var.shopId, domain).catch(() => {});
         }
-      }
-      try {
-        const r = await fetch(`https://${domain}/`, {
-          method: "HEAD",
-          redirect: "manual",
-          signal: AbortSignal.timeout(6000),
-        });
-        https = r.status > 0;
-      } catch {
-        https = false;
+      } else {
+        try {
+          const r = await fetch(`https://${domain}/`, {
+            method: "HEAD",
+            redirect: "manual",
+            signal: AbortSignal.timeout(6000),
+          });
+          https = r.status > 0;
+        } catch {
+          https = false;
+        }
       }
     }
     return c.json({ ok, https, target: want, lookups });
