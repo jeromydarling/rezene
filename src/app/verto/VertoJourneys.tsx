@@ -14,19 +14,19 @@ const TAILOR_BEATS: { time: string; beat: string; detail: string }[] = [
     time: "9:40 pm",
     beat: "She signs up.",
     detail:
-      "Amara has altered suits for friends for years. Tonight she gives the studio a name. Verto spins up her shop while the kettle boils — storefront, admin, her own corner of the internet.",
+      "Amara is a stylist. She has the eye, the Instagram following, and a phone full of people asking where to get a jacket like hers — and she has never cut a jacket in her life. She doesn't need to. Verto spins up her studio while the kettle boils.",
   },
   {
     time: "9:55 pm",
     beat: "She shares one link.",
     detail:
-      "Her shop came with a public “Book a consult” page. She puts the link in her Instagram bio and goes to bed. That's the whole launch.",
+      "Her shop came with a public “Book a consult” page. She puts the link in her bio and goes to bed. That's the whole launch.",
   },
   {
     time: "7:30 am",
     beat: "Three requests are waiting.",
     detail:
-      "“A coat for autumn — something structured, in wool.” Each request sits at the top of her Client Book. One tap confirms it: the visitor becomes a client, their words already on the timeline.",
+      "“A structured wool jacket — something I can wear to everything.” Each request sits at the top of her Client Book. One tap confirms it: the visitor becomes a client, their words already on the timeline.",
   },
   {
     time: "11:00 am",
@@ -36,23 +36,29 @@ const TAILOR_BEATS: { time: string; beat: string; detail: string }[] = [
   },
   {
     time: "2:00 pm",
-    beat: "The coat exists before the cloth is cut.",
+    beat: "The jacket exists before the cloth.",
     detail:
-      "She drafts the pattern to her client's exact measurements, then runs the true drape — real cloth physics hanging her actual pattern on a mannequin with her client's proportions, a fit map showing where it skims and where it pulls.",
+      "She styles the design and Verto drafts the real pattern to her client's exact measurements — she never touches a ruler. Then the true drape: actual cloth physics hanging that pattern on her client's proportions, with a fit map showing where it skims and where it pulls.",
   },
   {
     time: "4:30 pm",
-    beat: "The client says yes from the bus.",
+    beat: "The client says yes from the bus — and the quote is real.",
     detail:
-      "Amara opens a commission and shares a portal link. Her client sees the renders on her own body, the stages in plain words — and taps Approve. The sign-off is on record before scissors touch wool.",
+      "Amara opens a commission at $850 — the going rate for made-to-measure, and she already knows her side of it: about $95 in cloth and trims, around $220 for a maker's cut-and-sew, roughly $535 for her eye and her fittings. Her client sees the renders on her own body and taps Approve.",
   },
   {
     time: "4:45 pm",
-    beat: "The deposit is requested — and paid.",
+    beat: "The deposit lands.",
     detail:
-      "Half now, half at the final fitting. The request shows on the client's portal; the bank transfer lands that evening; Amara marks it paid. Less than a day after signing up, she is a business.",
+      "Half now — $425 — half at the final fitting. The request shows on the client's portal; the transfer arrives that evening; Amara marks it paid. Less than a day after signing up, she is a business.",
   },
-];
+  {
+    time: "Day three",
+    beat: "She finds her maker.",
+    detail:
+      "Amara designs and fits; someone else sews. Verto's sourcing research turns up a small workshop forty minutes away that takes single tailored pieces at around $220 cut-and-make — and the pattern, the drape, and the fitting notes travel to them as one clean brief. The deposit already covers the make before a metre of wool is bought.",
+  },
+]
 
 const LABEL_BEATS: { time: string; beat: string; detail: string }[] = [
   {
@@ -89,7 +95,7 @@ const LABEL_BEATS: { time: string; beat: string; detail: string }[] = [
     time: "Week two",
     beat: "Money arrives before production does.",
     detail:
-      "He opens pre-orders that can't oversell, with real checkout and taxes handled. The campaign — written in his voice, for his edit — goes out to the list his site has been quietly collecting. Orders fund the production run.",
+      "The overshirt goes up for pre-order at $145. His Verto cost sheet — not a guess — says $46 landed: $14 cloth, $23 cut-and-sew, $4 trims and packaging, $5 freight and duties. Forty-four pre-orders in two weeks banks $6,380 against a $2,760 run of sixty. The campaign, written in his voice for his edit, did the selling.",
   },
 ];
 
@@ -143,8 +149,8 @@ export function VertoJourneys() {
           </Reveal>
           <Reveal delay={300}>
             <p className="prose-editorial mt-6 max-w-2xl !text-chalk/80">
-              Not a feature list — two nights and the mornings after them. A tailor with a phone
-              full of people asking for coats. A designer with a capsule in his head and no
+              Not a feature list — two nights and the mornings after them. A stylist with a phone
+              full of people asking for jackets. A designer with a capsule in his head and no
               factory. Here's how each of them gets to money.
             </p>
           </Reveal>
@@ -154,7 +160,7 @@ export function VertoJourneys() {
       {/* Story one: the tailor — zero to a paying client overnight. */}
       <section className="mx-auto max-w-6xl px-5 py-24">
         <Reveal>
-          <p className="eyebrow mb-3">Story one · The tailor</p>
+          <p className="eyebrow mb-3">Story one · The stylist</p>
         </Reveal>
         <Reveal delay={150}>
           <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
@@ -163,16 +169,18 @@ export function VertoJourneys() {
         </Reveal>
         <Reveal delay={250}>
           <p className="prose-editorial mt-4 max-w-2xl">
-            Amara doesn't need a storefront full of products. Her product is her hands and her
-            eye. What she needs is the machinery around a client — booking, measurements,
-            sign-off, money — without hiring anyone or duct-taping five apps together.
+            Amara doesn't need a storefront full of products, and she doesn't need to know how
+            to sew. Her product is her eye. What she needs is the machinery around a client —
+            booking, measurements, a real pattern, a maker, sign-off, money — without hiring
+            anyone or duct-taping five apps together.
           </p>
         </Reveal>
         <StoryTimeline beats={TAILOR_BEATS} />
         <Reveal delay={200}>
           <p className="prose-editorial mt-10 max-w-2xl text-lg">
-            The next morning there are two more requests in her book. Nothing about her craft
-            changed overnight. Everything about her business did.
+            The next morning there are two more requests in her book. At $535 kept per jacket,
+            two commissions a week is a living; four is a studio. Nothing about her taste changed
+            overnight. Everything about her business did.
           </p>
         </Reveal>
       </section>
@@ -198,10 +206,11 @@ export function VertoJourneys() {
           </Reveal>
           <Reveal delay={350}>
             <p className="prose-editorial mt-4">
-              Every tailor and stylist already knows how to do the work. What stops them charging
-              properly is everything around the work: the follow-ups in DMs, the measurements on
-              paper scraps, the awkward “so, about the deposit” conversation. Verto turns that
-              whole layer into a link you share and a page you glance at.
+              Every stylist already knows what looks right on a body, and every good maker can sew
+              it. What kept them apart was everything in between: the pattern drafting, the
+              follow-ups in DMs, the measurements on paper scraps, the awkward “so, about the
+              deposit” conversation. Verto turns that whole layer into a link you share, a brief
+              your maker receives, and a page you glance at.
             </p>
           </Reveal>
           <Reveal delay={450}>
@@ -234,7 +243,9 @@ export function VertoJourneys() {
           <StoryTimeline beats={LABEL_BEATS} dark />
           <Reveal delay={200}>
             <p className="prose-editorial mt-10 max-w-2xl text-lg !text-chalk/80">
-              Week three, the samples arrive. The pre-orders already paid for them.
+              Week three, the samples arrive. The pre-orders already paid for them — and the
+              margin was never a guess: 68 points, printed on his cost sheet before he sold a
+              single piece.
             </p>
           </Reveal>
         </div>
