@@ -200,6 +200,20 @@ adminClientRoutes.get("/:id", async (c) => {
       id,
     ).catch(() => []),
   ]);
+  const payments = await all<{
+    commission_id: string;
+    id: string;
+    label: string;
+    amount_cents: number;
+    status: string;
+    paid_at: string | null;
+  }>(
+    c.var.db,
+    `SELECT commission_id, id, label, amount_cents, status, paid_at FROM commission_payments
+     WHERE commission_id IN (SELECT id FROM commissions WHERE client_id = ?) AND status != 'void'
+     ORDER BY created_at`,
+    id,
+  ).catch(() => []);
   return c.json({
     ...mapClient(client),
     measurements: measurements.map((m) => ({
@@ -224,6 +238,9 @@ adminClientRoutes.get("/:id", async (c) => {
       dueAt: co.due_at,
       priceCents: co.price_cents,
       updatedAt: co.updated_at,
+      payments: payments
+        .filter((pm) => pm.commission_id === co.id)
+        .map((pm) => ({ id: pm.id, label: pm.label, amountCents: pm.amount_cents, status: pm.status, paidAt: pm.paid_at })),
     })),
     looks: looks.map((l) => ({
       id: l.id,

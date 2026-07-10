@@ -150,7 +150,7 @@ adminCommissionRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
   const row = await first<CommissionRow>(c.var.db, `${COMMISSION_SELECT} WHERE co.id = ?`, id);
   if (!row) return c.json({ error: "Commission not found" }, 404);
-  const [events, photos] = await Promise.all([
+  const [events, photos, payments] = await Promise.all([
     all<{ id: string; kind: string; subject: string | null; body_md: string | null; event_at: string }>(
       c.var.db,
       `SELECT id, kind, subject, body_md, event_at FROM client_events
@@ -163,6 +163,12 @@ adminCommissionRoutes.get("/:id", async (c) => {
        WHERE entity_type = 'commission' AND entity_id = ? ORDER BY created_at DESC`,
       id,
     ),
+    all<{ id: string; label: string; amount_cents: number; status: string; paid_at: string | null; note: string | null; created_at: string }>(
+      c.var.db,
+      `SELECT id, label, amount_cents, status, paid_at, note, created_at FROM commission_payments
+       WHERE commission_id = ? ORDER BY created_at`,
+      id,
+    ).catch(() => []),
   ]);
   return c.json({
     ...mapCommission(row),
@@ -174,6 +180,15 @@ adminCommissionRoutes.get("/:id", async (c) => {
       eventAt: e.event_at,
     })),
     photos: photos.map((p) => ({ id: p.id, url: `/media/${p.id}`, alt: p.alt_text, createdAt: p.created_at })),
+    payments: payments.map((pm) => ({
+      id: pm.id,
+      label: pm.label,
+      amountCents: pm.amount_cents,
+      status: pm.status,
+      paidAt: pm.paid_at,
+      note: pm.note,
+      createdAt: pm.created_at,
+    })),
   });
 });
 
@@ -256,4 +271,92 @@ adminCommissionRoutes.post("/:id/fittings", requireAdminWrite, async (c) => {
   );
   await run(c.var.db, `UPDATE commissions SET updated_at = datetime('now') WHERE id = ?`, id);
   return c.json({ ok: true, id: eid }, 201);
+});
+
+const paymentSchema = z.object({
+  label: z.string().min(1).max(120),
+  amountCents: z.number().int().min(1).max(100_000_000),
+  note: z.string().max(500).optional().nullable(),
+});
+
+/**
+ * Deposits & milestone payments. v1 records money the way small studios
+ * take it (bank transfer, cash, a card reader at the fitting): request →
+ * mark paid, both written to the client's timeline. Online payment from
+ * the portal ships with a later Stripe wave.
+ */
+adminCommissionRoutes.post("/:id/payments", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const commission = await first<{ id: string; client_id: string; title: string }>(
+    c.var.db,
+    `SELECT id, client_id, title FROM commissions WHERE id = ?`,
+    id,
+  );
+  if (!commission) return c.json({ error: "Commission not found" }, 404);
+  const body = await parseBody(c, paymentSchema);
+  const pid = newId("cpay");
+  await run(
+    c.var.db,
+    `INSERT INTO commission_payments (id, commission_id, label, amount_cents, note)
+     VALUES (?, ?, ?, ?, ?)`,
+    pid,
+    id,
+    body.label.trim(),
+    body.amountCents,
+    body.note || null,
+  );
+  await run(
+    c.var.db,
+    `INSERT INTO client_events (id, client_id, commission_id, kind, subject)
+     VALUES (?, ?, ?, 'note', ?)`,
+    newId("cev"),
+    commission.client_id,
+    id,
+    `${body.label.trim()} requested for \u201c${commission.title}\u201d`,
+  );
+  return c.json({ ok: true, id: pid }, 201);
+});
+
+adminCommissionRoutes.post("/:id/payments/:pid/mark-paid", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const pid = c.req.param("pid");
+  const row = await first<{ id: string; label: string; amount_cents: number; status: string }>(
+    c.var.db,
+    `SELECT id, label, amount_cents, status FROM commission_payments WHERE id = ? AND commission_id = ?`,
+    pid,
+    id,
+  );
+  if (!row) return c.json({ error: "Payment not found" }, 404);
+  if (row.status === "paid") return c.json({ ok: true });
+  const commission = await first<{ client_id: string; title: string }>(
+    c.var.db,
+    `SELECT client_id, title FROM commissions WHERE id = ?`,
+    id,
+  );
+  await run(
+    c.var.db,
+    `UPDATE commission_payments SET status = 'paid', paid_at = datetime('now') WHERE id = ?`,
+    pid,
+  );
+  await run(
+    c.var.db,
+    `INSERT INTO client_events (id, client_id, commission_id, kind, subject)
+     VALUES (?, ?, ?, 'note', ?)`,
+    newId("cev"),
+    commission!.client_id,
+    id,
+    `${row.label} received for \u201c${commission!.title}\u201d`,
+  );
+  return c.json({ ok: true });
+});
+
+adminCommissionRoutes.delete("/:id/payments/:pid", requireAdminWrite, async (c) => {
+  const result = await run(
+    c.var.db,
+    `UPDATE commission_payments SET status = 'void' WHERE id = ? AND commission_id = ? AND status = 'requested'`,
+    c.req.param("pid"),
+    c.req.param("id"),
+  );
+  if (!result.meta.changes) return c.json({ error: "Only requested payments can be voided." }, 400);
+  return c.json({ ok: true });
 });
