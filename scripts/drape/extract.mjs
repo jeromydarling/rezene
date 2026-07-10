@@ -284,6 +284,28 @@ const BLOCKS = {
     },
     sim: { shellMm: 6, bending: 1.5 },
   },
+  brian: {
+    module: "@freesewing/brian",
+    design: "Brian",
+    // The foundation block itself: the pattern every Brian-family garment
+    // descends from. Draping the base block shows a client the canvas
+    // before any styling.
+    parts: { front: "brian.front", back: "brian.back", sleeve: "library.sleeve" },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    sim: { bending: 1.5 },
+  },
+  bent: {
+    module: "@freesewing/bent",
+    design: "Bent",
+    // Brian's body with the tailored TWO-PIECE sleeve — the jacket base.
+    // Same bridged sleeve machinery as the coats, without the coat body.
+    jacket: true,
+    parts: {
+      front: "brian.front", back: "brian.back",
+      topsleeve: "library.topsleeve", undersleeve: "library.undersleeve",
+    },
+    sim: { bending: 1.5 },
+  },
   bella: {
     module: "@freesewing/bella",
     design: "Bella",
@@ -1219,6 +1241,53 @@ function bodiceBack(splitFrac) {
   ]);
 }
 
+/** Two-piece sleeves: one shared ring per arm. Both long seams curve
+ *  inward in pattern-x (the pieces share elbow/wrist points), so a linear
+ *  taper can't keep the paired edges coincident — measure the four edge
+ *  x's per height instead and let the sim wrap the exact local ring
+ *  (rows [y, xLtop, xRtop, xLunder, xRunder]). capTopY: both pieces hang
+ *  in the topsleeve's shared y-frame. */
+function buildTwoPieceSleeves() {
+  const tsP = set[cfg.parts.topsleeve].points;
+  const usP = set[cfg.parts.undersleeve].points;
+  const tsPoly = pathPolyline(set[cfg.parts.topsleeve].paths.seam);
+  const usPoly = pathPolyline(set[cfg.parts.undersleeve].paths.seam);
+  const xOfY = (pts, yy) => {
+    const rows = [...pts].sort((a, b) => a[1] - b[1]);
+    if (yy <= rows[0][1]) return rows[0][0];
+    for (let i = 1; i < rows.length; i++) {
+      if (yy <= rows[i][1]) {
+        const t = (yy - rows[i - 1][1]) / Math.max(1e-6, rows[i][1] - rows[i - 1][1]);
+        return rows[i - 1][0] + (rows[i][0] - rows[i - 1][0]) * t;
+      }
+    }
+    return rows[rows.length - 1][0];
+  };
+  const edges = [
+    slice(tsPoly, tsP.tsLeftEdge, tsP.tsWristLeft),
+    slice(tsPoly, tsP.tsWristRight, tsP.tsRightEdge),
+    slice(usPoly, usP.usLeftEdge, usP.usWristLeft),
+    slice(usPoly, usP.usWristRight, usP.usRightEdge),
+  ];
+  const ringProfile = [];
+  const yRingTop = tsP.tsLeftEdge.y;
+  const yRingBot = Math.max(tsP.tsWristRight.y, usP.usWristRight.y);
+  for (let i = 0; i <= 24; i++) {
+    const yy = yRingTop + ((yRingBot - yRingTop) * i) / 24;
+    ringProfile.push([yy, ...edges.map((e) => xOfY(e, yy))]);
+  }
+  const out = [];
+  for (const dir of [1, -1]) {
+    const side = dir > 0 ? "R" : "L";
+    const top = twoPieceSleeve("topsleeve", `topsleeve_${side}`);
+    const under = twoPieceSleeve("undersleeve", `undersleeve_${side}`);
+    top.placement = { kind: "sleeve", dir, role: "top", ringProfile, capTopY: 0 };
+    under.placement = { kind: "sleeve", dir, role: "under", ringProfile, capTopY: 0 };
+    out.push(top, under);
+  }
+  return out;
+}
+
 const hasSleeves = Boolean(cfg.parts.sleeve);
 const sleeves = hasSleeves ? [sleevePiece("R"), sleevePiece("L")] : [];
 
@@ -1300,48 +1369,16 @@ if (cfg.trousers) {
     sideR.placement = { kind: "plane", y: -160 };
     bodyPieces = [frontL, frontR, sideL, sideR, back, tail];
   }
-  // Two-piece sleeves: one shared ring per arm. Both long seams curve
-  // inward in pattern-x (the pieces share elbow/wrist points), so a linear
-  // taper can't keep the paired edges coincident — measure the four edge
-  // x's per height instead and let the sim wrap the exact local ring
-  // (rows [y, xLtop, xRtop, xLunder, xRunder]).
-  const tsP = set[cfg.parts.topsleeve].points;
-  const usP = set[cfg.parts.undersleeve].points;
-  const tsPoly = pathPolyline(set[cfg.parts.topsleeve].paths.seam);
-  const usPoly = pathPolyline(set[cfg.parts.undersleeve].paths.seam);
-  const xOfY = (pts, yy) => {
-    const rows = [...pts].sort((a, b) => a[1] - b[1]);
-    if (yy <= rows[0][1]) return rows[0][0];
-    for (let i = 1; i < rows.length; i++) {
-      if (yy <= rows[i][1]) {
-        const t = (yy - rows[i - 1][1]) / Math.max(1e-6, rows[i][1] - rows[i - 1][1]);
-        return rows[i - 1][0] + (rows[i][0] - rows[i - 1][0]) * t;
-      }
-    }
-    return rows[rows.length - 1][0];
-  };
-  const edges = [
-    slice(tsPoly, tsP.tsLeftEdge, tsP.tsWristLeft),
-    slice(tsPoly, tsP.tsWristRight, tsP.tsRightEdge),
-    slice(usPoly, usP.usLeftEdge, usP.usWristLeft),
-    slice(usPoly, usP.usWristRight, usP.usRightEdge),
-  ];
-  const ringProfile = [];
-  const yRingTop = tsP.tsLeftEdge.y;
-  const yRingBot = Math.max(tsP.tsWristRight.y, usP.usWristRight.y);
-  for (let i = 0; i <= 24; i++) {
-    const yy = yRingTop + ((yRingBot - yRingTop) * i) / 24;
-    ringProfile.push([yy, ...edges.map((e) => xOfY(e, yy))]);
-  }
-  // capTopY: both pieces hang in the topsleeve's shared y-frame.
-  for (const dir of [1, -1]) {
-    const side = dir > 0 ? "R" : "L";
-    const top = twoPieceSleeve("topsleeve", `topsleeve_${side}`);
-    const under = twoPieceSleeve("undersleeve", `undersleeve_${side}`);
-    top.placement = { kind: "sleeve", dir, role: "top", ringProfile, capTopY: 0 };
-    under.placement = { kind: "sleeve", dir, role: "under", ringProfile, capTopY: 0 };
-    sleeves.push(top, under);
-  }
+  sleeves.push(...buildTwoPieceSleeves());
+} else if (cfg.jacket) {
+  // Jacket base (Bent): the plain cut-on-fold body with the tailored
+  // two-piece sleeve — the coats' sleeve machinery without the coat body.
+  const front = bodyPiece(cfg.parts.front, "front");
+  const back = bodyPiece(cfg.parts.back, "back");
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  bodyPieces = [front, back];
+  sleeves.push(...buildTwoPieceSleeves());
 } else if (cfg.waistcoat) {
   // The drafted front's body extends to +x (wearer's left panel).
   const frontL = waistcoatFront("frontL", false);
@@ -1549,6 +1586,23 @@ const seams = cfg.trousers
       // simply never closed, across eight bake variants. Bridged, the
       // top/under pair is one continuous tube; the fit map still measures
       // both seams' residual gaps through their closure constraints.
+      { name: "sleeveFront_R", a: ["topsleeve_R", "edgeFront"], b: ["undersleeve_R", "edgeFront"], bridge: true },
+      { name: "sleeveBack_R", a: ["topsleeve_R", "edgeBack"], b: ["undersleeve_R", "edgeBack"], bridge: true },
+      { name: "sleeveFront_L", a: ["topsleeve_L", "edgeFront"], b: ["undersleeve_L", "edgeFront"], bridge: true },
+      { name: "sleeveBack_L", a: ["topsleeve_L", "edgeBack"], b: ["undersleeve_L", "edgeBack"], bridge: true },
+    ]
+  : cfg.jacket
+  ? [
+      // Jacket base: the classic hang (pinned shoulders + necklines, sewn
+      // sides) with the coats' bridged two-piece sleeve pair.
+      { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+      { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["topsleeve_R", "capFront"] },
+      { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["topsleeve_R", "capBack"] },
+      { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["topsleeve_L", "capFront"] },
+      { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["topsleeve_L", "capBack"] },
       { name: "sleeveFront_R", a: ["topsleeve_R", "edgeFront"], b: ["undersleeve_R", "edgeFront"], bridge: true },
       { name: "sleeveBack_R", a: ["topsleeve_R", "edgeBack"], b: ["undersleeve_R", "edgeBack"], bridge: true },
       { name: "sleeveFront_L", a: ["topsleeve_L", "edgeFront"], b: ["undersleeve_L", "edgeFront"], bridge: true },

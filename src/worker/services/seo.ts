@@ -44,7 +44,7 @@ export const VERTO_META: Record<string, RouteMeta> = {
   "/stories": {
     title: "Two stories: zero to paying clients overnight — Verto",
     description:
-      "A tailor goes from signup to a paid deposit in a day. A designer goes from a blank screen to pre-orders that fund production. What actually happens when you press create my shop.",
+      "A stylist goes from signup to a paid $425 deposit in a day — and finds her maker. A designer goes from a blank screen to pre-orders that fund production. What actually happens when you press create my shop.",
     image: "/verto/dusk.jpg",
   },
   "/compare": {
