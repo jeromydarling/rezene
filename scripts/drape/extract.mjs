@@ -264,10 +264,12 @@ const BLOCKS = {
       front: "carlton.front", back: "carlton.back", tail: "carlton.tail",
       topsleeve: "carlton.topsleeve", undersleeve: "carlton.undersleeve",
     },
-    // Heavy overlapping wool panels: button-down stitch + the tee's thick
-    // collision shell (big chest contact, and coat sleeves are roomy enough
-    // to tolerate it) + the long-sleeve ring softener.
-    sim: { sewForce: 4, shellMm: 6, bending: 1.5 },
+    // Heavy overlapping wool panels: the tee's thick collision shell (big
+    // chest contact, and coat sleeves are roomy enough to tolerate it) +
+    // the long-sleeve ring softener. Sewing stays at the gentle default:
+    // force 4 whipped the two-piece sleeves into accordion crumples (the
+    // coat has no darts to justify more).
+    sim: { shellMm: 6, bending: 1.5 },
   },
   carlita: {
     module: "@freesewing/carlita",
@@ -280,7 +282,7 @@ const BLOCKS = {
       front: "carlita.front", back: "carlita.back", side: "carlita.side", tail: "carlton.tail",
       topsleeve: "carlton.topsleeve", undersleeve: "carlton.undersleeve",
     },
-    sim: { sewForce: 4, shellMm: 6, bending: 1.5 },
+    sim: { shellMm: 6, bending: 1.5 },
   },
   bella: {
     module: "@freesewing/bella",
