@@ -1117,13 +1117,21 @@ adminFittingRoutes.post("/drape", requireAdminWrite, async (c) => {
 adminFittingRoutes.get("/drape/:jobId", async (c) => {
   const raw = await c.env.KV.get(drapeKey(c.var.shopId, c.req.param("jobId")));
   if (!raw) return c.json({ error: "Drape job not found (it may have expired)." }, 404);
-  const job = JSON.parse(raw) as { status: string; fileId?: string; fitFileId?: string | null; error?: string };
+  const job = JSON.parse(raw) as {
+    status: string;
+    fileId?: string;
+    fitFileId?: string | null;
+    pressureFileId?: string | null;
+    error?: string;
+  };
   return c.json({
     status: job.status,
     fileId: job.fileId,
     url: job.fileId ? `/media/${job.fileId}` : undefined,
     // Strain fit map (green = comfortable → red = tight vs the flat pattern).
     fitUrl: job.fitFileId ? `/media/${job.fitFileId}` : undefined,
+    // Laplace pressure map (kPa where the garment presses on the body).
+    pressureUrl: job.pressureFileId ? `/media/${job.pressureFileId}` : undefined,
     error: job.error,
   });
 });

@@ -298,12 +298,30 @@ renderCallbackRoutes.post("/drape/:shopId/:jobId/complete", async (c) => {
       jobId,
     );
   }
+  // Optional third render: the Laplace pressure map (kPa where the garment
+  // presses — tension x body curvature at the contact).
+  let pressureFileId: string | null = null;
+  const pressure = form.pressure as unknown as File | undefined;
+  if (pressure && typeof pressure.arrayBuffer === "function") {
+    const pressKey = `${shopId}/drape/${jobId}-pressure.png`;
+    await c.env.FILES.put(pressKey, await pressure.arrayBuffer(), { httpMetadata: { contentType: "image/png" } });
+    pressureFileId = newId("file");
+    await run(
+      db(c.env, shopId),
+      `INSERT INTO files (id, r2_key, filename, content_type, entity_type, entity_id, is_public, uploaded_by)
+       VALUES (?, ?, ?, 'image/png', 'general', ?, 1, NULL)`,
+      pressureFileId,
+      pressKey,
+      `${jobId}-pressure.png`,
+      jobId,
+    );
+  }
   await c.env.KV.put(
     kvKey,
-    JSON.stringify({ ...(JSON.parse(existing) as object), status: "done", fileId, fitFileId }),
+    JSON.stringify({ ...(JSON.parse(existing) as object), status: "done", fileId, fitFileId, pressureFileId }),
     { expirationTtl: DRAPE_TTL },
   );
-  return c.json({ ok: true, fileId, fitFileId });
+  return c.json({ ok: true, fileId, fitFileId, pressureFileId });
 });
 
 renderCallbackRoutes.post("/drape/:shopId/:jobId/fail", async (c) => {

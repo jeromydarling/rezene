@@ -1401,3 +1401,75 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     scene.render.filepath = FIT_PNG
     bpy.ops.render.render(write_still=True)
     print(f"fit map written: {FIT_PNG}")
+
+    # ---- Pressure map (fit map v2): Laplace's law at the contact -----------
+    # P = T x kappa — membrane tension times body curvature, the physics of
+    # why a snug waistband presses harder over a hip bone than a shin. T
+    # comes from the measured hoop strain through an INDICATIVE fabric-class
+    # membrane modulus (N/m): real cloth moduli span an order of magnitude,
+    # so the map is honest about being a class estimate, not a lab reading.
+    # kappa is the grading form's hoop curvature at the contact point,
+    # estimated numerically from the collision surface itself (three nearest-
+    # surface samples in the horizontal hoop plane -> circumscribed circle) —
+    # part-agnostic, so torso ellipses, hips and legs all measure the same
+    # way. Pressure exists only where the garment BOTH touches and stretches;
+    # slack or free-hanging cloth is zero by construction, matching how
+    # garment-CAD pressure views behave.
+    E_FAB = 300.0 if _fab == "knit" else 2500.0  # N/m, indicative class moduli
+    press_kpa = np.zeros(nv)
+    _pq, _pn, _pd = contact_planes(x)
+    _up = np.array([0.0, 0.0, 1.0])
+    _hoop = np.cross(np.broadcast_to(_up, _pn.shape), _pn)
+    _hlen = np.linalg.norm(_hoop, axis=1)
+    _delta = 0.015  # 15 mm sampling arm for the curvature estimate
+    _press_i = np.where(in_contact & (tight > 0.0) & (_hlen > 1e-6))[0]
+    for i in _press_i:
+        t_hat = _hoop[i] / _hlen[i]
+        p0 = _pq[i]
+        ha = bvh.find_nearest((p0 + t_hat * _delta).tolist())
+        hb = bvh.find_nearest((p0 - t_hat * _delta).tolist())
+        if ha[0] is None or hb[0] is None:
+            continue
+        pa = np.array(ha[0][:])
+        pb = np.array(hb[0][:])
+        _a = np.linalg.norm(pa - pb)
+        _b = np.linalg.norm(p0 - pa)
+        _c = np.linalg.norm(p0 - pb)
+        _area2 = np.linalg.norm(np.cross(pa - p0, pb - p0))
+        if _area2 < 1e-10:
+            continue  # locally flat: no wrap pressure
+        _R = (_a * _b * _c) / (2.0 * _area2)  # circumradius, metres
+        _kappa = 1.0 / max(_R, 0.02)  # radii under 2 cm are mesh noise
+        press_kpa[i] = E_FAB * tight[i] * _kappa / 1000.0
+    if len(_press_i):
+        _pk = press_kpa[_press_i]
+        print(
+            f"pressure map: modulus {E_FAB:.0f} N/m ({_fab}) | pressing verts {len(_press_i)} "
+            f"| kPa p50={np.percentile(_pk, 50):.2f} p95={np.percentile(_pk, 95):.2f} max={_pk.max():.2f}"
+        )
+
+    # Scale anchored to garment reality: light contact sits under ~0.5 kPa,
+    # a snug waistband ~1-2, medical compression class II is ~2.7-4.3, and
+    # past ~6 kPa a garment reads as squeezing.
+    def pressure_color(pk, contact):
+        if not contact:
+            return (0.62, 0.66, 0.62)  # free-hanging: no contact, no pressure
+        stops = [(0.0, (0.30, 0.65, 0.34)), (2.0, (0.92, 0.85, 0.25)), (6.0, (0.85, 0.13, 0.10))]
+        if pk <= 0.0:
+            return stops[0][1]
+        for (s0, c0), (s1, c1) in zip(stops, stops[1:]):
+            if pk <= s1:
+                t = (pk - s0) / (s1 - s0)
+                return tuple(a + (b - a) * t for a, b in zip(c0, c1))
+        return stops[-1][1]
+
+    pattr = obj.data.color_attributes.new("pressure_col", "FLOAT_COLOR", "POINT")
+    for i in range(nv):
+        r_i = remap[i]
+        r, g, b = pressure_color(press_kpa[r_i], bool(in_contact[r_i]))
+        pattr.data[i].color = (r, g, b, 1.0)
+    ca.layer_name = "pressure_col"
+    PRESS_PNG = OUT_PNG.replace(".png", "-pressure.png")
+    scene.render.filepath = PRESS_PNG
+    bpy.ops.render.render(write_still=True)
+    print(f"pressure map written: {PRESS_PNG}")
