@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatMoney } from "../../lib/format";
 import {
   EmptyState,
   ErrorNote,
@@ -45,6 +45,16 @@ interface ClientEvent {
   eventAt: string;
 }
 
+interface Commission {
+  id: string;
+  title: string;
+  kind: string;
+  stage: string;
+  dueAt: string | null;
+  priceCents: number | null;
+  updatedAt: string;
+}
+
 interface ClientDetail {
   id: string;
   name: string;
@@ -54,6 +64,7 @@ interface ClientDetail {
   status: string;
   measurements: MeasurementSet[];
   events: ClientEvent[];
+  commissions: Commission[];
   looks: { id: string; name: string; garmentId: string; styleId: string | null; updatedAt: string }[];
   models: { id: string; label: string; fileId: string; source: string; createdAt: string }[];
   customer: { id: string; email: string; name: string | null } | null;
@@ -215,6 +226,14 @@ export function ClientDetailPage() {
   const [evKind, setEvKind] = useState<(typeof EVENT_KINDS)[number]>("note");
   const [evSubject, setEvSubject] = useState("");
   const [evBody, setEvBody] = useState("");
+  // New commission
+  const [showCommForm, setShowCommForm] = useState(false);
+  const [commTitle, setCommTitle] = useState("");
+  const [commKind, setCommKind] = useState<"commission" | "alteration">("commission");
+  const [commDue, setCommDue] = useState("");
+  const [commPrice, setCommPrice] = useState("");
+  // Per-commission fitting note drafts, keyed by commission id
+  const [fitDraft, setFitDraft] = useState<Record<string, string>>({});
 
   const unlinkedLooks = useFetch<{ id: string; name: string; clientId: string | null }[]>(
     "/api/admin/fitting/looks",
@@ -280,6 +299,25 @@ export function ClientDetailPage() {
     setEvBody("");
   }
 
+  async function createCommission(e: FormEvent) {
+    e.preventDefault();
+    if (!commTitle.trim()) return;
+    const cents = commPrice.trim() ? Math.round(Number(commPrice) * 100) : null;
+    await wrap(() =>
+      api.post("/api/admin/commissions", {
+        clientId: id,
+        title: commTitle.trim(),
+        kind: commKind,
+        dueAt: commDue || null,
+        priceCents: Number.isFinite(cents as number) && cents != null && cents >= 0 ? cents : null,
+      }),
+    );
+    setCommTitle("");
+    setCommDue("");
+    setCommPrice("");
+    setShowCommForm(false);
+  }
+
   async function deleteClient() {
     if (!window.confirm(`Delete ${data!.name} and their measurements and timeline? Saved patterns and photos are kept, just unlinked. This can't be undone.`)) return;
     await api.delete(`/api/admin/clients/${id}`);
@@ -320,6 +358,110 @@ export function ClientDetailPage() {
           </span>
         )}
       </div>
+
+      {/* Commissions: the staged work pipeline for this client */}
+      <section className="admin-card mb-4 p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-medium">Commissions</h2>
+          <span className="flex items-center gap-2">
+            <Link to="/admin/commissions" className="text-xs text-warmgrey hover:underline">
+              Whole pipeline →
+            </Link>
+            <button className="admin-btn" onClick={() => setShowCommForm((v) => !v)}>
+              {showCommForm ? "Cancel" : "New commission"}
+            </button>
+          </span>
+        </div>
+        {showCommForm && (
+          <form onSubmit={createCommission} className="mb-3 flex flex-wrap items-end gap-3 rounded border border-black/5 p-3">
+            <label className="flex flex-col text-sm">
+              <span className="mb-1 text-xs text-warmgrey">What are you making?</span>
+              <input className="admin-input" value={commTitle} onChange={(e) => setCommTitle(e.target.value)} placeholder="e.g. Wedding-guest coat" />
+            </label>
+            <label className="flex flex-col text-sm">
+              <span className="mb-1 text-xs text-warmgrey">Type</span>
+              <select className="admin-input" value={commKind} onChange={(e) => setCommKind(e.target.value as typeof commKind)}>
+                <option value="commission">Made to measure</option>
+                <option value="alteration">Alteration</option>
+              </select>
+            </label>
+            <label className="flex flex-col text-sm">
+              <span className="mb-1 text-xs text-warmgrey">Due (optional)</span>
+              <input className="admin-input" type="date" value={commDue} onChange={(e) => setCommDue(e.target.value)} />
+            </label>
+            <label className="flex flex-col text-sm">
+              <span className="mb-1 text-xs text-warmgrey">Quoted price (optional)</span>
+              <input className="admin-input" inputMode="decimal" value={commPrice} onChange={(e) => setCommPrice(e.target.value)} placeholder="e.g. 480" />
+            </label>
+            <button className="admin-btn-primary" disabled={busy || !commTitle.trim()}>
+              Open commission
+            </button>
+          </form>
+        )}
+        {data.commissions.length === 0 && !showCommForm && (
+          <p className="text-sm text-warmgrey">
+            No commissions yet — open one to track a made-to-measure piece or an alteration from consult to delivery.
+          </p>
+        )}
+        <ul className="space-y-2">
+          {data.commissions.map((co) => {
+            const stages = co.kind === "alteration"
+              ? ["consult", "fitting", "delivery", "done", "cancelled"]
+              : ["consult", "design", "fabric", "cutting", "fitting", "delivery", "done", "cancelled"];
+            return (
+              <li key={co.id} className="rounded border border-black/5 p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">
+                    {co.title}{" "}
+                    {co.kind === "alteration" && <span className="text-xs text-warmgrey">(alteration)</span>}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2 text-xs text-warmgrey">
+                    {co.dueAt && <span>due {formatDate(co.dueAt)}</span>}
+                    {co.priceCents != null && <span>{formatMoney(co.priceCents)}</span>}
+                    <select
+                      className="admin-input !py-1 text-xs"
+                      value={co.stage}
+                      disabled={busy}
+                      onChange={(e) =>
+                        void wrap(() => api.put(`/api/admin/commissions/${co.id}`, { stage: e.target.value }))
+                      }
+                    >
+                      {stages.map((st) => (
+                        <option key={st} value={st}>
+                          {st === "design" ? "Design approved" : st === "fabric" ? "Fabric sourced" : st[0].toUpperCase() + st.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                </div>
+                {!["done", "cancelled"].includes(co.stage) && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      className="admin-input flex-1 text-xs"
+                      value={fitDraft[co.id] ?? ""}
+                      onChange={(e) => setFitDraft((d) => ({ ...d, [co.id]: e.target.value }))}
+                      placeholder="Fitting note — e.g. take in left shoulder 1 cm"
+                    />
+                    <button
+                      className="admin-btn"
+                      disabled={busy || !(fitDraft[co.id] ?? "").trim()}
+                      onClick={() => {
+                        const note = (fitDraft[co.id] ?? "").trim();
+                        if (!note) return;
+                        void wrap(() =>
+                          api.post(`/api/admin/commissions/${co.id}/fittings`, { subject: note, kind: "fitting" }),
+                        ).then(() => setFitDraft((d) => ({ ...d, [co.id]: "" })));
+                      }}
+                    >
+                      Record fitting
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Style notes */}

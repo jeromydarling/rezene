@@ -38,6 +38,7 @@ import { ImportStudioPage } from "./pages/admin/ImportStudioPage";
 import { InventoryPage } from "./pages/admin/InventoryPage";
 import { OrdersPage, CustomersPage, PreOrdersPage } from "./pages/admin/CommercePages";
 import { ClientBookPage, ClientDetailPage } from "./pages/admin/ClientsPage";
+import { CommissionsPage } from "./pages/admin/CommissionsPage";
 import { DiscountsPage } from "./pages/admin/DiscountsPage";
 import { ReturnsPage } from "./pages/admin/ReturnsPage";
 import { ReviewsPage } from "./pages/admin/ReviewsPage";
@@ -185,6 +186,7 @@ export function AppRouter() {
           <Route path="3d" element={<ThreeDPage />} />
           <Route path="clients" element={<ClientBookPage />} />
           <Route path="clients/:id" element={<ClientDetailPage />} />
+          <Route path="commissions" element={<CommissionsPage />} />
           <Route
             path="fitting"
             element={
