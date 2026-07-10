@@ -397,7 +397,19 @@ def place(piece, x, y):
         C = max(1.0, (xrt - xlt) + (xru - xlu))
         r = C / (2 * math.pi) + 1
         k = 2 * math.pi / C
-        theta = k * x if pl["role"] == "top" else k * xlt - k * (x - xlu)
+        if pl["role"] == "top":
+            theta = k * x
+            tc = k * (xlt + xrt) / 2.0
+            half = k * (xrt - xlt) / 2.0
+        else:
+            theta = k * xlt - k * (x - xlu)
+            tc = k * xlt - k * (xru - xlu) / 2.0
+            half = k * (xru - xlu) / 2.0
+        # The paired edges must NOT start exactly coincident — the one-piece
+        # underarm lesson: self-collision fights zero-length sewing and the
+        # seams ruffle. Shrink each piece's arc ~3mm per edge (6mm gap for
+        # the springs to close) by pulling theta toward the piece's centre.
+        theta = tc + (theta - tc) * max(0.5, 1.0 - (3.0 / r) / max(1e-6, half))
     elif y <= 0:
         w = pl["w0"]  # cap region keeps the biceps width
         r = w / math.pi + 1
