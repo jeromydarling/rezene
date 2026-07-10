@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { getShopByDomain, getShopBySlug, PRIMARY_SHOP_ID } from "../services/shops";
+import { getShopByDomain, getShopById, getShopBySlug, PRIMARY_SHOP_ID } from "../services/shops";
 import { getShopDb } from "../services/tenant-db";
 import type { AppContext } from "../types/env";
 
@@ -23,7 +23,8 @@ export const tenantMiddleware: MiddlewareHandler<AppContext> = async (c, next) =
   let shopSlug: string | null = null;
 
   const host = new URL(c.req.url).hostname;
-  const domainShop = await getShopByDomain(c.env.DB, host);
+  const bare = host.replace(/^www\./, "");
+  const domainShop = (await getShopByDomain(c.env.DB, host)) ?? (bare !== host ? await getShopByDomain(c.env.DB, bare) : null);
   if (domainShop) {
     shopId = domainShop.id;
     shopSlug = domainShop.slug;
@@ -34,6 +35,24 @@ export const tenantMiddleware: MiddlewareHandler<AppContext> = async (c, next) =
       if (!shop) return c.json({ error: "Unknown shop" }, 404);
       shopId = shop.id;
       shopSlug = shop.slug;
+    } else {
+      // Self-activating custom domains: a merchant saved this domain in
+      // their settings and Cloudflare has since issued the certificate —
+      // this very request arriving over HTTPS is the proof. First visit
+      // flips the registry; no one has to come back and click a button.
+      const platformHost = new URL(c.env.APP_URL || "https://verto.style").hostname;
+      if (host !== platformHost && !host.endsWith(".workers.dev")) {
+        const pendingId = await c.env.KV.get(`pending_domain:${bare}`);
+        if (pendingId) {
+          const shop = await getShopById(c.env.DB, pendingId);
+          if (shop) {
+            await c.env.DB.prepare(`UPDATE shops SET custom_domain = ? WHERE id = ?`).bind(bare, shop.id).run();
+            await c.env.KV.delete(`pending_domain:${bare}`);
+            shopId = shop.id;
+            shopSlug = shop.slug;
+          }
+        }
+      }
     }
   }
 

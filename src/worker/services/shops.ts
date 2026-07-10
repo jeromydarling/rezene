@@ -70,6 +70,14 @@ export async function getShopBySlug(db: D1Database, slug: string): Promise<Shop 
   );
 }
 
+export async function getShopById(db: D1Database, id: string): Promise<Shop | null> {
+  return first<Shop>(
+    db,
+    `SELECT id, slug, name, status, custom_domain FROM shops WHERE id = ? AND status = 'active'`,
+    id,
+  );
+}
+
 export async function getShopByDomain(db: D1Database, host: string): Promise<Shop | null> {
   return first<Shop>(
     db,

@@ -201,11 +201,12 @@ def clamp_out(wx, wy, y_level):
     return wx, wy
 
 
-def arm_frame(direction):
+def arm_frame(direction, tilt=None):
     """Origin (mm) + orthonormal axes of the tilted hanging arm."""
+    a = ARM_TILT if tilt is None else tilt
     origin = (SHOULDER_X * direction, 0.0, HEIGHT + Y_OFF - SHOULDER_PY)
-    axis = (math.sin(ARM_TILT) * direction, 0.0, -math.cos(ARM_TILT))  # down the arm
-    e1 = (math.cos(ARM_TILT) * direction, 0.0, math.sin(ARM_TILT))  # outward
+    axis = (math.sin(a) * direction, 0.0, -math.cos(a))  # down the arm
+    e1 = (math.cos(a) * direction, 0.0, math.sin(a))  # outward
     e2 = (0.0, 1.0, 0.0)
     return origin, axis, e1, e2
 
@@ -347,10 +348,15 @@ def place(piece, x, y):
         fork_y = float(piece.get("forkY", 280.0))
         if y < fork_y:
             # Above the fork: sweep onto the hip shell — outseam edge stays
-            # at the hip side, inseam/crotch edge reaches CF/CB.
+            # at the hip side, inseam/crotch edge reaches CF/CB. NOTE the
+            # s_n convention flips between panels (mirrored drafting): the
+            # crotch edge is s_n=1 on FRONTS but s_n=0 on BACKS — sweeping
+            # both with (1-s_n) sent the back rise to the hip SIDE and the
+            # outseam to CB, which is why deep-seat blocks (Charlie) could
+            # never close the CB seam: its ends were placed ~340mm apart.
             ta, tb = torso_ab(y)
             A, B = ta + 12.0, tb + 12.0
-            psi = (1.0 - s_n) * (math.pi / 2)
+            psi = (1.0 - s_n) * (math.pi / 2) if pl["panel"] == "front" else s_n * (math.pi / 2)
             hx = A * math.sin(psi)
             hy = -B * math.cos(psi) if pl["panel"] == "front" else B * math.cos(psi)
             min_y = min(py for _, py in piece["points"])
@@ -538,7 +544,12 @@ for piece in DATA["pieces"]:
             pin_indices.add(idxs[-1])
 
 # ---- Invisible collision body (ghost mannequin) -------------------------------
-def build_body():
+def body_geometry(include_arms=True):
+    """Mannequin verts/faces. include_arms=False builds the ARMLESS grading
+    form the fit map measures against — like a professional dress form —
+    without touching what the designer sees. (A lowered-arm grading pose was
+    tried first: below ~9deg the arm cones intersect the torso and the
+    overlapping colliders' contradictory normals blow up the relax.)"""
     verts, faces = [], []
     N = 24
 
@@ -593,7 +604,7 @@ def build_body():
             ))
         return start
 
-    for d in (1, -1) if BODY_KIND == "upper" else ():
+    for d in (1, -1) if (BODY_KIND == "upper" and include_arms) else ():
         o, ax, e1, e2 = arm_frame(d)
         top = arm_ring(o, ax, e1, e2, 10, ARM_R)
         bot = arm_ring(o, ax, e1, e2, ARM_LEN, WRIST_R)
@@ -602,7 +613,11 @@ def build_body():
         verts.append((o[0] * S, 0.0, (o[2] + 10) * S))
         for i in range(N):
             faces.append((top + i, top + (i + 1) % N, c))
+    return verts, faces
 
+
+def build_body():
+    verts, faces = body_geometry()
     m = bpy.data.meshes.new("body")
     m.from_pydata(verts, [], faces)
     m.update()
@@ -1029,12 +1044,14 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
 
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
-    # exactly in the tight zones being graded).
-    bm_body = BODY_OBJ.data
-    bvh = BVHTree.FromPolygons(
-        [v.co[:] for v in bm_body.vertices],
-        [tuple(p.vertices) for p in bm_body.polygons],
-    )
+    # exactly in the tight zones being graded). The GRADING form is ARMLESS,
+    # like a professional dress form: the splayed presentation arms
+    # manufactured phantom tightness in the neck-to-armscye band (the closed
+    # garment can't span the splay unstretched) — a fact about the pose, not
+    # the pattern. Sleeves simply grade as hanging free, which is how rigid
+    # forms treat sleeve fit anyway (that's what live models are for).
+    _fb_verts, _fb_faces = body_geometry(include_arms=False)
+    bvh = BVHTree.FromPolygons(_fb_verts, [tuple(f) for f in _fb_faces])
     OFFSET = 0.003
 
     def contact_planes(pos):
@@ -1096,6 +1113,14 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # 0.992 needs 3x the sweeps for the same depth.
     RHO = float(_os.environ.get("DRAPE_FIT_RHO", "0.999"))
     GAMMA, WARMUP = 0.7, 15
+    # The grading pose differs from the render pose, so baked sleeve cloth
+    # can start INSIDE the fitting-pose arms. Evacuate it with plain
+    # (unaccelerated) projections first — deep penetration inside the
+    # accelerated sweep runs away.
+    for _k in range(4):
+        q, nrm, _ = contact_planes(x)
+        pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
+        x += nrm * (np.maximum(pen, 0.0) * invw)[:, None]
     omega_ch = 1.0
     x_prev = x.copy()
     for it in range(N_ITER):
@@ -1130,9 +1155,10 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
         # AFTER the accelerated step is chaotically unstable (identical
         # configs scattered girth p95 anywhere from +0.6 to +1.8 depending
         # on BVH normal noise); in-sweep contact converges to the same
-        # optimum from every rho/refresh setting tested.
+        # optimum from every rho/refresh setting tested. The push is capped:
+        # an accelerated arm-radius-deep correction runs away.
         pen = OFFSET - np.einsum("ij,ij->i", x - q, nrm)
-        push = np.maximum(pen, 0.0)
+        push = np.minimum(np.maximum(pen, 0.0), 0.015)
         dx += nrm * (push * invw)[:, None]
         cnt += (push > 0).astype(float)
         x_new = x + OMEGA * dx / np.maximum(cnt, 1.0)[:, None]
@@ -1168,13 +1194,12 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             _os.environ["DRAPE_FIT_DUMP"],
             x_drape=x_drape, x_relaxed=x, flat=flat, remap=remap, invw=invw,
             ei=ei, ej=ej, L0=L0, tris=tris, cA=cA, cB0=cB0, cB1=cB1, cT=cT, cS=cS,
-            body_verts=np.array([v.co[:] for v in bm_body.vertices]),
+            body_verts=np.array(_fb_verts),
             # fan-triangulate: quads truncated to one triangle would leave
             # holes in the offline BVH and understate contact
             body_tris=np.array([
                 (q[0], q[k], q[k + 1])
-                for p in bm_body.polygons
-                for q in [tuple(p.vertices)]
+                for q in _fb_faces
                 for k in range(1, len(q) - 1)
             ]),
         )
@@ -1200,8 +1225,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
     # Pinned verts are artificial hanging scaffolding frozen at placed
     # positions — triangles touching them measure the scaffold, not relaxed
     # cloth, and junctions between two pinned clusters can never relax at
-    # all. Exclude them like the free-hanging regions.
-    free_tri = (invw[t0] > 0) & (invw[t1] > 0) & (invw[t2] > 0)
+    # all. Exclude them like the free-hanging regions — and their one-ring
+    # SHADOW too: the ring of triangles just outside a pinned collar still
+    # measures the scaffold's pull, painting a phantom necklace.
+    _scaffold = invw == 0
+    _shadow = _scaffold.copy()
+    for _k in range(3):
+        _corner = _scaffold[remap[tris[:, _k]]]
+        for _j in range(3):
+            _shadow[remap[tris[_corner, _j]]] = True
+    free_tri = ~_shadow[t0] & ~_shadow[t1] & ~_shadow[t2]
     tight_tri = np.where(good & free_tri, lam_weft - 1.0, 0.0)
     areaT = np.where(free_tri, np.abs(detDm) * 0.5, 0.0)
 

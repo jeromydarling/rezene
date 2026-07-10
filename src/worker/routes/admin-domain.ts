@@ -46,6 +46,10 @@ adminDomainRoutes.put("/", requireAdminOnly, async (c) => {
     clean,
   );
   if (clean) {
+    // Self-activation marker: the tenant middleware flips the registry on
+    // the first HTTPS request that reaches this domain (the request itself
+    // proves the certificate is live). 90 days is plenty for DNS dawdling.
+    await c.env.KV.put(`pending_domain:${clean}`, c.var.shopId, { expirationTtl: 90 * 24 * 3600 }).catch(() => {});
     const { customHostnamesConfigured, ensureCustomHostname } = await import("../services/custom-hostnames");
     if (customHostnamesConfigured(c.env)) {
       // Fully automated: register the hostname now; Cloudflare validates it

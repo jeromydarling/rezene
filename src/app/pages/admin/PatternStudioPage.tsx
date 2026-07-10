@@ -103,7 +103,7 @@ const CM_PER_IN = 2.54;
 const DRAPE_BLOCKS = new Set([
   "classic-tee", "aaron", "relaxed-hoodie", "hugo", "simon", "simone",
   "slip-dress", "wahid", "wide-trouser", "pleated-skirt",
-  "paco", "sandy", "bella", "huey", "yuri", "walburga",
+  "paco", "sandy", "bella", "huey", "yuri", "walburga", "charlie",
 ]);
 
 /** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
