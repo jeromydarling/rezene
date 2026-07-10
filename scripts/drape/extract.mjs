@@ -298,13 +298,16 @@ const BLOCKS = {
     module: "@freesewing/bent",
     design: "Bent",
     // Brian's body with the tailored TWO-PIECE sleeve — the jacket base.
-    // Same bridged sleeve machinery as the coats, without the coat body.
+    // Same bridged sleeve machinery as the coats, without the coat body —
+    // and the coats' thick collision shell too: without it the roomy
+    // sleeve tube's folds concentrate at the bridge bands and the seams
+    // read as open slits.
     jacket: true,
     parts: {
       front: "brian.front", back: "brian.back",
       topsleeve: "library.topsleeve", undersleeve: "library.undersleeve",
     },
-    sim: { bending: 1.5 },
+    sim: { shellMm: 6, bending: 1.5 },
   },
   bella: {
     module: "@freesewing/bella",
