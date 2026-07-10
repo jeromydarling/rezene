@@ -67,6 +67,7 @@ const BLOCKS = {
     parts: { front: "sven.front", back: "sven.back", sleeve: "sven.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true, // ribbed cuffs grip the wrist — the sim pins the sleeve hems
+    sim: { bending: 1.5 },
   },
   hugo: {
     module: "@freesewing/hugo",
@@ -79,6 +80,7 @@ const BLOCKS = {
     // raglan seam replaces both shoulder seam and armscye. The hood is NOT
     // simulated; the text description carries it, the sim carries the body.
     raglan: true,
+    sim: { bending: 1.5 },
   },
   simon: {
     module: "@freesewing/simon",
@@ -98,7 +100,7 @@ const BLOCKS = {
     cuffed: true,
     // At the true (shirt-tail) default length the heavier panels strain the
     // armscye springs open — stitch harder than the default force 2.
-    sim: { sewForce: 4 },
+    sim: { sewForce: 4, bending: 1.5 },
   },
   simone: {
     module: "@freesewing/simone",
@@ -114,7 +116,7 @@ const BLOCKS = {
     },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true,
-    sim: { sewForce: 4 },
+    sim: { sewForce: 4, bending: 1.5 },
   },
   huey: {
     module: "@freesewing/huey",
@@ -130,7 +132,7 @@ const BLOCKS = {
     cuffed: true,
     // The side seams pull each front half outward; the zip springs need the
     // same firmer stitch as the button-downs to hold CF fully shut.
-    sim: { sewForce: 4 },
+    sim: { sewForce: 4, bending: 1.5 },
   },
   yuri: {
     module: "@freesewing/yuri",
@@ -146,7 +148,7 @@ const BLOCKS = {
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     cuffed: true,
     // Heavy overlapping knit panels need the button-down stitch.
-    sim: { sewForce: 4 },
+    sim: { sewForce: 4, bending: 1.5 },
   },
   walburga: {
     module: "@freesewing/walburga",
