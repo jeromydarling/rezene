@@ -16,7 +16,10 @@ concurrency:
 jobs:
   drape:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 40: the tailored coats (10 pieces, bridged two-piece sleeves, fit map
+    # at 80 frames) are the heaviest bakes in the catalogue — Carlton was the
+    # first block to blow the old 20-minute budget, cancelled mid-bake.
+    timeout-minutes: 40
     steps:
       - name: Checkout (for scripts/drape)
         uses: actions/checkout@v4
