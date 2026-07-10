@@ -41,6 +41,12 @@ export const VERTO_META: Record<string, RouteMeta> = {
     image: "/verto/wall.jpg",
     preloadImage: "/verto/wall.jpg",
   },
+  "/stories": {
+    title: "Two stories: zero to paying clients overnight — Verto",
+    description:
+      "A tailor goes from signup to a paid deposit in a day. A designer goes from a blank screen to pre-orders that fund production. What actually happens when you press create my shop.",
+    image: "/verto/dusk.jpg",
+  },
   "/compare": {
     title: "Verto vs. Shopify, fashion ERPs & the spreadsheet patchwork — Verto",
     description:
@@ -471,6 +477,7 @@ export async function buildSitemap(env: Env): Promise<string> {
   const urls: SitemapUrl[] = [
     { loc: "/" },
     { loc: "/why" },
+    { loc: "/stories" },
     { loc: "/features" },
     { loc: "/compare" },
     { loc: "/pricing" },
