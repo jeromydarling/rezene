@@ -292,6 +292,11 @@ def place(piece, x, y):
         neck_w = neck_half_width(piece)
         t_seam = min(1.0, max(0.08, (y - y_top) / 120.0))
         t = max(t_seam, min(1.0, max(0.0, (neck_w - abs(x)) / 10.0)))
+        if pl.get("hangCollapse") is False:
+            # Pieces that hang from a mid-body seam (a coat tail at the
+            # waist) sit at the wrapped depth all the way to their top edge
+            # — collapsing toward the centre line is for shoulder seams.
+            t = 1.0
         wy = side * 8.0 * (1 - t) + wrapped * t
         wx, wy = clamp_out(wx, wy, y)
         return (wx * S, wy * S, (HEIGHT - y) * S)
@@ -368,20 +373,73 @@ def place(piece, x, y):
     # Sleeve: wrap into a CONE around the tilted arm axis — radius follows the
     # piece's local width (biceps -> hem taper), else a straight tube leaves
     # an open wedge along a tapered forearm. Underarm edges meet inner-side.
-    if y <= 0:
+    if "ringProfile" in pl:
+        # Two-piece tailored sleeve (coats). A single taper is NOT enough:
+        # both long seams curve inward in pattern-x (the pieces share the
+        # same elbow/wrist points), so mapping flat x to azimuth against a
+        # linearly tapered ring leaves the paired edges tens of mm apart at
+        # the elbow and wrist, and the stitching shreds the sleeve. Instead
+        # the extract emits the measured edge x's per height — rows of
+        # [y, xLtop, xRtop, xLunder, xRunder] — and BOTH pieces wrap the
+        # exact local circumference so their seam angles coincide at EVERY
+        # height: topsleeve theta = k*x (apex at its grain line, front
+        # edge on the wearer's front), undersleeve winds the complementary
+        # arc backwards from the shared front seam angle through pi.
+        prof = pl["ringProfile"]
+        yq = max(prof[0][0], min(prof[-1][0], y))  # cap zone keeps the biceps ring
+        for r0, r1 in zip(prof, prof[1:]):
+            if yq <= r1[0]:
+                t = (yq - r0[0]) / max(1e-6, r1[0] - r0[0])
+                xlt, xrt, xlu, xru = (a + (b - a) * t for a, b in zip(r0[1:], r1[1:]))
+                break
+        else:
+            xlt, xrt, xlu, xru = prof[-1][1:]
+        C = max(1.0, (xrt - xlt) + (xru - xlu))
+        r = C / (2 * math.pi) + 1
+        # SEAM LINES RUN STRAIGHT DOWN THE ARM. Mapping x through the local
+        # circumference (theta = k*x) made the seam angles spiral ~40deg
+        # from biceps to wrist (the pieces' midlines drift as the ring
+        # tapers); the bake untwists that spiral and slides the paired
+        # edges ~100mm apart — the back seam never closed, in any variant.
+        # Instead both seams keep their BICEPS angles at every height and
+        # each piece's arc stretches linearly between them (a straight
+        # tailored seam; worst arc-vs-width distortion is ~2% at the
+        # wrist, which the cloth absorbs invisibly).
+        xlt0, xrt0, xlu0, xru0 = prof[0][1:]
+        k0 = 2 * math.pi / max(1.0, (xrt0 - xlt0) + (xru0 - xlu0))
+        tF0, tB0 = k0 * xlt0, k0 * xrt0
+        if pl["role"] == "top":
+            theta = tF0 + (x - xlt) / max(1e-6, xrt - xlt) * (tB0 - tF0)
+            tc, half = (tF0 + tB0) / 2.0, (tB0 - tF0) / 2.0
+        else:
+            span = 2 * math.pi - (tB0 - tF0)
+            theta = tF0 - (x - xlu) / max(1e-6, xru - xlu) * span
+            tc, half = tF0 - span / 2.0, span / 2.0
+        # The paired edges must NOT start exactly coincident — the one-piece
+        # underarm lesson: self-collision fights zero-length sewing and the
+        # seams ruffle. Shrink each piece's arc ~3mm per edge (6mm gap for
+        # the springs to close) by pulling theta toward the piece's centre.
+        theta = tc + (theta - tc) * max(0.5, 1.0 - (3.0 / r) / max(1e-6, half))
+    elif y <= 0:
         w = pl["w0"]  # cap region keeps the biceps width
+        r = w / math.pi + 1
+        theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
     else:
         t = min(1.0, y / max(1.0, pl["y1"]))
         w = pl["w0"] + (pl["w1"] - pl["w0"]) * t
-    r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
-    # Slightly less than a full wrap: the underarm edges must NOT start
-    # coincident (self-collision fights zero-length sewing and explodes).
-    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
+        r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
+        # Slightly less than a full wrap: the underarm edges must NOT start
+        # coincident (self-collision fights zero-length sewing and explodes).
+        theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
     # u: distance down the arm axis from the shoulder joint.
     if pl.get("raglan"):
         u = y + RAGLAN_U0  # biceps line lands at the armhole depth
     else:
-        u = y - sleeve_miny[piece["name"]]  # 0 at cap top
+        # 0 at cap top. Two-piece sleeves share ONE pattern-y frame across
+        # both pieces (capTopY: the topsleeve's cap apex), else the shorter
+        # undersleeve would hang its own min-y from the shoulder and sit
+        # ~60mm high against every edge seam it must meet.
+        u = y - float(pl.get("capTopY", sleeve_miny[piece["name"]]))
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]
@@ -511,6 +569,7 @@ def _pair_score(ia, ib):
     return sum(math.dist(all_verts[a], all_verts[b]) for a, b in zip(sa, sb))
 
 
+bridge_faces = []
 for seam in DATA["seams"]:
     ia = seg_indices(*seam["a"])
     ib = seg_indices(*seam["b"])
@@ -518,12 +577,33 @@ for seam in DATA["seams"]:
         ib = list(reversed(ib))
     seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
+    if seam.get("bridge"):
+        # STRUCTURAL seam: join the sides with a quad strip of real cloth
+        # (a ~6mm seam-allowance band) instead of sewing springs. Two
+        # separate shells sprung around one limb never stabilised — the
+        # two-piece coat sleeve shredded, accordioned or held ~90mm open
+        # across seven bake variants (strong force, weak force, pinned,
+        # unpinned) — but a strip of faces makes the pair topologically
+        # ONE tube, the configuration every working sleeve block uses.
+        for i in range(len(ia) - 1):
+            va0, vb0, vb1, va1 = ia[i], ib[i], ib[i + 1], ia[i + 1]
+            if va0 == vb0 or va1 == vb1:
+                continue
+            # Triangles, not quads — the fit machinery unpacks 3-tuples.
+            bridge_faces.append((va0, vb0, vb1))
+            if va1 != vb1 and va0 != va1:
+                bridge_faces.append((va0, vb1, va1))
+        continue
     for va, vb in zip(ia, ib):
         if va != vb:
             sew_edges.append((va, vb))
     if seam.get("pin"):
         pin_indices.update(ia)
         pin_indices.update(ib)
+# Bridge faces go to the BLENDER mesh only — never into all_faces: the fit
+# machinery derives every rest length from per-piece flat coordinates, and
+# bridge edges cross panels whose flat layouts overlap (garbage lengths).
+# The bridged seam still gets its hard closure constraints via seam_sides.
 
 # Pin the necklines too: on a ghost mannequin the collar keeps its shape (a
 # real neckband would hold it); unpinned it sags open into the neck hole.
@@ -715,7 +795,7 @@ build_fit_tape()
 
 # ---- Assemble the object ------------------------------------------------------
 mesh = bpy.data.meshes.new("garment")
-mesh.from_pydata(all_verts, sew_edges, all_faces)
+mesh.from_pydata(all_verts, sew_edges, all_faces + bridge_faces)
 mesh.update()
 for poly in mesh.polygons:
     poly.use_smooth = True
@@ -1041,6 +1121,16 @@ if FRAMES > 0 and _os.environ.get("DRAPE_FITMAP") == "1":
             for si in np.unique(cS):
                 gs = _g[cS == si]
                 print(f"  seam {_seam_name(si)}: n={len(gs)} gap p50={np.percentile(gs,50):.1f} max={gs.max():.1f}mm")
+                if np.percentile(gs, 50) > 60:
+                    # Anatomy of a failed seam: sampled world positions and
+                    # gap vectors along it (is the miss azimuthal, radial,
+                    # or longitudinal?).
+                    _w = np.where(cS == si)[0]
+                    for ci in _w[:: max(1, len(_w) // 8)]:
+                        a = x[cA[ci]]
+                        b = (1 - cT[ci]) * x[cB0[ci]] + cT[ci] * x[cB1[ci]]
+                        v = (a - b) * 1000
+                        print(f"    A=({a[0]*1000:+.0f},{a[1]*1000:+.0f},{a[2]*1000:+.0f}) d=({v[0]:+.0f},{v[1]:+.0f},{v[2]:+.0f})")
 
     # Mannequin BVH for sliding contact planes (vertices may slide along the
     # form but not through it — freezing them would corrupt the strain field
