@@ -326,6 +326,18 @@ const BLOCKS = {
     // shaping to wrap, so past a point the springs fight the collision body.
     sim: { sewForce: 6 },
   },
+  breanna: {
+    module: "@freesewing/breanna",
+    design: "Breanna",
+    // Women's bodice block with a rotatable bust dart. At the default
+    // orientation nearly all shaping lives in the primary (waist) dart —
+    // sewn shut like Bella's — while the secondary dart is a ~2mm sliver
+    // we collapse instead of sewing: triangulating a 150mm-deep 2mm notch
+    // makes degenerate cloth. Needs bustFront/highBustFront in the set.
+    breanna: true,
+    parts: { front: "breanna.front", back: "breanna.back" },
+    sim: { sewForce: 6 },
+  },
   uma: {
     module: "@freesewing/uma",
     design: "Uma",
@@ -1283,6 +1295,89 @@ function circleSkirtPiece() {
 
 /** Bodice front (Bella "frontSideDart"): cut on fold at CF, a waist dart in
  *  the hem and a side bust dart splitting the side seam — both sewn shut. */
+/** Breanna front: half draft with the CF a couple of mm off x=0 (shift it
+ *  back before mirroring) and TWO rotatable bust darts. With the studio's
+ *  small-cup measurement set (bustFront barely past highBustFront) both
+ *  darts draft as millimetre slivers whose feet land ON the hem/side lines
+ *  — triangulating a 2-8mm notch 150mm deep shreds the cloth mesh, so
+ *  sliver darts are COLLAPSED (their feet weld via buildPiece's shared-
+ *  endpoint dedupe). A fuller-cup draft makes the primary dart a real
+ *  wedge, and then it is cut and sewn exactly like Bella's. */
+function breannaFront() {
+  const part = set[cfg.parts.front];
+  const dx = -part.points.cfNeck.x;
+  const P = Object.fromEntries(
+    Object.entries(part.points).map(([k, p]) => [k, { x: p.x + dx, y: p.y }]),
+  );
+  const poly = pathPolyline(part.paths.seam).map(([x, y]) => [x + dx, y]);
+  const dartW = Math.hypot(
+    P.primaryBustDart1.x - P.primaryBustDart2.x,
+    P.primaryBustDart1.y - P.primaryBustDart2.y,
+  );
+  const slim = dartW < 6;
+  const hem1R = slice(poly, P.cfWaist, P.primaryBustDart1);
+  const wdartLR = slice(poly, P.primaryBustDart1, P.primaryBustDartTip);
+  const wdartRR = slice(poly, P.primaryBustDartTip, P.primaryBustDart2);
+  const hem2R = slice(poly, P.primaryBustDart2, P.waist);
+  const sideR = slice(poly, P.waist, P.secondaryBustDart1);
+  const armscyeR = slice(poly, P.secondaryBustDart2, P.shoulder);
+  const shoulderR = slice(poly, P.shoulder, P.hps);
+  const neckR = slice(poly, P.hps, P.cfNeck);
+  const dartSegsR = slim ? [] : [["wdartLR", wdartLR], ["wdartRR", wdartRR]];
+  const dartSegsL = slim
+    ? []
+    : [["wdartRL", mirror([...wdartRR].reverse())], ["wdartLL", mirror([...wdartLR].reverse())]];
+  return buildPiece("front", [
+    ["hem1R", hem1R],
+    ...dartSegsR,
+    ["hem2R", hem2R],
+    ["sideR", sideR],
+    ["armscyeR", armscyeR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hem2L", mirror([...hem2R].reverse())],
+    ...dartSegsL,
+    ["hem1L", mirror([...hem1R].reverse())],
+  ]);
+}
+
+/** Breanna back: half draft on the CB fold, one waist dart per side. */
+function breannaBack() {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hem1R = slice(poly, P.cbWaist, P.waistDart1);
+  const dartLR = slice(poly, P.waistDart1, P.waistDartTip);
+  const dartRR = slice(poly, P.waistDartTip, P.waistDart2);
+  const hem2R = slice(poly, P.waistDart2, P.waist);
+  const sideR = slice(poly, P.waist, P.armhole);
+  const armscyeR = slice(poly, P.armhole, P.shoulder);
+  const shoulderR = slice(poly, P.shoulder, P.hps);
+  const neckR = slice(poly, P.hps, P.cbNeck);
+  return buildPiece("back", [
+    ["hem1R", hem1R],
+    ["dartLR", dartLR],
+    ["dartRR", dartRR],
+    ["hem2R", hem2R],
+    ["sideR", sideR],
+    ["armscyeR", armscyeR],
+    ["shoulderR", shoulderR],
+    ["neckR", neckR],
+    ["neckL", mirror([...neckR].reverse())],
+    ["shoulderL", mirror([...shoulderR].reverse())],
+    ["armscyeL", mirror([...armscyeR].reverse())],
+    ["sideL", mirror([...sideR].reverse())],
+    ["hem2L", mirror([...hem2R].reverse())],
+    ["dartRL", mirror([...dartRR].reverse())],
+    ["dartLL", mirror([...dartLR].reverse())],
+    ["hem1L", mirror([...hem1R].reverse())],
+  ]);
+}
+
 function bodiceFront() {
   const part = set[cfg.parts.front];
   const P = part.points;
@@ -1479,6 +1574,12 @@ if (cfg.trousers) {
 } else if (cfg.bodice) {
   const front = bodiceFront();
   const back = bodiceBack(front.sideSplitFrac);
+  front.placement = { kind: "plane", y: -160 };
+  back.placement = { kind: "plane", y: 160 };
+  bodyPieces = [front, back];
+} else if (cfg.breanna) {
+  const front = breannaFront();
+  const back = breannaBack();
   front.placement = { kind: "plane", y: -160 };
   back.placement = { kind: "plane", y: 160 };
   bodyPieces = [front, back];
@@ -1708,6 +1809,25 @@ const seams = cfg.trousers
       { name: "wdartF_L", a: ["front", "wdartLL"], b: ["front", "wdartRL"] },
       { name: "bdart_R", a: ["front", "bdartLR"], b: ["front", "bdartRR"] },
       { name: "bdart_L", a: ["front", "bdartLL"], b: ["front", "bdartRL"] },
+      { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
+      { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
+    ]
+  : cfg.breanna
+  ? [
+      // Hangs from pinned shoulders + necklines; whole side seams (the
+      // sliver secondary dart is always collapsed, so nothing splits
+      // them). The primary bust darts sew shut only when the draft cut
+      // them as real wedges — sliver drafts collapsed them away.
+      { name: "shoulder_R", a: ["front", "shoulderR"], b: ["back", "shoulderR"], pin: true },
+      { name: "shoulder_L", a: ["front", "shoulderL"], b: ["back", "shoulderL"], pin: true },
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+      ...(bodyPieces[0].segments.wdartLR
+        ? [
+            { name: "wdartF_R", a: ["front", "wdartLR"], b: ["front", "wdartRR"] },
+            { name: "wdartF_L", a: ["front", "wdartLL"], b: ["front", "wdartRL"] },
+          ]
+        : []),
       { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
       { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
     ]
