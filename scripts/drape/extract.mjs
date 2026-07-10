@@ -827,7 +827,15 @@ function carlitaSide(pieceName, mirrored) {
   const part = set[cfg.parts.side];
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
-  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  // The side panel's draft x starts ~12mm past where the front panel's seam
+  // edge ends (drafting offsets, not garment geometry) — butt the pieces on
+  // the wrap arc or the princess seam shows as a wide dark channel. A pure
+  // translation, so the flat shape (and the strain it grades) is untouched.
+  const dx = set[cfg.parts.front].points.psHem.x - P.psHem.x;
+  const seg = (pts) => {
+    const shifted = pts.map(([x, y]) => [x + dx, y]);
+    return mirrored ? mirror(shifted) : shifted;
+  };
   return buildPiece(pieceName, [
     ["sideLower", seg(slice(poly, P.hem, P.waist))],
     ["sideUpper", seg(slice(poly, P.waist, P.armhole))],
