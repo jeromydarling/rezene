@@ -33,6 +33,10 @@
  *   carlton (Carlton)     the Sherlock coat: double-breasted fronts, waist
  *                         seam to a pleated tail, tailored two-piece sleeves
  *   carlita (Carlita)     Carlton's women's cut (side-panel body)
+ *   uma (Uma)             briefs: hip-wrapped panels + crotch gusset on the
+ *                         "brief" body (pinched fork keel, parted thighs)
+ *   shin (Shin)           swim trunks: Titan leg topology, hip-slung anchor,
+ *                         elastic waistband described not simulated
  *
  * Usage: node scripts/drape/extract.mjs '{"block":"classic-tee","easePct":8,"lengthPct":-12,"sleevePct":-25,"measurements":{"chest":1080}}' out/pieces.json
  */
@@ -321,6 +325,46 @@ const BLOCKS = {
     // and tear the waist instead — the ghost form has no bust for the dart
     // shaping to wrap, so past a point the springs fight the collision body.
     sim: { sewForce: 6 },
+  },
+  uma: {
+    module: "@freesewing/uma",
+    design: "Uma",
+    fabric: "knit",
+    // Briefs: hip-wrapped front/back panels (a very short skirt, waistband
+    // pinned) joined by a crotch gusset — the first block whose cloth must
+    // CROSS the mannequin's crotch, so it drapes on the "brief" body: the
+    // trouser form's full-ellipse fork (276mm front-to-back, thigh stubs
+    // overlapping the centreline) has no gap a ~127mm gusset could span.
+    brief: true,
+    parts: { front: "uma.front", back: "uma.back", gusset: "uma.gusset" },
+    yOffset: 460,
+    bodyKind: "brief",
+    // Force 5: the gusset seams must haul the strip up against the keel
+    // and both thighs — at the default force the front seam bakes as an
+    // open slit (the relax closes it, but the render is what you see).
+    // Bending 1.5 is the knit-family finish (brian/sven/hugo): without it
+    // the free leg-opening edges scallop into fine ruffles.
+    sim: { sewForce: 5, bending: 1.5 },
+  },
+  shin: {
+    module: "@freesewing/shin",
+    design: "Shin",
+    fabric: "knit",
+    // Swim trunks: the Titan leg topology cut hip-slung and thigh-short.
+    // The waist edge is drafted AT the hip line (waistToHips drives it), so
+    // the vertical anchor drops to waist+hips. The elastic waistband part
+    // is described, not simulated (collar honesty); the waist edge pins
+    // like every trouser block. Drafted for ~20% stretch swim knit — the
+    // fit map's knit scale is what keeps that honest.
+    trousers: true,
+    parts: { front: "shin.front", back: "shin.back" },
+    trouserAnchors: {
+      waistOut: "hipSide", waistIn: "hipCb",
+      floorOut: "legSide", floorIn: "legInner", fork: "crossSeam",
+    },
+    yOffset: 590,
+    bodyKind: "lower",
+    sim: { bending: 1.5 },
   },
 };
 
@@ -1018,6 +1062,12 @@ function trouserPanel(partName, pieceName, mirrored) {
   const P = part.points;
   const poly = pathPolyline(part.paths.seam);
   const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  // Titan-family anchor names by default; blocks drafted with other names
+  // (Shin's hip-slung trunks) map theirs in via cfg.trouserAnchors.
+  const N = cfg.trouserAnchors ?? {
+    waistOut: "styleWaistOut", waistIn: "styleWaistIn",
+    floorOut: "floorOut", floorIn: "floorIn", fork: "fork",
+  };
   // A slant front pocket (chinos) cuts the waist-side corner off the panel.
   // Restore that corner synthetically — in the worn garment the pocket bag
   // fills it, and simulating the hole instead leaves the front panel
@@ -1029,21 +1079,21 @@ function trouserPanel(partName, pieceName, mirrored) {
       p1.y + ((p2.y - p1.y) * i) / n,
     ]);
   const outseamPts = cut
-    ? [...line(P.styleWaistOut, P[cut.bottom]), ...sliceShort(poly, P[cut.bottom], P.floorOut)]
-    : sliceShort(poly, P.styleWaistOut, P.floorOut);
+    ? [...line(P[N.waistOut], P[cut.bottom]), ...sliceShort(poly, P[cut.bottom], P[N.floorOut])]
+    : sliceShort(poly, P[N.waistOut], P[N.floorOut]);
   const waistPts = cut
-    ? [...sliceShort(poly, P.styleWaistIn, P[cut.top]), ...line(P[cut.top], P.styleWaistOut)]
-    : sliceShort(poly, P.styleWaistIn, P.styleWaistOut);
+    ? [...sliceShort(poly, P[N.waistIn], P[cut.top]), ...line(P[cut.top], P[N.waistOut])]
+    : sliceShort(poly, P[N.waistIn], P[N.waistOut]);
   // Optionally pin the top of the rise (waistband grip continues down the
   // CF/CB seam): blocks with a deep back rise (chinos) crumple at the seat
   // when the whole rise must find its place by springs alone.
   const risePin = Number(cfg.riseTopPin) || 0;
-  const crotchFull = sliceShort(poly, P.fork, P.styleWaistIn);
+  const crotchFull = sliceShort(poly, P[N.fork], P[N.waistIn]);
   const [crotchPts, riseTopPts] = risePin ? splitAt(crotchFull, 1 - risePin) : [crotchFull, null];
   const piece = buildPiece(pieceName, [
     ["outseam", seg(outseamPts)],
-    ["hem", seg(sliceShort(poly, P.floorOut, P.floorIn))],
-    ["inseam", seg(sliceShort(poly, P.floorIn, P.fork))],
+    ["hem", seg(sliceShort(poly, P[N.floorOut], P[N.floorIn]))],
+    ["inseam", seg(sliceShort(poly, P[N.floorIn], P[N.fork]))],
     ["crotch", seg(crotchPts)],
     ...(riseTopPts ? [["riseTop", seg(riseTopPts)]] : []),
     ["waist", seg(waistPts)],
@@ -1056,7 +1106,7 @@ function trouserPanel(partName, pieceName, mirrored) {
     bins.set(b, [Math.min(e[0], x), Math.max(e[1], x)]);
   }
   piece.edgesProfile = [...bins.entries()].map(([y, [lo, hi]]) => [y, lo, hi]).sort((a, b) => a[0] - b[0]);
-  piece.forkY = P.fork.y;
+  piece.forkY = P[N.fork].y;
   return piece;
 }
 
@@ -1076,6 +1126,69 @@ function skirtPanel(partName, pieceName) {
     ["waistL", mirror([...waistR].reverse())],
     ["sideL", mirror([...sideR].reverse())],
     ["hemL", mirror([...hemR].reverse())],
+  ]);
+}
+
+/** Brief front (Uma): a hip-wrapped panel like a very short skirt — waistband
+ *  on top (pinned), short side seams, free leg-opening curves, and a straight
+ *  bottom edge the gusset sews to. That edge is one drafted line; the gusset's
+ *  matching edge is split at CF by its own path start, so split ours the same
+ *  way and the seams pair segment-for-segment. */
+function briefFront() {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const gy = P.frontGussetSplit.y;
+  return buildPiece("front", [
+    ["waistL", slice(poly, P.cfWaistbandDip, P.sideWaistbandFlipped)],
+    ["sideL", slice(poly, P.sideWaistbandFlipped, P.sideLegFlipped)],
+    ["legL", slice(poly, P.sideLegFlipped, P.frontGussetSplitFlipped)],
+    ["gussetEdgeL", [[P.frontGussetSplitFlipped.x, gy], [0, gy]]],
+    ["gussetEdgeR", [[0, gy], [P.frontGussetSplit.x, gy]]],
+    ["legR", slice(poly, P.frontGussetSplit, P.sideLeg)],
+    ["sideR", slice(poly, P.sideLeg, P.sideWaistband)],
+    ["waistR", slice(poly, P.sideWaistband, P.cfWaistbandDip)],
+  ]);
+}
+
+/** Brief back (Uma): drafted far below the shared base frame (waistband at
+ *  y≈-551, gusset edge at y≈-368 — draft y still increases downward, no flip
+ *  needed). Translating by the side-waistband delta lines both waistbands up
+ *  in one pattern frame, so the plane placement's h = yOffset + y works
+ *  untouched for both panels. */
+function briefBack() {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const dy = P.sideWaistband.y - P.sideWaistbandBack.y;
+  const gy = P.backGussetSplit.y;
+  const piece = buildPiece("back", [
+    ["waistR", slice(poly, P.cfWaistbandDipBack, P.sideWaistbandBack)],
+    ["sideR", slice(poly, P.sideWaistbandBack, P.sideLegBack)],
+    ["legR", slice(poly, P.sideLegBack, P.backGussetSplit)],
+    // The gusset's back edge is a single segment, so keep ours whole too.
+    ["gussetEdge", [[P.backGussetSplit.x, gy], [P.backGussetSplitFlipped.x, gy]]],
+    ["legL", slice(poly, P.backGussetSplitFlipped, P.sideLegBackFlipped)],
+    ["sideL", slice(poly, P.sideLegBackFlipped, P.sideWaistbandBackFlipped)],
+    ["waistL", slice(poly, P.sideWaistbandBackFlipped, P.cfWaistbandDipBack)],
+  ]);
+  piece.points = piece.points.map(([x, y]) => [x, y + dy]);
+  return piece;
+}
+
+/** Brief gusset (Uma): the crotch strip. Front edge split at CF by the
+ *  draft's own path start; the waisted side curves are the leg openings'
+ *  inner arcs — free edges, like every leg opening. */
+function briefGusset() {
+  const part = set[cfg.parts.gusset];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  return buildPiece("gusset", [
+    ["frontEdgeL", slice(poly, P.cfFrontGusset, P.frontGussetSplitFlipped)],
+    ["sideEdgeL", slice(poly, P.frontGussetSplitFlipped, P.backGussetSplitFlipped)],
+    ["backEdge", slice(poly, P.backGussetSplitFlipped, P.backGussetSplit)],
+    ["sideEdgeR", slice(poly, P.backGussetSplit, P.frontGussetSplit)],
+    ["frontEdgeR", slice(poly, P.frontGussetSplit, P.cfFrontGusset)],
   ]);
 }
 
@@ -1319,6 +1432,28 @@ if (cfg.trousers) {
   front.pinSegments = ["waistR", "waistL"];
   back.pinSegments = ["waistR", "waistL"];
   bodyPieces = [front, back];
+} else if (cfg.brief) {
+  const front = briefFront();
+  const back = briefBack();
+  const gusset = briefGusset();
+  // Panels wrap the hip shell exactly like a short skirt; the waistband is a
+  // mid-body top edge, not a shoulder, so it must not collapse to a hang line.
+  front.placement = { kind: "plane", y: -160, hangCollapse: false };
+  back.placement = { kind: "plane", y: 160, hangCollapse: false };
+  // The gusset bridges the panels' bottom edges under the crotch keel. Its
+  // placement needs its own pattern-y span (y0..y1, front edge to back edge)
+  // and the two attach heights (the panels' edge pattern-y, yF/yB).
+  const gys = gusset.points.map(([, y]) => y);
+  gusset.placement = {
+    kind: "gusset",
+    y0: Math.min(...gys),
+    y1: Math.max(...gys),
+    yF: set[cfg.parts.front].points.frontGussetSplit.y,
+    yB: Math.max(...back.points.map(([, y]) => y)),
+  };
+  front.pinSegments = ["waistR", "waistL"];
+  back.pinSegments = ["waistR", "waistL"];
+  bodyPieces = [front, back, gusset];
 } else if (cfg.circleSkirt) {
   const skirt = circleSkirtPiece();
   skirt.placement = { kind: "circle", ...skirt.circle };
@@ -1515,6 +1650,16 @@ const seams = cfg.trousers
   ? [
       { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
       { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+    ]
+  : cfg.brief
+  ? [
+      // Hangs from the pinned waistband. Short side seams close the hip
+      // wrap; the gusset sews to both panels' bottom edges under the crotch.
+      { name: "side_R", a: ["front", "sideR"], b: ["back", "sideR"] },
+      { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
+      { name: "gusset_front_L", a: ["front", "gussetEdgeL"], b: ["gusset", "frontEdgeL"] },
+      { name: "gusset_front_R", a: ["front", "gussetEdgeR"], b: ["gusset", "frontEdgeR"] },
+      { name: "gusset_back", a: ["back", "gussetEdge"], b: ["gusset", "backEdge"] },
     ]
   : cfg.circleSkirt
   ? [
