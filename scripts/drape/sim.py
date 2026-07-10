@@ -373,22 +373,38 @@ def place(piece, x, y):
     # Sleeve: wrap into a CONE around the tilted arm axis — radius follows the
     # piece's local width (biceps -> hem taper), else a straight tube leaves
     # an open wedge along a tapered forearm. Underarm edges meet inner-side.
-    if y <= 0:
+    if "ringProfile" in pl:
+        # Two-piece tailored sleeve (coats). A single taper is NOT enough:
+        # both long seams curve inward in pattern-x (the pieces share the
+        # same elbow/wrist points), so mapping flat x to azimuth against a
+        # linearly tapered ring leaves the paired edges tens of mm apart at
+        # the elbow and wrist, and the stitching shreds the sleeve. Instead
+        # the extract emits the measured edge x's per height — rows of
+        # [y, xLtop, xRtop, xLunder, xRunder] — and BOTH pieces wrap the
+        # exact local circumference so their seam angles coincide at EVERY
+        # height: topsleeve theta = k*x (apex at its grain line, front
+        # edge on the wearer's front), undersleeve winds the complementary
+        # arc backwards from the shared front seam angle through pi.
+        prof = pl["ringProfile"]
+        yq = max(prof[0][0], min(prof[-1][0], y))  # cap zone keeps the biceps ring
+        for r0, r1 in zip(prof, prof[1:]):
+            if yq <= r1[0]:
+                t = (yq - r0[0]) / max(1e-6, r1[0] - r0[0])
+                xlt, xrt, xlu, xru = (a + (b - a) * t for a, b in zip(r0[1:], r1[1:]))
+                break
+        else:
+            xlt, xrt, xlu, xru = prof[-1][1:]
+        C = max(1.0, (xrt - xlt) + (xru - xlu))
+        r = C / (2 * math.pi) + 1
+        k = 2 * math.pi / C
+        theta = k * x if pl["role"] == "top" else k * xlt - k * (x - xlu)
+    elif y <= 0:
         w = pl["w0"]  # cap region keeps the biceps width
+        r = w / math.pi + 1
+        theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
     else:
         t = min(1.0, y / max(1.0, pl["y1"]))
         w = pl["w0"] + (pl["w1"] - pl["w0"]) * t
-    if "thetaSign" in pl:
-        # Two-piece tailored sleeve (coats): each piece wraps PART of the
-        # ring. w0/w1 carry the COMBINED circumference of both pieces, so
-        # both compute the same ring radius at every height; theta maps the
-        # piece's own arc onto its azimuth range. The topsleeve runs
-        # theta = x/r (apex outward), the undersleeve theta = pi - x/r
-        # (mirrored winding) — their front/back edges land at identical
-        # angles, which is what makes the pair sewable.
-        r = w / (2 * math.pi) + 1
-        theta = pl["thetaOffset"] + pl["thetaSign"] * (x / r)
-    else:
         r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
         # Slightly less than a full wrap: the underarm edges must NOT start
         # coincident (self-collision fights zero-length sewing and explodes).

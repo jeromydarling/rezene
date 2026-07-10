@@ -1228,24 +1228,46 @@ if (cfg.trousers) {
   frontL.pinStride = 6;
   frontR.pinStride = 6;
   bodyPieces = [frontL, frontR, back, tail];
-  // Two-piece sleeves: one shared ring per arm. w0/w1 carry the COMBINED
-  // flat circumference of both pieces so each computes the same ring radius;
-  // thetaSign/thetaOffset assign each piece its own arc (topsleeve around
-  // the apex, undersleeve around the inner side, edges landing coincident).
+  // Two-piece sleeves: one shared ring per arm. Both long seams curve
+  // inward in pattern-x (the pieces share elbow/wrist points), so a linear
+  // taper can't keep the paired edges coincident — measure the four edge
+  // x's per height instead and let the sim wrap the exact local ring
+  // (rows [y, xLtop, xRtop, xLunder, xRunder]).
   const tsP = set[cfg.parts.topsleeve].points;
   const usP = set[cfg.parts.undersleeve].points;
-  const ring = {
-    w0: tsP.tsRightEdge.x - tsP.tsLeftEdge.x + (usP.usRightEdge.x - usP.usLeftEdge.x),
-    w1: tsP.tsWristRight.x - tsP.tsWristLeft.x + (usP.usWristRight.x - usP.usWristLeft.x),
-    y1: Math.max(tsP.tsWristRight.y, usP.usWristRight.y),
-    capTopY: 0, // both pieces hang in the topsleeve's y-frame
+  const tsPoly = pathPolyline(set[cfg.parts.topsleeve].paths.seam);
+  const usPoly = pathPolyline(set[cfg.parts.undersleeve].paths.seam);
+  const xOfY = (pts, yy) => {
+    const rows = [...pts].sort((a, b) => a[1] - b[1]);
+    if (yy <= rows[0][1]) return rows[0][0];
+    for (let i = 1; i < rows.length; i++) {
+      if (yy <= rows[i][1]) {
+        const t = (yy - rows[i - 1][1]) / Math.max(1e-6, rows[i][1] - rows[i - 1][1]);
+        return rows[i - 1][0] + (rows[i][0] - rows[i - 1][0]) * t;
+      }
+    }
+    return rows[rows.length - 1][0];
   };
+  const edges = [
+    slice(tsPoly, tsP.tsLeftEdge, tsP.tsWristLeft),
+    slice(tsPoly, tsP.tsWristRight, tsP.tsRightEdge),
+    slice(usPoly, usP.usLeftEdge, usP.usWristLeft),
+    slice(usPoly, usP.usWristRight, usP.usRightEdge),
+  ];
+  const ringProfile = [];
+  const yRingTop = tsP.tsLeftEdge.y;
+  const yRingBot = Math.max(tsP.tsWristRight.y, usP.usWristRight.y);
+  for (let i = 0; i <= 24; i++) {
+    const yy = yRingTop + ((yRingBot - yRingTop) * i) / 24;
+    ringProfile.push([yy, ...edges.map((e) => xOfY(e, yy))]);
+  }
+  // capTopY: both pieces hang in the topsleeve's shared y-frame.
   for (const dir of [1, -1]) {
     const side = dir > 0 ? "R" : "L";
     const top = twoPieceSleeve("topsleeve", `topsleeve_${side}`);
     const under = twoPieceSleeve("undersleeve", `undersleeve_${side}`);
-    top.placement = { kind: "sleeve", dir, thetaSign: 1, thetaOffset: 0, ...ring };
-    under.placement = { kind: "sleeve", dir, thetaSign: -1, thetaOffset: Math.PI, ...ring };
+    top.placement = { kind: "sleeve", dir, role: "top", ringProfile, capTopY: 0 };
+    under.placement = { kind: "sleeve", dir, role: "under", ringProfile, capTopY: 0 };
     sleeves.push(top, under);
   }
 } else if (cfg.waistcoat) {
