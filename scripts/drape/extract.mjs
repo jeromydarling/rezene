@@ -801,6 +801,42 @@ function tailPiece(backWaistY) {
   ]);
 }
 
+/** Carlita front: the coat front's CF/lapel half, ending at a princess-style
+ *  panel seam (psHem up through bustPoint to the front armhole pitch) — the
+ *  side panel carries the rest of the body round to the back seam. */
+function carlitaFront(pieceName, mirrored) {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  return buildPiece(pieceName, [
+    ["panel", seg(slice(poly, P.psHem, P.frontArmholePitch))],
+    ["armscye", seg(slice(poly, P.frontArmholePitch, P.shoulder))],
+    ["shoulder", seg(slice(poly, P.shoulder, P.hps))],
+    ["neck", seg(slice(poly, P.hps, P.cfNeck))],
+    ["placket", seg(slice(poly, P.cfNeck, P.hemEdge))],
+    ["hem", seg(slice(poly, P.hemEdge, P.psHem))],
+  ]);
+}
+
+/** Carlita side panel: full-length, owning the underarm curve of the
+ *  armscye (armhole up to the pitch — unsewn, the honest underarm scope
+ *  shared with the undersleeve cap). Its back edge splits at the waist:
+ *  above to the back panel, below to the tail. */
+function carlitaSide(pieceName, mirrored) {
+  const part = set[cfg.parts.side];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  return buildPiece(pieceName, [
+    ["sideLower", seg(slice(poly, P.hem, P.waist))],
+    ["sideUpper", seg(slice(poly, P.waist, P.armhole))],
+    ["armscye", seg(slice(poly, P.armhole, P.armholePitch))],
+    ["panel", seg(slice(poly, P.armholePitch, P.psHem))],
+    ["hem", seg(slice(poly, P.psHem, P.hem))],
+  ]);
+}
+
 /** Tailored two-piece sleeve (Carlton/Carlita): topsleeve wraps the outer
  *  arm, undersleeve the underarm — both drafted in ONE shared coordinate
  *  frame (biceps line at the same y, elbow/wrist heights matched), which is
@@ -825,10 +861,19 @@ function twoPieceSleeve(partKey, pieceName) {
   // accordion pleats instead; the real closure fix was the straight,
   // spiral-free seam placement, which makes the pinned ring coincident-
   // compatible with the sewn equilibrium — the armscye lesson satisfied.)
+  // Side-panel coats (Carlita): the front panel's armscye is only the short
+  // pitch-to-shoulder arc, so capFront splits at the front pitch point —
+  // the upper half sews to it, the lower half (capFrontLow) stays a pinned
+  // unsewn underarm edge alongside the side panel's own armscye curve.
   const capSegs = isTop
     ? [
         ["capBack", slice(poly, edgeR, P.top)],
-        ["capFront", slice(poly, P.top, edgeL)],
+        ...(cfg.sidePanel
+          ? [
+              ["capFront", slice(poly, P.top, P.frontPitchPoint)],
+              ["capFrontLow", slice(poly, P.frontPitchPoint, edgeL)],
+            ]
+          : [["capFront", slice(poly, P.top, edgeL)]]),
       ]
     : [["capUnder", slice(poly, edgeR, edgeL)]];
   return buildPiece(pieceName, [
@@ -1222,8 +1267,8 @@ if (cfg.trousers) {
   // like the buttoned shirts); the whole placket is pinned shut — a walking
   // coat's skirt flap can swing open in life, but an open 136mm overlap of
   // free-hanging layers just interpenetrates in the sim.
-  const frontL = coatFront("frontL", false);
-  const frontR = coatFront("frontR", true);
+  const frontL = cfg.sidePanel ? carlitaFront("frontL", false) : coatFront("frontL", false);
+  const frontR = cfg.sidePanel ? carlitaFront("frontR", true) : coatFront("frontR", true);
   const back = coatBack();
   const tail = tailPiece(set[cfg.parts.back].points.cbWaist.y);
   frontL.placement = { kind: "plane", y: -160, outset: 5 };
@@ -1237,6 +1282,16 @@ if (cfg.trousers) {
   frontL.pinStride = 6;
   frontR.pinStride = 6;
   bodyPieces = [frontL, frontR, back, tail];
+  if (cfg.sidePanel) {
+    // Three-panel body: the side panels wrap the front shell too — their
+    // draft x starts where the front panel seam ends, so the plane wrap
+    // lands them between the front edge and the side line.
+    const sideL = carlitaSide("sideL", false);
+    const sideR = carlitaSide("sideR", true);
+    sideL.placement = { kind: "plane", y: -160 };
+    sideR.placement = { kind: "plane", y: -160 };
+    bodyPieces = [frontL, frontR, sideL, sideR, back, tail];
+  }
   // Two-piece sleeves: one shared ring per arm. Both long seams curve
   // inward in pattern-x (the pieces share elbow/wrist points), so a linear
   // taper can't keep the paired edges coincident — measure the four edge
@@ -1456,10 +1511,24 @@ const seams = cfg.trousers
       // undersleeve's short cap is pinned, unsewn underarm scope.
       { name: "shoulder_R", a: ["frontL", "shoulder"], b: ["back", "shoulderR"], pin: true },
       { name: "shoulder_L", a: ["frontR", "shoulder"], b: ["back", "shoulderL"], pin: true },
-      { name: "side_upper_R", a: ["frontL", "sideUpper"], b: ["back", "sideR"] },
-      { name: "side_upper_L", a: ["frontR", "sideUpper"], b: ["back", "sideL"] },
-      { name: "side_lower_R", a: ["frontL", "sideLower"], b: ["tail", "sideR"] },
-      { name: "side_lower_L", a: ["frontR", "sideLower"], b: ["tail", "sideL"] },
+      // Three-panel bodies (Carlita) route the princess panel seam between
+      // front and side, and the side panel carries the side seam; two-panel
+      // bodies (Carlton) run the front straight to the back/tail.
+      ...(cfg.sidePanel
+        ? [
+            { name: "panel_R", a: ["frontL", "panel"], b: ["sideL", "panel"] },
+            { name: "panel_L", a: ["frontR", "panel"], b: ["sideR", "panel"] },
+            { name: "side_upper_R", a: ["sideL", "sideUpper"], b: ["back", "sideR"] },
+            { name: "side_upper_L", a: ["sideR", "sideUpper"], b: ["back", "sideL"] },
+            { name: "side_lower_R", a: ["sideL", "sideLower"], b: ["tail", "sideR"] },
+            { name: "side_lower_L", a: ["sideR", "sideLower"], b: ["tail", "sideL"] },
+          ]
+        : [
+            { name: "side_upper_R", a: ["frontL", "sideUpper"], b: ["back", "sideR"] },
+            { name: "side_upper_L", a: ["frontR", "sideUpper"], b: ["back", "sideL"] },
+            { name: "side_lower_R", a: ["frontL", "sideLower"], b: ["tail", "sideR"] },
+            { name: "side_lower_L", a: ["frontR", "sideLower"], b: ["tail", "sideL"] },
+          ]),
       { name: "tail_R", a: ["tail", "topR"], b: ["back", "waistR"] },
       { name: "tail_L", a: ["tail", "topL"], b: ["back", "waistL"] },
       { name: "armscye_R_front", a: ["frontL", "armscye"], b: ["topsleeve_R", "capFront"] },
