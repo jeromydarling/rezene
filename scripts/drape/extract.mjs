@@ -186,6 +186,7 @@ const BLOCKS = {
     // shell above the fork; the waist is pinned (belt/waistband grip).
     trousers: true,
     parts: { front: "titan.front", back: "titan.back" },
+    riseTopPin: 0.2, // waistband grip: closes the CF/CB rise-top gaps (charlie recipe)
     yOffset: 460,
     bodyKind: "lower",
   },
@@ -207,6 +208,7 @@ const BLOCKS = {
     // simulated (same honesty as collars and hoods).
     trousers: true,
     parts: { front: "paco.front", back: "paco.back" },
+    riseTopPin: 0.2, // waistband grip: closes the CF/CB rise-top gaps (charlie recipe)
     yOffset: 460,
     bodyKind: "lower",
   },
