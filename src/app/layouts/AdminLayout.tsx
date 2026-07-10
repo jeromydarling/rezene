@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
+  BookUser,
   BarChart3,
   HeartHandshake,
   Map,
@@ -134,6 +135,7 @@ const NAV_SECTIONS: {
       { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
       { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
+      { to: "/admin/clients", label: "Client Book", icon: BookUser },
       { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },
       { to: "/admin/patterns", label: "Pattern Studio", icon: Ruler },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
