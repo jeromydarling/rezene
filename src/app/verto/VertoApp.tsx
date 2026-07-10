@@ -15,6 +15,7 @@ import {
   useScrolledPast,
 } from "./cinema";
 import { VertoCompare, VertoWhy } from "./VertoStory";
+import { VertoJourneys } from "./VertoJourneys";
 import { VertoFeatures } from "./VertoFeatures";
 
 /**
@@ -74,6 +75,7 @@ const TIERS = [
 // visitor scrolls — orientation appears exactly when it's needed.
 const NAV_ITEMS = [
   { to: "/why", label: "Why" },
+  { to: "/stories", label: "Stories" },
   { to: "/features", label: "Features" },
   { to: "/compare", label: "Compare" },
   { to: "/pricing", label: "Pricing" },
@@ -1016,6 +1018,7 @@ export function VertoApp() {
       <Routes>
         <Route index element={<VertoHome />} />
         <Route path="why" element={<VertoWhy />} />
+        <Route path="stories" element={<VertoJourneys />} />
         <Route path="features" element={<VertoFeatures />} />
         <Route path="compare" element={<VertoCompare />} />
         <Route path="pricing" element={<VertoPricing />} />
