@@ -116,6 +116,21 @@ def brief_leg_r(by):
     t = (by - BRIEF_LEG_TOP) / max(1.0, BRIEF_LEG_BOT - BRIEF_LEG_TOP)
     return BRIEF_LEG_R0 + (BRIEF_LEG_R1 - BRIEF_LEG_R0) * min(1.0, max(0.0, t))
 
+
+def leg_r_at(by):
+    """ANATOMICAL trouser leg-stub radius at a body height: thigh at the
+    crotch, knee at the knee line, ankle at the floor. The old straight
+    thigh->ankle taper ran over the GARMENT's length, so a mid-thigh hem
+    (swim trunks) ended in an ankle-width carrot where a thigh should be;
+    full-length trousers see the same radius at their hem as before."""
+    pts = [(700.0, 95.0), (1050.0, 67.0), (1500.0, 42.0)]
+    if by <= pts[0][0]:
+        return pts[0][1] * _chest_s
+    for (y0, r0), (y1, r1) in zip(pts, pts[1:]):
+        if by <= y1:
+            return (r0 + (r1 - r0) * (by - y0) / (y1 - y0)) * _chest_s
+    return pts[-1][1] * _chest_s
+
 # Arm stubs end just below the sleeve hem for the same reason. Long sleeves
 # hang closer to the body (a wide splay looks scarecrow-ish and crops out of
 # frame); short sleeves keep the wider, airier tank/tee stance. For raglan
@@ -366,13 +381,27 @@ def place(piece, x, y):
             lo, hi = prof[-1][1], prof[-1][2]
         w = max(1.0, hi - lo)
         r = w / math.pi + 2.0
-        # Negative-ease knits (swim trunks) cut the leg tube TIGHTER than
-        # the thigh stub — never start the wrap inside the collider: wrap at
-        # the stub's own radius and let the strain be real instead.
+        # Short snug blocks (swim trunks) drape on the "brief" body — parted
+        # thighs with a real crotch channel — because their inseams and rise
+        # seams must MEET between the legs, and the trouser stubs (thighs
+        # overlapping the centreline) leave no gap for that. Long trousers
+        # keep the classic stubs.
+        if BODY_KIND == "brief":
+            _legx, _leg_top = BRIEF_LEG_X, BRIEF_LEG_TOP
+            _stub_r = brief_leg_r
+        else:
+            _legx, _leg_top = 92.0 * _chest_s, 700.0
+            _stub_r = leg_r_at
+        # Negative-ease knits cut the leg tube TIGHTER than the thigh stub —
+        # never start the wrap inside the collider: wrap at the stub's own
+        # radius and let the strain be real instead. But cap the inflation
+        # so the tube's inseam edge (lx = LEG_X - r) never crosses the body
+        # centreline — an uncapped clamp put the two legs' inseam edges
+        # INSIDE each other's territory and the self-collision fight flipped
+        # the hems into pleats.
         _lby = Y_OFF + y
-        if _lby >= 700.0:
-            _lt = min(1.0, (_lby - 700.0) / max(1.0, (_HEM_BY + 6.0) - 700.0))
-            r = max(r, (95.0 + (42.0 - 95.0) * _lt) * _chest_s + 4.0)
+        if _lby >= _leg_top:
+            r = max(r, min(_stub_r(_lby) + 4.0, _legx - 6.0))
         leg = pl["leg"]
         # s: 0 at the OUTSEAM edge, 1 at the INSEAM edge (mirrored panels
         # walk their profile the other way).
@@ -381,11 +410,11 @@ def place(piece, x, y):
         gap = 4.0 / r
         if pl["panel"] == "front":
             phi = (math.pi / 2 - gap) - s_n * (math.pi - 2 * gap)
-            lx = 92.0 * _chest_s + r * math.sin(phi)
+            lx = _legx + r * math.sin(phi)
             ly = -r * math.cos(phi)
         else:
             phi = (-math.pi / 2 + gap) + s_n * (math.pi - 2 * gap)
-            lx = 92.0 * _chest_s + r * math.sin(phi)
+            lx = _legx + r * math.sin(phi)
             ly = r * math.cos(phi)
         fork_y = float(piece.get("forkY", 280.0))
         if y < fork_y:
@@ -722,13 +751,15 @@ def body_geometry(include_arms=True):
     cap(rings[0], z_of_body(TORSO[0][0] - 10))
 
     if BODY_KIND == "lower":
-        # Leg stubs: tapered cones from the crotch to just past the hem.
+        # Leg stubs: tapered cones from the crotch to just past the hem,
+        # ending at the ANATOMICAL radius for that height (thigh/knee/ankle)
+        # so short blocks end at a thigh, not an ankle-width carrot.
         LEG_X = 92.0 * _chest_s
         R_THIGH = 95.0 * _chest_s
-        R_ANKLE = 42.0 * _chest_s
         for d in (1, -1):
             top = ring(LEG_X * d, R_THIGH, R_THIGH, z_of_body(700))
-            bot = ring(LEG_X * d, R_ANKLE, R_ANKLE, z_of_body(_HEM_BY + 6))
+            _rb = leg_r_at(_HEM_BY + 6)
+            bot = ring(LEG_X * d, _rb, _rb, z_of_body(_HEM_BY + 6))
             bridge(top, bot)
             c = len(verts)
             verts.append((LEG_X * d * S, 0.0, z_of_body(690)))

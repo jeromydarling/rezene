@@ -362,9 +362,20 @@ const BLOCKS = {
       waistOut: "hipSide", waistIn: "hipCb",
       floorOut: "legSide", floorIn: "legInner", fork: "crossSeam",
     },
+    // Shin drafts its back panel front-oriented (inseam outboard), unlike
+    // Titan's mirrored back — flip it to match the sim's wrap convention.
+    trouserBackMirrored: true,
+    crotchBridge: true,
     yOffset: 590,
-    bodyKind: "lower",
-    sim: { bending: 1.5 },
+    // The brief body (parted thighs + crotch keel): trunk inseams and rises
+    // must MEET between the legs, and the trouser stubs leave no gap there.
+    bodyKind: "brief",
+    // Force 4 (the Simon lesson): these leg tubes are SNUG — the panels
+    // start stretched over the thigh stubs and contract as they settle, and
+    // default-force springs lose the seam edges to that slide (placement
+    // starts every seam within 61mm; a default-force bake ends with the
+    // worst 5% near 290mm).
+    sim: { sewForce: 4, bending: 1.5 },
   },
 };
 
@@ -374,7 +385,8 @@ const cfg = BLOCKS[blockId];
 // The studio's standard measurement set (mm) — any client measurement sent in
 // the spec overrides its entry.
 const M = {
-  ankle: 230, biceps: 335, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080,
+  ankle: 230, biceps: 335, bustFront: 490, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080,
+  highBustFront: 470,
   crossSeam: 800, crossSeamFront: 390, head: 560, heel: 330, highBust: 1040, hips: 1000,
   hpsToBust: 270, hpsToWaistBack: 460, hpsToWaistFront: 505, inseam: 790, knee: 420, neck: 400, seat: 1050,
   seatBack: 520, shoulderSlope: 13, shoulderToElbow: 340, shoulderToShoulder: 445, shoulderToWrist: 620,
@@ -1412,10 +1424,15 @@ if (cfg.trousers) {
   // Right leg wears the drafted panels as-is; the left leg wears mirrors.
   // (Titan's front is drafted with the outseam near x=0 and the inseam
   // outboard; the sim's leg wrap reads the edges profile either way.)
+  // The sim's leg wrap assumes Titan's BACK convention: inseam/crotch near
+  // x=0, mirrored relative to the front. Blocks that draft their back
+  // front-oriented (Shin) flip it here, or the back inseam wraps to the
+  // outseam side and every crotch seam starts half a tube away.
+  const bm = Boolean(cfg.trouserBackMirrored);
   const frontR = trouserPanel(cfg.parts.front, "frontR", false);
-  const backR = trouserPanel(cfg.parts.back, "backR", false);
+  const backR = trouserPanel(cfg.parts.back, "backR", bm);
   const frontL = trouserPanel(cfg.parts.front, "frontL", true);
-  const backL = trouserPanel(cfg.parts.back, "backL", true);
+  const backL = trouserPanel(cfg.parts.back, "backL", !bm);
   frontR.placement = { kind: "leg", leg: 1, panel: "front" };
   backR.placement = { kind: "leg", leg: 1, panel: "back" };
   frontL.placement = { kind: "leg", leg: -1, panel: "front" };
@@ -1636,8 +1653,12 @@ const seams = cfg.trousers
       { name: "inseam_R", a: ["frontR", "inseam"], b: ["backR", "inseam"] },
       { name: "outseam_L", a: ["frontL", "outseam"], b: ["backL", "outseam"] },
       { name: "inseam_L", a: ["frontL", "inseam"], b: ["backL", "inseam"] },
-      { name: "crotch_front", a: ["frontR", "crotch"], b: ["frontL", "crotch"] },
-      { name: "crotch_back", a: ["backR", "crotch"], b: ["backL", "crotch"] },
+      // Short snug blocks (Shin) BRIDGE the rises (structural strips, the
+      // two-piece-sleeve lesson): four half-shells sprung around two limbs
+      // never stabilise — the bake ended with rise seams ~150mm open while
+      // the outseams closed to 3mm. Bridged, the two fronts are one sheet.
+      { name: "crotch_front", a: ["frontR", "crotch"], b: ["frontL", "crotch"], ...(cfg.crotchBridge ? { bridge: true } : {}) },
+      { name: "crotch_back", a: ["backR", "crotch"], b: ["backL", "crotch"], ...(cfg.crotchBridge ? { bridge: true } : {}) },
       // Deep-rise blocks pin the top of the rise like the waistband holds it.
       ...(cfg.riseTopPin
         ? [
