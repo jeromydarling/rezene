@@ -277,9 +277,11 @@ export function PatternStudioPage() {
     fileId?: string;
     /** Strain fit map (green = comfortable → red = tight vs the pattern). */
     fitUrl?: string;
+    /** Laplace pressure map (kPa where the garment presses on the body). */
+    pressureUrl?: string;
     error?: string;
   } | null>(null);
-  const [drapeView, setDrapeView] = useState<"drape" | "fit">("drape");
+  const [drapeView, setDrapeView] = useState<"drape" | "fit" | "pressure">("drape");
   const [draping, setDraping] = useState(false);
   const [styling, setStyling] = useState(false);
   const [explaining, setExplaining] = useState(false);
@@ -514,7 +516,7 @@ export function PatternStudioPage() {
       // The Actions run takes ~4-6 min (installs Blender, sims, renders).
       for (let i = 0; i < 100; i++) {
         await new Promise((r) => setTimeout(r, 6000));
-        const s = await api.get<{ status: string; url?: string; fileId?: string; fitUrl?: string; error?: string }>(
+        const s = await api.get<{ status: string; url?: string; fileId?: string; fitUrl?: string; pressureUrl?: string; error?: string }>(
           `/api/admin/fitting/drape/${res.jobId}`,
         );
         setDrape({ jobId: res.jobId, ...s });
@@ -1134,7 +1136,7 @@ export function PatternStudioPage() {
                   <div className="space-y-2">
                     {drape.fitUrl && (
                       <div className="flex gap-1">
-                        {(["drape", "fit"] as const).map((v) => (
+                        {(["drape", "fit", ...(drape.pressureUrl ? (["pressure"] as const) : [])] as const).map((v) => (
                           <button
                             key={v}
                             type="button"
@@ -1143,17 +1145,25 @@ export function PatternStudioPage() {
                             }`}
                             onClick={() => setDrapeView(v)}
                           >
-                            {v === "drape" ? "Drape" : "Fit map"}
+                            {v === "drape" ? "Drape" : v === "fit" ? "Fit map" : "Pressure"}
                           </button>
                         ))}
                       </div>
                     )}
                     <img
-                      src={drapeView === "fit" && drape.fitUrl ? drape.fitUrl : drape.url}
+                      src={
+                        drapeView === "pressure" && drape.pressureUrl
+                          ? drape.pressureUrl
+                          : drapeView === "fit" && drape.fitUrl
+                            ? drape.fitUrl
+                            : drape.url
+                      }
                       alt={
-                        drapeView === "fit"
-                          ? "Strain fit map of this draft — green comfortable, red tight"
-                          : "Simulated drape of this draft on a ghost mannequin"
+                        drapeView === "pressure"
+                          ? "Pressure map of this draft — kPa where the garment presses on the body"
+                          : drapeView === "fit"
+                            ? "Strain fit map of this draft — green comfortable, red tight"
+                            : "Simulated drape of this draft on a ghost mannequin"
                       }
                       className="w-full rounded-md border border-ink/10"
                     />
@@ -1174,6 +1184,20 @@ export function PatternStudioPage() {
                         the body of the garment here — shoulder and armhole joins read warmer than
                         they really are on our rigid stand, the same reason fitters check sleeves on
                         a live model.
+                      </p>
+                    )}
+                    {drapeView === "pressure" && drape.pressureUrl && (
+                      <p className="text-[10px] leading-snug text-warmgrey">
+                        Where the garment actually presses, in kilopascals — tension times body
+                        curvature, the physics of why a snug waistband digs in over a hip bone but
+                        not a flat back. <span className="font-medium" style={{ color: "#3f9e4d" }}>Green</span> is
+                        light contact (under ~1 kPa),{" "}
+                        <span className="font-medium" style={{ color: "#c9a12b" }}>yellow</span> is a
+                        firm hold (~2 kPa, a confident waistband), and{" "}
+                        <span className="font-medium" style={{ color: "#c22" }}>red</span> (6 kPa+) is
+                        squeezing — medical compression territory. Pale areas touch without pressing
+                        or hang free. The tension side uses an indicative modulus for the block's
+                        fabric class, so read it as a class estimate, not a lab reading.
                       </p>
                     )}
                     <button

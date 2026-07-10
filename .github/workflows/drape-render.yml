@@ -60,6 +60,7 @@ jobs:
           [ -f out/drape.png ] || fail "no render produced"
           FIT_ARG=()
           [ -f out/drape-fit.png ] && FIT_ARG=(-F "fit=@out/drape-fit.png;type=image/png")
+          [ -f out/drape-pressure.png ] && FIT_ARG+=(-F "pressure=@out/drape-pressure.png;type=image/png")
           curl -sS --fail -X POST "$CALLBACK_BASE/drape/$SHOP_ID/$JOB_ID/complete" \
             -F "secret=$RENDER_CALLBACK_SECRET" \
             -F "image=@out/drape.png;type=image/png" \
