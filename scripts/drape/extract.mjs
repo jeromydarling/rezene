@@ -1466,10 +1466,14 @@ const seams = cfg.trousers
       { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["topsleeve_R", "capBack"] },
       { name: "armscye_L_front", a: ["frontR", "armscye"], b: ["topsleeve_L", "capFront"] },
       { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["topsleeve_L", "capBack"] },
+      // The back seam is BRIDGED (structural cloth strip, not springs):
+      // two separate shells sprung around one limb never stabilised; the
+      // bridge makes top+under one tube, open only at the sprung front
+      // seam — the same topology as every working one-piece sleeve.
       { name: "sleeveFront_R", a: ["topsleeve_R", "edgeFront"], b: ["undersleeve_R", "edgeFront"] },
-      { name: "sleeveBack_R", a: ["topsleeve_R", "edgeBack"], b: ["undersleeve_R", "edgeBack"] },
+      { name: "sleeveBack_R", a: ["topsleeve_R", "edgeBack"], b: ["undersleeve_R", "edgeBack"], bridge: true },
       { name: "sleeveFront_L", a: ["topsleeve_L", "edgeFront"], b: ["undersleeve_L", "edgeFront"] },
-      { name: "sleeveBack_L", a: ["topsleeve_L", "edgeBack"], b: ["undersleeve_L", "edgeBack"] },
+      { name: "sleeveBack_L", a: ["topsleeve_L", "edgeBack"], b: ["undersleeve_L", "edgeBack"], bridge: true },
     ]
   : cfg.waistcoat
   ? [

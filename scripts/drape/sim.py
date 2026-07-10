@@ -569,6 +569,7 @@ def _pair_score(ia, ib):
     return sum(math.dist(all_verts[a], all_verts[b]) for a, b in zip(sa, sb))
 
 
+bridge_faces = []
 for seam in DATA["seams"]:
     ia = seg_indices(*seam["a"])
     ib = seg_indices(*seam["b"])
@@ -576,12 +577,33 @@ for seam in DATA["seams"]:
         ib = list(reversed(ib))
     seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
+    if seam.get("bridge"):
+        # STRUCTURAL seam: join the sides with a quad strip of real cloth
+        # (a ~6mm seam-allowance band) instead of sewing springs. Two
+        # separate shells sprung around one limb never stabilised — the
+        # two-piece coat sleeve shredded, accordioned or held ~90mm open
+        # across seven bake variants (strong force, weak force, pinned,
+        # unpinned) — but a strip of faces makes the pair topologically
+        # ONE tube, the configuration every working sleeve block uses.
+        for i in range(len(ia) - 1):
+            va0, vb0, vb1, va1 = ia[i], ib[i], ib[i + 1], ia[i + 1]
+            if va0 == vb0 or va1 == vb1:
+                continue
+            # Triangles, not quads — the fit machinery unpacks 3-tuples.
+            bridge_faces.append((va0, vb0, vb1))
+            if va1 != vb1 and va0 != va1:
+                bridge_faces.append((va0, vb1, va1))
+        continue
     for va, vb in zip(ia, ib):
         if va != vb:
             sew_edges.append((va, vb))
     if seam.get("pin"):
         pin_indices.update(ia)
         pin_indices.update(ib)
+# Bridge faces go to the BLENDER mesh only — never into all_faces: the fit
+# machinery derives every rest length from per-piece flat coordinates, and
+# bridge edges cross panels whose flat layouts overlap (garbage lengths).
+# The bridged seam still gets its hard closure constraints via seam_sides.
 
 # Pin the necklines too: on a ghost mannequin the collar keeps its shape (a
 # real neckband would hold it); unpinned it sags open into the neck hole.
@@ -773,7 +795,7 @@ build_fit_tape()
 
 # ---- Assemble the object ------------------------------------------------------
 mesh = bpy.data.meshes.new("garment")
-mesh.from_pydata(all_verts, sew_edges, all_faces)
+mesh.from_pydata(all_verts, sew_edges, all_faces + bridge_faces)
 mesh.update()
 for poly in mesh.polygons:
     poly.use_smooth = True
