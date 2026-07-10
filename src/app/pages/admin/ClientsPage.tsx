@@ -234,6 +234,7 @@ export function ClientDetailPage() {
   const [commPrice, setCommPrice] = useState("");
   // Per-commission fitting note drafts, keyed by commission id
   const [fitDraft, setFitDraft] = useState<Record<string, string>>({});
+  const [portalNote, setPortalNote] = useState<string | null>(null);
 
   const unlinkedLooks = useFetch<{ id: string; name: string; clientId: string | null }[]>(
     "/api/admin/fitting/looks",
@@ -349,6 +350,29 @@ export function ClientDetailPage() {
         >
           {data.status === "archived" ? "Unarchive" : "Archive"}
         </button>
+        <button
+          className="admin-btn"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await api.post<{ link: string; emailed: boolean }>(
+                `/api/admin/clients/${id}/portal-link`,
+                {},
+              );
+              await navigator.clipboard.writeText(r.link).catch(() => {});
+              setPortalNote(
+                r.emailed
+                  ? "Invite link copied — and emailed to the client."
+                  : "Invite link copied. Share it with the client — it signs them in once and lasts 14 days.",
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Copy portal invite link
+        </button>
         <button className="admin-btn text-red-700" disabled={busy} onClick={deleteClient}>
           Delete client &amp; their data
         </button>
@@ -358,6 +382,7 @@ export function ClientDetailPage() {
           </span>
         )}
       </div>
+      {portalNote && <p className="mb-4 text-sm text-warmgrey">{portalNote}</p>}
 
       {/* Commissions: the staged work pipeline for this client */}
       <section className="admin-card mb-4 p-4">

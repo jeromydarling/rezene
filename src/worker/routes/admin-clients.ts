@@ -3,7 +3,7 @@ import { z } from "zod";
 import { all, first, run } from "../services/db";
 import { parseBody } from "../services/validators";
 import { requireAdminWrite, requireAdminOnly } from "../middleware/auth";
-import { newId } from "../utils/id";
+import { newId, randomToken, sha256Hex } from "../utils/id";
 import type { AppContext } from "../types/env";
 
 /**
@@ -271,6 +271,60 @@ adminClientRoutes.delete("/:id", requireAdminOnly, async (c) => {
   const result = await run(c.var.db, `DELETE FROM clients WHERE id = ?`, id);
   if (!result.meta.changes) return c.json({ error: "Client not found" }, 404);
   return c.json({ ok: true });
+});
+
+/**
+ * Portal invite: a one-time link (14 days) that signs this client into
+ * their portal. Always returned for copy/share; also emailed when the
+ * client has an email AND buyer email is configured (a logged no-op
+ * otherwise, per the email house rule).
+ */
+adminClientRoutes.post("/:id/portal-link", requireAdminWrite, async (c) => {
+  const id = c.req.param("id");
+  const client = await first<ClientRow>(c.var.db, `SELECT * FROM clients WHERE id = ?`, id);
+  if (!client) return c.json({ error: "Client not found" }, 404);
+  const token = randomToken(24);
+  await run(
+    c.var.db,
+    `INSERT INTO client_portal_tokens (id, client_id, token_hash, expires_at)
+     VALUES (?, ?, ?, datetime('now', '+14 days'))`,
+    newId("cpt"),
+    id,
+    await sha256Hex(token),
+  );
+  const origin = new URL(c.req.url).origin;
+  const { getPrimaryShopBase } = await import("../services/shops");
+  const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : await getPrimaryShopBase(c.env.DB);
+  const base = (c.env.APP_ENV === "development" ? origin : c.env.APP_URL || origin) + shopBase;
+  const link = `${base}/portal?token=${encodeURIComponent(token)}`;
+  let emailed = false;
+  if (client.email) {
+    try {
+      const { buyerEmailConfigured, sendBuyerEmail } = await import("../services/buyer-email");
+      const { getEmailBrand, renderBrandedEmail } = await import("../services/email-template");
+      emailed = buyerEmailConfigured(c.env);
+      const brand = await getEmailBrand(c.env, c.var.db);
+      const html = renderBrandedEmail({
+        brand,
+        preheader: `Your fitting portal at ${brand.name}`,
+        heading: `Your portal at ${brand.name}`,
+        bodyHtml:
+          `<p style="margin:0 0 16px;">See your pieces in progress, your fittings and your renders — and approve designs when you're happy. The link below signs you in; it works once and lasts 14 days.</p>` +
+          `<p style="margin:0 0 20px;"><a href="${link}" style="display:inline-block;background:#1c2b3a;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;">Open my portal</a></p>`,
+        footerNote: `Sent by ${brand.name} for their client fittings.`,
+      });
+      await sendBuyerEmail(c.env, {
+        to: client.email,
+        subject: `Your fitting portal at ${brand.name}`,
+        text: `Open your portal at ${brand.name}:\n\n${link}\n\nThe link signs you in; it works once and lasts 14 days.`,
+        html,
+      });
+    } catch (err) {
+      console.error("[clients] portal email failed:", String(err).slice(0, 160));
+      emailed = false;
+    }
+  }
+  return c.json({ ok: true, link, emailed });
 });
 
 const measurementSchema = z.object({
