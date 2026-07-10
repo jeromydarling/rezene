@@ -292,6 +292,11 @@ def place(piece, x, y):
         neck_w = neck_half_width(piece)
         t_seam = min(1.0, max(0.08, (y - y_top) / 120.0))
         t = max(t_seam, min(1.0, max(0.0, (neck_w - abs(x)) / 10.0)))
+        if pl.get("hangCollapse") is False:
+            # Pieces that hang from a mid-body seam (a coat tail at the
+            # waist) sit at the wrapped depth all the way to their top edge
+            # — collapsing toward the centre line is for shoulder seams.
+            t = 1.0
         wy = side * 8.0 * (1 - t) + wrapped * t
         wx, wy = clamp_out(wx, wy, y)
         return (wx * S, wy * S, (HEIGHT - y) * S)
@@ -373,15 +378,30 @@ def place(piece, x, y):
     else:
         t = min(1.0, y / max(1.0, pl["y1"]))
         w = pl["w0"] + (pl["w1"] - pl["w0"]) * t
-    r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
-    # Slightly less than a full wrap: the underarm edges must NOT start
-    # coincident (self-collision fights zero-length sewing and explodes).
-    theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
+    if "thetaSign" in pl:
+        # Two-piece tailored sleeve (coats): each piece wraps PART of the
+        # ring. w0/w1 carry the COMBINED circumference of both pieces, so
+        # both compute the same ring radius at every height; theta maps the
+        # piece's own arc onto its azimuth range. The topsleeve runs
+        # theta = x/r (apex outward), the undersleeve theta = pi - x/r
+        # (mirrored winding) — their front/back edges land at identical
+        # angles, which is what makes the pair sewable.
+        r = w / (2 * math.pi) + 1
+        theta = pl["thetaOffset"] + pl["thetaSign"] * (x / r)
+    else:
+        r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
+        # Slightly less than a full wrap: the underarm edges must NOT start
+        # coincident (self-collision fights zero-length sewing and explodes).
+        theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
     # u: distance down the arm axis from the shoulder joint.
     if pl.get("raglan"):
         u = y + RAGLAN_U0  # biceps line lands at the armhole depth
     else:
-        u = y - sleeve_miny[piece["name"]]  # 0 at cap top
+        # 0 at cap top. Two-piece sleeves share ONE pattern-y frame across
+        # both pieces (capTopY: the topsleeve's cap apex), else the shorter
+        # undersleeve would hang its own min-y from the shoulder and sit
+        # ~60mm high against every edge seam it must meet.
+        u = y - float(pl.get("capTopY", sleeve_miny[piece["name"]]))
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]
