@@ -108,6 +108,23 @@ const DRAPE_BLOCKS = new Set([
   "cathrin",
 ]);
 
+/** Blocks we tested in the cloth simulator and chose NOT to ship a drape
+ *  for — with the honest reason shown in place of the drape button. */
+const DRAPE_EXCLUDED: Record<string, string> = {
+  diana:
+    "We tested this one thoroughly and chose not to show you a wrong picture: the cowl only " +
+    "works because loose cloth hangs completely free, and the close-fitting sleeves rely on " +
+    "real knit stretch — two things our cloth simulator can't do faithfully yet. " +
+    "“Render this cut on a model” above works as usual.",
+};
+
+/** For blocks WITHOUT a drape reference, the model render only knows what the
+ *  words say — carry the block's defining construction so the engine doesn't
+ *  guess (a bare "drape-neck top" came back with cap sleeves). */
+const BLOCK_RENDER_HINTS: Record<string, string> = {
+  diana: "a softly draped cowl neckline and long close-fitting sleeves, in a fluid knit",
+};
+
 /** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
  *  image-model reference. White background; the SVG's own mm dimensions set
  *  the aspect ratio. */
@@ -568,7 +585,8 @@ export function PatternStudioPage() {
         }
       }
       const detailClause = details.length ? `, detailed with ${details.slice(0, 8).join(", ")}` : "";
-      const description = `a ${block.name.toLowerCase()} cut with ${bits.join(", ")}${detailClause}`.slice(0, 450);
+      const hint = !drapeFileId && BLOCK_RENDER_HINTS[blockId] ? `, with ${BLOCK_RENDER_HINTS[blockId]}` : "";
+      const description = `a ${block.name.toLowerCase()} cut with ${bits.join(", ")}${hint}${detailClause}`.slice(0, 450);
 
       // Experimental: show the engine the pattern sheet itself. A CLEAN draft
       // (no seam allowance, no dimension text) rasterized and passed as a
@@ -1113,6 +1131,14 @@ export function PatternStudioPage() {
             >
               {visualising ? "Rendering…" : "Render this cut on a model"}
             </button>
+            {!DRAPE_BLOCKS.has(blockId) && DRAPE_EXCLUDED[blockId] && (
+              <div className="rounded-md border border-navy/10 bg-white/60 p-2">
+                <p className="text-[11px] leading-snug text-warmgrey">
+                  <span className="font-medium text-ink/80">No true-drape preview for this block.</span>{" "}
+                  {DRAPE_EXCLUDED[blockId]}
+                </p>
+              </div>
+            )}
             {DRAPE_BLOCKS.has(blockId) && (
               <div className="space-y-2 rounded-md border border-navy/10 bg-white/60 p-2">
                 <p className="text-[11px] leading-snug text-warmgrey">
