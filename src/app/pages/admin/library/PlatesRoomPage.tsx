@@ -14,13 +14,14 @@ export function PlatesRoomPage() {
   const [items, setItems] = useState<LibraryItem[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<LibraryItem | null>(null);
+  const [costumeOnly, setCostumeOnly] = useState(false);
 
   const search = async (query = q) => {
     if (query.trim().length < 2) return;
     setBusy(true);
     try {
       const res = await api.get<{ items: LibraryItem[] }>(
-        `/api/admin/library/search?room=plates&q=${encodeURIComponent(query.trim())}`,
+        `/api/admin/library/search?room=plates&q=${encodeURIComponent(query.trim())}${costumeOnly ? "&dept=8" : ""}`,
       );
       setItems(res.items);
     } catch (err) {
@@ -41,6 +42,10 @@ export function PlatesRoomPage() {
       <RoomNav active="plates" />
 
       <SearchBar value={q} onChange={setQ} onSearch={() => search()} busy={busy} placeholder="Search the Met — 'fashion plate', 'evening dress 1925', 'brocade'…" />
+      <label className="-mt-2 mb-4 flex items-center gap-2 text-xs text-ink/70">
+        <input type="checkbox" checked={costumeOnly} onChange={(e) => setCostumeOnly(e.target.checked)} />
+        Costume Institute only — garments and accessories, no paintings
+      </label>
 
       {items === null && (
         <div className="flex flex-wrap gap-1.5">

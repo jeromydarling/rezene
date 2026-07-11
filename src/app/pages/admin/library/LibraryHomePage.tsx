@@ -25,13 +25,13 @@ const ROOM_CARDS = [
     room: "magazines",
     title: "Magazines",
     blurb: "Vogue from its first issue (1892) and six decades of Harper's Bazar — read page by page.",
-    art: "/school/fashion-drawing/lesson3-barbier-les-colchiques.jpg",
+    art: "/school/fashion-drawing/lesson3-steinmetz-parasol-etching.jpg",
   },
   {
     room: "books",
     title: "Books",
     blurb: "The school's source shelf and the Archive's pre-1931 stacks, searchable.",
-    art: "/school/foundations-of-cutting/lesson3-madison-rational-draft.jpg",
+    art: "/school/the-trouser/lesson0-walking-trousers-draft.jpg",
   },
   {
     room: "patterns",
@@ -69,7 +69,7 @@ export function LibraryHomePage() {
               <img
                 src={card.art}
                 alt=""
-                className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
               />
             </div>
             <div className="p-4">

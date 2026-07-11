@@ -87,8 +87,9 @@ adminLibraryRoutes.get("/search", async (c) => {
   const q = s(c.req.query("q"), 200);
   if (!q || q.length < 2) return c.json({ items: [], sources: [] });
   if (!(ROOMS as readonly string[]).includes(room)) return c.json({ error: "Unknown room." }, 400);
+  const dept = parseInt(c.req.query("dept") || "", 10);
   try {
-    const out = await librarySearch(c.env, room, q);
+    const out = await librarySearch(c.env, room, q, { dept: Number.isFinite(dept) ? dept : undefined });
     return c.json(out);
   } catch {
     return c.json(
