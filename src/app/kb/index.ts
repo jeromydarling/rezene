@@ -11,6 +11,7 @@ import { marketing } from "./content/marketing";
 import { commerceAccount } from "./content/commerceAccount";
 import { commerceNew } from "./content/commerceNew";
 import { school } from "./content/school";
+import { library } from "./content/library";
 
 export type { KbArticle, KbPart, KbHeading } from "./types";
 
@@ -42,6 +43,7 @@ export const KB_ARTICLES: KbArticle[] = [
   ...commerceAccount,
   ...commerceNew,
   ...school,
+  ...library,
 ];
 
 const BASE_ORDER = new Map(KB_ARTICLES.map((a, i) => [a.slug, i]));

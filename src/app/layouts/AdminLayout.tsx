@@ -53,6 +53,7 @@ import {
   Undo2,
   Users,
   GraduationCap,
+  LibraryBig,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
@@ -142,6 +143,7 @@ const NAV_SECTIONS: {
       { to: "/admin/commissions", label: "Commissions", icon: ClipboardList },
       { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },
       { to: "/admin/patterns", label: "Pattern Studio", icon: Ruler },
+      { to: "/admin/library", label: "Timeless Library", icon: LibraryBig },
       { to: "/admin/files", label: "Files", icon: FlaskConical },
     ],
   },
