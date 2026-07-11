@@ -53,7 +53,12 @@ _biceps_s = float(_body.get("biceps", 1.0))
 _shoulder_s = float(_body.get("shoulder", 1.0))
 _torso_s = float(_body.get("torso", 1.0))
 
-ARM_R = 55.0 * _biceps_s  # arm stub radius — fills the sleeve tube so it can't ruffle
+# Arm stub radius — deliberately fat by default: it fills loose sleeve tubes
+# so they can't ruffle. Fitted knit sleeves (diana) are drafted SMALLER than
+# that stub plus the collision standoff — a real knit stretches over the arm,
+# sim cloth can't — so those blocks pass sim.armScale for a true-scale arm
+# the drafted tube can actually close around.
+ARM_R = 55.0 * _biceps_s * float(DATA.get("sim", {}).get("armScale", 1.0))
 # Arm axis origin distance from centre (mm). Env override for pose experiments.
 SHOULDER_X = float(_os.environ.get("DRAPE_SHOULDER_X", "215.0")) * _shoulder_s
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint
@@ -435,8 +440,11 @@ def place(piece, x, y):
         # line (near 0 depth) where the pins hold front and back together.
         _, tb = torso_ab(y)
         # `outset` layers overlapping panels (a shirt's button stand) so the
-        # closed placket stacks instead of interpenetrating.
-        wrapped = side * (tb + 15.0 + float(pl.get("outset", 0.0))) * math.cos(phi)
+        # closed placket stacks instead of interpenetrating. The cowl fold's
+        # own outward layering (_cowl_ou) stacks the folded rows OUTSIDE the
+        # chest cloth they lie over — without it the two layers start at the
+        # identical depth and self-collision presses the band through.
+        wrapped = side * (tb + 15.0 + float(pl.get("outset", 0.0)) + _cowl_ou) * math.cos(phi)
         # The panel hangs from its own top edge (shoulder seam, tank strap or
         # raglan diagonal — extract emits the profile): at the top edge it
         # sits near centre depth, sweeping onto the wrapped chest as it
@@ -722,7 +730,12 @@ def place(piece, x, y):
         # both pieces (capTopY: the topsleeve's cap apex), else the shorter
         # undersleeve would hang its own min-y from the shoulder and sit
         # ~60mm high against every edge seam it must meet.
-        u = y - float(pl.get("capTopY", sleeve_miny[piece["name"]]))
+        # Drop-shoulder cuts (Diana: shoulder point 70mm past the joint)
+        # carry the armscye DOWN THE ARM — the cap must start there too, or
+        # the pinned cap and the pinned body shoulder fight across the drop
+        # and the springs tear the cloth between them (the huey pin lesson,
+        # sideways).
+        u = y - float(pl.get("capTopY", sleeve_miny[piece["name"]])) + float(pl.get("u0", 0.0))
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]

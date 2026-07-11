@@ -298,9 +298,18 @@ const BLOCKS = {
     // garment, so the front neckline is NOT pinned (cowlFront names it
     // past the sim's neck-pinning rule); shoulders and back neck hold.
     cowlFront: true,
+    // Diana's shoulder point sits 70mm past the Brian-family joint — a
+    // drop-shoulder cut whose armscye lies along the upper arm.
+    dropShoulder: true,
     parts: { front: "diana.front", back: "diana.back", sleeve: "diana.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
-    sim: { bending: 1.5 },
+    // The fitted knit sleeve drafts SMALLER than the fat arm stub + collision
+    // standoff (wrist tube r34 vs r52 required — a real knit stretches, sim
+    // cloth can't), so the arm poked through the cloth everywhere. armScale
+    // 0.8 gives a true-scale arm; cuffEase 30 buys the last few mm at the
+    // wrist. Together they make the tube geometrically closable.
+    draftOptions: { cuffEase: 0.3 },
+    sim: { bending: 1.5, armScale: 0.8 },
   },
   brian: {
     module: "@freesewing/brian",
@@ -439,6 +448,40 @@ const BLOCKS = {
     // starts every seam within 61mm; a default-force bake ends with the
     // worst 5% near 290mm).
     sim: { sewForce: 4, bending: 1.5 },
+  },
+  cathrin: {
+    module: "@freesewing/cathrin",
+    design: "Cathrin",
+    // Underbust corset: six panels per side in ONE shared flat frame
+    // (CF x=0 to CB x=482, underbust y=0 to hips y=240). The ring wrap
+    // built for Bruce carries the whole half-body on one face — phi runs
+    // 0..pi from CF to CB — and the mirrored copies make the other side.
+    // The waist REDUCTION is drafted as gaps between the panels: the
+    // seams close those gaps (sprung, not bridged — a bridge would freeze
+    // the gap open as cloth) and the pressure map shows the cinch. The
+    // CB edges stay free: corsets lace, and the lacing gap is honest.
+    cathrin: true,
+    parts: {
+      panel1: "cathrin.panel1", panel2: "cathrin.panel2", panel3: "cathrin.panel3",
+      panel4: "cathrin.panel4", panel5: "cathrin.panel5", panel6: "cathrin.panel6",
+    },
+    // Pattern y=0 is the underbust line: hpsToWaistFront(505) - waistToUnderbust(110).
+    yOffset: 395,
+    // Upper mannequin + the waistband-grip convention: unpinned, the ring
+    // slid off the torso's flat hip rim before friction could engage
+    // (bakes 1-2, no cloth left in frame); on the legs-up brief body the
+    // ribcage is missing and the top half concertina'd out of the air onto
+    // the hip flare (bake 3). Every trouser block pins its waist edge —
+    // a corset is one giant waistband, pinned at its top edge.
+    // Draped at the minimum 2% waist reduction (documented in the KB): a
+    // corset's reduction compresses FLESH, and the ghost mannequin is
+    // rigid — at the drafted 10% the hem ring (smaller than the hips)
+    // rode up the taper to where its circumference fits and the shaping
+    // gaps physically could not close. At near-fit the seams close and
+    // the woven fit map still shows the snug truth.
+    draftOptions: { waistReduction: 0.02 },
+    // Panel edges under real cinch tension: uma-class hauling force.
+    sim: { sewForce: 6, friction: 70 },
   },
   bruce: {
     module: "@freesewing/bruce",
@@ -1312,6 +1355,42 @@ function briefGusset() {
   ]);
 }
 
+/** Cathrin corset panel: every panel path walks the same loop — bottom-left,
+ *  along the hem, up the CB-side edge, across the top, down the CF-side
+ *  edge. Corners are the path ops' endpoints classified by height (tops
+ *  near y<=50, bottoms near y>=200 in the 240mm frame). Segments come out
+ *  as hem / cbEdge / top / cfEdge, where cbEdge of panel N sews to cfEdge
+ *  of panel N+1 (the drafted shaping gap between them closes). */
+function cathrinPanel(part, pathName, pieceName, mirrored) {
+  const path = part.paths[pathName];
+  const poly = pathPolyline(path);
+  const ends = [];
+  let cur = null;
+  for (const op of path.ops) {
+    if (op.type === "move") cur = op.to;
+    else if (op.to) cur = op.to;
+    if (cur && (ends.length === 0 || ends[ends.length - 1] !== cur)) ends.push(cur);
+  }
+  const isTop = (p) => p.y <= 50;
+  const isBottom = (p) => p.y >= 200;
+  const bl = ends[0];
+  let br = null;
+  for (const p of ends) {
+    if (isTop(p)) break;
+    if (isBottom(p)) br = p;
+  }
+  const tr = ends.find(isTop);
+  const tops = ends.filter(isTop);
+  const tl = tops[tops.length - 1];
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  return buildPiece(pieceName, [
+    ["hem", seg(slice(poly, bl, br))],
+    ["cbEdge", seg(slice(poly, br, tr))],
+    ["top", seg(slice(poly, tr, tl))],
+    ["cfEdge", seg(slice(poly, tl, bl))],
+  ]);
+}
+
 /** Bruce back: cut on fold — unfold across CB (x=0). The bottom edge is a
  *  W: a notch rising to gussetTop at CB between two crotch "wings" that drop
  *  to ±gussetRight. Each wing edge (the * crotch seam) is split by length
@@ -1905,6 +1984,37 @@ if (cfg.trousers) {
   front.placement = { kind: "plane", y: -160, cowl: { y0: FPd.neck.y } };
   back.placement = { kind: "plane", y: 160 };
   bodyPieces = [front, back];
+} else if (cfg.cathrin) {
+  // Corset: 7 pattern pieces per side (panel1 splits into the busk strip
+  // 1a + 1b), mirrored for the other side of the body. All ride the ring
+  // wrap on ONE face — the shared frame spans CF to CB, and phi = pi*x/R
+  // walks the full half-ellipse.
+  const specs = [
+    ["panel1", "panel1a"], ["panel1", "panel1b"], ["panel2", "panel2"],
+    ["panel3", "panel3"], ["panel4", "panel4"], ["panel5", "panel5"],
+    ["panel6", "panel6"],
+  ];
+  bodyPieces = [];
+  for (const side of ["R", "L"]) {
+    for (const [partKey, pathName] of specs) {
+      const piece = cathrinPanel(set[cfg.parts[partKey]], pathName, `${pathName}${side}`, side === "L");
+      piece.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
+      // Top AND hem grips: a corset is boned — it holds its shape by
+      // structure, not drape. Both edge rings gripped is the honest stand-in.
+      piece.pinSegments = ["top", "hem"];
+      bodyPieces.push(piece);
+    }
+  }
+  // One shared ring extent: the frame half-width (widest row wins). The
+  // gaps between panels stay open at placement; the seams cinch them shut.
+  const allPts = bodyPieces.flatMap((p) => p.points);
+  const ringW = Math.max(...allPts.map(([x]) => Math.abs(x))) + 8;
+  const ys = allPts.map(([, y]) => y);
+  const ringProfileRows = [[Math.min(...ys), ringW], [Math.max(...ys), ringW]];
+  for (const p of bodyPieces) {
+    p.uniformWrap = true;
+    p.widthProfile = ringProfileRows;
+  }
 } else if (cfg.bruce) {
   // Boxer briefs: hip panels (front pouch, back, two sides) + two thigh
   // insets. The crotch closes from three directions — back wings meet the
@@ -2300,8 +2410,15 @@ if (hasSleeves) {
   // Ribbed cuffs grip the wrist: pin the sleeve hem ring so the sleeve
   // blouses naturally instead of accordion-sliding down the arm.
   const pinSegments = cfg.cuffed ? ["hem"] : [];
-  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper, ...raglan };
-  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper, ...raglan };
+  // Drop-shoulder cuts carry the armscye down the arm: start the cap there
+  // (u0 = how far the drafted shoulder point extends past the block
+  // family's standard joint), or the pinned cap and pinned body shoulder
+  // tear the cloth between them.
+  const drop = cfg.dropShoulder
+    ? { u0: Math.max(0, Math.abs(set[cfg.parts.front].points.shoulder.x) - 223) }
+    : {};
+  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper, ...raglan, ...drop };
+  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper, ...raglan, ...drop };
   sleeves[0].pinSegments = pinSegments;
   sleeves[1].pinSegments = pinSegments;
 }
@@ -2346,6 +2463,26 @@ const seams = cfg.trousers
       { name: "gusset_front_L", a: ["front", "gussetEdgeL"], b: ["gusset", "frontEdgeL"] },
       { name: "gusset_front_R", a: ["front", "gussetEdgeR"], b: ["gusset", "frontEdgeR"] },
       { name: "gusset_back", a: ["back", "gussetEdge"], b: ["gusset", "backEdge"] },
+    ]
+  : cfg.cathrin
+  ? [
+      // Per side: busk strip to panel1b, then each panel's CB-side edge to
+      // the next panel's CF-side edge — the drafted shaping gaps close and
+      // the waist cinches. The two busk strips meet at CF (bridged: they
+      // start coincident, a closed busk front). CB edges stay free (laced).
+      // SPRUNG, not bridged: bridging all twelve panel seams while both
+      // edge rings are pinned shredded the mesh (bridge faces + double-edge
+      // grip + ring tension = explosion). Sprung stitches leave hairline
+      // slits equal to the collision standoff — the honest render.
+      ...["R", "L"].flatMap((s) => [
+        { name: `busk_${s}`, a: [`panel1a${s}`, "cbEdge"], b: [`panel1b${s}`, "cfEdge"] },
+        { name: `p1_p2_${s}`, a: [`panel1b${s}`, "cbEdge"], b: [`panel2${s}`, "cfEdge"] },
+        { name: `p2_p3_${s}`, a: [`panel2${s}`, "cbEdge"], b: [`panel3${s}`, "cfEdge"] },
+        { name: `p3_p4_${s}`, a: [`panel3${s}`, "cbEdge"], b: [`panel4${s}`, "cfEdge"] },
+        { name: `p4_p5_${s}`, a: [`panel4${s}`, "cbEdge"], b: [`panel5${s}`, "cfEdge"] },
+        { name: `p5_p6_${s}`, a: [`panel5${s}`, "cbEdge"], b: [`panel6${s}`, "cfEdge"] },
+      ]),
+      { name: "cf", a: ["panel1aR", "cfEdge"], b: ["panel1aL", "cfEdge"], bridge: true },
     ]
   : cfg.bruce
   ? [

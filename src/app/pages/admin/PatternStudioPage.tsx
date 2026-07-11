@@ -105,6 +105,7 @@ const DRAPE_BLOCKS = new Set([
   "slip-dress", "wahid", "wide-trouser", "pleated-skirt",
   "paco", "sandy", "bella", "huey", "yuri", "walburga", "charlie",
   "carlton", "carlita", "brian", "bent", "uma", "shin", "breanna", "noble",
+  "cathrin",
 ]);
 
 /** Rasterize a pattern SVG to a PNG blob (long side capped) for use as an
