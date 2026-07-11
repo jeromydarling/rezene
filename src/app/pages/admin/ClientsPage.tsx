@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
+import { emitToast } from "../../lib/toast";
 import { formatDate, formatMoney } from "../../lib/format";
 import {
   EmptyState,
@@ -10,6 +11,7 @@ import {
   PageHeader,
   StatusBadge,
 } from "../../components/admin/ui";
+import { MessageDecoder } from "../../components/MessageDecoder";
 
 /**
  * The Client Book — the people behind the patterns. Each client keeps a
@@ -138,6 +140,9 @@ export function ClientBookPage() {
         help="client-book"
         description="The people you sew and style for — measurement history, style notes, fittings, and every pattern and photo that belongs to them."
       />
+      <div className="mb-4 flex justify-end">
+        <MessageDecoder defaultKind="client" />
+      </div>
       {error && <ErrorNote message={error} />}
       <form onSubmit={createClient} className="admin-card mb-4 flex flex-wrap items-end gap-3 p-4">
         <label className="flex flex-col text-sm">
@@ -299,6 +304,56 @@ export function ClientDetailPage() {
   // New measurement set
   const [measDraft, setMeasDraft] = useState<Record<string, string>>({});
   const [measNote, setMeasNote] = useState("");
+  const [photoFront, setPhotoFront] = useState<File | null>(null);
+  const [photoSide, setPhotoSide] = useState<File | null>(null);
+  const [estimating, setEstimating] = useState(false);
+
+  // Photos → an ESTIMATED measurement set. Honest framing throughout: it
+  // prefills the form as a draft the tape must confirm — never saves itself.
+  async function estimateFromPhotos() {
+    const heightCm = parseFloat(measDraft.heightCm ?? "");
+    if (!photoFront || !Number.isFinite(heightCm)) return;
+    setEstimating(true);
+    try {
+      const toDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const img = new Image();
+          const url = URL.createObjectURL(file);
+          img.onload = () => {
+            const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      const front = await toDataUrl(photoFront);
+      const side = photoSide ? await toDataUrl(photoSide) : undefined;
+      const res = await api.post<{ measurements: Record<string, number>; confidence: string; caveats: string }>(
+        "/api/admin/assist/measure-photos",
+        { front, side, heightCm },
+      );
+      setMeasDraft((d) => {
+        const next = { ...d };
+        for (const [k, v] of Object.entries(res.measurements)) next[k] = String(v);
+        return next;
+      });
+      setMeasNote(
+        `AI estimate from photos (${res.confidence} confidence) — verify with the tape at the fitting.${res.caveats ? ` ${res.caveats}` : ""}`,
+      );
+    } catch (err) {
+      emitToast({
+        kind: "error",
+        message: err instanceof Error && err.message ? err.message : "Couldn't estimate from those photos.",
+      });
+    } finally {
+      setEstimating(false);
+    }
+  }
   const [showMeasForm, setShowMeasForm] = useState(false);
   // New timeline entry
   const [evKind, setEvKind] = useState<(typeof EVENT_KINDS)[number]>("note");
@@ -730,6 +785,32 @@ export function ClientDetailPage() {
           </p>
           {showMeasForm && (
             <form onSubmit={addMeasurements} className="mb-3 rounded border border-black/5 p-3">
+              <div className="mb-3 rounded-lg bg-navy/[0.04] p-3">
+                <p className="text-xs font-medium text-ink">Estimate from photos <span className="rounded bg-navy/10 px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wide text-navy">beta</span></p>
+                <p className="mt-0.5 text-[0.68rem] text-warmgrey">
+                  A front photo (side photo helps), fitted clothing, full body in frame — plus height below to set the
+                  scale. It prefills a draft the tape must confirm at the fitting; it never replaces measuring.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <label className="flex items-center gap-1.5">
+                    Front
+                    <input type="file" accept="image/*" onChange={(e) => setPhotoFront(e.target.files?.[0] ?? null)} className="text-xs" />
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    Side (optional)
+                    <input type="file" accept="image/*" onChange={(e) => setPhotoSide(e.target.files?.[0] ?? null)} className="text-xs" />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void estimateFromPhotos()}
+                    disabled={estimating || !photoFront || !parseFloat(measDraft.heightCm ?? "")}
+                    className="rounded bg-navy px-3 py-1 text-xs text-white disabled:opacity-50"
+                    title={!parseFloat(measDraft.heightCm ?? "") ? "Enter the height first — it sets the scale" : undefined}
+                  >
+                    {estimating ? "Estimating…" : "Estimate"}
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {MEASUREMENT_FIELDS.map(([key, label]) => (
                   <label key={key} className="flex flex-col text-xs">

@@ -36,23 +36,20 @@ export async function askClaude(
     model?: string;
     /** Optional image for vision tasks (sketch/photo → tech pack). */
     image?: { base64: string; mediaType: string };
+    /** Several images (front + side photos, contact sheets). Wins over `image`. */
+    images?: { base64: string; mediaType: string }[];
   },
 ): Promise<ClaudeResult> {
   if (!env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
   const model = opts.model ?? DEFAULT_MODEL;
-  const content: unknown[] = opts.image
-    ? [
-        {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: opts.image.mediaType,
-            data: opts.image.base64,
-          },
-        },
-        { type: "text", text: opts.prompt },
-      ]
-    : [{ type: "text", text: opts.prompt }];
+  const imgs = opts.images ?? (opts.image ? [opts.image] : []);
+  const content: unknown[] = [
+    ...imgs.map((im) => ({
+      type: "image",
+      source: { type: "base64", media_type: im.mediaType, data: im.base64 },
+    })),
+    { type: "text", text: opts.prompt },
+  ];
   const res = await fetch(BASE_URL, {
     method: "POST",
     headers: {
