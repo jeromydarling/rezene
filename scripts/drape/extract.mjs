@@ -309,17 +309,21 @@ const BLOCKS = {
     // 0.8 gives a true-scale arm; cuffEase 30 buys the last few mm at the
     // wrist. Together they make the tube geometrically closable.
     draftOptions: { cuffEase: 0.3 },
-    // PARKED after seven bakes. Solved along the way: the fitted knit
-    // sleeve tube is geometrically closable (armScale + cuffEase, kept),
-    // and the cowl now folds over the chest (placement outset fix in
-    // sim.py). Structurally open: the drop-shoulder armscye seam starts
-    // 85-96mm apart (measured, DRAPE_SEAM_DEBUG) because the body panel
-    // wraps around the TORSO ellipse while the sleeve cap rings the ARM
-    // axis. Falsified: cap-zone stub clamp, axial u0 offset (0 and 70mm
-    // within 4mm of each other — the gap is radial), sewForce 6 (armscye
-    // unmoved, sleeves ruche). Needs assembled placement (cap placed
-    // coincident with the body's armscye edge) — the same machinery the
-    // bruce pouch and the tamiko/waralee folds wait on.
+    // PARKED after nine bakes. Solved along the way (kept): the fitted
+    // knit sleeve tube is geometrically closable (armScale + cuffEase),
+    // the cowl folds over the chest (placement outset fix), and the
+    // preClose warp attaches the drop-shoulder armscye (85-96mm radial
+    // start gap -> 6mm; the body panel wraps the TORSO ellipse while the
+    // cap rings the ARM axis, so no spring force ever closed it).
+    // Falsified: cap-zone stub clamp, axial u0 (0 vs 70mm differ <4mm —
+    // the gap is radial), sewForce 6 (armscye unmoved, sleeves ruche),
+    // preClose alone (targets inside the arm stub trap cloth in the
+    // collider — holes down the upper arm), preClose + arm push-out
+    // (re-inflating the cap gathers its ease into puff-shoulder ruffles,
+    // the exact regression the socket-alignment NOTE in sim.py recorded),
+    // and cowl clearance 8 -> 20mm (the mid-chest see-through band is NOT
+    // the fold edge pressing — cause still unknown). Ships only with true
+    // co-draped assembled placement, same as bruce/tamiko/waralee.
     sim: { bending: 1.5, armScale: 0.8 },
   },
   brian: {
