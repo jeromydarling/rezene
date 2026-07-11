@@ -249,7 +249,7 @@ function ImportDialog({ mode: initialMode, onDone, onClose }: { mode: "makers" |
           </div>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {targets.map((t) => (
                 <label key={t.key} className="text-xs text-warmgrey">
                   {t.label}
@@ -645,7 +645,7 @@ export function ResearchPage() {
       {/* Ask panel */}
       <div className="mb-4 rounded-xl border border-ink/10 bg-white p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="min-w-0 flex-1 text-xs text-warmgrey">
+          <label className="w-full text-xs text-warmgrey sm:w-auto sm:min-w-0 sm:flex-1">
             Ask a research question — the answer lands in your notes with its sources
             <input
               value={askPrompt}
@@ -752,12 +752,12 @@ export function ResearchPage() {
       )}
       {showNewNote && tab === "notes" && (
         <div className="mb-3 space-y-2 rounded-xl border border-ink/10 bg-white p-3">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               value={noteDraft.title}
               onChange={(e) => setNoteDraft((d) => ({ ...d, title: e.target.value }))}
               placeholder="Title *"
-              className="flex-1 rounded border border-ink/15 px-2 py-1.5 text-sm"
+              className="min-w-[180px] flex-1 rounded border border-ink/15 px-2 py-1.5 text-sm"
             />
             <input
               value={noteDraft.topic}
