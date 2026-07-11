@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
-import { Mic, Send, Sparkles, Volume2, VolumeX, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router";
+import { GraduationCap, Mic, Send, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import { api, ApiRequestError } from "../lib/api";
+import { useToast } from "../lib/toast";
 import { Markdown } from "./Markdown";
 
 /**
@@ -13,10 +14,24 @@ import { Markdown } from "./Markdown";
  * conversation lives here, per tab.
  */
 
+interface Action {
+  type: "open" | "create_concept" | "create_trend_board" | "create_price_study" | "add_research_note";
+  label: string;
+  path?: string;
+  title?: string;
+  brief?: string;
+  name?: string;
+  category?: string;
+  market?: string;
+  bodyMd?: string;
+  directions?: { label: string; note?: string }[];
+}
+
 interface Turn {
   role: "user" | "assistant";
   content: string;
   sources?: { title: string; link: string }[];
+  actions?: Action[];
 }
 
 // Route-aware conversation starters: the first question a person on this
@@ -64,11 +79,22 @@ const speechText = (md: string): string =>
 
 export function Companion() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [speak, setSpeak] = useState(false);
+  // Plain-language mode: every trade term gets defined in plain words the
+  // moment it appears. Persisted — newcomers stay newcomers across pages.
+  const [plain, setPlain] = useState(() => {
+    try {
+      return localStorage.getItem("companion:plain") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [listening, setListening] = useState(false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -95,11 +121,11 @@ export function Companion() {
       setTurns((t) => [...t, { role: "user", content: q }]);
       try {
         const history = turns.map((t) => ({ role: t.role, content: t.content }));
-        const res = await api.post<{ answer: string; sources: { title: string; link: string }[] }>(
+        const res = await api.post<{ answer: string; sources: { title: string; link: string }[]; actions?: Action[] }>(
           "/api/admin/companion/ask",
-          { question: q, route: location.pathname, history },
+          { question: q, route: location.pathname, history, plain },
         );
-        setTurns((t) => [...t, { role: "assistant", content: res.answer, sources: res.sources }]);
+        setTurns((t) => [...t, { role: "assistant", content: res.answer, sources: res.sources, actions: res.actions }]);
         if (speak && speechSupported) {
           window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance(speechText(res.answer));
@@ -112,8 +138,45 @@ export function Companion() {
         setBusy(false);
       }
     },
-    [busy, turns, location.pathname, speak, speechSupported],
+    [busy, turns, location.pathname, speak, speechSupported, plain],
   );
+
+  // Proposed actions execute only on the user's click, through the same
+  // admin APIs (and the same permission checks) as doing it by hand.
+  const runAction = async (a: Action) => {
+    try {
+      switch (a.type) {
+        case "open":
+          if (a.path) navigate(a.path);
+          return;
+        case "create_concept": {
+          await api.post("/api/admin/ai/concepts", { title: a.title, brief: a.brief });
+          toast.success("Concept drafted — it's in the studio.");
+          navigate("/admin/ai-concepts");
+          return;
+        }
+        case "create_trend_board": {
+          await api.post("/api/admin/research/trends", { title: a.title, items: a.directions ?? [] });
+          toast.success("Board started.");
+          navigate("/admin/research/trends");
+          return;
+        }
+        case "create_price_study": {
+          await api.post("/api/admin/research/pricing", { name: a.name, category: a.category, market: a.market });
+          toast.success("Price study opened.");
+          navigate("/admin/research/pricing");
+          return;
+        }
+        case "add_research_note": {
+          await api.post("/api/admin/research/notes", { title: a.title, bodyMd: a.bodyMd ?? "" });
+          toast.success("Saved to research notes.");
+          return;
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Couldn't do that.");
+    }
+  };
 
   const toggleMic = () => {
     if (listening) {
@@ -156,10 +219,29 @@ export function Companion() {
           <Sparkles size={16} />
           <div>
             <p className="text-sm font-medium leading-tight">Verto Companion</p>
-            <p className="text-[0.65rem] text-white/60">Schooled on the masters. Knows every corner of Verto.</p>
+            <p className="text-[0.65rem] text-white/60">
+              {plain ? "Plain language on — every term explained." : "Schooled on the masters. Knows every corner of Verto."}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => {
+              setPlain((p) => {
+                try {
+                  localStorage.setItem("companion:plain", p ? "0" : "1");
+                } catch {
+                  /* private mode */
+                }
+                return !p;
+              });
+            }}
+            className={`rounded p-1.5 ${plain ? "bg-white/20" : "hover:bg-white/10"}`}
+            title={plain ? "Plain language is ON — trade terms get explained" : "Turn on plain language — every trade term explained as it appears"}
+            aria-label="Toggle plain language"
+          >
+            <GraduationCap size={15} />
+          </button>
           {speechSupported && (
             <button
               onClick={() => {
@@ -205,6 +287,19 @@ export function Companion() {
           ) : (
             <div key={i} className="mr-4 rounded-xl rounded-bl-sm border border-ink/10 bg-chalk px-3 py-2 text-sm [&_p]:text-sm">
               <Markdown text={t.content} headingBase={2} />
+              {t.actions && t.actions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {t.actions.map((a, ai) => (
+                    <button
+                      key={ai}
+                      onClick={() => void runAction(a)}
+                      className="rounded-lg bg-navy px-2.5 py-1.5 text-xs text-white hover:bg-navy/90"
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {t.sources && t.sources.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1 border-t border-ink/10 pt-2">
                   {t.sources.map((s, si) => (

@@ -1185,7 +1185,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Deposits & consult booking", "Request deposits and milestone payments per commission, and take consult requests from a public /book page."],
       ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
       ["The Verto School", "Courses in tailoring, seamstressing and fashion from the era's own masters — timed lessons you can read or listen to, illustrated with the original books' plates, server-graded examinations, and certificates verified by real work in your studio."],
-      ["The Verto Companion", "An assistant on every page, schooled on the nine courses and the whole manual — ask by voice or text, get the master's answer with a citation, and a link to the exact room in Verto."],
+      ["The Verto Companion", "An assistant on every page, schooled on the nine courses and the whole manual — ask by voice or text, get the master's answer with a citation, one-click next steps, and a plain-language mode that explains every trade term as it appears."],
       ["The Timeless Library", "The Met's open collection, every early Vogue and Harper's Bazar readable page by page, and the school's books — public domain, searchable, pinnable to trend boards with citations, and one click ports any plate into a new design as a studio reference."],
       ["Verto Certified badges", "Course badges, school diplomas and the Certified Studio mark — every certificate has a public verification link that can't be faked."],
       ["R&D research studio", "Maker research, brand dossiers, price studies, trend boards and stockist pipelines — live cited research in every room, one daily allowance."],
