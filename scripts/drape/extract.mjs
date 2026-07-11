@@ -461,10 +461,14 @@ const BLOCKS = {
     },
     // Pattern y=0 is the underbust line: hpsToWaistFront(505) - waistToUnderbust(110).
     yOffset: 395,
+    // The LOWER mannequin: the upper body ends at the hips with a flat rim
+    // and the corset's hem placed at that rim slid clean off the open end
+    // (bakes 1-2 ended with no cloth in frame). The brief body's hip flare
+    // and legs below are what actually stop a cinched ring from walking
+    // down — same reason real corsets stay put.
+    bodyKind: "brief",
     // Panel edges under real cinch tension: uma-class hauling force.
-    // Friction high: nothing pins a corset — it GRIPS. Frictionless, the
-    // cinch tension walked the whole ring down off its zone over the bake
-    // (placement frame 0 sat perfectly).
+    // Friction high: nothing pins a corset — it GRIPS.
     sim: { sewForce: 6, friction: 70 },
   },
   bruce: {
