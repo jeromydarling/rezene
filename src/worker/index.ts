@@ -51,6 +51,7 @@ import { adminKbRoutes } from "./routes/admin-kb";
 import { adminSourcingRoutes } from "./routes/admin-sourcing";
 import { adminResearchRoutes } from "./routes/admin-research";
 import { adminResearchPlusRoutes } from "./routes/admin-research-plus";
+import { adminSchoolRoutes } from "./routes/admin-school";
 import { adminAutomationRoutes } from "./routes/admin-automations";
 import { adminUndoRoutes } from "./routes/admin-undo";
 import { adminDomainRoutes } from "./routes/admin-domain";
@@ -236,6 +237,69 @@ app.get("/sitemap.xml", async (c) => {
   await c.env.KV.put(cacheKey, xml, { expirationTtl: 3600 });
   return c.text(xml, 200, { "content-type": "application/xml", "cache-control": "public, max-age=3600" });
 });
+// Public certificate verification page — server-rendered so the credential
+// link works everywhere (previews, printouts, no-JS), and because the page
+// IS the anti-forgery: a badge image can be copied; this URL cannot.
+app.get("/certified/:id", async (c) => {
+  const id = c.req.param("id");
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  let cert: {
+    user_name: string;
+    shop_slug: string;
+    title: string;
+    scope: string;
+    curriculum_version: string;
+    issued_at: string;
+    revoked: number;
+  } | null = null;
+  if (/^crt_[0-9a-f]{24}$/.test(id)) {
+    cert = await c.env.DB.prepare(
+      `SELECT user_name, shop_slug, title, scope, curriculum_version, issued_at, revoked
+       FROM school_certificates WHERE id = ?`,
+    )
+      .bind(id)
+      .first();
+  }
+  const body = cert
+    ? `<p class="eyebrow">${cert.revoked ? "REVOKED CERTIFICATE" : "VERIFIED CERTIFICATE"}</p>
+       <h1>${escapeHtml(cert.user_name)}</h1>
+       <p class="what">has completed <strong>${escapeHtml(cert.title)}</strong> at the Verto School${
+         cert.scope === "course" ? "" : cert.scope === "school" ? " — full school diploma" : " — Verto Certified Studio"
+       }.</p>
+       <dl>
+         <dt>Studio</dt><dd>${escapeHtml(cert.shop_slug)}</dd>
+         <dt>Issued</dt><dd>${escapeHtml(cert.issued_at.slice(0, 10))}</dd>
+         <dt>Curriculum</dt><dd>v${escapeHtml(cert.curriculum_version)}</dd>
+         <dt>Credential</dt><dd>${escapeHtml(id)}</dd>
+       </dl>
+       ${cert.revoked ? '<p class="revoked">This certificate has been revoked and is no longer valid.</p>' : ""}`
+    : `<p class="eyebrow">NOT FOUND</p>
+       <h1>No such certificate</h1>
+       <p class="what">This credential id doesn't resolve. A Verto certificate link only exists if the certificate was actually earned.</p>`;
+  return c.html(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Certificate verification — Verto School</title>
+<meta name="robots" content="noindex">
+<style>
+  body{margin:0;font-family:Georgia,'Times New Roman',serif;background:#1f2a44;color:#f5f1e8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{max-width:560px;width:100%;background:#f5f1e8;color:#1f2a44;border-radius:14px;padding:44px 40px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+  .eyebrow{font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px;letter-spacing:.22em;color:#b4573e;margin:0 0 14px}
+  h1{font-weight:400;font-size:32px;margin:0 0 10px}
+  .what{font-size:16px;line-height:1.55;margin:0 0 22px}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;border-top:1px solid rgba(31,42,68,.15);padding-top:18px;margin:0}
+  dt{color:rgba(31,42,68,.55);text-transform:uppercase;letter-spacing:.08em;font-size:10px;align-self:center}
+  dd{margin:0}
+  .revoked{color:#a33;font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px}
+  .foot{margin-top:26px;font-family:ui-sans-serif,system-ui,sans-serif;font-size:12px;color:rgba(31,42,68,.55)}
+  .foot a{color:#1f2a44}
+</style></head><body><main class="card">${body}
+<p class="foot">Verto School certificates are earned through timed lessons, randomized server-graded examinations, and verified studio work — <a href="/why">about Verto</a>.</p>
+</main></body></html>`,
+    cert ? 200 : 404,
+  );
+});
+
 app.get("/robots.txt", (c) => {
   const url = new URL(c.req.url);
   // The sitemap reference must live on the SAME host — a custom-domain shop
@@ -350,6 +414,7 @@ admin.route("/feedback", adminFeedbackRoutes);
 admin.route("/sourcing", adminSourcingRoutes);
 admin.route("/research", adminResearchRoutes);
 admin.route("/research", adminResearchPlusRoutes);
+admin.route("/school", adminSchoolRoutes);
 admin.route("/automations", adminAutomationRoutes);
 admin.route("/undo", adminUndoRoutes);
 admin.route("/domain", adminDomainRoutes);

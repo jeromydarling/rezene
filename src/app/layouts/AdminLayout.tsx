@@ -52,6 +52,7 @@ import {
   Truck,
   Undo2,
   Users,
+  GraduationCap,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
@@ -160,6 +161,7 @@ const NAV_SECTIONS: {
       { to: "/admin/automations", label: "Automations", icon: Zap },
       { to: "/admin/domain", label: "Custom Domain", icon: Globe },
       { to: "/admin/team", label: "Team", icon: UsersRound },
+      { to: "/admin/school", label: "Verto School", icon: GraduationCap },
       { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },
     ],
   },

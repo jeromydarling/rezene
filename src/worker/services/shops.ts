@@ -68,6 +68,7 @@ export const RESERVED_SLUGS = new Set([
   "sitemap.xml",
   "robots.txt",
   "favicon.ico",
+  "certified", // public School certificate verification pages
 ]);
 
 export async function getShopBySlug(db: D1Database, slug: string): Promise<Shop | null> {
