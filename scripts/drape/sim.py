@@ -722,7 +722,12 @@ def place(piece, x, y):
         # both pieces (capTopY: the topsleeve's cap apex), else the shorter
         # undersleeve would hang its own min-y from the shoulder and sit
         # ~60mm high against every edge seam it must meet.
-        u = y - float(pl.get("capTopY", sleeve_miny[piece["name"]]))
+        # Drop-shoulder cuts (Diana: shoulder point 70mm past the joint)
+        # carry the armscye DOWN THE ARM — the cap must start there too, or
+        # the pinned cap and the pinned body shoulder fight across the drop
+        # and the springs tear the cloth between them (the huey pin lesson,
+        # sideways).
+        u = y - float(pl.get("capTopY", sleeve_miny[piece["name"]])) + float(pl.get("u0", 0.0))
     o, ax, e1, e2 = arm_frame(pl["dir"])
     c, s_ = r * math.cos(theta), r * math.sin(theta)
     wx = o[0] + u * ax[0] + c * e1[0]

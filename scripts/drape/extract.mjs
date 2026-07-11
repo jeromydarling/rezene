@@ -298,6 +298,9 @@ const BLOCKS = {
     // garment, so the front neckline is NOT pinned (cowlFront names it
     // past the sim's neck-pinning rule); shoulders and back neck hold.
     cowlFront: true,
+    // Diana's shoulder point sits 70mm past the Brian-family joint — a
+    // drop-shoulder cut whose armscye lies along the upper arm.
+    dropShoulder: true,
     parts: { front: "diana.front", back: "diana.back", sleeve: "diana.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
     sim: { bending: 1.5 },
@@ -2300,8 +2303,15 @@ if (hasSleeves) {
   // Ribbed cuffs grip the wrist: pin the sleeve hem ring so the sleeve
   // blouses naturally instead of accordion-sliding down the arm.
   const pinSegments = cfg.cuffed ? ["hem"] : [];
-  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper, ...raglan };
-  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper, ...raglan };
+  // Drop-shoulder cuts carry the armscye down the arm: start the cap there
+  // (u0 = how far the drafted shoulder point extends past the block
+  // family's standard joint), or the pinned cap and pinned body shoulder
+  // tear the cloth between them.
+  const drop = cfg.dropShoulder
+    ? { u0: Math.max(0, Math.abs(set[cfg.parts.front].points.shoulder.x) - 223) }
+    : {};
+  sleeves[0].placement = { kind: "sleeve", dir: 1, ...taper, ...raglan, ...drop };
+  sleeves[1].placement = { kind: "sleeve", dir: -1, ...taper, ...raglan, ...drop };
   sleeves[0].pinSegments = pinSegments;
   sleeves[1].pinSegments = pinSegments;
 }
