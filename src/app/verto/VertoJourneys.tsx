@@ -2,11 +2,14 @@ import { useNavigate } from "react-router";
 import { MagneticButton, ParallaxImage, ParticleField, Reveal } from "./cinema";
 
 /**
- * /stories — two founding journeys, told hour by hour. The features page
- * says what Verto does; this page shows a life changing around it: a
- * tailor going from zero to a paying client overnight, and a label going
- * from a blank screen to money in the till. Same cinematic grammar as
- * /why: reveals pace the narrative, one anchored image per act.
+ * /stories — founding journeys, told hour by hour. The features page says
+ * what Verto does; this page shows a life changing around it: a tailor
+ * going from zero to a paying client overnight, a label going from a blank
+ * screen to money in the till, a founder deciding a season on evidence
+ * instead of feelings, and an established brand moving in over one
+ * afternoon. Same cinematic grammar as /why: reveals pace the narrative,
+ * one anchored image per act, light and dark sections alternating. Every
+ * beat is a shipped feature wearing a person; every story ends at money.
  */
 
 const TAILOR_BEATS: { time: string; beat: string; detail: string }[] = [
@@ -56,7 +59,7 @@ const TAILOR_BEATS: { time: string; beat: string; detail: string }[] = [
     time: "Day three",
     beat: "She finds her maker.",
     detail:
-      "Amara designs and fits; someone else sews. Verto's sourcing research turns up a small workshop forty minutes away that takes single tailored pieces at around $220 cut-and-make — and the pattern, the drape, and the fitting notes travel to them as one clean brief. The deposit already covers the make before a metre of wool is bought.",
+      "Amara designs and fits; someone else sews. Verto's sourcing research turns up a small workshop forty minutes away that takes single tailored pieces at around $220 cut-and-make — and the pattern, the drape, and the fitting notes travel to them as one clean brief. The two runners-up stay warm in her R&D pipeline for the week she needs more hands. The deposit already covers the make before a metre of wool is bought.",
   },
 ]
 
@@ -95,7 +98,97 @@ const LABEL_BEATS: { time: string; beat: string; detail: string }[] = [
     time: "Week two",
     beat: "Money arrives before production does.",
     detail:
-      "The overshirt goes up for pre-order at $145. His Verto cost sheet — not a guess — says $46 landed: $14 cloth, $23 cut-and-sew, $4 trims and packaging, $5 freight and duties. Forty-four pre-orders in two weeks banks $6,380 against a $2,760 run of sixty. The campaign, written in his voice for his edit, did the selling.",
+      "The overshirt goes up for pre-order at $145 — mid-band in his R&D price study of real comparables, not a number pulled from the air. His Verto cost sheet — not a guess — says $46 landed: $14 cloth, $23 cut-and-sew, $4 trims and packaging, $5 freight and duties. Forty-four pre-orders in two weeks banks $6,380 against a $2,760 run of sixty. The campaign, written in his voice for his edit, did the selling.",
+  },
+];
+
+const FOUNDER_BEATS: { time: string; beat: string; detail: string }[] = [
+  {
+    time: "Sunday, 4:00 pm",
+    beat: "She names the competition.",
+    detail:
+      "Leila's label is two years old, and every price she has ever set was a feeling. She opens R&D and adds the three brands her customer cross-shops. One research pass each builds the dossier: who they sell to, what things actually cost, whose racks they hang on — every claim with its source sitting underneath it.",
+  },
+  {
+    time: "4:30 pm",
+    beat: "Two go on watch.",
+    detail:
+      "The direct competitors get the watch flag. From now on Verto re-researches them about once a week and tells her what changed — a price move, a new stockist, a campaign — in the same morning digest that chases her late samples. Competitive research stops being a thing she means to do.",
+  },
+  {
+    time: "5:00 pm",
+    beat: "The price question gets a study.",
+    detail:
+      "“Linen maxi dress — US direct-to-consumer.” The comps table fills with real garments at real prices, from a $69 fast-fashion maxi to a $420 hand-woven one, each with its fabric and where it's made. The defensible band for a label with a making story reads clearly: $125–265.",
+  },
+  {
+    time: "5:20 pm",
+    beat: "The number lands in costing.",
+    detail:
+      "She decides $145 and pushes it straight into the style's cost sheet. Margin appears next to the cloth she already priced: 62 points. The season's first price is a decision with receipts — and when a buyer later asks “why $145?”, she has an answer that isn't a shrug.",
+  },
+  {
+    time: "That evening",
+    beat: "A direction earns its place.",
+    detail:
+      "Her trend board on fluid tailoring comes back grounded: who's actually showing it, which cloths carry the look, and how to cut it small-batch without chasing drops. She adopts the board and the brief lands in the Design Studio as a concept, directions attached, ready to generate.",
+  },
+  {
+    time: "Tuesday, week two",
+    beat: "The digest catches a move.",
+    detail:
+      "“Watched brand refreshed — see what changed.” Her closest competitor raised knit prices and landed two new boutiques; the dossier keeps the old version as a snapshot, so the change is a diff, not a memory. She adjusts nothing yet. But she knows, and knowing cost her nothing.",
+  },
+  {
+    time: "Week three",
+    beat: "She pitches the doors that already believe.",
+    detail:
+      "Her stockist list started inside the dossiers — the boutiques already carrying her comp set, profiled with what they stock and how they buy. Two pitched, one in talks. When the buyer says yes, they sign into her wholesale portal and write the first order at their own pricing, net terms attached.",
+  },
+];
+
+const SWITCHER_BEATS: { time: string; beat: string; detail: string }[] = [
+  {
+    time: "Saturday, 10:00 am",
+    beat: "She exports four years of business.",
+    detail:
+      "Nadia's label is real — forty styles, three makers, a season mid-flight — and it lives in spreadsheets, a template storefront, and DM threads. Moving always felt like moving house. She exports three CSVs from her old tools and signs up.",
+  },
+  {
+    time: "10:20 am",
+    beat: "The catalog imports itself.",
+    detail:
+      "The Import Studio reads her odd column names, maps them to fields on its own, and flags the two rows missing prices instead of choking on them. Forty products land with their variants, images queued to follow. She corrects one mapping. That was the migration.",
+  },
+  {
+    time: "11:00 am",
+    beat: "Her makers become records.",
+    detail:
+      "The maker spreadsheet lands in R&D with its research phrasing intact — “1–50 (managed)”, “2–4 wks sample” stay as words, because flattening them to a number would lie. The three workshops she actually works with get promoted into Factories & Suppliers and marked verified; the maybes stay warm in the pipeline.",
+  },
+  {
+    time: "Noon",
+    beat: "The season in flight comes with her.",
+    detail:
+      "The two purchase orders sitting at factories go onto the board with their real dates. The sample ladder picks up mid-rung — one style at proto, one waiting on a fit sample. Nothing pretends the season started today.",
+  },
+  {
+    time: "2:00 pm",
+    beat: "Materials carry their origins.",
+    detail:
+      "Her linen, her trims, the mills they come from and the countries they ship from — entered once, then working everywhere: landed-cost math, duty estimates, and the product passports her stockists have started asking about.",
+  },
+  {
+    time: "3:00 pm",
+    beat: "The domain follows her.",
+    detail:
+      "She points her domain at Verto and saves it in settings. The certificate issues; the first visit over HTTPS flips it live automatically. Her customers never see the move happen — Saturday afternoon, the same address, a better shop behind it.",
+  },
+  {
+    time: "Monday morning",
+    beat: "The season starts running itself.",
+    detail:
+      "A sample approval drafts its own purchase order. The confirmed PO files its own chase task for the promised date. Her digest lists the three things that actually need her, and the calendar filled itself in from orders and fittings she never typed twice. Four years of spreadsheet discipline, replaced in an afternoon.",
   },
 ];
 
@@ -140,7 +233,7 @@ export function VertoJourneys() {
         <ParticleField />
         <div className="relative mx-auto w-full max-w-6xl px-5 pb-20 pt-40 text-chalk">
           <Reveal>
-            <p className="eyebrow mb-4 !text-chalk/70">Two stories</p>
+            <p className="eyebrow mb-4 !text-chalk/70">Four stories</p>
           </Reveal>
           <Reveal delay={150}>
             <h1 className="max-w-3xl font-display text-4xl font-light md:text-6xl">
@@ -149,9 +242,10 @@ export function VertoJourneys() {
           </Reveal>
           <Reveal delay={300}>
             <p className="prose-editorial mt-6 max-w-2xl !text-chalk/80">
-              Not a feature list — two nights and the mornings after them. A stylist with a phone
-              full of people asking for jackets. A designer with a capsule in his head and no
-              factory. Here's how each of them gets to money.
+              Not a feature list — four people and the hours that changed their businesses. A
+              stylist with a phone full of people asking for jackets. A designer with a capsule in
+              his head and no factory. A founder tired of pricing by feel. A label four years deep
+              in spreadsheets. Here's how each of them gets to money.
             </p>
           </Reveal>
         </div>
@@ -251,11 +345,107 @@ export function VertoJourneys() {
         </div>
       </section>
 
+      {/* Story three: the founder — a season decided on evidence. */}
+      <section className="mx-auto max-w-6xl px-5 py-24">
+        <Reveal>
+          <p className="eyebrow mb-3">Story three · The founder</p>
+        </Reveal>
+        <Reveal delay={150}>
+          <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
+            A season decided on evidence, not vibes.
+          </h2>
+        </Reveal>
+        <Reveal delay={250}>
+          <p className="prose-editorial mt-4 max-w-2xl">
+            Leila can design and she can make. What has always been foggy is everything around the
+            work: what the competition actually charges, what her linen maxi should retail for,
+            which direction deserves the season, and which boutiques would ever say yes. Big brands
+            have research departments for those questions. She has a Sunday afternoon and R&D.
+          </p>
+        </Reveal>
+        <StoryTimeline beats={FOUNDER_BEATS} />
+        <Reveal delay={200}>
+          <p className="prose-editorial mt-10 max-w-2xl text-lg">
+            Nothing in her season is a feeling anymore. The price has comparables, the direction
+            has sources, the pitch list came from evidence — and the watching continues while she
+            cuts. She spent one afternoon deciding and kept the receipts.
+          </p>
+        </Reveal>
+      </section>
+
+      {/* Interlude image two. */}
+      <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-24 md:grid-cols-2">
+        <div className="md:order-2">
+          <Reveal>
+            <ParallaxImage
+              src="/verto/wall.jpg"
+              alt="A studio wall of pinned research, swatches and photographs"
+              speed={0.3}
+              className="aspect-[3/4] max-h-[70vh]"
+            />
+          </Reveal>
+        </div>
+        <div className="md:order-1">
+          <Reveal delay={150}>
+            <p className="eyebrow mb-3">The point</p>
+          </Reveal>
+          <Reveal delay={250}>
+            <h2 className="font-display text-3xl font-light md:text-4xl">
+              Research you can act on keeps its receipts.
+            </h2>
+          </Reveal>
+          <Reveal delay={350}>
+            <p className="prose-editorial mt-4">
+              Every founder does this research already — in seventeen tabs, a screenshot folder,
+              and a note that says “competitor raised prices??”. It evaporates. In Verto every
+              answer lands with its sources attached, every dossier remembers what it said last
+              month, and the decisions flow into the tools that spend the money: the cost sheet,
+              the Design Studio, the pitch list.
+            </p>
+          </Reveal>
+          <Reveal delay={450}>
+            <p className="prose-editorial mt-4">
+              And the watching runs on the same allowance as your own questions, capped and
+              honest — an assistant, not a meter that spins while you sleep.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Story four: the switcher — an established brand moves in. */}
+      <section className="bg-navy text-chalk">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <Reveal>
+            <p className="eyebrow mb-3 !text-chalk/50">Story four · The switcher</p>
+          </Reveal>
+          <Reveal delay={150}>
+            <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
+              Four years of business, moved in one afternoon.
+            </h2>
+          </Reveal>
+          <Reveal delay={250}>
+            <p className="prose-editorial mt-4 max-w-2xl !text-chalk/80">
+              Nadia isn't starting — she's switching, which is scarier. A real catalog, real
+              makers, a season already at the factory, customers who know her address. The move
+              only works if nothing gets dropped and nobody notices the seams.
+            </p>
+          </Reveal>
+          <StoryTimeline beats={SWITCHER_BEATS} dark />
+          <Reveal delay={200}>
+            <p className="prose-editorial mt-10 max-w-2xl text-lg !text-chalk/80">
+              Sunday she did nothing, because nothing needed her. The catalog, the makers, the
+              season, the domain — all of it moved; none of it broke. The only thing she left
+              behind was the spreadsheet.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
       {/* Close: the invitation. */}
       <section className="mx-auto max-w-6xl px-5 py-24 text-center">
         <Reveal>
           <h2 className="mx-auto max-w-2xl font-display text-3xl font-light md:text-5xl">
-            Both stories start the same way.
+            Every story starts the same way.
           </h2>
         </Reveal>
         <Reveal delay={200}>
