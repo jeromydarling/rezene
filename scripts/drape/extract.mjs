@@ -448,10 +448,11 @@ const BLOCKS = {
     // crotch seams had to dive a full keel-depth (287mm start gaps).
     yOffset: 580,
     bodyKind: "brief",
-    // Force 6: between uma's 5 (short gusset hauls) and waralee's 8 — the
-    // crotch seams span the keel from three directions (back wings, front
-    // tusks, inset tips) and start wider than uma's gusset pairs.
-    sim: { sewForce: 6, bending: 1.5 },
+    // Force 8 (waralee's crotch number): at 6 the sprung pouch/crotch
+    // seams closed to ~50mm but left the bunched inset-tip cloth dangling
+    // as a knot under the pouch. The panel seams are bridged, so the high
+    // force only acts on the crotch cluster.
+    sim: { sewForce: 8, bending: 1.5 },
   },
 };
 
