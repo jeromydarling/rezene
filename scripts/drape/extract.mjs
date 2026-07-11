@@ -1387,7 +1387,13 @@ function bruceInset(pieceName, mirrored) {
   const notchY = SP.topRight.y + (SP.bottomRight.y - SP.topRight.y) * t;
   const dy = notchY - P.topLeft.y;
   const seg = (pts) => {
-    const ring = pts.map(([x, y]) => [FP.midRight.x - x, y + dy]);
+    // Clamp at CF+6: the drafted tip is 30mm wider than the arc from the
+    // side seam to centre front, and letting it CROSS CF stacked the two
+    // insets against each other's seam targets — the crotch seams then
+    // pulled them THROUGH each other and the pouch baked as a twisted
+    // knot. Clamped, the tip cloth starts slightly bunched on its own
+    // side and the seams pull it under instead.
+    const ring = pts.map(([x, y]) => [Math.max(6, FP.midRight.x - x), y + dy]);
     return mirrored ? mirror(ring) : ring;
   };
   return buildPiece(pieceName, [
@@ -1899,8 +1905,10 @@ if (cfg.trousers) {
   // The insets ride the same ring, tips layered over the tusks (and each
   // other) around CF like a placket stack — the crotch seams pull the
   // layers apart and under during the bake.
+  // Same outset both sides: clamped at CF they no longer overlap each
+  // other, only the tusk layer beneath.
   insetR.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true, outset: 6 };
-  insetL.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true, outset: 12 };
+  insetL.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true, outset: 6 };
   for (const p of [front, back, sideL, sideR, insetR, insetL]) {
     p.uniformWrap = true; // keep the generic pass from overwriting it
     p.widthProfile = combined;
