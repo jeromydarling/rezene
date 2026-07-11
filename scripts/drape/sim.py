@@ -440,8 +440,11 @@ def place(piece, x, y):
         # line (near 0 depth) where the pins hold front and back together.
         _, tb = torso_ab(y)
         # `outset` layers overlapping panels (a shirt's button stand) so the
-        # closed placket stacks instead of interpenetrating.
-        wrapped = side * (tb + 15.0 + float(pl.get("outset", 0.0))) * math.cos(phi)
+        # closed placket stacks instead of interpenetrating. The cowl fold's
+        # own outward layering (_cowl_ou) stacks the folded rows OUTSIDE the
+        # chest cloth they lie over — without it the two layers start at the
+        # identical depth and self-collision presses the band through.
+        wrapped = side * (tb + 15.0 + float(pl.get("outset", 0.0)) + _cowl_ou) * math.cos(phi)
         # The panel hangs from its own top edge (shoulder seam, tank strap or
         # raglan diagonal — extract emits the profile): at the top edge it
         # sits near centre depth, sweeping onto the wrapped chest as it
