@@ -21,6 +21,26 @@ import type {
 
 export const publicRoutes = new Hono<AppContext>();
 
+// ---------- Verto School certifications (public, storefront badge) ----------
+// Certificates live in the PLATFORM database; a shop wears the badge while a
+// certified person belongs to it. Best credential first (studio > school >
+// course); each carries its public verification link.
+publicRoutes.get("/certifications", async (c) => {
+  try {
+    const rows = await all<{ id: string; scope: string; title: string; user_name: string }>(
+      c.env.DB,
+      `SELECT id, scope, title, user_name FROM school_certificates
+       WHERE shop_id = ? AND revoked = 0
+       ORDER BY CASE scope WHEN 'studio' THEN 0 WHEN 'school' THEN 1 ELSE 2 END, issued_at DESC
+       LIMIT 6`,
+      c.var.shopId,
+    );
+    return c.json(rows.map((r) => ({ id: r.id, scope: r.scope, title: r.title, holder: r.user_name })));
+  } catch {
+    return c.json([]);
+  }
+});
+
 // ---------- Brand settings ----------
 publicRoutes.get("/settings", async (c) => {
   const rows = await all<{ key: string; value: string }>(

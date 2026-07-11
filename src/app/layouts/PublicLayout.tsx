@@ -7,6 +7,34 @@ import { BrandMark, paletteVars, typographyVars } from "../components/BrandMark"
 import { useCart } from "../lib/cart";
 import { useLang } from "../lib/lang";
 import { NewsletterForm } from "../components/LeadForm";
+import { api } from "../lib/api";
+
+/** The Verto School badge: shown when someone at this shop holds a
+ *  certificate; the link IS the credential (public verification page). */
+function CertifiedBadge() {
+  const [certs, setCerts] = useState<{ id: string; scope: string; title: string }[]>([]);
+  useEffect(() => {
+    api
+      .get<{ id: string; scope: string; title: string }[]>("/api/public/certifications")
+      .then((rows) => setCerts(rows.slice(0, 1)))
+      .catch(() => setCerts([]));
+  }, []);
+  if (!certs.length) return null;
+  const best = certs[0];
+  return (
+    <p>
+      <a
+        href={`/certified/${best.id}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1 text-chalk/70 underline decoration-chalk/30 hover:text-chalk"
+        title="Verified Verto School credential — click to check it"
+      >
+        ◈ {best.scope === "studio" ? "Verto Certified Studio" : `Verto School certified — ${best.title}`}
+      </a>
+    </p>
+  );
+}
 
 // Pre-fetch fallbacks — the live menus are data (Admin → Content → Pages).
 const DEFAULT_NAV = [
@@ -156,8 +184,11 @@ export function PublicLayout() {
             <NewsletterForm kind="waitlist" dark />
           </div>
         </div>
-        <div className="border-t border-chalk/10 px-5 py-4 text-center text-xs text-chalk/50">
-          © {new Date().getFullYear()} {brand.brandName} · Produced in Casablanca, Morocco
+        <div className="space-y-1 border-t border-chalk/10 px-5 py-4 text-center text-xs text-chalk/50">
+          <CertifiedBadge />
+          <p>
+            © {new Date().getFullYear()} {brand.brandName} · Produced in Casablanca, Morocco
+          </p>
         </div>
       </footer>
     </div>
