@@ -42,7 +42,7 @@ function FileThumb({ file }: { file: AdminFile }) {
   if (isImage) {
     return (
       <img
-        src={`/api/admin/files/${file.id}/download`}
+        src={`/api/admin/files/${file.id}/thumb`}
         alt={file.altText ?? file.filename}
         loading="lazy"
         onError={() => setBroken(true)}
