@@ -309,6 +309,21 @@ const BLOCKS = {
     // 0.8 gives a true-scale arm; cuffEase 30 buys the last few mm at the
     // wrist. Together they make the tube geometrically closable.
     draftOptions: { cuffEase: 0.3 },
+    // PARKED after nine bakes. Solved along the way (kept): the fitted
+    // knit sleeve tube is geometrically closable (armScale + cuffEase),
+    // the cowl folds over the chest (placement outset fix), and the
+    // preClose warp attaches the drop-shoulder armscye (85-96mm radial
+    // start gap -> 6mm; the body panel wraps the TORSO ellipse while the
+    // cap rings the ARM axis, so no spring force ever closed it).
+    // Falsified: cap-zone stub clamp, axial u0 (0 vs 70mm differ <4mm —
+    // the gap is radial), sewForce 6 (armscye unmoved, sleeves ruche),
+    // preClose alone (targets inside the arm stub trap cloth in the
+    // collider — holes down the upper arm), preClose + arm push-out
+    // (re-inflating the cap gathers its ease into puff-shoulder ruffles,
+    // the exact regression the socket-alignment NOTE in sim.py recorded),
+    // and cowl clearance 8 -> 20mm (the mid-chest see-through band is NOT
+    // the fold edge pressing — cause still unknown). Ships only with true
+    // co-draped assembled placement, same as bruce/tamiko/waralee.
     sim: { bending: 1.5, armScale: 0.8 },
   },
   brian: {
@@ -2754,10 +2769,15 @@ const seams = cfg.trousers
       { name: "side_L", a: ["front", "sideL"], b: ["back", "sideL"] },
       ...(hasSleeves
         ? [
-            { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["sleeve_R", "capFront"] },
-            { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"] },
-            { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["sleeve_L", "capFront"] },
-            { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"] },
+            // Drop-shoulder blocks (diana) pre-close the armscye at placement:
+            // the body's armscye edge wraps around the TORSO ellipse while the
+            // cap rings the ARM axis — the seam starts 85-96mm apart radially
+            // and no spring force spans that (u0 0 vs 70 differ by <4mm). The
+            // warp drags the cap onto the body edge before the sim starts.
+            { name: "armscye_R_front", a: ["front", "armscyeR"], b: ["sleeve_R", "capFront"], ...(cfg.dropShoulder ? { preClose: true } : {}) },
+            { name: "armscye_R_back", a: ["back", "armscyeR"], b: ["sleeve_R", "capBack"], ...(cfg.dropShoulder ? { preClose: true } : {}) },
+            { name: "armscye_L_front", a: ["front", "armscyeL"], b: ["sleeve_L", "capFront"], ...(cfg.dropShoulder ? { preClose: true } : {}) },
+            { name: "armscye_L_back", a: ["back", "armscyeL"], b: ["sleeve_L", "capBack"], ...(cfg.dropShoulder ? { preClose: true } : {}) },
             { name: "underarm_R", a: ["sleeve_R", "edgeR"], b: ["sleeve_R", "edgeL"] },
             { name: "underarm_L", a: ["sleeve_L", "edgeR"], b: ["sleeve_L", "edgeL"] },
           ]
