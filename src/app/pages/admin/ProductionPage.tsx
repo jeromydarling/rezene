@@ -1,6 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { Link } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
+import { useToast } from "../../lib/toast";
 import { formatDate, titleCase } from "../../lib/format";
 import {
   EmptyState,
@@ -26,6 +28,7 @@ const KANBAN_COLUMNS: { status: AdminProductionTask["status"]; label: string }[]
 type View = "kanban" | "table" | "timeline";
 
 export function ProductionPage() {
+  const toast = useToast();
   const tasks = useFetch<AdminProductionTask[]>("/api/admin/production/tasks");
   const calendar = useFetch<AdminCalendarEvent[]>("/api/admin/production/calendar");
   const stages = useFetch<AdminProductionStage[]>("/api/admin/production/stages");
@@ -38,9 +41,16 @@ export function ProductionPage() {
   }
 
   async function deleteTask(task: AdminProductionTask) {
-    if (!window.confirm(`Delete task "${task.title}"?`)) return;
-    await api.delete(`/api/admin/production/tasks/${task.id}`);
+    // No confirm dialog — the undo toast IS the safety net.
+    const res = await api.delete<{ ok: boolean; undoId?: string }>(`/api/admin/production/tasks/${task.id}`);
     tasks.reload();
+    if (res.undoId) {
+      const undoId = res.undoId;
+      toast.undo(`Deleted “${task.title}”.`, async () => {
+        await api.post(`/api/admin/undo/${undoId}`, {});
+        tasks.reload();
+      });
+    }
   }
 
   const byStatus = useMemo(() => {
@@ -209,10 +219,21 @@ function TimelineView({ events, loading }: { events: AdminCalendarEvent[]; loadi
         return (
           <div key={e.id} className="grid grid-cols-[200px_1fr] items-center gap-4">
             <div>
-              <p className="truncate text-sm font-medium">{e.title}</p>
+              {e.href ? (
+                <Link to={e.href} className="block truncate text-sm font-medium hover:underline">
+                  {e.title}
+                </Link>
+              ) : (
+                <p className="truncate text-sm font-medium">{e.title}</p>
+              )}
               <p className="text-xs text-warmgrey">
                 {formatDate(e.startsOn)}
                 {e.endsOn ? ` → ${formatDate(e.endsOn)}` : ""}
+                {e.source ? (
+                  <span className="ml-1.5 rounded bg-ink/5 px-1 py-0.5 text-[10px] uppercase tracking-wide text-ink/50">
+                    auto · {e.source}
+                  </span>
+                ) : null}
               </p>
             </div>
             <div className="relative h-5 rounded bg-ink/5">

@@ -18,6 +18,35 @@ function issueDate(): string {
   }
 }
 
+interface AttentionItem {
+  label: string;
+  count: number;
+  href: string;
+}
+
+/** What's STUCK — overdue tasks, orders past ex-factory, unanswered makers.
+ *  The calendar says what's scheduled; this card says what needs a human. */
+function AttentionCard() {
+  const { data } = useFetch<{ items: AttentionItem[] }>("/api/admin/dashboard/attention");
+  if (!data || data.items.length === 0) return null;
+  return (
+    <div className="mb-8 rounded-xl border border-terracotta/30 bg-terracotta/5 p-4">
+      <p className="text-[0.66rem] font-medium uppercase tracking-editorial text-terracotta">
+        Needs your attention
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+        {data.items.map((it) => (
+          <li key={it.label}>
+            <Link to={it.href} className="text-sm text-ink hover:underline">
+              <span className="font-semibold">{it.count}</span> {it.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const { data, loading, error } = useFetch<DashboardSummary>("/api/admin/dashboard");
 
@@ -32,6 +61,7 @@ export function DashboardPage() {
         </p>
       </div>
 
+      <AttentionCard />
       {error && <ErrorNote message={error} />}
       {loading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

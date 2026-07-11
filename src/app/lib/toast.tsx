@@ -18,6 +18,8 @@ export interface Toast {
   detail?: string;
   /** ms before auto-dismiss; errors linger, successes are brief. 0 = sticky. */
   duration?: number;
+  /** Optional action button (e.g. Undo) — runs, then dismisses. */
+  action?: { label: string; run: () => void | Promise<void> };
 }
 
 type Listener = (t: Omit<Toast, "id">) => void;
@@ -46,6 +48,8 @@ interface ToastApi {
   success: (message: string, detail?: string) => void;
   error: (message: string, detail?: string) => void;
   info: (message: string, detail?: string) => void;
+  /** A success toast with an action button — the undo pattern. */
+  undo: (message: string, run: () => void | Promise<void>) => void;
   dismiss: (id: string) => void;
 }
 
@@ -81,6 +85,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     success: (message, detail) => push({ kind: "success", message, detail }),
     error: (message, detail) => push({ kind: "error", message, detail }),
     info: (message, detail) => push({ kind: "info", message, detail }),
+    undo: (message, run) => push({ kind: "success", message, duration: 8000, action: { label: "Undo", run } }),
     dismiss,
   };
 
@@ -121,6 +126,18 @@ function Toaster({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: strin
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">{t.message}</p>
             {t.detail && <p className="mt-0.5 text-xs opacity-80">{t.detail}</p>}
+            {t.action && (
+              <button
+                type="button"
+                onClick={() => {
+                  void t.action!.run();
+                  onDismiss(t.id);
+                }}
+                className="mt-1.5 rounded border border-current px-2 py-0.5 text-xs font-medium hover:bg-white/60"
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
           <button
             type="button"

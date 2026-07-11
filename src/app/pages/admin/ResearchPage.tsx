@@ -3,6 +3,7 @@ import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { api } from "../../lib/api";
 import { useFetch } from "../../lib/useFetch";
 import { useToast } from "../../lib/toast";
+import { useAutosave, AutosaveChipText } from "../../lib/useAutosave";
 
 /**
  * R&D — the shop's research workspace. Where knowledge lives BEFORE it's
@@ -331,9 +332,16 @@ function MakerCard({ maker, onChanged }: { maker: Maker; onChanged: () => void }
   };
 
   const remove = async () => {
-    if (!confirm(`Delete ${maker.name} from R&D? (A promoted supplier record stays.)`)) return;
-    await api.delete(`/api/admin/research/makers/${maker.id}`);
+    // No confirm dialog — the undo toast IS the safety net.
+    const res = await api.delete<{ ok: boolean; undoId?: string }>(`/api/admin/research/makers/${maker.id}`);
     onChanged();
+    if (res.undoId) {
+      const undoId = res.undoId;
+      toast.undo(`Deleted ${maker.name}.`, async () => {
+        await api.post(`/api/admin/undo/${undoId}`, {});
+        onChanged();
+      });
+    }
   };
 
   return (
@@ -399,15 +407,28 @@ function MakerCard({ maker, onChanged }: { maker: Maker; onChanged: () => void }
 }
 
 function NoteCard({ note, onChanged }: { note: Note; onChanged: () => void }) {
+  const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(note.bodyMd);
+  // Edits save themselves — the chip below the textarea says so.
+  const saveStatus = useAutosave(body, async (v) => {
+    await api.patch(`/api/admin/research/notes/${note.id}`, { bodyMd: v });
+  });
   const togglePin = async () => {
     await api.patch(`/api/admin/research/notes/${note.id}`, { pinned: !note.pinned });
     onChanged();
   };
   const remove = async () => {
-    if (!confirm(`Delete “${note.title}”?`)) return;
-    await api.delete(`/api/admin/research/notes/${note.id}`);
+    const res = await api.delete<{ ok: boolean; undoId?: string }>(`/api/admin/research/notes/${note.id}`);
     onChanged();
+    if (res.undoId) {
+      const undoId = res.undoId;
+      toast.undo(`Deleted “${note.title}”.`, async () => {
+        await api.post(`/api/admin/undo/${undoId}`, {});
+        onChanged();
+      });
+    }
   };
   return (
     <div className="rounded-lg border border-ink/10 bg-white">
@@ -425,7 +446,19 @@ function NoteCard({ note, onChanged }: { note: Note; onChanged: () => void }) {
       </div>
       {open && (
         <div className="border-t border-ink/5 px-3 py-2">
-          <pre className="whitespace-pre-wrap font-sans text-sm text-ink/80">{note.bodyMd}</pre>
+          {editing ? (
+            <div>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={Math.min(18, Math.max(6, body.split("\n").length + 2))}
+                className="block w-full rounded border border-ink/15 px-2 py-1.5 font-sans text-sm text-ink/80"
+              />
+              <p className="mt-1 text-xs text-warmgrey">{AutosaveChipText(saveStatus) || "Edits save themselves."}</p>
+            </div>
+          ) : (
+            <pre className="whitespace-pre-wrap font-sans text-sm text-ink/80">{note.bodyMd}</pre>
+          )}
           {note.citations.length > 0 && (
             <div className="mt-2 space-y-0.5">
               <p className="text-xs font-medium text-warmgrey">Sources</p>
@@ -441,7 +474,16 @@ function NoteCard({ note, onChanged }: { note: Note; onChanged: () => void }) {
               {note.sourceUrl}
             </a>
           )}
-          <div className="pt-2">
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => {
+                if (editing) onChanged();
+                setEditing(!editing);
+              }}
+              className="text-xs text-navy hover:underline"
+            >
+              {editing ? "Done" : "Edit"}
+            </button>
             <button onClick={remove} className="text-xs text-red-600 hover:underline">
               Delete
             </button>

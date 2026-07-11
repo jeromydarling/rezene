@@ -433,6 +433,10 @@ export interface AdminCalendarEvent {
   startsOn: string;
   endsOn: string | null;
   notes: string | null;
+  /** Set on DERIVED entries (auto-fed from POs, commissions, bookings,
+   *  scheduled content) — read-only rows the UI styles and links. */
+  source?: string;
+  href?: string;
 }
 
 export interface AdminSample {

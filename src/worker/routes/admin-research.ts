@@ -3,6 +3,8 @@ import { all, first, run, writeAudit } from "../services/db";
 import { requireAdminWrite } from "../middleware/auth";
 import { reserveResearchQuota, quotaExceededBody } from "../services/ai-quota";
 import { newId } from "../utils/id";
+import { emit } from "../services/activity";
+import { softDelete } from "../services/tombstone";
 import type { AppContext } from "../types/env";
 
 /**
@@ -184,8 +186,11 @@ adminResearchRoutes.patch("/makers/:id", requireAdminWrite, async (c) => {
 });
 
 adminResearchRoutes.delete("/makers/:id", requireAdminWrite, async (c) => {
-  await run(c.var.db, `DELETE FROM research_makers WHERE id = ?`, c.req.param("id"));
-  return c.json({ ok: true });
+  const id = c.req.param("id");
+  const row = await first<{ name: string }>(c.var.db, `SELECT name FROM research_makers WHERE id = ?`, id);
+  const undoId = row ? await softDelete(c.var.db, "research_makers", id, `Deleted maker “${row.name}”`) : null;
+  if (!undoId) await run(c.var.db, `DELETE FROM research_makers WHERE id = ?`, id);
+  return c.json({ ok: true, undoId });
 });
 
 /** Promote a researched maker into Factories & Suppliers as an unverified
@@ -243,6 +248,13 @@ adminResearchRoutes.post("/makers/:id/promote", requireAdminWrite, async (c) => 
     id,
   );
   await writeAudit(c.var.db, c.var.userId, "research.promote_maker", "supplier", supplierId, { name: row.name });
+  await emit(c.var.db, {
+    kind: "research.maker_promoted",
+    entityType: "supplier",
+    entityId: supplierId,
+    title: `${row.name} promoted from R&D into Factories & Suppliers`,
+    payload: { name: row.name, supplierId },
+  });
   return c.json({ supplierId });
 });
 
@@ -401,8 +413,11 @@ adminResearchRoutes.patch("/notes/:id", requireAdminWrite, async (c) => {
 });
 
 adminResearchRoutes.delete("/notes/:id", requireAdminWrite, async (c) => {
-  await run(c.var.db, `DELETE FROM research_notes WHERE id = ?`, c.req.param("id"));
-  return c.json({ ok: true });
+  const id = c.req.param("id");
+  const row = await first<{ title: string }>(c.var.db, `SELECT title FROM research_notes WHERE id = ?`, id);
+  const undoId = row ? await softDelete(c.var.db, "research_notes", id, `Deleted note “${row.title}”`) : null;
+  if (!undoId) await run(c.var.db, `DELETE FROM research_notes WHERE id = ?`, id);
+  return c.json({ ok: true, undoId });
 });
 
 // ---- Ask (Perplexity) ------------------------------------------------------

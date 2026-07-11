@@ -17,6 +17,8 @@ import {
 } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
+import { emit } from "../services/activity";
+import { softDelete } from "../services/tombstone";
 import type { AppContext } from "../types/env";
 import type {
   AdminCalendarEvent,
@@ -182,7 +184,81 @@ adminProductionRoutes.get("/calendar", async (c) => {
     endsOn: (r.ends_on as string) ?? null,
     notes: (r.notes as string) ?? null,
   }));
-  return c.json(events);
+
+  // The calendar THINKS FOR YOU: dated facts that already live in the
+  // database show up on their own — no one should have to type a PO's
+  // ex-factory date into a calendar it is already stored next to. Derived
+  // entries carry `source`/`href` so the UI can style and link them, and
+  // they are read-only (no delete button). Each query is best-effort.
+  const derived: AdminCalendarEvent[] = [];
+  const push = (e: Omit<AdminCalendarEvent, "stageId" | "stageName" | "notes"> & { source: string; href: string }) =>
+    derived.push({ stageId: null, stageName: null, notes: null, ...e });
+  try {
+    const pos = await all<Record<string, unknown>>(
+      c.var.db,
+      `SELECT po.id, po.po_number, po.status, po.issue_date, po.ex_factory_date, po.received_date,
+              sup.name AS supplier_name
+       FROM production_orders po LEFT JOIN suppliers sup ON sup.id = po.supplier_id
+       WHERE po.status NOT IN ('draft','cancelled')`,
+    );
+    for (const po of pos) {
+      const num = po.po_number as string;
+      const sup = (po.supplier_name as string) ?? "maker";
+      const exf = po.ex_factory_date as string | null;
+      const issued = (po.issue_date as string) ?? null;
+      if (exf && issued && issued < exf && !po.received_date) {
+        push({ id: `po-window:${po.id}`, title: `${num} in production · ${sup}`, kind: "window",
+          startsOn: issued, endsOn: exf, source: "po", href: "/admin/purchase-orders" });
+      } else if (exf && !po.received_date) {
+        push({ id: `po-exf:${po.id}`, title: `${num} ex-factory · ${sup}`, kind: "deadline",
+          startsOn: exf, endsOn: null, source: "po", href: "/admin/purchase-orders" });
+      }
+      if (po.received_date) {
+        push({ id: `po-rec:${po.id}`, title: `${num} received`, kind: "milestone",
+          startsOn: po.received_date as string, endsOn: null, source: "po", href: "/admin/purchase-orders" });
+      }
+    }
+  } catch { /* table shape drift — the manual calendar still works */ }
+  try {
+    const comms = await all<Record<string, unknown>>(
+      c.var.db,
+      `SELECT co.id, co.title, co.due_at, cl.name AS client_name
+       FROM commissions co JOIN clients cl ON cl.id = co.client_id
+       WHERE co.due_at IS NOT NULL AND co.stage NOT IN ('done','cancelled')`,
+    );
+    for (const co of comms) {
+      push({ id: `commission:${co.id}`, title: `${co.title} due · ${co.client_name}`, kind: "deadline",
+        startsOn: (co.due_at as string).slice(0, 10), endsOn: null, source: "commission",
+        href: `/admin/commissions/${co.id}` });
+    }
+  } catch { /* commissions not provisioned yet */ }
+  try {
+    const bookings = await all<Record<string, unknown>>(
+      c.var.db,
+      `SELECT id, name, preferred_at, status FROM booking_requests
+       WHERE preferred_at IS NOT NULL AND status IN ('new','confirmed')`,
+    );
+    for (const b of bookings) {
+      push({ id: `booking:${b.id}`, title: `Consult · ${b.name}${b.status === "new" ? " (unconfirmed)" : ""}`,
+        kind: "milestone", startsOn: (b.preferred_at as string).slice(0, 10), endsOn: null,
+        source: "booking", href: "/admin/commissions" });
+    }
+  } catch { /* bookings not provisioned yet */ }
+  try {
+    const posts = await all<Record<string, unknown>>(
+      c.var.db,
+      `SELECT id, title, scheduled_for FROM marketing_assets
+       WHERE scheduled_for IS NOT NULL AND scheduled_for >= date('now', '-7 days')`,
+    );
+    for (const m of posts) {
+      push({ id: `content:${m.id}`, title: `Content: ${(m.title as string) ?? "scheduled post"}`, kind: "milestone",
+        startsOn: (m.scheduled_for as string).slice(0, 10), endsOn: null, source: "content",
+        href: "/admin/marketing/calendar" });
+    }
+  } catch { /* marketing assets table drift */ }
+
+  const combined = [...events, ...derived].sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  return c.json(combined);
 });
 
 adminProductionRoutes.post("/calendar", requireAdminWrite, async (c) => {
@@ -288,23 +364,47 @@ adminProductionRoutes.patch("/samples/:id", requireAdminWrite, async (c) => {
     );
   }
   const row = await first(c.var.db, `${SAMPLE_SELECT} WHERE sm.id = ?`, id);
-  return c.json(mapSample(row!));
+  const sample = mapSample(row!);
+  if (body.status && body.status !== existing.status) {
+    await emit(c.var.db, {
+      kind: body.status === "approved" ? "sample.approved" : "sample.status_changed",
+      entityType: "sample",
+      entityId: id,
+      title: `Sample round ${sample.round} of ${sample.styleName} → ${body.status}`,
+      payload: {
+        styleId: sample.styleId,
+        styleName: sample.styleName,
+        supplierId: sample.supplierId,
+        supplierName: sample.supplierName,
+        round: String(sample.round),
+        status: body.status,
+      },
+    });
+  }
+  return c.json(sample);
 });
 
 adminProductionRoutes.delete("/samples/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
-  const result = await run(c.var.db, `DELETE FROM samples WHERE id = ?`, id);
-  if (!result.meta.changes) return c.json({ error: "Sample not found" }, 404);
+  const undoId = await softDelete(c.var.db, "samples", id, "Deleted sample round");
+  if (!undoId) {
+    const result = await run(c.var.db, `DELETE FROM samples WHERE id = ?`, id);
+    if (!result.meta.changes) return c.json({ error: "Sample not found" }, 404);
+  }
   await writeAudit(c.var.db, c.var.userId, "sample.delete", "sample", id, {});
-  return c.json({ ok: true });
+  return c.json({ ok: true, undoId });
 });
 
 adminProductionRoutes.delete("/tasks/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
-  const result = await run(c.var.db, `DELETE FROM production_tasks WHERE id = ?`, id);
-  if (!result.meta.changes) return c.json({ error: "Task not found" }, 404);
+  const row = await first<{ title: string }>(c.var.db, `SELECT title FROM production_tasks WHERE id = ?`, id);
+  const undoId = row ? await softDelete(c.var.db, "production_tasks", id, `Deleted task “${row.title}”`) : null;
+  if (!undoId) {
+    const result = await run(c.var.db, `DELETE FROM production_tasks WHERE id = ?`, id);
+    if (!result.meta.changes) return c.json({ error: "Task not found" }, 404);
+  }
   await writeAudit(c.var.db, c.var.userId, "production_task.delete", "production_task", id, {});
-  return c.json({ ok: true });
+  return c.json({ ok: true, undoId });
 });
 
 // ---------- Fabrics & materials ----------
@@ -581,7 +681,11 @@ adminProductionRoutes.post("/orders", requireAdminWrite, async (c) => {
 adminProductionRoutes.patch("/orders/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, productionOrderUpdateSchema);
-  const existing = await first(c.var.db, `SELECT id FROM production_orders WHERE id = ?`, id);
+  const existing = await first<{ id: string; status: string; po_number: string; supplier_id: string; ex_factory_date: string | null }>(
+    c.var.db,
+    `SELECT id, status, po_number, supplier_id, ex_factory_date FROM production_orders WHERE id = ?`,
+    id,
+  );
   if (!existing) return c.json({ error: "Production order not found" }, 404);
   const cols: Record<string, string> = {
     status: "status",
@@ -605,6 +709,20 @@ adminProductionRoutes.patch("/orders/:id", requireAdminWrite, async (c) => {
   sets.push(`updated_at = datetime('now')`);
   await run(c.var.db, `UPDATE production_orders SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
   await writeAudit(c.var.db, c.var.userId, "production_order.update", "production_order", id, body);
+  if (body.status && body.status !== existing.status) {
+    await emit(c.var.db, {
+      kind: `po.status.${body.status}`,
+      entityType: "production_order",
+      entityId: id,
+      title: `${existing.po_number} → ${body.status.replace(/_/g, " ")}`,
+      payload: {
+        poNumber: existing.po_number,
+        supplierId: existing.supplier_id,
+        status: body.status,
+        exFactoryDate: body.exFactoryDate ?? existing.ex_factory_date,
+      },
+    });
+  }
   return c.json({ ok: true });
 });
 

@@ -1185,6 +1185,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Deposits & consult booking", "Request deposits and milestone payments per commission, and take consult requests from a public /book page."],
       ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
       ["R&D workspace", "Save maker research and strategy notes, import spreadsheets, run live cited research, and promote leads to your supplier CRM."],
+      ["Automations", "Approve a sample and the production order drafts itself; the calendar fills in from your orders, fittings and bookings."],
       ["Cash flow & open-to-buy", "Money in vs. out and how much of your season budget is left, from real POs and invoices."],
       ["Multi-location stock", "Track a studio, warehouse, or shopfront and move stock between them."],
       ["Data export", "Products, customers and orders as CSV — plus QuickBooks/Xero-ready accounting."],

@@ -114,6 +114,44 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
 - **Change password** — update your own password; all other sessions sign out.`,
   },
   {
+    slug: "automations",
+    title: "Automations — Verto thinks ahead for you",
+    summary: "Built-in rules that watch your shop and file the obvious next step: tasks, draft orders, reminders.",
+    part: "account",
+    moduleRoute: "/admin/automations",
+    keywords: "automations rules triggers workflow auto task draft calendar activity feed toggle",
+    updated: "2026-07-11",
+    body: `# Automations
+
+Verto watches what happens in your shop and files the obvious next step for you, so nothing falls through the cracks between modules. Every rule is a plain sentence, every rule can be paused, and **no rule ever changes or deletes anything** — automations only create tasks, drafts, and reminders. The worst surprise is a task you delete.
+
+## The built-in rules
+
+- **Sample approved → draft the production order.** Approve a sample and Verto drafts a purchase order to that maker (auto-numbered, waiting for line items) plus a task to finalise it.
+- **Order confirmed → ex-factory reminder.** A task to chase the shipment lands on the promised ex-factory date.
+- **Order received → reconcile the delivery.** A task to check the delivery against the order and update stock.
+- **R&D lead promoted → follow up.** Promote a maker from [R&D](/admin/support/kb/rd-research) and a reach-out task appears, due in a week.
+- **Commission moves stage → next step.** Each stage files its natural follow-up — source the fabric, schedule the fitting, arrange the handover.
+
+Toggle any rule on the **System → Automations** page. The **Recent activity** feed beside the toggles shows everything Verto noticed — the events your automations react to.
+
+## The calendar fills itself in
+
+The [Production board](/admin/support/kb/production)'s calendar now shows **derived entries** automatically: purchase-order production windows and ex-factory deadlines, commission due dates, consult bookings, and scheduled content — anything dated that already lives in your shop. Derived entries are marked \`auto\`, link back to their record, and can't be deleted from the calendar (change the source record instead).
+
+## Undo instead of "are you sure?"
+
+Deleting a research note or maker, a production task, or a sample round no longer interrupts you with a confirmation — the toast that appears offers **Undo**, and one click brings the record back exactly as it was.
+
+## Edits save themselves
+
+Where you write at length (research note bodies today, more editors over time), changes save automatically a moment after you stop typing — the "Saved" chip below the editor confirms it. There is no save button to forget.
+
+## What needs your attention
+
+The Dashboard opens with a card of what's **stuck** — overdue tasks, orders past their ex-factory date, sample rounds waiting over two weeks, maker messages awaiting a response, overdue commissions, unconfirmed consults. The calendar says what's scheduled; this card says what needs a human. It disappears when nothing needs you.`,
+  },
+  {
     slug: "ai-limits",
     title: "LLM research limits",
     summary: "How the shared daily quota on paid LLM research works.",
