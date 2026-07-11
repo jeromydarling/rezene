@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { GeoTextMap } from "../../components/MapboxMap";
 import { ErrorNote, PageHeader } from "../../components/admin/ui";
 
 /**
@@ -148,6 +149,19 @@ export function SourcingPage() {
 
       {leads && leads.length > 0 && (
         <div className="space-y-3">
+          <GeoTextMap
+            className="h-72"
+            points={leads
+              .filter((l) => l.city || l.country)
+              .map((l) => ({
+                id: l.name,
+                query: [l.city, l.country].filter(Boolean).join(", "),
+                label: l.name,
+                sublabel: [l.specialties.slice(0, 2).join(", "), [l.city, l.country].filter(Boolean).join(", ")]
+                  .filter(Boolean)
+                  .join(" · "),
+              }))}
+          />
           {leads.map((lead) => (
             <div key={lead.name} className="admin-card p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
