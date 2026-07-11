@@ -309,10 +309,18 @@ const BLOCKS = {
     // 0.8 gives a true-scale arm; cuffEase 30 buys the last few mm at the
     // wrist. Together they make the tube geometrically closable.
     draftOptions: { cuffEase: 0.3 },
-    // sewForce 6: the drop-shoulder armscye seam spans the radial distance
-    // between the body panel (wrapped onto the torso side) and the sleeve
-    // cap ring (out along the arm) — force 2 never closed it (bakes 1-6).
-    sim: { bending: 1.5, armScale: 0.8, sewForce: 6 },
+    // PARKED after seven bakes. Solved along the way: the fitted knit
+    // sleeve tube is geometrically closable (armScale + cuffEase, kept),
+    // and the cowl now folds over the chest (placement outset fix in
+    // sim.py). Structurally open: the drop-shoulder armscye seam starts
+    // 85-96mm apart (measured, DRAPE_SEAM_DEBUG) because the body panel
+    // wraps around the TORSO ellipse while the sleeve cap rings the ARM
+    // axis. Falsified: cap-zone stub clamp, axial u0 offset (0 and 70mm
+    // within 4mm of each other — the gap is radial), sewForce 6 (armscye
+    // unmoved, sleeves ruche). Needs assembled placement (cap placed
+    // coincident with the body's armscye edge) — the same machinery the
+    // bruce pouch and the tamiko/waralee folds wait on.
+    sim: { bending: 1.5, armScale: 0.8 },
   },
   brian: {
     module: "@freesewing/brian",
