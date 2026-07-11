@@ -253,7 +253,7 @@ adminLibraryRoutes.post("/to-design", requireAdminWrite, async (c) => {
   await run(
     c.var.db,
     `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, 'concept', ?, 0, ?)`,
+     VALUES (?, ?, ?, ?, ?, 'concept', ?, 1, ?)`,
     fileId,
     r2Key,
     `library-reference.${ext}`,
