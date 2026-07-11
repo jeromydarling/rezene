@@ -97,7 +97,11 @@ With a plan in place, these five steps turn it into a live storefront. If you to
 5. **Know your numbers.** Create a **Cost Sheet** for your hero style (**Finance → Costing**), add a destination market, and Verto shows landed cost and margin — its LLM can benchmark a first-pass breakdown. See [Costing & margins](/admin/support/kb/costing).
 
 > [!NOTE]
-> Nothing here is destructive or public until you choose. Products stay drafts until published; LLM outputs are always yours to edit; your plan and sheets are private to your team.`,
+> Nothing here is destructive or public until you choose. Products stay drafts until published; LLM outputs are always yours to edit; your plan and sheets are private to your team.
+
+## Ready for a real journey?
+
+The **[How-to guides](/admin/support/kb/how-to-first-piece)** walk whole scenarios end to end — designing your first piece and sending it to a maker, drafting made-to-measure for a client, going from approved sample to a production run, and launching your shop.`,
   },
   {
     slug: "accounts-and-security",

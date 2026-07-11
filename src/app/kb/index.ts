@@ -1,5 +1,6 @@
 import type { KbArticle, KbPart } from "./types";
 import { gettingStarted } from "./content/gettingStarted";
+import { howTo } from "./content/howTo";
 import { catalog } from "./content/catalog";
 import { design } from "./content/design";
 import { clients } from "./content/clients";
@@ -14,6 +15,7 @@ export type { KbArticle, KbPart, KbHeading } from "./types";
 /** Parts in reading order — the book's table of contents. */
 export const KB_PARTS: KbPart[] = [
   { slug: "getting-started", title: "Getting started", description: "What Verto is and how to find your way around.", icon: "🧭" },
+  { slug: "how-to", title: "How-to guides", description: "Step-by-step walkthroughs of whole journeys — from first sketch to a maker's inbox.", icon: "🗺️" },
   { slug: "catalog", title: "Catalog & inventory", description: "Products, variants, stock, collections, and bulk import.", icon: "🏷️" },
   { slug: "design", title: "Design & development", description: "Styles, tech packs, the LLM Design Studio, and 3D.", icon: "✏️" },
   { slug: "clients", title: "Clients & commissions", description: "The Client Book, made-to-measure commissions, the client portal, deposits and booking.", icon: "🧵" },
@@ -27,6 +29,7 @@ export const KB_PARTS: KbPart[] = [
 /** The in-repo canonical book, in reading order. */
 export const KB_ARTICLES: KbArticle[] = [
   ...gettingStarted,
+  ...howTo,
   ...catalog,
   ...design,
   ...clients,
