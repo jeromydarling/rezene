@@ -159,3 +159,82 @@ vertoRoutes.get("/certified/:id", async (c) => {
     valid: !cert.revoked,
   });
 });
+
+// ---- The Verto Directory (public, gated) --------------------------------------
+// Private-first: listings exist the moment shops opt in, but the public page
+// only serves them when DIRECTORY_PUBLIC=1 (or with the documented preview
+// param, so the founder can watch the network fill in before opening it).
+
+vertoRoutes.get("/directory", async (c) => {
+  const open = c.env.DIRECTORY_PUBLIC === "1" || c.req.query("preview") === "verto-preview-2026";
+  if (!open) return c.json({ open: false, listings: [] });
+  try {
+    const rows = await c.env.DB.prepare(
+      `SELECT d.shop_id, d.craft, d.specialties, d.city, d.country, d.blurb, d.cert_count, d.cert_best,
+              s.slug, s.name
+         FROM directory_listings d JOIN shops s ON s.id = d.shop_id
+        WHERE d.opted_in = 1 AND s.status = 'active'
+        ORDER BY d.cert_count DESC, d.updated_at DESC LIMIT 200`,
+    ).all<Record<string, unknown>>();
+    return c.json({
+      open: true,
+      listings: (rows.results ?? []).map((r) => ({
+        slug: r.slug,
+        name: r.name,
+        craft: r.craft,
+        specialties: r.specialties,
+        city: r.city,
+        country: r.country,
+        blurb: r.blurb,
+        certCount: r.cert_count,
+        certBest: r.cert_best,
+      })),
+    });
+  } catch {
+    return c.json({ open: true, listings: [] });
+  }
+});
+
+// ---- Maker waitlist (the maker-tools front door) --------------------------------
+const makerSignupSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email().max(200),
+  craft: z.string().max(120).optional(),
+  city: z.string().max(120).optional(),
+  country: z.string().max(120).optional(),
+  website: z.string().max(300).optional(),
+  note: z.string().max(1000).optional(),
+  invitedByShop: z.string().max(60).optional(),
+});
+
+vertoRoutes.post("/maker-signup", rateLimit({ key: "maker_signup", limit: 10, windowSeconds: 3600 }), async (c) => {
+  const body = await parseBody(c, makerSignupSchema);
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO maker_waitlist (id, name, email, craft, city, country, website, note, invited_by_shop)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(email) DO UPDATE SET name = excluded.name, craft = excluded.craft,
+         city = excluded.city, country = excluded.country, website = excluded.website,
+         note = COALESCE(excluded.note, maker_waitlist.note)`,
+    )
+      .bind(
+        newId("maker"),
+        body.name,
+        body.email.toLowerCase(),
+        body.craft ?? null,
+        body.city ?? null,
+        body.country ?? null,
+        body.website ?? null,
+        body.note ?? null,
+        body.invitedByShop ?? null,
+      )
+      .run();
+  } catch {
+    return c.json({ error: "Couldn't save that — try again in a moment." }, 500);
+  }
+  await sendNotification(c.env, {
+    subject: `Maker waitlist: ${body.name}`,
+    text: `${body.name} <${body.email}> — ${body.craft ?? "craft n/a"}, ${[body.city, body.country].filter(Boolean).join(", ") || "location n/a"}${body.invitedByShop ? ` (invited by ${body.invitedByShop})` : ""}\n${body.note ?? ""}`,
+  }).catch(() => {});
+  return c.json({ ok: true });
+});

@@ -1185,6 +1185,8 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Deposits & consult booking", "Request deposits and milestone payments per commission, and take consult requests from a public /book page."],
       ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
       ["The Verto School", "Courses in tailoring, seamstressing and fashion from the era's own masters — timed lessons you can read or listen to, illustrated with the original books' plates, server-graded examinations, and certificates verified by real work in your studio."],
+      ["The Verto Directory", "An opt-in public directory of real studios — searchable by craft and place, every card a living storefront, Verto School certificates as the trust mark that can't be bought."],
+      ["Verto for Makers", "Invite your factories and mills to the founding makers' list — the coming workspace lets them receive tech packs, quote line by line, and get found by every label on Verto."],
       ["The Interpreter", "Paste any message — a client's tangled question, a maker's reply in another language, a mill's jargon — and get the meaning, the terms explained, and a reply drafted in both languages."],
       ["Measurements from photos (beta)", "A front photo, a side photo and the client's height — AI estimates a full measurement set as a draft the tape confirms at the fitting. Remote consultations start moving."],
       ["The Verto Companion", "An assistant on every page, schooled on the nine courses and the whole manual — ask by voice or text, get the master's answer with a citation, one-click next steps, and a plain-language mode that explains every trade term as it appears."],

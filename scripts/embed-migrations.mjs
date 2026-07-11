@@ -29,6 +29,7 @@ const EXCLUDE = new Set([
   "0021_superadmin_role.sql", // Platform-owner role — only the platform DB has HQ
   "0045_school_certificates.sql", // Public credentials resolve at the platform, not per-shop
   "0047_library_cache.sql", // Library cache is shared across shops at the platform
+  "0048_directory.sql", // Directory + maker waitlist live at the platform
 ]);
 
 const files = readdirSync(dir)

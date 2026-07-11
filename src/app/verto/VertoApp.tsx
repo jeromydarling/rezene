@@ -15,6 +15,7 @@ import {
   useScrolledPast,
 } from "./cinema";
 import { VertoCompare, VertoWhy } from "./VertoStory";
+import { VertoDirectory, VertoMakers } from "./VertoDirectory";
 import { VertoJourneys } from "./VertoJourneys";
 import { VertoFeatures } from "./VertoFeatures";
 
@@ -224,6 +225,12 @@ function VertoLayout({ children }: { children: ReactNode }) {
           <div className="flex gap-6 text-xs text-chalk/70">
             <Link to="/why" className="hover:text-chalk">
               Why Verto
+            </Link>
+            <Link to="/directory" className="hover:text-chalk">
+              Directory
+            </Link>
+            <Link to="/makers" className="hover:text-chalk">
+              For makers
             </Link>
             <Link to="/compare" className="hover:text-chalk">
               Compare
@@ -1022,6 +1029,8 @@ export function VertoApp() {
         <Route path="features" element={<VertoFeatures />} />
         <Route path="compare" element={<VertoCompare />} />
         <Route path="pricing" element={<VertoPricing />} />
+        <Route path="directory" element={<VertoDirectory />} />
+        <Route path="makers" element={<VertoMakers />} />
         <Route path="signup" element={<VertoSignup />} />
         <Route path="*" element={<VertoNotFound />} />
       </Routes>

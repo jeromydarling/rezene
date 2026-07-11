@@ -1596,6 +1596,87 @@ function ChangePasswordCard() {
   );
 }
 
+function DirectoryCard() {
+  const { data, reload } = useFetch<{
+    optedIn: boolean;
+    craft: string;
+    specialties: string;
+    city: string;
+    country: string;
+    blurb: string;
+    certCount: number;
+  }>("/api/admin/settings/directory");
+  const [draft, setDraft] = useState<Record<string, string | boolean> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const d = draft ?? (data as Record<string, string | boolean> | null);
+
+  async function save() {
+    if (!d) return;
+    setBusy(true);
+    try {
+      await api.put("/api/admin/settings/directory", d);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      setDraft(null);
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  const set = (k: string, v: string | boolean) => setDraft({ ...(d ?? {}), [k]: v });
+
+  if (!data) return null;
+  return (
+    <div className="admin-card p-4">
+      <h2 className="mb-1 font-medium">Verto Directory</h2>
+      <p className="mb-3 text-xs text-warmgrey">
+        The public directory of studios on Verto — searchable by craft and place, every card a living storefront. Your
+        shop is <span className="font-medium">never listed unless you opt in</span>; your Verto School certificates
+        {data.certCount > 0 ? ` (you hold ${data.certCount})` : ""} show as the ◈ trust mark.
+      </p>
+      <label className="mb-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={Boolean(d?.optedIn)} onChange={(e) => set("optedIn", e.target.checked)} />
+        List my studio in the directory
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-warmgrey">Craft</span>
+          <select className="admin-input" value={String(d?.craft ?? "label")} onChange={(e) => set("craft", e.target.value)}>
+            <option value="label">Label</option>
+            <option value="tailor">Tailor</option>
+            <option value="seamstress">Seamstress</option>
+            <option value="stylist">Stylist</option>
+            <option value="boutique">Boutique</option>
+          </select>
+        </label>
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-warmgrey">Specialties</span>
+          <input className="admin-input" placeholder="bridal, linen tailoring, MTM" value={String(d?.specialties ?? "")} onChange={(e) => set("specialties", e.target.value)} />
+        </label>
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-warmgrey">City</span>
+          <input className="admin-input" value={String(d?.city ?? "")} onChange={(e) => set("city", e.target.value)} />
+        </label>
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-warmgrey">Country</span>
+          <input className="admin-input" value={String(d?.country ?? "")} onChange={(e) => set("country", e.target.value)} />
+        </label>
+        <label className="col-span-2 flex flex-col text-xs">
+          <span className="mb-1 text-warmgrey">A line about your studio</span>
+          <textarea className="admin-input" rows={2} maxLength={600} value={String(d?.blurb ?? "")} onChange={(e) => set("blurb", e.target.value)} />
+        </label>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <button onClick={() => void save()} disabled={busy || !draft} className="admin-btn-primary">
+          {busy ? "Saving…" : "Save listing"}
+        </button>
+        {saved && <span className="text-xs text-emerald-700">Saved.</span>}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { data, loading, error, reload } = useFetch<SettingsResponse>("/api/admin/settings");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -1687,6 +1768,7 @@ export function SettingsPage() {
               database or the browser.
             </p>
           </div>
+          <DirectoryCard />
           <ChangePasswordCard />
         </div>
       )}
