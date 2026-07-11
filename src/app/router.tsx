@@ -30,6 +30,7 @@ import { TeamPage } from "./pages/admin/TeamPage";
 import { KnowledgeBasePage } from "./pages/admin/KnowledgeBasePage";
 import { LaunchPlaybookPage } from "./pages/admin/LaunchPlaybookPage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
+import { ResearchPage } from "./pages/admin/ResearchPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
@@ -177,6 +178,7 @@ export function AppRouter() {
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="sourcing" element={<SourcingPage />} />
+          <Route path="research" element={<ResearchPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
