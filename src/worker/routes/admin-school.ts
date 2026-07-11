@@ -4,6 +4,7 @@ import { requireAdminWrite } from "../middleware/auth";
 import { emit } from "../services/activity";
 import { newId } from "../utils/id";
 import {
+  COURSES,
   CURRICULUM_VERSION,
   SCHOOLS,
   coursesForSchool,
@@ -701,5 +702,49 @@ adminSchoolRoutes.post("/course/:slug/certificate", requireAdminWrite, async (c)
     title: `${me.name || me.email} earned the “${course.title}” certificate`,
     payload: { certificateId: id, course: course.slug },
   });
-  return c.json({ certificateId: id });
+
+  // Ladder check: all courses in this school → diploma; all schools → studio.
+  const extras: { scope: string; title: string; certificateId: string }[] = [];
+  const mine = await all<{ scope: string; ref: string }>(
+    c.env.DB,
+    `SELECT scope, ref FROM school_certificates WHERE shop_id = ? AND user_email = ? AND revoked = 0`,
+    c.var.shopId,
+    me.email,
+  );
+  const has = (scope: string, ref: string) => mine.some((r) => r.scope === scope && r.ref === ref) || (scope === "course" && ref === course.slug);
+  const issueExtra = async (scope: "school" | "studio", ref: string, title: string) => {
+    const extraId = certId();
+    await run(
+      c.env.DB,
+      `INSERT INTO school_certificates (id, shop_id, shop_slug, user_email, user_name, scope, ref, title, curriculum_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      extraId,
+      c.var.shopId,
+      shop?.slug ?? "",
+      me.email,
+      me.name || me.email,
+      scope,
+      ref,
+      title,
+      CURRICULUM_VERSION,
+    );
+    extras.push({ scope, title, certificateId: extraId });
+    await emit(db, {
+      kind: "school.certified",
+      entityType: scope === "studio" ? "school" : "school_school",
+      entityId: ref,
+      title: `${me.name || me.email} earned ${title}`,
+      payload: { certificateId: extraId },
+    });
+  };
+  const school = SCHOOLS.find((s) => s.key === course.school);
+  if (school && !mine.some((r) => r.scope === "school" && r.ref === school.key)) {
+    const allInSchool = coursesForSchool(school.key).every((cd) => has("course", cd.slug));
+    if (allInSchool) await issueExtra("school", school.key, `${school.title} Diploma`);
+  }
+  if (!mine.some((r) => r.scope === "studio")) {
+    const allCourses = COURSES.every((cd) => has("course", cd.slug));
+    if (allCourses) await issueExtra("studio", "studio", "Verto Certified Studio");
+  }
+  return c.json({ certificateId: id, extras });
 });
