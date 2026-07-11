@@ -53,8 +53,21 @@ ins(
 );
 
 // ---------------------------------------------------------------------------
-// Suppliers — promote three long-standing partners to verified.
+// Suppliers — the four researched Moroccan makers the narrative leans on.
+// These exist in the primary shop from real R&D imports but NOT in the demo
+// DO's base catalog (0002), and later rows reference them by foreign key —
+// the seed must be self-contained. Then promote the long-standing partners.
 // ---------------------------------------------------------------------------
+ins(
+  "suppliers",
+  ["id", "name", "kind", "city", "country", "email", "phone", "website", "capabilities", "moq_units", "lead_time_days", "is_verified", "notes"],
+  [
+    ["sup_ma_ateliermarrakech", "Atelier de Marrakech", "factory", "Marrakech", "MA", "atelierdemarrakech1@gmail.com", "+212 662 357 549", "https://atelierdemarrakech.com/", '["tailoring","cut_and_sew","private_label","small_batch"]', null, null, 1, "Real researched maker. Custom tailoring/confection studio, no stated minimum; design, pattern-making, fabric, labeling, packaging. Source: atelierdemarrakech.com"],
+    ["sup_ma_cotexma", "Cotexma (Atelier Expert Couture Textile Maroc)", "factory", "Mohammedia", "MA", null, null, "https://atelierexpertcouturetextilemaroc.com/", '["wovens","tailoring","cut_and_sew","private_label","small_batch"]', null, null, 0, "Real researched maker. Specialist in small-quantity textile confection for launching brands and limited capsule collections; online from pattern CAD through prototyping. Source: atelierexpertcouturetextilemaroc.com"],
+    ["sup_ma_flores", "Flores Confecciones", "factory", "Tangier", "MA", "flores.majd@floresconfecciones.com", "+212 539 951 164", "https://floresconfecciones.com/en/home/", '["wovens","knits","tailoring","cut_and_sew","private_label"]', null, null, 0, "Real researched maker. Specialties: soft wovens, jersey, tailoring; full collection design and development concept-to-delivery. Source: floresconfecciones.com"],
+    ["sup_ma_vita", "Vita Couture SARL", "factory", "Tangier", "MA", "contact@vita-couture.com", "+212 5 39 39 26 53", "https://www.vita-couture.com/", '["wovens","tailoring","cut_and_sew","private_label"]', null, null, 1, "Real researched maker. Full-package woven garment supplier (concept to finished product, Barcelona design office); design, fabric sourcing, QC. Skews to larger programs. Source: vita-couture.com"],
+  ],
+);
 stmts.push(`UPDATE suppliers SET is_verified = 1 WHERE id IN ('sup_coupe_cousu','sup_ma_ateliermarrakech','sup_ma_vita');`);
 ins(
   "supplier_interactions",
