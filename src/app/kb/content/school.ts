@@ -7,6 +7,7 @@ export const school: KbArticle[] = [
     summary: "Learn tailoring, seamstressing and fashion from the era's own masters — and earn certificates backed by real work in your studio.",
     part: "account",
     moduleRoute: "/admin/school",
+    screenshot: "/kb/shots/school.png",
     keywords: "school course lesson quiz examination certificate badge tailoring seamstressing dressmaking fashion learn education lms certified verto",
     updated: "2026-07-11",
     body: `# The Verto School
