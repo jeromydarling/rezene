@@ -461,14 +461,13 @@ const BLOCKS = {
     },
     // Pattern y=0 is the underbust line: hpsToWaistFront(505) - waistToUnderbust(110).
     yOffset: 395,
-    // The LOWER mannequin: the upper body ends at the hips with a flat rim
-    // and the corset's hem placed at that rim slid clean off the open end
-    // (bakes 1-2 ended with no cloth in frame). The brief body's hip flare
-    // and legs below are what actually stop a cinched ring from walking
-    // down — same reason real corsets stay put.
-    bodyKind: "brief",
+    // Upper mannequin + the waistband-grip convention: unpinned, the ring
+    // slid off the torso's flat hip rim before friction could engage
+    // (bakes 1-2, no cloth left in frame); on the legs-up brief body the
+    // ribcage is missing and the top half concertina'd out of the air onto
+    // the hip flare (bake 3). Every trouser block pins its waist edge —
+    // a corset is one giant waistband, pinned at its top edge.
     // Panel edges under real cinch tension: uma-class hauling force.
-    // Friction high: nothing pins a corset — it GRIPS.
     sim: { sewForce: 6, friction: 70 },
   },
   bruce: {
@@ -1987,6 +1986,7 @@ if (cfg.trousers) {
     for (const [partKey, pathName] of specs) {
       const piece = cathrinPanel(set[cfg.parts[partKey]], pathName, `${pathName}${side}`, side === "L");
       piece.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
+      piece.pinSegments = ["top"]; // the waistband grip, at underbust
       bodyPieces.push(piece);
     }
   }
