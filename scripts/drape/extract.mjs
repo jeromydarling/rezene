@@ -2309,12 +2309,16 @@ const seams = cfg.trousers
       // curve, and the two dart curves sew to each other (the bulge fold).
       // The crotch closes from three directions: each back wing's inner
       // portion meets the front tusk, its tip meets the inset's gusset edge.
-      { name: "side_up_R", a: ["front", "sideR"], b: ["sideR", "frontUp"] },
-      { name: "side_up_L", a: ["front", "sideL"], b: ["sideL", "frontUp"] },
-      { name: "side_lo_R", a: ["insetR", "side"], b: ["sideR", "frontLo"] },
-      { name: "side_lo_L", a: ["insetL", "side"], b: ["sideL", "frontLo"] },
-      { name: "back_R", a: ["back", "sideR"], b: ["sideR", "back"] },
-      { name: "back_L", a: ["back", "sideL"], b: ["sideL", "back"] },
+      // The six panel seams start within 16mm — bridge them (the sleeve
+      // recipe): one continuous sheet instead of a sprung slit band. The
+      // crotch and pouch seams start 30-130mm out and stay sprung — a
+      // bridge across those gaps bakes as a toothed channel (waralee).
+      { name: "side_up_R", a: ["front", "sideR"], b: ["sideR", "frontUp"], bridge: true },
+      { name: "side_up_L", a: ["front", "sideL"], b: ["sideL", "frontUp"], bridge: true },
+      { name: "side_lo_R", a: ["insetR", "side"], b: ["sideR", "frontLo"], bridge: true },
+      { name: "side_lo_L", a: ["insetL", "side"], b: ["sideL", "frontLo"], bridge: true },
+      { name: "back_R", a: ["back", "sideR"], b: ["sideR", "back"], bridge: true },
+      { name: "back_L", a: ["back", "sideL"], b: ["sideL", "back"], bridge: true },
       { name: "pouch_curve_R", a: ["front", "curveR"], b: ["insetR", "curve"] },
       { name: "pouch_curve_L", a: ["front", "curveL"], b: ["insetL", "curve"] },
       ...(bodyPieces[0].segments.dartR
