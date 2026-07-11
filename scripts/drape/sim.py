@@ -344,7 +344,10 @@ def place(piece, x, y):
         if cw and y < cw["y0"]:
             d = cw["y0"] - y
             y = cw["y0"] + d
-            _cowl_ou = 8.0 + 0.15 * d
+            # 20mm base clearance: at 8mm the folded edge started within the
+            # collision standoff of the chest layer and pressed a horizontal
+            # see-through band into it (bakes 4-8).
+            _cowl_ou = 20.0 + 0.15 * d
         # Wrap pattern x around the shell by arc length. Front centre sits at
         # (0, -B), back centre at (0, +B); both walk toward the sides so the
         # side seams nearly meet. side = -1 for front, +1 for back.
@@ -907,6 +910,30 @@ for seam in DATA["seams"]:
             _w = (1.0 - _dist / _FALL) ** 2
             _x, _y, _z = all_verts[_vi]
             all_verts[_vi] = (_x + _dv[0] * _w, _y + _dv[1] * _w, _z + _dv[2] * _w)
+        # The warp targets (the body edge, wrapped on the torso) can sit
+        # INSIDE the arm stub — cloth dragged through the collider starts
+        # trapped and the ejection tears holes down the upper arm (bake 8).
+        # Push any warped sleeve vert back out to the stub's surface.
+        _pl_b = next(p for p in DATA["pieces"] if p["name"] == seam["b"][0]).get("placement", {})
+        if _pl_b.get("kind") == "sleeve":
+            _o, _ax, _e1, _e2 = arm_frame(_pl_b["dir"])
+            for _vi in range(_off_b, _off_b + _cnt_b):
+                _pm = (all_verts[_vi][0] / S, all_verts[_vi][1] / S, all_verts[_vi][2] / S)
+                _v = (_pm[0] - _o[0], _pm[1] - _o[1], _pm[2] - _o[2])
+                _uc = _v[0] * _ax[0] + _v[1] * _ax[1] + _v[2] * _ax[2]
+                if _uc < 0.0:
+                    continue  # above the shoulder ball — off the stub
+                _rd = (_v[0] - _uc * _ax[0], _v[1] - _uc * _ax[1], _v[2] - _uc * _ax[2])
+                _r = math.sqrt(_rd[0] ** 2 + _rd[1] ** 2 + _rd[2] ** 2)
+                _t = min(1.0, max(0.0, _uc / max(1.0, ARM_LEN)))
+                _need = ARM_R + (WRIST_R - ARM_R) * _t + 4.0
+                if 1e-6 < _r < _need:
+                    _k = _need / _r
+                    all_verts[_vi] = (
+                        (_o[0] + _uc * _ax[0] + _rd[0] * _k) * S,
+                        (_o[1] + _uc * _ax[1] + _rd[1] * _k) * S,
+                        (_o[2] + _uc * _ax[2] + _rd[2] * _k) * S,
+                    )
         if _os.environ.get("DRAPE_SEAM_DEBUG") == "1":
             _da, _db = match(list(ia), list(ib))
             _ds = sorted(math.dist(all_verts[a], all_verts[b]) / S for a, b in zip(_da, _db))
