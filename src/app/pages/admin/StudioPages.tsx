@@ -1,9 +1,66 @@
 import { useRef, useState } from "react";
+import {
+  Archive,
+  Box,
+  File as FileIcon,
+  FileText,
+  Film,
+  Music,
+  Table2,
+  Type,
+} from "lucide-react";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatDate, titleCase } from "../../lib/format";
 import { EmptyState, ErrorNote, LoadingTable, PageHeader } from "../../components/admin/ui";
 import type { AdminClo3dProject, AdminFile } from "../../../shared/types";
+
+/** Icon + tint for a non-image file, chosen by content type then extension. */
+function fileGlyph(f: AdminFile): { Icon: typeof FileIcon; tint: string; label: string } {
+  const ct = f.contentType ?? "";
+  const ext = (f.filename.split(".").pop() ?? "").toLowerCase();
+  if (ct.startsWith("video/")) return { Icon: Film, tint: "bg-navy/10 text-navy", label: ext || "video" };
+  if (ct.startsWith("audio/")) return { Icon: Music, tint: "bg-navy/10 text-navy", label: ext || "audio" };
+  if (ct === "application/pdf" || ext === "pdf")
+    return { Icon: FileText, tint: "bg-terracotta/10 text-terracotta", label: "pdf" };
+  if (["csv", "xlsx", "xls", "tsv"].includes(ext) || ct.includes("spreadsheet") || ct === "text/csv")
+    return { Icon: Table2, tint: "bg-olive/15 text-olive-deep", label: ext || "sheet" };
+  if (["zip", "rar", "7z", "gz", "tar"].includes(ext) || ct.includes("zip"))
+    return { Icon: Archive, tint: "bg-ink/5 text-ink/60", label: ext || "zip" };
+  if (["glb", "gltf", "obj", "fbx", "stl", "zprj", "blend"].includes(ext))
+    return { Icon: Box, tint: "bg-navy/10 text-navy", label: ext };
+  if (["otf", "ttf", "woff", "woff2"].includes(ext) || ct.includes("font"))
+    return { Icon: Type, tint: "bg-ink/5 text-ink/60", label: ext || "font" };
+  return { Icon: FileIcon, tint: "bg-ink/5 text-ink/60", label: ext || "file" };
+}
+
+/** 40px preview: real thumbnail for images (streamed through the session-
+ *  gated download route), a typed icon tile for everything else. */
+function FileThumb({ file }: { file: AdminFile }) {
+  const [broken, setBroken] = useState(false);
+  const isImage = (file.contentType ?? "").startsWith("image/") && !broken;
+  if (isImage) {
+    return (
+      <img
+        src={`/api/admin/files/${file.id}/download`}
+        alt={file.altText ?? file.filename}
+        loading="lazy"
+        onError={() => setBroken(true)}
+        className="h-10 w-10 rounded-md border border-ink/10 bg-ink/5 object-cover"
+      />
+    );
+  }
+  const { Icon, tint, label } = fileGlyph(file);
+  return (
+    <span
+      title={file.contentType ?? label}
+      className={`flex h-10 w-10 flex-col items-center justify-center gap-0.5 rounded-md border border-ink/10 ${tint}`}
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+      <span className="text-[8px] font-semibold uppercase leading-none">{label.slice(0, 5)}</span>
+    </span>
+  );
+}
 
 const SIM_STATUSES = ["not_started", "pattern_needed", "in_simulation", "fit_review", "approved"];
 
@@ -163,6 +220,7 @@ export function FilesPage() {
       <PageHeader
         eyebrow="Studio"
         title="Files"
+        help="files"
         description="Every working file — sketches, patterns, 3D files, renders, and factory documents — filed against the style, product, or order it belongs to."
         actions={
           <div className="flex items-center gap-2">
@@ -210,6 +268,7 @@ export function FilesPage() {
           <table className="admin-table">
             <thead>
               <tr>
+                <th className="w-12"></th>
                 <th>Filename</th>
                 <th>Type</th>
                 <th>Size</th>
@@ -221,6 +280,11 @@ export function FilesPage() {
             <tbody>
               {data.map((f) => (
                 <tr key={f.id}>
+                  <td className="!py-1.5">
+                    <a href={`/api/admin/files/${f.id}/download`} target="_blank" rel="noreferrer">
+                      <FileThumb file={f} />
+                    </a>
+                  </td>
                   <td className="font-medium">{f.filename}</td>
                   <td className="text-xs text-warmgrey">{f.contentType ?? "—"}</td>
                   <td className="text-xs">

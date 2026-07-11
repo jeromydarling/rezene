@@ -201,6 +201,29 @@ Every result saves to **Model renders** at the bottom — click any to reopen it
 Virtual try-on, refits, and mood-board style-matching use a best-in-class engine (fal.ai) that a platform admin enables with an API key — until then the page shows a short "needs a key" note.`,
   },
   {
+    slug: "files",
+    title: "Files",
+    summary: "Every working file in one place — with image thumbnails and typed icons so you can find things by eye.",
+    part: "design",
+    moduleRoute: "/admin/files",
+    keywords: "files upload download rename delete thumbnail preview pdf csv sketch pattern 3d glb factory documents",
+    updated: "2026-07-11",
+    body: `# Files
+
+**Design Studio → Files** holds every working file — flat sketches, pattern PDFs, 3D exports, factory documents — filed against the style, product, or order it belongs to.
+
+## Finding things by eye
+
+Every row leads with a preview: **images show a real thumbnail**, and every other kind of file gets a **typed icon** — PDFs, spreadsheets, archives, 3D files (GLB, OBJ, CLO projects), fonts, video and audio each look like what they are. Click the preview (or **Open**) to view the file full-size in a new tab.
+
+## Uploading and housekeeping
+
+Pick what the file belongs to (style, tech pack, sample, factory, production order…), then **Upload file**. **Rename** keeps names meaningful as work evolves; **Delete** removes the file for good, so use it deliberately.
+
+> [!NOTE]
+> Files here are private to your team — they stream through your session, never from a public URL. Product photos and other public assets live with the product or in the [site content media library](/admin/support/kb/cms).`,
+  },
+  {
     slug: "pattern-studio",
     title: "The Pattern Studio: real sewing patterns",
     summary: "Draft manufacturable 2D patterns — graded to a size or a person's measurements — and download the SVG.",
