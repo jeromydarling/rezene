@@ -109,6 +109,7 @@ const SHOTS = [
   ["research", "/admin/research"],
   ["automations", "/admin/automations"],
   ["files", "/admin/files"],
+  ["school", "/admin/school"],
 ];
 
 const OUT = "public/kb/shots";
