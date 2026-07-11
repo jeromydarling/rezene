@@ -440,10 +440,13 @@ const BLOCKS = {
     // fronts, so they drape on the leg placement, not the hip plane.
     bruce: true,
     parts: { back: "bruce.back", front: "bruce.front", side: "bruce.side", inset: "bruce.inset" },
-    // 530 lands the crotch wings (pattern y 216) at the under-keel (~746)
-    // and the leg hems (y 150) at the crotch crease — 500 left the whole
-    // garment floating a hand above the fork.
-    yOffset: 530,
+    // 580 puts the waistband at the hip-widest and the whole under-crotch
+    // assembly (gussetTop ~730, tusks ~750, wings just under the keel) AT
+    // the keel. The cross-seam arithmetic demands it: the body's back-
+    // waist-to-crotch path is 410mm and this low-rise draft's CB is only
+    // 172mm — at 500/530 the garment floated above the fork and the
+    // crotch seams had to dive a full keel-depth (287mm start gaps).
+    yOffset: 580,
     bodyKind: "brief",
     // Force 6: between uma's 5 (short gusset hauls) and waralee's 8 — the
     // crotch seams span the keel from three directions (back wings, front
@@ -1890,7 +1893,11 @@ if (cfg.trousers) {
   const BPn = set[cfg.parts.back].points;
   back.placement = {
     kind: "plane", y: 160, hangCollapse: false, ringWrap: true,
-    tongue: { y0: BPn.gussetTop.y, y1: BPn.gussetBottom.y, yF: FP.rightTuskLeft.y },
+    tongue: {
+      y0: BPn.gussetTop.y, y1: BPn.gussetBottom.y, yF: FP.rightTuskLeft.y,
+      xC0: 0, xC1: Math.abs(BPn.gussetRight.x),
+      xL0: Math.abs(BPn.legRight.x), xL1: Math.abs(BPn.gussetRight.x),
+    },
   };
   sideL.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
   sideR.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };

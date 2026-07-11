@@ -344,23 +344,56 @@ def place(piece, x, y):
             # face's outboard edge and the back's edge land on the same
             # azimuth by construction.
             tng = pl.get("tongue")
-            if tng and y > tng["y0"]:
-                # Under-crotch sweep for the crotch-wing region (Bruce's
-                # back below gussetTop): the wings' seam partners live on
-                # the FRONT face — pre-sweep the region under the keel to
-                # them, exactly the uma-gusset arc walked back-to-front.
-                # Springs cannot haul cloth across the keel (uma and
-                # waralee both proved it; bake 5's crotch pairs started
-                # at 286mm and never closed).
-                t = min(1.0, (y - tng["y0"]) / max(1e-6, tng["y1"] - tng["y0"]))
-                hB = Y_OFF + tng["y0"]
+            t_fwd = 0.0
+            if tng:
+                # Under-crotch sweep for the back's crotch region. Forward
+                # travel is NOT pattern depth — it runs along the crotch
+                # CURVE: gussetTop (the notch apex at CB) sews to the front
+                # tusks at CF and needs the FULL sweep, while the wing tips
+                # reach only mid-under (the inset tips at the inner thighs)
+                # and the leg-opening edge stays on the back of the thigh.
+                # A y-parameterised arc had this inverted: the tusk pairs
+                # still started at 287mm. Two regions:
+                #  - the CB funnel just ABOVE the notch apex (butt-cleft
+                #    cloth that sinks toward under);
+                #  - the wing rows, interpolated between the curve edge
+                #    (t 1 -> 0.8) and the leg edge (t 0 -> 0.8). The tip
+                #    parameter is 0.8, not the sagittal midpoint: the
+                #    inset gusset edges the tips sew to sit near-CF on the
+                #    front face, and ending the sweep mid-under left those
+                #    pairs 104mm apart.
+                y0, y1 = tng["y0"], tng["y1"]
+                if y <= y0:
+                    t_fwd = max(0.0, 1.0 - (y0 - y) / 50.0) * max(0.0, 1.0 - abs(x) / 60.0)
+                else:
+                    fy = min(1.0, (y - y0) / max(1e-6, y1 - y0))
+                    xC = tng["xC0"] + (tng["xC1"] - tng["xC0"]) * fy
+                    xL = tng["xL0"] + (tng["xL1"] - tng["xL0"]) * fy
+                    u = min(1.0, max(0.0, (abs(x) - xC) / max(1.0, xL - xC)))
+                    t_fwd = (1.0 - 0.2 * fy) * (1 - u) + (0.8 * fy) * u
+            R = width_at(piece, y) or 1.0
+            phi = math.pi * min(1.0, abs(x) / max(1.0, R))
+            ta, tb = torso_ab(y)
+            _ou = float(pl.get("outset", 0.0))
+            wx = math.copysign((ta + 15.0 + _ou) * math.sin(phi), x)
+            wy = side * (tb + 15.0 + _ou) * math.cos(phi)
+            wx, wy = clamp_out(wx, wy, y)
+            if t_fwd > 0.0:
+                # Blend toward the uma-gusset sagittal arc at parameter
+                # t_fwd (0 = this back-face wrap, 1 = the front face at the
+                # tusk height), sagging under the keel between. The blend
+                # ramp keeps the boundary with the un-swept region seamless.
+                t = t_fwd
                 hF = Y_OFF + tng["yF"]
+                # Dampen descent below the notch level: this cloth WRAPS
+                # under, it doesn't keep hanging down — full pattern depth
+                # started the wing tips 40mm below the keel.
+                hB = Y_OFF + (min(y, tng["y0"]) + max(0.0, y - tng["y0"]) * 0.3)
                 sag = max(0.0, TORSO[-1][0] + 14.0 - (hF + hB) / 2.0)
                 h = hB + (hF - hB) * t + sag * math.sin(math.pi * t)
-                _, dB = torso_ab(tng["y0"])
                 _, dF = torso_ab(tng["yF"])
-                amp = (dB + 15.0) * (1 - t) + (dF + 15.0) * t
-                ly = amp * math.cos(math.pi * t)  # +back face -> -front face
+                amp = (tb + 15.0) * (1 - t) + (dF + 15.0) * t
+                ly = amp * math.cos(math.pi * t)
                 lx = x
                 rr = brief_leg_r(h) + 6.0
                 if h >= BRIEF_LEG_TOP:
@@ -370,14 +403,11 @@ def place(piece, x, y):
                             need = math.sqrt(rr * rr - dx * dx)
                             if abs(ly) < need:
                                 ly = need if t < 0.5 else -need
-                return (lx * S, ly * S, z_of_body(h))
-            R = width_at(piece, y) or 1.0
-            phi = math.pi * min(1.0, abs(x) / max(1.0, R))
-            ta, tb = torso_ab(y)
-            _ou = float(pl.get("outset", 0.0))
-            wx = math.copysign((ta + 15.0 + _ou) * math.sin(phi), x)
-            wy = side * (tb + 15.0 + _ou) * math.cos(phi)
-            wx, wy = clamp_out(wx, wy, y)
+                s = min(1.0, 3.0 * t_fwd)
+                wx = wx * (1 - s) + lx * s
+                wy = wy * (1 - s) + ly * s
+                zz = (HEIGHT - y) * S * (1 - s) + z_of_body(h) * s
+                return (wx * S, wy * S, zz)
             return (wx * S, wy * S, (HEIGHT - y) * S)
         # Per-height wrap scale: a flared garment wraps snug where it is
         # narrow and full where it is wide; one global scale bunches the
@@ -808,6 +838,10 @@ for seam in DATA["seams"]:
     ib = seg_indices(*seam["b"])
     if _pair_score(ia, list(reversed(ib))) < _pair_score(ia, ib):
         ib = list(reversed(ib))
+    if _os.environ.get("DRAPE_SEAM_DEBUG") == "1":
+        _da, _db = match(list(ia), list(ib))
+        _ds = sorted(math.dist(all_verts[a], all_verts[b]) / S for a, b in zip(_da, _db))
+        print(f"seam {seam['name']:16s} start gap mm p50={_ds[len(_ds) // 2]:7.1f} max={_ds[-1]:7.1f}")
     seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
     if seam.get("bridge"):
