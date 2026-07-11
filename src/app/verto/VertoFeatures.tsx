@@ -1184,7 +1184,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Client portal", "A passwordless page where clients follow their piece, see renders on their own body, and approve the design."],
       ["Deposits & consult booking", "Request deposits and milestone payments per commission, and take consult requests from a public /book page."],
       ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
-      ["The Verto School", "Courses in tailoring, seamstressing and fashion from the era's own masters — timed lessons you can read or listen to, server-graded examinations, and certificates verified by real work in your studio."],
+      ["The Verto School", "Courses in tailoring, seamstressing and fashion from the era's own masters — timed lessons you can read or listen to, illustrated with the original books' plates, server-graded examinations, and certificates verified by real work in your studio."],
       ["Verto Certified badges", "Course badges, school diplomas and the Certified Studio mark — every certificate has a public verification link that can't be faked."],
       ["R&D research studio", "Maker research, brand dossiers, price studies, trend boards and stockist pipelines — live cited research in every room, one daily allowance."],
       ["Competition on watch", "Watch a competitor's dossier and Verto re-researches it weekly — price moves, new stockists and launches land in your digest with sources."],

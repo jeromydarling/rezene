@@ -18,7 +18,8 @@ export const F1: CourseDef = {
   sources: [
     { label: "Talbot Hughes — Dress Design: An Account of Costume for Artists & Dressmakers (1920)", iaId: "dressdesignaccou0000unse", url: "https://archive.org/details/dressdesignaccou0000unse" },
     { label: "Katherine Morris Lester — Historic Costume (1925)", iaId: "historiccostume0000kath", url: "https://archive.org/details/historiccostume0000kath" },
-    { label: "Auguste Racinet — Le Costume Historique (1888, Getty scan)", iaId: "gri_33125008521722", url: "https://archive.org/details/gri_33125008521722" },
+    { label: "Auguste Racinet — Le Costume Historique, vol. 1: text & Coupes et Patrons (1888, Getty scan)", iaId: "gri_33125008521722", url: "https://archive.org/details/gri_33125008521722" },
+    { label: "Auguste Racinet — Le Costume Historique, vol. 5: color plates (1888, Getty scan)", iaId: "gri_33125008496388", url: "https://archive.org/details/gri_33125008496388" },
   ],
   lessons: [
     {
@@ -26,6 +27,9 @@ export const F1: CourseDef = {
       minutes: 8,
       source: { label: "Hughes, introduction", url: "https://archive.org/details/dressdesignaccou0000unse" },
       bodyMd: `Talbot Hughes wrote his 1920 costume history *for artists and dressmakers*, and his premise is this course's premise: costume history is not trivia — it is the **working vocabulary of design**. Every silhouette you will ever sketch has been worn before, argued about before, and solved technically before. Knowing where a line comes from lets you quote it on purpose, break it on purpose, and answer a client's "make it feel Edwardian, but modern" with something better than a mood.
+
+![Color plate of seven French 17th-century court ladies in brocade gowns and tall lace headdresses](/school/language-of-costume/lesson0-racinet-court-dress-france-17th-century.jpg)
+*Auguste Racinet, Le Costume Historique (1888), vol. 5 — French court dress under Louis XIV: brocade mantuas and fontange headdresses in chromolithograph.*
 
 His method is the one to copy: Hughes worked from **surviving garments**, not paintings alone — he cut patterns from period pieces in his own collection and printed the diagrams, garment by garment, at the back of the book. (This is why his book, of all era costume histories, remains a working tool: the plates show the look; the pattern diagrams show *how the look is a piece of cutting*.) When this school's tailoring courses talk about balance and suppression, Hughes shows you five centuries of answers.
 
@@ -61,11 +65,20 @@ Three habits of reading a garment historically, from his introduction:
 
 **1800s–1810s · The Empire column.** Waist directly under the bust, fabric falling in a slim column — the neoclassical moment. Structure: almost none (the corset briefly nearly died). The recurring revival whenever fashion wants "liberation."
 
+![Four photographs of women modeling slim high-waisted Empire dresses of 1800-1830](/school/language-of-costume/lesson1-empire-dresses-1800-1830.jpg)
+*Talbot Hughes, Dress Design (1920) — surviving Empire dresses, 1800–1830, photographed on live models: the column itself.*
+
 **1830s · Romantic volume.** The waist returns to place and cinches; sleeves balloon into the **gigot** (leg-of-mutton); skirts bell. Volume high on the body.
 
 **1850s–60s · The crinoline.** Volume moves down: the cage crinoline swings skirts to their widest in history — an engineering solution (steel hoops) replacing dozens of petticoats. Silhouette: a bell on a fitted bodice.
 
+![Color fashion plate of two women in wide hooped crinoline dresses, from Godey's Lady's Book, 1865](/school/language-of-costume/lesson1-crinoline-godeys-lady-book-1865.jpg)
+*Godey's Lady's Book, 1865, reproduced in Lester's Historic Costume (1925) — the crinoline at its widest.*
+
 **1870s–80s · The bustle.** Volume migrates *backward*: skirts flatten in front, project behind over a bustle frame; bodices lengthen into the boned **cuirass**. The most sculptural, upholstered moment of the century.
+
+![Line-drawn plate of five women and one man showing bustle-era to 1890s American dress](/school/language-of-costume/lesson1-bustle-american-costume-1873-1897.jpg)
+*Katherine Morris Lester, Historic Costume (1925), plate XXVIII — American dress 1873–1897: bustle, princess line, and the 1890s skirt-and-waist.*
 
 **1890s · The hourglass.** Bustle collapses; sleeves balloon again (the gigot's revival); skirts gore into smooth flares: the Gibson-girl hourglass. This is Hecklinger's and Vincent's customer.
 
@@ -105,9 +118,18 @@ The pattern to internalize is not the dates but the **mechanism**: volume migrat
 
 **Suppression silhouettes** (the fitted eras: 1840s bodice, 1890s hourglass, 1950s revival): shape made by *removing* — darts, seams, and a boned foundation garment doing the heavy compression. To quote these silhouettes without their corsetry, the structure moves into the garment (S3's boned linings) or the silhouette softens honestly.
 
+![Line diagrams of three 17th-century corset patterns with boning and quilting marked](/school/language-of-costume/lesson2-hughes-corset-patterns-1620-1705.jpg)
+*Hughes, pattern 9 — three boned corsets, 1620–1705, cut open as measured diagrams: the suppression engine itself.*
+
 **Suspension silhouettes** (crinoline, bustle, pannier, the modern ballgown): shape made by *hanging cloth on a frame*. The cloth's own weight is the enemy and the frame's geometry is the design. Quote these and your real design object is the understructure — which is why couture still employs *flou* AND *tailleur*.
 
+![Pattern-diagram plate mixing corset and stays pieces with small drawings of structured court gowns](/school/language-of-costume/lesson2-racinet-stays-and-corset-patterns.jpg)
+*Racinet, 'Coupes et Patrons', tab XI — stays, busks and stomachers beside the court silhouettes they produce.*
+
 **Padding silhouettes** (the gigot sleeve, the Edwardian pouf, the 1980s shoulder): shape made by *filling*. Fast, light, reversible — padding is the cheapest historical quote in the book, which is exactly why it recurs.
+
+![Diagrams of an Elizabethan jerkin and four triangular embroidered stomachers, 1600-1730](/school/language-of-costume/lesson2-hughes-jerkin-and-stomacher-patterns.jpg)
+*Hughes, pattern 5 — an Elizabethan jerkin and four rigid embroidered stomachers: stiffened panels holding the pointed line.*
 
 **Cut silhouettes** (the 1920s tube, the bias 30s, the tent, the cocoon): shape made by *the pattern itself* — geometry, grain and drape doing everything. The hardest to copy from a photograph because the effect IS the pattern; Hughes's diagrams and a muslin are the honest route.
 
@@ -143,13 +165,22 @@ This lesson is the bridge to your practical: a trend board that names a directio
 
 **1. Collect by silhouette, not by decade.** Pull plates that share a *line* — high-waisted columns, say — across periods (Empire 1805, directoire-revival 1910, bias 1935). What survives the periods is the idea; what changes is the technology. The idea is what you're licensing.
 
+![Color plate of French 17th-century women in richly draped, trimmed gowns in interior scenes](/school/language-of-costume/lesson3-racinet-gowns-drape-and-trim.jpg)
+*Racinet, vol. 5 — a plate dense with quotable ideas: looped overskirts, contrast linings, lace engageantes, banded metallic trim.*
+
 **2. Name the mechanism** (lesson 3). A plate is a result; your board needs the cause. "1890s sleeve: volume by padding + pleating onto a fitted armhole" is actionable; "big sleeves" is a mood.
 
 **3. Translate the foundation.** Decide explicitly what plays the corset/crinoline/bustle's role today: interior structure, clever cut, knit stretch, or nothing (accepting the soft version). This single decision separates a modern quote from a costume.
 
-**4. Steal the details literally.** Surfaces date, but *techniques* are timeless and legal tender: a Racinet border becomes an embroidery placement; an 1870s bound edge becomes your signature finish. Period detail on a modern silhouette reads as taste; period silhouette with period detail reads as reenactment.
+**4. Steal the details literally.** Surfaces date, but *techniques* are timeless and legal tender: a Racinet border becomes an embroidery placement; an 1870s bound edge becomes your signature finish.
+
+![Four close-up photographs of embroidered and trimmed bodices from 1798-1830](/school/language-of-costume/lesson3-hughes-embroidered-bodices-detail.jpg)
+*Hughes, plate XXIV — surviving bodices at pinboard scale: sleeve puffs, rouleaux trim, applied embroidery, 1798–1830.* Period detail on a modern silhouette reads as taste; period silhouette with period detail reads as reenactment.
 
 **5. Cite your sources on the board.** Not academically — practically. A trend board whose directions link the plates that seeded them briefs a design team (or a Design Studio prompt) with precision no adjective reaches. "Sleeve per Racinet vol. 5, plate 312, volume moved to the forearm" generates better than "romantic sleeve."
+
+![Color plate of French regional costumes with a column of detailed lace headdress studies](/school/language-of-costume/lesson3-racinet-french-headdresses-and-lace.jpg)
+*Racinet, vol. 5 — regional dress with a margin column of lace and ribbon headdress studies: citation-ready detail.*
 
 That is your practical: build a trend board in R&D with at least three directions, worded as mechanisms, sourced from the archive you now know how to read. (When we open the Timeless Library — the plate collections and magazine runs this school researched — this exercise will have twelve thousand plates one click away; the method is already yours.)`,
       checkpoints: [
@@ -220,15 +251,24 @@ export const F2: CourseDef = {
 
 **Heads as the unit.** The classical figure stands 7.5–8 heads tall; the fashion figure of her era stretches to 8.5 (today's stretches further — the *convention* moves, the *method* doesn't). Landmarks fall on head-lines: chin at 1, bust near 2, waist near 3, hips at 4, knees around 5.5–6, ankles just above 8. Draw the ruler-of-heads first; hang the figure on it.
 
+![Diagram of a standing female figure divided into head-length units with labeled proportion lines](/school/fashion-drawing/lesson0-heads-tall-grid.jpg)
+*Ethel Traphagen, Costume Design and Illustration (1918) — the figure ruled into head units, every landmark labeled against the count.*
+
 **The action line.** Before anatomy, one long stroke establishes the pose — the spine's sweep from head to weight-bearing heel. Every convincing figure drawing starts as this single line; stiff figures are figures whose action line was never drawn.
 
 **Weight and the standing leg.** A standing figure bears weight on one leg; the weight-bearing ankle sits under the pit of the neck (drop a plumb line — the era's test and the studio's still). The hip over the standing leg rises; the shoulder above it drops: the counterpose that makes a figure stand instead of float.
 
 **Simplify the anatomy.** Young's era drew ovals and cylinders — egg head, cylinder neck, oval ribcage and hip masses, tapered cylinder limbs — assembled on the action line, refined only after the assembly stands. Anatomy in a fashion drawing is scaffolding for cloth; the drawing exists to carry the garment.
 
+![Side-by-side line drawings showing a fashion figure first as construction guide lines, then as a finished outline](/school/fashion-drawing/lesson0-figure-construction-steps.jpg)
+*Edna Woolman Young, A Student's Manual of Fashion Drawing (1919) — the same figure blocked in with guide lines, then cleaned up and ready to dress.*
+
 Her practice regime is the unglamorous secret: **a page of figures a day**, thirty seconds to five minutes each, from life or photographs, drawn *through* (light lines continuing where limbs pass behind cloth or each other, so the body under the clothes is never guessed). Thirty lessons of it and the hand stops negotiating with the pencil — which is the entire point: a designer's drawing speed is a design speed.
 
-> **Adapting the era:** Young's proportions and poses reflect 1919's figure conventions. Draw today's variety of bodies with the same method — the head-unit scaffold, action line and plumb test are body-neutral tools; the convention layered on top is yours to set.`,
+> **Adapting the era:** Young's proportions and poses reflect 1919's figure conventions. Draw today's variety of bodies with the same method — the head-unit scaffold, action line and plumb test are body-neutral tools; the convention layered on top is yours to set.
+
+![Rows of head-construction drawings above a chart of figures at different ages measured in head units](/school/fashion-drawing/lesson0-proportions-by-age.jpg)
+*Traphagen — heads constructed in five views, and how many heads tall the figure stands at every age.*`,
       checkpoints: [
         {
           q: "The plumb test for a standing figure drops from…",
@@ -266,7 +306,13 @@ Her practice regime is the unglamorous secret: **a page of figures a day**, thir
 
 **Falling/cascade folds** — the flared zigzag edge of a bias or circular piece: a jabot, a cascade ruffle, a circle skirt's hem.
 
+![Line drawings of five draped skirts showing cascading folds, pleats, and gathered fabric](/school/fashion-drawing/lesson1-skirt-drapery-on-the-form.jpg)
+*Young — five skirts on the form: where cascades, accordion pleats, gathers and tucks each fall.*
+
 Two principles govern all of them. **Folds radiate from points of support or tension** — shoulder, bust, belt, knee; begin every fold at its cause and the drawing explains the garment. And **fabric weight sets fold scale**: chiffon makes many small soft folds, melton few large firm ones; the pencil pressure and stroke length should change with the cloth. An era exercise worth stealing whole: drape one meter of muslin, then of charmeuse, then of coating over the same chair and draw all three — same support, three languages.
+
+![Chart of fabric texture strokes and four skirt studies showing folds rendered in different materials](/school/fashion-drawing/lesson1-rendering-fabric-folds.jpg)
+*Young — the same folds rendered as velvet, taffeta, chiffon and crepe: fabric weight is the drawing's real subject.*
 
 Traphagen adds the drawing-from-history discipline this school loves: her assignments send students to redraw silhouettes from museum plates *as working sketches* — not to copy the rendering but to extract the line. Drawing a garment is the fastest way to understand its cut; her book is a bridge between F1's plates and your own croquis.`,
       checkpoints: [
@@ -300,11 +346,20 @@ Traphagen adds the drawing-from-history discipline this school loves: her assign
 
 **The working drawing** — the era's name for what production calls the **flat**: garment drawn off the body (or on a neutral figure), both halves, true proportions, with the seams, darts, closures and construction lines *drawn where they actually are*. Its audience is the maker; its virtue is truth. Traphagen's rules for it read like a tech-pack standard a century early: show every seam; indicate the closure (which side laps, how far it opens); draw the back; note the fabric; if a detail can't be drawn clearly, draw it enlarged in a corner ("detail sketches," her term — the ancestor of every tech pack's callout).
 
+![Drawing of a shirred and scalloped dress with enlarged margin studies of lacing, fringe, and tassels](/school/fashion-drawing/lesson2-shirring-scallops-lacing.jpg)
+*Young — trims specified in a sketch: shirring, scalloped tiers, lacing and tassels, each redrawn enlarged in the margin.*
+
 Between them sits her **presentation drawing** — the rendered, attitudinal illustration for the client or the page. It borrows the croquis's life and the working drawing's honesty, and its era-specific techniques (wash, line economy, the dramatically elongated figure) are style; borrow what suits your brand.
 
 The modern mapping is exact and worth saying aloud: croquis → your sketchbook and Design Studio prompts; working drawing → the flat sketch on your tech pack; presentation drawing → your lookbook and product page imagery. One design, three drawings, three audiences — and the discipline of knowing which one you're making at any moment.
 
-Her assignment structure also survives translation: design *in series* (six variations on one block beat one masterpiece), and **annotate every sketch** — fabric, key measure, the one construction note that makes it buildable. An annotated croquis is halfway to a spec; an unannotated beauty is halfway to nothing.`,
+![Line drawing of a plaid dress with the pattern following seams and folds, surrounded by plaid swatch studies](/school/fashion-drawing/lesson2-plaids-follow-construction.jpg)
+*Young — a check pattern bending truthfully around bodice, sleeve and gored skirt: the working drawing's honesty applied to cloth.*
+
+Her assignment structure also survives translation: design *in series* (six variations on one block beat one masterpiece), and **annotate every sketch** — fabric, key measure, the one construction note that makes it buildable. An annotated croquis is halfway to a spec; an unannotated beauty is halfway to nothing.
+
+![Line drawings of two blouses on the waist form with detail studies of collars, cuffs, and a buckle](/school/fashion-drawing/lesson2-waists-collars-details.jpg)
+*Young — waists on the form with their collars, cuffs and frills drawn as separate construction studies.*`,
       checkpoints: [
         {
           q: "The working drawing's audience and virtue are…",
@@ -334,11 +389,20 @@ Her assignment structure also survives translation: design *in series* (six vari
 
 **Line survives; rendering seduces.** The era's reproduction processes rewarded confident line drawings (halftones were costly), which trained a virtue worth keeping: if the design reads in pure line, it is a design; if it needs the rendering to read, it is a mood. Test your croquis by what a pattern maker could do with them.
 
+![Art-deco fashion plate of a woman in a Paquin travel coat standing between two dark stylized trees](/school/fashion-drawing/lesson3-barbier-les-colchiques.jpg)
+*George Barbier, 'Les Colchiques' (1913), for a Paquin coat, reproduced in Traphagen — line economy carrying an entire composition.*
+
 **Draw for the brief, in series.** Young's later lessons assign garments to constraints — a walking suit for such a figure, a frock in such a cloth — never "draw something beautiful." Series thinking (six necklines on one bodice; four sleeve volumes on one jacket) is design's real motion, and it maps directly onto how you'd brief a generation batch in the Design Studio: one block, one fabric truth, several disciplined variations.
 
 **The sketch is a contract with the make.** Every drawing that leaves your hands toward a maker is a promise about grain, volume and construction — which is why the era annotated relentlessly and why your flats live *inside* tech packs, not beside them. A sleeve drawn with pipe folds promises gathering; drawn smooth it promises a fitted cap; the maker will price and sew what you drew.
 
+![Soft etching of a woman in a broad-brimmed hat and long dress holding an open parasol](/school/fashion-drawing/lesson3-steinmetz-parasol-etching.jpg)
+*E. M. A. Steinmetz for Harper's Bazar, in Traphagen — atmosphere as a brand voice: the presentation drawing at full power.*
+
 **Practice remains the engine.** Thirty lessons, a page a day — the books end where they began. A studio habit that survives a century of technology deserves the last word: designers who draw daily see garments more precisely, brief makers and machines more precisely, and recognize in a fitting what others only feel.
+
+![Decorative cover illustration of a masked couple in costume among fireworks, flowers, and night sky](/school/fashion-drawing/lesson3-brunelleschi-cover-design.jpg)
+*Umberto Brunelleschi's cover design, in Traphagen — how far a costume drawing can carry mood and story.*
 
 Your practical closes the loop with the modern instrument: save a concept in the Design Studio — a disciplined brief in the era's spirit (block, fabric, three variations) rather than an adjective cloud. The school verifies the concept exists; the discipline it verifies is Young's and Traphagen's.`,
       checkpoints: [

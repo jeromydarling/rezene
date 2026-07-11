@@ -102,6 +102,14 @@ function renderBlock(block: string, levelFor: (depth: number) => number): ReactN
     );
   }
   const lines = block.split("\n");
+  if (lines.every((l) => l.trim().startsWith(">"))) {
+    const inner = lines.map((l) => l.replace(/^\s*>\s?/, "")).join(" ").trim();
+    return (
+      <blockquote className="border-l-2 border-navy/30 pl-4 text-[0.95em] text-ink/80 prose-editorial">
+        {renderInline(inner)}
+      </blockquote>
+    );
+  }
   if (lines.every((l) => l.trim().startsWith("- "))) {
     return (
       <ul className="list-disc space-y-1 pl-5 prose-editorial">
@@ -152,6 +160,18 @@ function renderInline(text: string): ReactNode {
       <strong key={i} className="font-semibold">
         {part.slice(2, -2)}
       </strong>
+    ) : (
+      <Fragment key={i}>{renderItalic(part)}</Fragment>
+    ),
+  );
+}
+
+function renderItalic(text: string): ReactNode {
+  const parts = text.split(/(\*[^*\s][^*]*\*)/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.length > 2 && part.startsWith("*") && part.endsWith("*") ? (
+      <em key={i}>{part.slice(1, -1)}</em>
     ) : (
       part
     ),

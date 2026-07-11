@@ -23,8 +23,10 @@ export function speechTextForBlock(block: string): string | null {
   }
   const text = block
     .replace(/^#{1,4}\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
     .replace(/^\s*-\s+/gm, "")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*\s][^*]*)\*/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
   return text || null;

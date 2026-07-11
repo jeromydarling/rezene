@@ -32,9 +32,18 @@ export const S2: CourseDef = {
 
 **Widths** — back width between the arm joints; chest width above the bust.
 
+![Labeled diagram of a woman's figure showing all dressmaking measurement lines](/school/drafting-and-draping/lesson0-taking-measures-labeled-figure.jpg)
+*Jane Fales, Dressmaking (1917) — the complete measure map: every dress measure labeled on the standing figure.*
+
 Three rules Picken drills. **The tape stays snug and level** — a drooping tape adds phantom centimeters. **Measure over the foundation garments the dress will be worn with** — fit is relative to what's underneath (as true of a modern bra as of a 1920 corset). **Record immediately, dated** — her Institute's record cards are the direct ancestors of the Client Book's dated measurement sets, and her reason is the modern one: bodies change, and a dated history tells you *how*.
 
+![Line drawings of a woman measured around bust and across back with a tape measure](/school/drafting-and-draping/lesson0-bust-and-back-measures.jpg)
+*Mary Brooks Picken, Pattern Drafting (c. 1920) — taking the bust and back measures: tape snug, level behind.*
+
 The quiet radicalism of her method: she teaches students to trust the measures over the mirror. A drafted bodice that matches honest measures and still looks wrong is revealing a **posture correction** to make (the balance lesson of the tailoring school applies to dresses identically), not a reason to distrust the tape.
+
+![Two full-length figures of a woman having skirt lengths measured from waist to floor](/school/drafting-and-draping/lesson0-length-measures-to-floor.jpg)
+*Picken — the length measures, taken from the waist tape to the floor.*
 
 > **Term note:** the *waist* in period dressmaking often means the bodice garment itself ("shirtwaist"); the *waist line* is the body's. *Basque* = a bodice extending below the waist. Where this course says waist, it means the body line.`,
       checkpoints: [
@@ -66,11 +75,20 @@ The quiet radicalism of her method: she teaches students to trust the measures o
 
 The draft in brief (Picken's and Fales's methods agree in structure): a rectangle of back length by half-bust plus ease; the scye depth set from the nape; back and chest widths hung on it; the neck curves cut; the shoulder slopes drawn. Then the front is drafted *longer* than the back — the extra front length walks over the bust — and the surplus between bust and waist gathers into the **waist dart(s)**, while the surplus at the side, between bust and underarm, closes into the **underarm/side dart**. Where the dart points converge is the **bust point**, and every dart must stop short of it (2–3 cm) or the block sculpts a cone instead of a curve.
 
+![Geometric bodice drafting diagram with lettered construction lines](/school/drafting-and-draping/lesson1-shirt-waist-draft.jpg)
+*Fales — the shirt-waist draft: front, back and armhole hung on lettered construction lines.*
+
 What Picken wants a student to understand — and what separates pattern literacy from recipe-following — is that **the dart is movable**. Slash the block to the bust point from any edge, close the original dart, and it opens where you slashed: shoulder, neck, armhole, center front, French dart at the hip. Same fit, different design line. Gathering, tucks, and princess seams are all the same suppression wearing different clothes; a princess seam is simply the shoulder-or-armhole dart and the waist dart joined into one continuous seam and cut apart.
+
+![Drafting diagram of a tight-fitting bodice block with darts and collar pieces](/school/drafting-and-draping/lesson1-tight-fitting-waist-draft.jpg)
+*Fales — the tight-fitting waist: the fitted bodice block with its darts and underarm pieces.*
 
 **Ease** in a dress block is smaller than a coat's (the era: about 5–8 cm at the bust for a fitted bodice) and, exactly as in trousers, positional: bust and hip carry it; the waist carries almost none; the back carries a little more than the front because arms live forward.
 
-The block, once fitted and proven, is the studio's capital — Picken's students traced theirs onto card. Yours lives as a dated pattern in your shop, and the practical for this course is the block's raw material: a complete dress-measure set recorded on a client.`,
+The block, once fitted and proven, is the studio's capital — Picken's students traced theirs onto card. Yours lives as a dated pattern in your shop, and the practical for this course is the block's raw material: a complete dress-measure set recorded on a client.
+
+![Diagrams showing a drafting square and curve laid on a bodice pattern draft](/school/drafting-and-draping/lesson1-drafting-with-the-square.jpg)
+*Picken — the square and curve in position on the waist draft: the tools doing the geometry.*`,
       checkpoints: [
         {
           q: "Every dart must stop short of the bust point because…",
@@ -100,9 +118,18 @@ The block, once fitted and proven, is the studio's capital — Picken's students
 
 **Prepare the form** — pad a dress form to the client's measures (the era padded with cotton wadding toward the figure's asymmetries; a modern studio fits the form to the measurement set — same idea). Mark its landmarks with tape: center front, center back, bust line, waist line, side seams. The tapes are the draft's frame, transplanted onto the form.
 
+![Four figures showing successive steps of draping cloth on a standing figure](/school/drafting-and-draping/lesson2-draping-the-dress-steps.jpg)
+*Woman's Institute, Draping and Designing with Scissors and Cloth (1924) — draping a dress step by step: laying, pinning, slashing.*
+
 **Prepare the cloth** — muslin (period: "cambric or cheap lining") torn, not cut, to blocks, because tearing follows a thread and guarantees grain. Mark the grain boldly. **Grain discipline is the whole secret of draping**: a lengthwise grain hung plumb at center front, a crosswise grain level at the bust — violate them and the drape lies to you, hanging in ways cut cloth never will.
 
+![Sequence of figures with cloth pinned and slashed while draped on the body](/school/drafting-and-draping/lesson2-pinning-and-slashing-on-figure.jpg)
+*Woman's Institute — pinning over the hips, slashing for the armhole, smoothing the drape before any cut commits.*
+
 **Drape** — pin at the landmarks, let the cloth fall, and *move the fullness where the design wants it*: smooth toward a seam and pin; sweep into folds and let them cascade; cut away only what the design has firmly rejected (her scissors are confident but late — cloth removed is an option destroyed). The bust suppression appears under your fingers as the cloth chooses its dart — often the most natural dart position for *this* figure, which is knowledge no flat draft provides.
+
+![Figures draping straight cloth lengths and shaping darts on a standing figure](/school/drafting-and-draping/lesson2-shaping-straight-lengths.jpg)
+*Woman's Institute — straight lengths shaped on the body: the under-arm fulness becoming a dart under the fingers.*
 
 **Truing** — the drape comes off the form and becomes a pattern: fold lines become seams, pin lines become stitching lines, curves get smoothed with the rulers, grain arrows carry over, seam allowances go on. An untrued drape is a sketch; the truing is where it becomes an instruction.
 
@@ -140,7 +167,13 @@ Drafting and draping are not rivals; the era used them as a pair. Draft the bloc
 
 **Bodice rides up in front.** Front length insufficient over the bust (the through-the-bust-point measure from lesson 1 was skimped) — let down the front waist seam or add front length at the shoulder.
 
+![Diagrams of bodice pattern pieces slashed open to add length in fitting](/school/drafting-and-draping/lesson3-altering-waist-length.jpg)
+*Fales — the remedy drawn: a too-short waist opened and lengthened on the pattern.*
+
 **Skirt hem rises at front or back.** Not a hem problem — a **balance** problem: the waist seam is spending length unevenly. Lift or drop the skirt at the waist until the hem hangs level, *then* mark the hem. Period books level hems with a chalk marker on a stand at fixed height from the floor — still the most accurate method in the room.
+
+![Photograph of a fitted waist lining pinned on a dress form showing correct seam lines](/school/drafting-and-draping/lesson3-seam-lines-on-the-form.jpg)
+*Fales — 'correct seam-lines for the tight-fitting waist': the fitted lining on the form, the standard the fitting steers toward.*
 
 **Sleeve wrinkles.** As in tailoring: spiral drags = pitch; crown dents = ease misplaced; tightness across the upper arm = the block, not the seam allowance.
 
@@ -214,11 +247,20 @@ export const S3: CourseDef = {
 
 **The continuous-bound placket** — a slash bound with one continuous strip, one side folding under as a facing, the other standing as an underlap. The workhorse for sleeve openings and children's clothes; strong, quick, invisible when closed. Its one law: **the slash's end is the stress point** — reinforce it (small stitches pivoting at the point, or a tiny bar tack) or it tears the first time the garment is pulled on impatiently.
 
+![Book page with two drawings of a continuous-lap placket, inside and outside views](/school/dressmaking-in-detail/lesson0-continuous-lap-placket.jpg)
+*Butterick, The New Dressmaker (1921) — the continuous-lap placket, inside and out.*
+
 **The seam placket** — the opening built into a seam (a skirt's left side, a dress's back), faced on one edge, underlapped on the other, closing with snaps or hooks so the seam line appears unbroken. The period's dress zipper, essentially — and when you *do* set a zipper today, the same geometry applies: faced edge, underlap, nothing visible when closed.
+
+![Book page with a photograph of a folded-back seam placket opening on fabric](/school/dressmaking-in-detail/lesson0-seam-placket-opening.jpg)
+*Mary Brooks Picken, Dressmaking Perfection in Details (1927) — a seam placket folded open to show its anatomy.*
 
 **The tailored/shirt placket** — the topstitched tower of a shirt cuff opening: a two-piece binding whose upper piece finishes in the little peaked "steeple." Decorative and structural at once; the machine-age placket.
 
 Two universal placket judgments, per Butterick: an opening must be **long enough to dress through without strain** (a too-short placket destroys itself; the classic fault of skimpy making), and it must **lie dead flat when closed** — a placket that gapes or ripples announces every other shortcut in the garment.
+
+![Book page with four drawings of skirt plackets, including one hidden in an inverted plait and one with hooks and eyes](/school/dressmaking-in-detail/lesson0-placket-in-inverted-plait.jpg)
+*Butterick — skirt plackets, including one hidden inside an inverted plait, with their hook-and-eye compositions.*
 
 Fastenings recap from S1 apply here with one addition the dress trade lived by: **snaps take alignment, hooks take strain, buttons take both but slowly.** A side placket closes with hooks at the waist (strain) and snaps along the rest (alignment). That little composition — mixed closures, each doing what it's best at — is the sort of detail Picken's "perfection" booklet is made of.`,
       checkpoints: [
@@ -250,9 +292,18 @@ Fastenings recap from S1 apply here with one addition the dress trade lived by: 
 
 **Underlining (mounting)** — a layer cut identical to the fashion fabric and handled *as one with it* through construction. It gives a fragile or sheer cloth body, hides construction from show-through, and carries marks the face fabric shouldn't. The era mounted georgettes and laces on net or China silk; the method is unchanged for a modern chiffon.
 
+![Book page with two photographs of sheer waist linings, a camisole lining and a blouse lining](/school/dressmaking-in-detail/lesson1-camisole-and-blouse-lining.jpg)
+*Butterick — camisole and blouse linings under sheer waists: the underlayer doing the quiet work.*
+
 **Lining** — a separate inner garment, constructed apart and joined at the edges, so the dress slides on and the seams live in a closed room. A lining is drafted from the same block, *slightly eased* (the era cut linings a touch larger through the bust and back) because a lining cut exactly grips and creeps.
 
+![Book page showing the inside of a dress lining with bound seams and an inside belt](/school/dressmaking-in-detail/lesson1-inside-belt-and-lining-reinforcement.jpg)
+*Butterick — the inside of a well-made dress: bound lining seams and the inside belt that carries the strain.*
+
 **Interlining** — warmth or body between the two (the era: flannel in winter coats; today: the same idea in a quilted lining).
+
+![Book page with drawings of a coat interior showing tape, weights and interlining pieces](/school/dressmaking-in-detail/lesson1-interlining-for-warmth.jpg)
+*Butterick — a coat's interior: interlining for warmth, tape on the edges, weights in the hem.*
 
 **The fitted, boned lining** — the Institute's *Tight Linings and Boning* booklet documents the Edwardian bodice's engine room: a snug inner bodice, seams channeled and **boned** so the bodice stands without strain on the face fabric. Couture never abandoned it — a strapless dress today stands on exactly this foundation garment sewn inside — and a made-to-measure studio should know the anatomy: bones on the seams, casings eased not taut, every bone end capped and cushioned, the lining fitted *tighter than the dress* so it, not the silk, takes the load.
 
@@ -286,13 +337,22 @@ The judgment call the era teaches: **not every dress earns every layer.** A wash
 
 **Sheers (chiffon, georgette, organdy).** Every raw edge and seam allowance is on display, so the seam *is* the finish: French seams (S1) at 6 mm or narrower; hems rolled by hand or finished as a fine machine roll; facings replaced by bindings or simply by a rolled edge, because a facing's shadow reads through. Stitch length shortens, needles go fine and *new* (a burred needle pulls a thread that runs the garment's whole life), and tissue under the seam stops the machine eating the cloth.
 
+![Book page with drawings of flat fell, lapped fell, rolled and pinked seams](/school/dressmaking-in-detail/lesson2-rolled-seam-for-sheers.jpg)
+*Butterick — the rolled seam among its relatives: the sheer fabric's seam-as-finish.*
+
 **Silks (crepes, satins, charmeuse).** The era's rules: fine pins in the seam allowances only; no pressing over pins ever (satin remembers); a press cloth always; test every iron temperature on a scrap because scorch and glaze are one second apart. Slippery cuts want a single layer, weighted not pinned, on a surface the cloth grips (the old trick: a sheet over the table).
+
+![Book page with a photo of figured silk being slip-stitched and diagrams for cutting bias and diagonal fabrics](/school/dressmaking-in-detail/lesson2-handling-figured-silk.jpg)
+*Butterick — handling figured silk: matching and slip-stitching the pattern, and how bias and diagonal cuts behave.*
 
 **Velvet.** Nap has direction — the whole garment cuts one way (period rule: pile *up* for depth of color) — and it cannot be pressed flat, only steamed over a needle board or velvet scrap. Seams finger-pressed; basting with silk thread which leaves no bruise.
 
 **Lace.** Never darted if it can be helped — lace is *appliquéd*: motifs lapped and whipped along their own outlines so joins vanish into the pattern. The era's lace-mending logic is also its seam logic: follow the design, not the geometry.
 
-Underneath all of these sits the Institute's *Sewing Materials* doctrine: **thread, needle and stitch scale to the cloth as a system.** Silk thread for silk; fine cottons for sheers; needle sized so the thread fills its eye; machine stitch length shortening as fabric fineness rises. Half of "my machine hates this fabric" is a system mismatch, 1923 or now. Materials literacy is the practical for this course: your bill of materials, linked to real fabrics and trims from your library, is where these choices become production instead of good intentions.`,
+Underneath all of these sits the Institute's *Sewing Materials* doctrine: **thread, needle and stitch scale to the cloth as a system.** Silk thread for silk; fine cottons for sheers; needle sized so the thread fills its eye; machine stitch length shortening as fabric fineness rises. Half of "my machine hates this fabric" is a system mismatch, 1923 or now.
+
+![Book page comparing plain and twill weaves with fabric photographs and weave diagrams](/school/dressmaking-in-detail/lesson2-plain-and-twill-weaves.jpg)
+*Woman's Institute, Sewing Materials — plain and twill weaves side by side: the structure your thread-needle-stitch system answers to.* Materials literacy is the practical for this course: your bill of materials, linked to real fabrics and trims from your library, is where these choices become production instead of good intentions.`,
       checkpoints: [
         {
           q: "On sheer fabrics, facings are often replaced by bindings because…",
@@ -323,12 +383,21 @@ Underneath all of these sits the Institute's *Sewing Materials* doctrine: **thre
 Her late-1920s catalogue of distinguishing details, all still current:
 
 - **Bindings and pipings** that turn edges into design lines — a self-fabric piping in a seam is nearly free and reads as intent; a contrast binding is a signature.
+
+![Book page with three photographs of binding being mitered around fabric corners](/school/dressmaking-in-detail/lesson3-turning-corners-with-binding.jpg)
+*Picken, Dressmaking Perfection in Details — mitering a binding around a corner so it sits square.*
 - **Hand-finished hems on anything that moves** — a skirt's hem is its motion made visible; machine-blind it on dailywear, slip-stitch it on occasion wear, and *interface* it (bias strips of soft canvas in the fold) on coats and full skirts so the hem swings instead of flutters.
 - **The hidden neatnesses**: seams graded (allowances trimmed to stepped widths so edges never print through), corners built out with a stitch across the point before turning (a sharp corner is *constructed*, not poked), facings understitched and tacked, threads buried. Nobody sees any of it; everybody sees their absence.
+
+![Book page with a photograph of a blouse neckline with convertible collar and bound front opening](/school/dressmaking-in-detail/lesson3-convertible-collar-and-bound-opening.jpg)
+*Picken — a convertible collar with a bound front opening: nothing shows when the lapels turn back.*
 - **Weights** — the couture trick the era used freely: small lead (today: steel) weights in coat hems and a fine chain inside a jacket's hem to make cloth hang plumb. The most literal example in all dressmaking of spending money where only the drape shows.
 - **Pressing as punctuation** — her final chapters return to the iron (Copeland's doctrine from the tailoring school, in a dressmaker's accent): every detail pressed as it is made, the finished garment pressed as little as possible.
 
-And her closing counsel, which is really a business lesson wearing a thimble: details are **where a small maker beats a factory**. Industry can match your seams and undercut your price; it cannot afford your hand-rolled hem, your matched plaid at every seam, your buried threads. The details are the moat. Document them (that's this course's practical — a BOM whose materials are real, so the details are *ordered*, not improvised), price them honestly, and photograph them for the product page — the customer who can't name understitching can still see it.`,
+And her closing counsel, which is really a business lesson wearing a thimble: details are **where a small maker beats a factory**. Industry can match your seams and undercut your price; it cannot afford your hand-rolled hem, your matched plaid at every seam, your buried threads. The details are the moat. Document them (that's this course's practical — a BOM whose materials are real, so the details are *ordered*, not improvised), price them honestly, and photograph them for the product page — the customer who can't name understitching can still see it.
+
+![Book page with a photograph of a sleeve end being finished with a bias-bound opening and tie cuff](/school/dressmaking-in-detail/lesson3-applying-tie-cuffs.jpg)
+*Picken — a tie cuff finished with a bias-bound opening: the small detail a photograph sells.*`,
       checkpoints: [
         {
           q: "Seam allowances are graded (trimmed to stepped widths) so that…",
