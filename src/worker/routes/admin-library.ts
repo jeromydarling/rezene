@@ -231,8 +231,10 @@ adminLibraryRoutes.post("/to-design", requireAdminWrite, async (c) => {
     return c.json({ error: "Couldn't fetch that image from the archive — try again in a minute." }, 502);
   }
 
-  // New concept, the citation in its brief.
+  // New concept, the citation in its brief. Each step is named in its error
+  // so a failure in the field reads as a diagnosis, not a shrug.
   const conceptId = newId("aic");
+  try {
   await run(
     c.var.db,
     `INSERT INTO ai_concepts (id, title, brief, tags, created_by) VALUES (?, ?, ?, ?, ?)`,
@@ -276,6 +278,10 @@ adminLibraryRoutes.post("/to-design", requireAdminWrite, async (c) => {
   );
   await writeAudit(c.var.db, c.var.userId, "library.to_design", "ai_concept", conceptId, { title });
   return c.json({ conceptId }, 201);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Couldn't open the concept (${msg.slice(0, 200)}).` }, 500);
+  }
 });
 
 // ---- Pin → trend board (the school's method, one click) -----------------------
