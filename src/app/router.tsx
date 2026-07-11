@@ -31,6 +31,11 @@ import { KnowledgeBasePage } from "./pages/admin/KnowledgeBasePage";
 import { LaunchPlaybookPage } from "./pages/admin/LaunchPlaybookPage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
 import { ResearchPage } from "./pages/admin/ResearchPage";
+import { ResearchHomePage } from "./pages/admin/research/ResearchHomePage";
+import { BrandsPage } from "./pages/admin/research/BrandsPage";
+import { PricingPage } from "./pages/admin/research/PricingPage";
+import { TrendsPage } from "./pages/admin/research/TrendsPage";
+import { StockistsPage } from "./pages/admin/research/StockistsPage";
 import { AutomationsPage } from "./pages/admin/AutomationsPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
@@ -179,7 +184,12 @@ export function AppRouter() {
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="sourcing" element={<SourcingPage />} />
-          <Route path="research" element={<ResearchPage />} />
+          <Route path="research" element={<ResearchHomePage />} />
+          <Route path="research/makers" element={<ResearchPage />} />
+          <Route path="research/brands" element={<BrandsPage />} />
+          <Route path="research/pricing" element={<PricingPage />} />
+          <Route path="research/trends" element={<TrendsPage />} />
+          <Route path="research/stockists" element={<StockistsPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />

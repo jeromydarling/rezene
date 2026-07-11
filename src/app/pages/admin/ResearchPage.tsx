@@ -6,6 +6,7 @@ import { useToast } from "../../lib/toast";
 import { useAutosave, AutosaveChipText } from "../../lib/useAutosave";
 import { MapboxMap, type MapMarker } from "../../components/MapboxMap";
 import { geocodeAll } from "../../lib/geocode";
+import { ResearchNav } from "./research/shared";
 
 /**
  * R&D — the shop's research workspace. Where knowledge lives BEFORE it's
@@ -620,9 +621,9 @@ export function ResearchPage() {
   return (
     <div>
       <PageHeader
-        title="R&D"
-        eyebrow="Production"
-        description="Your research workspace — candidate makers, findings, and live research that saves itself. When a maker earns it, promote them into Factories & Suppliers."
+        title="Makers & notes"
+        eyebrow="R&D"
+        description="Candidate makers and every finding you've saved — live research answers keep their citations. When a maker earns it, promote them into Factories & Suppliers."
         help="rd-research"
         actions={
           <div className="flex gap-2">
@@ -641,6 +642,7 @@ export function ResearchPage() {
           </div>
         }
       />
+      <ResearchNav />
 
       {/* Ask panel */}
       <div className="mb-4 rounded-xl border border-ink/10 bg-white p-3">

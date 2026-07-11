@@ -192,3 +192,65 @@ INSERT OR REPLACE INTO activity_events (id, kind, entity_type, entity_id, title,
 INSERT OR REPLACE INTO activity_events (id, kind, entity_type, entity_id, title, payload, created_at) VALUES ('aev_demo_08', 'commission.stage_changed', 'commission', 'com_demo_gala', 'Saffron gala kaftan moved to fitting', '{"stage":"fitting","title":"Saffron gala kaftan","clientName":"Amira El Fassi"}', '2026-07-08 15:10:00');
 INSERT OR REPLACE INTO activity_events (id, kind, entity_type, entity_id, title, payload, created_at) VALUES ('aev_demo_09', 'po.status.sent', 'production_order', 'po_demo_004', 'PO-2026-004 sent to Atelier de Marrakech', '{"status":"sent","poNumber":"PO-2026-004","supplierName":"Atelier de Marrakech"}', '2026-07-08 17:25:00');
 INSERT OR REPLACE INTO activity_events (id, kind, entity_type, entity_id, title, payload, created_at) VALUES ('aev_demo_10', 'sample.status_changed', 'sample', 'smp_demo_med_proto', 'Medina Overshirt proto received', '{"styleId":"sty_medina_overshirt","styleName":"Medina Overshirt","round":1,"status":"received"}', '2026-07-10 12:33:00');
+INSERT OR REPLACE INTO research_makers (id, name, market, location, website, email, speciality, min_order, lead_time, price_unit, about, best_use, status, topic) VALUES ('rmaker_demo_01', 'Atlas Knit Coop', 'Morocco', 'Marrakech, Morocco', 'atlasknit.example.com', 'hello@atlasknit.example.com', 'Hand crochet & artisan knits', '50-200 (managed)', '6-8 wks', '$18-32', 'Women''s cooperative doing hand crochet and chunky knits; gauge swatches on request.', 'Cruise crochet program if the Essaouira coverup scales.', 'sampling', 'Knitwear');
+INSERT OR REPLACE INTO research_makers (id, name, market, location, website, email, speciality, min_order, lead_time, price_unit, about, best_use, status, topic) VALUES ('rmaker_demo_02', 'Porto Fino Malhas', 'Portugal', 'Barcelos, Portugal', 'portofinomalhas.example.pt', 'geral@portofinomalhas.example.pt', 'Fine-gauge knitwear', '100/style', '4-6 wks sample', 'EUR 22-38', 'Family knitting mill, fully-fashioned programs, GOTS cotton yarns in stock.', 'AW28 knit capsule if we go fine-gauge.', 'contacted', 'Knitwear');
+INSERT OR REPLACE INTO research_makers (id, name, market, location, website, email, speciality, min_order, lead_time, price_unit, about, best_use, status, topic) VALUES ('rmaker_demo_03', 'Tanger Denim Works', 'Morocco', 'Tangier, Morocco', 'tangerdenim.example.com', NULL, 'Denim & heavy twill', '300/style', '8-10 wks', '$14-19', 'Laser finishing and ozone wash in-house; mostly EU high-street contracts.', 'Only if a denim line ever happens — MOQ is steep for us.', 'researching', 'Denim');
+INSERT OR REPLACE INTO research_makers (id, name, market, location, website, email, speciality, min_order, lead_time, price_unit, about, best_use, status, topic) VALUES ('rmaker_demo_04', 'Studio Lisboa Amostras', 'Portugal', 'Lisbon, Portugal', 'lisboaamostras.example.pt', 'studio@lisboaamostras.example.pt', 'Sampling & small runs', '1-50 (managed)', '2-3 wks sample', 'EUR 45-70', 'Sample room that also does micro-runs; strong on fluid viscose and silk.', 'Fast proto partner for the Saadia line when Casablanca is at capacity.', 'approved', 'Sampling');
+INSERT OR REPLACE INTO research_notes (id, title, body_md, topic, tags, citations, kind, pinned) VALUES ('rnote_demo_01', 'Linen sourcing — Belgian vs Portuguese mills', '## The short version
+
+Belgian linen (Libeco) reads as the quality story our customer expects, but Portuguese mills within two hours of our Tangier makers cut freight and lead time nearly in half.
+
+- Libeco: heritage story, 320gsm suiting weight, ~EUR 24/m at our volumes
+- Fielpor (Guimaraes): comparable hand, ~EUR 16/m, 3 wk delivery
+- Keep Libeco for hero pieces, move volume styles to Portuguese cloth
+
+Decision parked until the SS28 fabric budget is set.', 'Fabrics', '["linen","mills","sourcing"]', '["https://www.libeco.com","https://european-flax.com"]', 'search', 1);
+INSERT OR REPLACE INTO research_notes (id, title, body_md, topic, tags, citations, kind, pinned) VALUES ('rnote_demo_02', 'Wholesale timing — cruise buying windows', 'Buyers for US resort doors write cruise orders **June through August** for November delivery. If we want Corniche Polo and Saadia Maxi in boutiques for Cruise 27 we need line sheets out by mid-June and PP samples photographed before Eid.
+
+Showroom option: join a Paris showroom for the January window instead — lower risk, later cash.', 'Wholesale', '["cruise","buying-calendar"]', '[]', 'note', 0);
+INSERT OR REPLACE INTO research_brands (id, name, website, instagram, segment, positioning, price_floor_cents, price_ceiling_cents, currency, channels, dossier_md, citations, watch, last_researched_at) VALUES ('rbrand_demo_01', 'Marrakshi Life', 'marrakshilife.com', '@marrakshilife', 'direct', 'Hand-woven Moroccan atelier wear, unisex, hotel-boutique darling.', 18500, 68000, 'USD', '["dtc","wholesale"]', '## Positioning
+Hand-woven-in-Marrakech atelier label selling artisanal ease to design-literate travellers; strong hotel and concept-store presence.
+
+## Price architecture
+Woven shirting $185-295, dresses and robes $340-480, outerwear to $680.
+
+## Channels & stockists
+DTC plus tight wholesale: concept stores and five-star hotel boutiques rather than department doors.
+
+## Recent moves
+Leaning into made-to-order and studio visits; steady drumbeat of hotel collaborations.
+
+## Read for an independent label
+- Their loom story earns the premium — our tailoring story must be equally concrete.
+- Hotel boutiques are a viable early wholesale lane in Morocco.
+- They under-serve tailored silhouettes; that is our gap.', '["https://marrakshilife.com","https://www.instagram.com/marrakshilife"]', 1, '2026-07-06 08:03:00');
+INSERT OR REPLACE INTO research_brands (id, name, website, instagram, segment, positioning, price_floor_cents, price_ceiling_cents, currency, channels, dossier_md, citations, watch, last_researched_at) VALUES ('rbrand_demo_02', 'LemLem', 'lemlem.com', '@lemlem', 'aspirational', 'Artisan-made resortwear at scale — proof the category supports real price ceilings.', 16000, 55000, 'USD', '["dtc","wholesale","marketplace"]', NULL, '[]', 0, NULL);
+INSERT OR REPLACE INTO research_brands (id, name, website, instagram, segment, positioning, price_floor_cents, price_ceiling_cents, currency, channels, dossier_md, citations, watch, last_researched_at) VALUES ('rbrand_demo_03', 'Zeus+Dione', 'zeusndione.com', '@zeusndione', 'adjacent', 'Greek craft-luxury resort house; adjacent geography, same customer on a different island.', 22000, 90000, 'USD', '["dtc","wholesale"]', NULL, '[]', 0, NULL);
+INSERT OR REPLACE INTO price_studies (id, name, category, market, style_id, currency, band_low_cents, band_mid_cents, band_high_cents, recommendation_md, citations, status, last_researched_at) VALUES ('pstudy_demo_01', 'Linen maxi dress', 'Linen maxi dress', 'US direct-to-consumer', 'sty_saadia_dress', 'USD', 12500, 17500, 26500, '## Recommendation
+The contemporary band for artisanal linen maxis sits $125-265; brands with a making story (Marrakshi Life, LemLem) hold $165-245 without discounting. With Belgian linen and Casablanca tailoring, **$145 target retail** sits confidently mid-band while protecting a wholesale margin at 2.3x.', '["https://marrakshilife.com","https://lemlem.com"]', 'decided', '2026-07-03 10:12:00');
+INSERT OR REPLACE INTO price_studies (id, name, category, market, style_id, currency, band_low_cents, band_mid_cents, band_high_cents, recommendation_md, citations, status, last_researched_at) VALUES ('pstudy_demo_02', 'Terry polo', 'Cotton terry polo', 'US direct-to-consumer', 'sty_corniche_polo', 'USD', 9500, 12500, 18500, NULL, '[]', 'open', NULL);
+INSERT OR REPLACE INTO price_study_comps (id, study_id, brand, product, price_cents, currency, url, fabric, origin) VALUES ('pcomp_demo_01', 'pstudy_demo_01', 'Marrakshi Life', 'Woven maxi dress', 42000, 'USD', 'https://marrakshilife.com', 'Hand-woven cotton', 'Morocco');
+INSERT OR REPLACE INTO price_study_comps (id, study_id, brand, product, price_cents, currency, url, fabric, origin) VALUES ('pcomp_demo_02', 'pstudy_demo_01', 'LemLem', 'Makeda maxi', 24500, 'USD', 'https://lemlem.com', 'Cotton blend', 'Ethiopia');
+INSERT OR REPLACE INTO price_study_comps (id, study_id, brand, product, price_cents, currency, url, fabric, origin) VALUES ('pcomp_demo_03', 'pstudy_demo_01', 'Reformation', 'Linen maxi', 17800, 'USD', 'https://thereformation.com', 'European linen', 'Turkey');
+INSERT OR REPLACE INTO price_study_comps (id, study_id, brand, product, price_cents, currency, url, fabric, origin) VALUES ('pcomp_demo_04', 'pstudy_demo_01', 'Quince', '100% linen maxi', 6990, 'USD', 'https://quince.com', 'European linen', 'China');
+INSERT OR REPLACE INTO price_study_comps (id, study_id, brand, product, price_cents, currency, url, fabric, origin) VALUES ('pcomp_demo_05', 'pstudy_demo_01', 'Posse', 'Emma linen dress', 26000, 'USD', 'https://posse.com', 'French linen', 'China');
+INSERT OR REPLACE INTO trend_boards (id, title, season, focus, brief_md, citations, items, status, watch, last_researched_at) VALUES ('tboard_demo_01', 'Fluid tailoring', 'SS27', 'silhouettes', '## The direction
+Soft-shoulder jackets and wide, pressed-crease trousers in fluid wovens — tailoring language without the armour.
+
+## Who''s showing it
+Consistent across The Row, Toteme and Saint Laurent resort; filtering into contemporary via St. Agni and Rohe.
+
+## Materials & making
+Fluid viscose-linen blends, sand-washed cupro, heavier silk twill. Our Tangier trouser block already speaks this language.
+
+## Wear it forward
+- Cut the Tangier trouser in the Kurabo chambray for a softer read
+- One soft blazer, not a suiting program
+- Press creases, no shoulder-pad tooling needed', '["https://www.vogue.com/fashion-shows"]', '[{"label":"soft-shoulder blazer"},{"label":"wide pressed-crease trouser"},{"label":"sand-washed cupro"}]', 'exploring', 1, '2026-07-05 07:44:00');
+INSERT OR REPLACE INTO trend_boards (id, title, season, focus, brief_md, citations, items, status, watch, last_researched_at) VALUES ('tboard_demo_02', 'Crochet revival', 'Cruise 27', 'fabrics', NULL, '[]', '[{"label":"open-work crochet coverups"},{"label":"raffia accents"}]', 'exploring', 0, NULL);
+INSERT OR REPLACE INTO research_stockists (id, name, kind, city, country, website, email, brands_carried, price_point, fit_note, status, last_researched_at) VALUES ('rstock_demo_01', 'Le 66 Concept', 'boutique', 'Marrakech', 'Morocco', 'le66concept.example.com', 'buyer@le66concept.example.com', 'Marrakshi Life, local ateliers, French resort labels', 'contemporary', 'Two blocks from the hotel cluster; buyer already carries our direct comp.', 'in_talks', '2026-06-28 09:30:00');
+INSERT OR REPLACE INTO research_stockists (id, name, kind, city, country, website, email, brands_carried, price_point, fit_note, status, last_researched_at) VALUES ('rstock_demo_02', 'Riad Yima Boutique', 'boutique', 'Marrakech', 'Morocco', 'riadyima.example.com', NULL, 'Artisan-made resortwear, homeware, local designers', 'contemporary', 'Small but the right crowd; good first consignment door.', 'stocked', NULL);
+INSERT OR REPLACE INTO research_stockists (id, name, kind, city, country, website, email, brands_carried, price_point, fit_note, status, last_researched_at) VALUES ('rstock_demo_03', 'Beldi Country Club Boutique', 'boutique', 'Marrakech', 'Morocco', 'beldicountryclub.example.com', NULL, 'Artisan-made resortwear, homeware', 'advanced contemporary', 'Hotel boutique — exactly the Marrakshi Life lane; pitch after PP photography.', 'shortlist', NULL);
+INSERT OR REPLACE INTO research_stockists (id, name, kind, city, country, website, email, brands_carried, price_point, fit_note, status, last_researched_at) VALUES ('rstock_demo_04', 'Couverture & The Garbstore', 'boutique', 'London', 'UK', 'couvertureandthegarbstore.com', NULL, 'Rohe, Cawley, Studio Nicholson', 'advanced contemporary', 'Stretch door for AW28 — needs the fluid tailoring story to land first.', 'researching', NULL);
+INSERT OR REPLACE INTO activity_events (id, kind, entity_type, entity_id, title, payload, created_at) VALUES ('aev_demo_11', 'research.brand_refreshed', 'research_brand', 'rbrand_demo_01', 'Watched brand refreshed: Marrakshi Life — see what changed in R&D', '{"name":"Marrakshi Life"}', '2026-07-06 08:03:00');
+INSERT OR REPLACE INTO activity_events (id, kind, entity_type, entity_id, title, payload, created_at) VALUES ('aev_demo_12', 'research.retail_applied', 'cost_sheet', 'cst_demo_saadia', 'Target retail for Saadia Maxi Dress set from the Linen maxi dress price study', '{"styleId":"sty_saadia_dress","retail":14500}', '2026-07-03 10:20:00');
