@@ -570,19 +570,21 @@ function DesignWorkspace({
         </div>
       )}
 
-      {/* The full parametric drafter lives in its own studio now. */}
+      {/* The full parametric drafter lives in its own studio now. Carrying the
+          concept in ?describe= lets the Pattern Studio's assistant pick the
+          closest block + fit across the whole catalogue on arrival. */}
       <a
-        href="/admin/patterns"
+        href={`/admin/patterns${data ? `?describe=${encodeURIComponent([data.title, data.brief ?? ""].filter(Boolean).join(" — ").slice(0, 400))}` : ""}`}
         className="admin-card flex items-center justify-between gap-3 p-4 text-sm hover:border-navy"
       >
         <span>
           <span className="font-medium">Need the sewing pattern?</span>{" "}
           <span className="text-warmgrey">
-            Draft a real, manufacturable block for this design — graded or made-to-measure — in the Pattern
-            Studio.
+            The Pattern Studio reads this concept, picks the closest of its drafting blocks, and sets the
+            rough fit — then it's yours to refine, grade, or draft to a client's measurements.
           </span>
         </span>
-        <span className="shrink-0 text-navy">Open the Pattern Studio →</span>
+        <span className="shrink-0 text-navy">Draft this design →</span>
       </a>
 
       <SlideOver open={Boolean(useGen)} title="Use on your site" onClose={() => setUseGen(null)}>

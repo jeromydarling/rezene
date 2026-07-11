@@ -246,7 +246,8 @@ For the shops with a tailor or seamstress in the room — and for the designers 
 The full FreeSewing catalogue is in — **fifty-one blocks** across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear, foundation bodices, activewear (leggings with or without pockets, cycling breeches, a one-piece base), underwear & swim (from briefs to a bikini top and a raglan swim shirt), workwear (a proper apron, overalls), kids & baby (romper, bib), accessories (necktie, bow tie, flat cap, Sherlock hat, handbag, face mask) — and a historical & costume shelf (a 1790s shift, a tie-on pocket, a Roman tunic and cloak) that pairs beautifully with the Timeless Library's plates. Three ways in:
 
 - **Browse** the grouped picker (Tops, Shirts, Hoodies & Sweats, Dresses, Bottoms, Tailoring, Activewear, Accessories, Historical…).
-- **Describe it** to the ✨ assistant — *"a boxy cropped tee"* — and it picks the block, size and rough fit for you.
+- **Describe it** to the ✨ assistant — *"a boxy cropped tee"*, *"high-waisted leggings with a pocket"* — and it picks the closest of all fifty-one blocks, the size and the rough fit for you. Everything it chooses lands on the visible controls, yours to override.
+- **Arrive from the Design Studio** — every concept has a **Draft this design** card that carries the concept's title and brief here; the assistant reads it and preselects the block and fit on arrival.
 - **Arrive from a fitting** — fit notes sent from the Fitting Studio land here with the right block preselected and the adjustments already on the sliders.
 
 ## 2 · Size it — three levels of truth
