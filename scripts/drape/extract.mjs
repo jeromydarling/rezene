@@ -462,7 +462,10 @@ const BLOCKS = {
     // Pattern y=0 is the underbust line: hpsToWaistFront(505) - waistToUnderbust(110).
     yOffset: 395,
     // Panel edges under real cinch tension: uma-class hauling force.
-    sim: { sewForce: 6 },
+    // Friction high: nothing pins a corset — it GRIPS. Frictionless, the
+    // cinch tension walked the whole ring down off its zone over the bake
+    // (placement frame 0 sat perfectly).
+    sim: { sewForce: 6, friction: 70 },
   },
   bruce: {
     module: "@freesewing/bruce",
