@@ -5,6 +5,7 @@ import { catalog } from "./content/catalog";
 import { design } from "./content/design";
 import { clients } from "./content/clients";
 import { sourcing } from "./content/sourcing";
+import { rdStudio } from "./content/rdStudio";
 import { finance } from "./content/finance";
 import { marketing } from "./content/marketing";
 import { commerceAccount } from "./content/commerceAccount";
@@ -34,6 +35,7 @@ export const KB_ARTICLES: KbArticle[] = [
   ...design,
   ...clients,
   ...sourcing,
+  ...rdStudio,
   ...finance,
   ...marketing,
   ...commerceAccount,

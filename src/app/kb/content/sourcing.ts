@@ -40,7 +40,9 @@ The search captures websites and, where it can verify them, phone numbers and ad
     screenshot: "/kb/shots/research.png",
     body: `# R&D — your research workspace
 
-**Sourcing & Production → R&D** is where knowledge lives *before* it's structured enough to be a supplier record or a tech pack. Two kinds of records:
+**Sourcing & Production → R&D** is where knowledge lives *before* it's structured enough to be a supplier record or a tech pack. It's a studio of rooms: **Makers & notes** (this chapter), plus [brand dossiers](/admin/support/kb/rd-brands), [price studies](/admin/support/kb/rd-pricing), [trend boards](/admin/support/kb/rd-trends), and [stockists](/admin/support/kb/rd-stockists) — all built on the same live research with citations, all sharing one daily research allowance. The overview page shows what's on watch and what came back recently.
+
+In Makers & notes, two kinds of records:
 
 - **Makers** — candidate ateliers and factories you're researching: contact details, speciality, MOQ, lead time, price ballpark, and what they'd be best used for. Each has a pipeline status: **researching → contacted → sampling → approved** (or **passed**).
 - **Notes** — free-form findings: pasted research, strategy write-ups, pipeline plans, and live research answers with their citations preserved.

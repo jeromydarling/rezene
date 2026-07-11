@@ -62,6 +62,13 @@ export const AUTOMATION_RULES: AutomationRule[] = [
       "When you promote a research lead into Factories & Suppliers, Verto files a reach-out task due in a week.",
   },
   {
+    key: "research-watch-refresh",
+    on: "cron.daily",
+    title: "Watched research → weekly refresh",
+    description:
+      "Brand dossiers and trend boards you watch are re-researched about once a week (from your daily research allowance), and what changed lands in your activity feed and digest.",
+  },
+  {
     key: "commission-stage-next-step",
     on: "commission.stage_changed",
     title: "Commission moves stage → next step",

@@ -30,13 +30,34 @@ function dailyLimit(env: AppContext["Bindings"]): number {
 
 /** Reserve one unit of today's research quota for this shop. */
 export async function reserveResearchQuota(c: Context<AppContext>): Promise<QuotaResult> {
-  const limit = dailyLimit(c.env);
+  return reserveResearchQuotaFor(c.env, c.var.shopId);
+}
+
+/** Same reservation without a request context — the scheduled watch sweep
+ *  draws from the SAME per-shop pool, so automation never spends past the
+ *  cap a human would hit. */
+export async function reserveResearchQuotaFor(
+  env: AppContext["Bindings"],
+  shopId: string,
+): Promise<QuotaResult> {
+  const limit = dailyLimit(env);
   const day = new Date().toISOString().slice(0, 10); // UTC day
-  const key = `aiq:${c.var.shopId}:research:${day}`;
-  const used = parseInt((await c.env.KV.get(key)) ?? "0", 10);
+  const key = `aiq:${shopId}:research:${day}`;
+  const used = parseInt((await env.KV.get(key)) ?? "0", 10);
   if (used >= limit) return { ok: false, used, limit };
-  await c.env.KV.put(key, String(used + 1), { expirationTtl: 172800 }); // 2 days
+  await env.KV.put(key, String(used + 1), { expirationTtl: 172800 }); // 2 days
   return { ok: true, used: used + 1, limit };
+}
+
+/** Read today's usage without reserving (for the R&D home meter). */
+export async function peekResearchQuota(
+  env: AppContext["Bindings"],
+  shopId: string,
+): Promise<QuotaResult> {
+  const limit = dailyLimit(env);
+  const day = new Date().toISOString().slice(0, 10);
+  const used = parseInt((await env.KV.get(`aiq:${shopId}:research:${day}`)) ?? "0", 10);
+  return { ok: used < limit, used, limit };
 }
 
 /** Standard 429 body for an exhausted research quota. */

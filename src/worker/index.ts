@@ -50,6 +50,7 @@ import { adminFeedbackRoutes } from "./routes/admin-feedback";
 import { adminKbRoutes } from "./routes/admin-kb";
 import { adminSourcingRoutes } from "./routes/admin-sourcing";
 import { adminResearchRoutes } from "./routes/admin-research";
+import { adminResearchPlusRoutes } from "./routes/admin-research-plus";
 import { adminAutomationRoutes } from "./routes/admin-automations";
 import { adminUndoRoutes } from "./routes/admin-undo";
 import { adminDomainRoutes } from "./routes/admin-domain";
@@ -348,6 +349,7 @@ admin.route("/users", adminUsersRoutes);
 admin.route("/feedback", adminFeedbackRoutes);
 admin.route("/sourcing", adminSourcingRoutes);
 admin.route("/research", adminResearchRoutes);
+admin.route("/research", adminResearchPlusRoutes);
 admin.route("/automations", adminAutomationRoutes);
 admin.route("/undo", adminUndoRoutes);
 admin.route("/domain", adminDomainRoutes);
@@ -384,6 +386,9 @@ export default {
             await crmHealthSweep(env).catch((err) => console.error("[crm] health sweep failed:", err));
             const { crmFollowupSweep } = await import("./services/crm");
             await crmFollowupSweep(env).catch((err) => console.error("[crm] sweep failed:", err));
+            // R&D: refresh watched brand dossiers / trend boards that went stale.
+            const { researchWatchSweep } = await import("./services/research-lab");
+            await researchWatchSweep(env).catch((err) => console.error("[research] watch sweep failed:", err));
           }),
       );
     }
