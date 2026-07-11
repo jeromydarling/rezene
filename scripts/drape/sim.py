@@ -775,6 +775,7 @@ all_flat = []
 all_faces = []
 offsets = {}
 boundary_index = {}  # piece -> list of global indices for its ORIGINAL boundary points
+piece_range = {}  # piece -> (first global vert index, vert count)
 
 for piece in DATA["pieces"]:
     # Build the piece FLAT in pattern space (mm), so triangulation and
@@ -819,6 +820,7 @@ for piece in DATA["pieces"]:
         # pieces) — kept per vertex so the fit map can measure real strain.
         all_flat.append((v.co.x, v.co.y))
         all_verts.append(place(piece, v.co.x, v.co.y))
+    piece_range[piece["name"]] = (off, len(all_verts) - off)
     for f in bm.faces:
         all_faces.append(tuple(off + v.index for v in f.verts))
     bm.free()
@@ -875,6 +877,40 @@ for seam in DATA["seams"]:
         _da, _db = match(list(ia), list(ib))
         _ds = sorted(math.dist(all_verts[a], all_verts[b]) / S for a, b in zip(_da, _db))
         print(f"seam {seam['name']:16s} start gap mm p50={_ds[len(_ds) // 2]:7.1f} max={_ds[-1]:7.1f}")
+    if seam.get("preClose"):
+        # Assembled placement, lite: drag side b's edge onto side a's placed
+        # positions BEFORE the sim, with a smooth falloff into b's interior
+        # (flat-pattern distance), so springs start within closing range.
+        # Built for the drop-shoulder armscye: the body edge wraps the torso
+        # ellipse while the cap rings the arm — an 85-96mm radial start gap
+        # no spring force ever closed (diana bakes 1-7). 6mm of slack stays
+        # so the pre-closed pair doesn't start coincident/interpenetrating.
+        _ia_m, _ib_m = match(list(ia), list(ib))
+        _deltas = []
+        for _va, _vb in zip(_ia_m, _ib_m):
+            _pa, _pb = all_verts[_va], all_verts[_vb]
+            _d = math.dist(_pa, _pb)
+            _k = (max(0.0, _d - 0.006) / _d) if _d > 1e-9 else 0.0
+            _deltas.append((all_flat[_vb], ((_pa[0] - _pb[0]) * _k, (_pa[1] - _pb[1]) * _k, (_pa[2] - _pb[2]) * _k)))
+        _FALL = 110.0  # mm of flat pattern the warp reaches into the piece
+        _off_b, _cnt_b = piece_range[seam["b"][0]]
+        for _vi in range(_off_b, _off_b + _cnt_b):
+            _fx, _fy = all_flat[_vi]
+            _best, _dv = 1e18, None
+            for (_sfx, _sfy), _delta in _deltas:
+                _d2 = (_fx - _sfx) ** 2 + (_fy - _sfy) ** 2
+                if _d2 < _best:
+                    _best, _dv = _d2, _delta
+            _dist = math.sqrt(_best)
+            if _dist >= _FALL or _dv is None:
+                continue
+            _w = (1.0 - _dist / _FALL) ** 2
+            _x, _y, _z = all_verts[_vi]
+            all_verts[_vi] = (_x + _dv[0] * _w, _y + _dv[1] * _w, _z + _dv[2] * _w)
+        if _os.environ.get("DRAPE_SEAM_DEBUG") == "1":
+            _da, _db = match(list(ia), list(ib))
+            _ds = sorted(math.dist(all_verts[a], all_verts[b]) / S for a, b in zip(_da, _db))
+            print(f"  preClose -> {seam['name']:14s} start gap mm p50={_ds[len(_ds) // 2]:7.1f} max={_ds[-1]:7.1f}")
     seam_sides.append((list(ia), list(ib)))
     ia, ib = match(ia, ib)
     if seam.get("bridge"):
