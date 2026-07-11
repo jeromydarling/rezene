@@ -11,6 +11,8 @@ import {
   StatusBadge,
 } from "../../components/admin/ui";
 import { GeoTextMap } from "../../components/MapboxMap";
+import { getShop } from "../../lib/shop";
+import { emitToast } from "../../lib/toast";
 import type { AdminSupplier, AdminSupplierInteraction } from "../../../shared/types";
 
 interface SupplierDetail extends AdminSupplier {
@@ -39,9 +41,24 @@ export function SuppliersPage() {
         help="suppliers"
         description="Your maker network. Leads marked 'unverified' are LLM-researched — confirm details before committing production."
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            + New supplier
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn"
+              title="Copy an invitation link — your makers join the founding list for the Verto maker workspace"
+              onClick={() => {
+                const slug = getShop()?.slug ?? "verto";
+                void navigator.clipboard
+                  .writeText(`https://verto.style/makers?from=${encodeURIComponent(slug)}`)
+                  .then(() => emitToast({ kind: "success", message: "Invitation link copied — send it to your makers." }));
+              }}
+            >
+              Invite your makers
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+              + New supplier
+            </button>
+          </>
         }
       />
       <ExportIntelPanel suppliers={data ?? []} />

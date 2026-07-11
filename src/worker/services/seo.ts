@@ -47,6 +47,16 @@ export const VERTO_META: Record<string, RouteMeta> = {
       "A stylist goes from signup to a paid $425 deposit in a day. A designer's pre-orders fund production. A founder prices her season on evidence, not vibes. A four-year-old label switches in one afternoon. What actually happens when you press create my shop.",
     image: "/verto/dusk.jpg",
   },
+  "/directory": {
+    title: "The Verto Directory — real studios, living storefronts",
+    description: "Tailors, labels, seamstresses, stylists and boutiques on Verto — searchable by craft and place, every card a living storefront, credentials verified by the Verto School.",
+    image: "/verto/hero.jpg",
+  },
+  "/makers": {
+    title: "Verto for Makers — you make it, let the labels find you",
+    description: "The maker workspace is coming: receive tech packs, quote line by line, show capacity, get found by the labels already on Verto. Join the founding list.",
+    image: "/verto/move.jpg",
+  },
   "/compare": {
     title: "Verto vs. Shopify, fashion ERPs & the spreadsheet patchwork — Verto",
     description:

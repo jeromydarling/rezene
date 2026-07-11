@@ -119,6 +119,7 @@ export interface Env {
   /** Per-shop daily cap on Design Studio Flux generation batches (default 40). */
   DESIGN_DAILY_LIMIT?: string;
   COMPANION_DAILY_LIMIT?: string;
+  DIRECTORY_PUBLIC?: string;
 }
 
 /** Hono context variables set by middleware. */

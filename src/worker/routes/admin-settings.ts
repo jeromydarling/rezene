@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
 import { parseBody, settingsUpdateSchema } from "../services/validators";
-import { requireAdminOnly } from "../middleware/auth";
+import { requireAdminOnly, requireAdminWrite } from "../middleware/auth";
 import type { AppContext } from "../types/env";
 
 export const adminSettingsRoutes = new Hono<AppContext>();
@@ -118,4 +118,78 @@ adminSettingsRoutes.get("/seo-checkup", async (c) => {
     mediaMissingAlt: mediaMissingAlt?.n ?? 0,
     publishedPages: publishedPages?.n ?? 0,
   });
+});
+
+// ---- The Verto Directory listing -----------------------------------------------
+// The listing itself lives at the platform (0048) so the directory can be
+// assembled across shops; each shop edits its own row from here. Default is
+// NOT listed — the directory is opt-in, always.
+
+adminSettingsRoutes.get("/directory", async (c) => {
+  try {
+    const row = await c.env.DB.prepare(`SELECT * FROM directory_listings WHERE shop_id = ?`)
+      .bind(c.var.shopId)
+      .first<Record<string, unknown>>();
+    return c.json({
+      optedIn: row ? Boolean(row.opted_in) : false,
+      craft: (row?.craft as string) ?? "label",
+      specialties: (row?.specialties as string) ?? "",
+      city: (row?.city as string) ?? "",
+      country: (row?.country as string) ?? "",
+      blurb: (row?.blurb as string) ?? "",
+      certCount: Number(row?.cert_count ?? 0),
+    });
+  } catch {
+    return c.json({ optedIn: false, craft: "label", specialties: "", city: "", country: "", blurb: "", certCount: 0 });
+  }
+});
+
+adminSettingsRoutes.put("/directory", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const CRAFTS = ["label", "tailor", "seamstress", "stylist", "boutique"];
+  const craft = CRAFTS.includes(body.craft as string) ? (body.craft as string) : "label";
+
+  // Snapshot the shop's Verto School standing into the listing — the badge
+  // is the directory's trust layer.
+  let certCount = 0;
+  let certBest: string | null = null;
+  try {
+    const certs = await c.env.DB.prepare(
+      `SELECT scope, COUNT(*) AS n FROM school_certificates WHERE shop_id = ? AND revoked = 0 GROUP BY scope`,
+    )
+      .bind(c.var.shopId)
+      .all<{ scope: string; n: number }>();
+    for (const r of certs.results ?? []) {
+      certCount += Number(r.n);
+      if (r.scope === "studio" || (r.scope === "school" && certBest !== "studio") || (certBest === null)) certBest = r.scope;
+    }
+  } catch {
+    /* no certificates table drama — the listing still saves */
+  }
+
+  await c.env.DB.prepare(
+    `INSERT INTO directory_listings (shop_id, opted_in, craft, specialties, city, country, blurb, cert_count, cert_best, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(shop_id) DO UPDATE SET opted_in = excluded.opted_in, craft = excluded.craft,
+       specialties = excluded.specialties, city = excluded.city, country = excluded.country,
+       blurb = excluded.blurb, cert_count = excluded.cert_count, cert_best = excluded.cert_best,
+       updated_at = datetime('now')`,
+  )
+    .bind(
+      c.var.shopId,
+      body.optedIn === true ? 1 : 0,
+      craft,
+      clean(body.specialties, 300),
+      clean(body.city, 120),
+      clean(body.country, 120),
+      clean(body.blurb, 600),
+      certCount,
+      certBest,
+    )
+    .run();
+  await writeAudit(c.var.db, c.var.userId, "settings.directory", "directory_listing", c.var.shopId, {
+    optedIn: body.optedIn === true,
+  });
+  return c.json({ ok: true, certCount });
 });

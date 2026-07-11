@@ -14,6 +14,7 @@ import { school } from "./content/school";
 import { library } from "./content/library";
 import { companion } from "./content/companion";
 import { interpreter } from "./content/interpreter";
+import { directory } from "./content/directory";
 
 export type { KbArticle, KbPart, KbHeading } from "./types";
 
@@ -48,6 +49,7 @@ export const KB_ARTICLES: KbArticle[] = [
   ...library,
   ...companion,
   ...interpreter,
+  ...directory,
 ];
 
 const BASE_ORDER = new Map(KB_ARTICLES.map((a, i) => [a.slug, i]));
