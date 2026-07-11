@@ -358,8 +358,10 @@ const BLOCKS = {
     yOffset: 460,
     bodyKind: "brief",
     // Force 8: the crotch seam fights the whole wrap's tension — 5 (the
-    // uma recipe) left the front rise baked open.
-    sim: { sewForce: 8 },
+    // uma recipe) left the front rise baked open. Friction maxed: the
+    // wrap's overlap layers otherwise creep around the body over the bake
+    // and coverage tears open (more frames = more drift, not less).
+    sim: { sewForce: 8, friction: 80 },
   },
   breanna: {
     module: "@freesewing/breanna",
@@ -1759,8 +1761,8 @@ if (cfg.trousers) {
     cutoutProfile.push([yy, branchX(frontBranch, yy), branchX(backBranch, yy)]);
   }
   const cut = { cutF: WP.fWaistSide.x, cutB: WP.bWaistSide.x, cutoutProfile };
-  pantsR.placement = { kind: "legTube", leg: 1, forkY, ...cut };
-  pantsL.placement = { kind: "legTube", leg: -1, forkY, ...cut };
+  pantsR.placement = { kind: "legTube", leg: 1, forkY, layerBias: 0, ...cut };
+  pantsL.placement = { kind: "legTube", leg: -1, forkY, layerBias: 1, ...cut };
   // The wrap ties at the waist: both waist edges pinned, like every
   // trouser block's waistband grip.
   pantsR.pinSegments = ["waistFront", "waistBack"];

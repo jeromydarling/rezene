@@ -507,12 +507,18 @@ def place(piece, x, y):
             halfC = math.pi * math.sqrt((A * A + B * B) / 2.0)
             xf, xb = float(pl["cutF"]), float(pl["cutB"])
             if x < (xf + xb) / 2.0:
+                # Each flap wraps its OWN side. Crossing the front flap
+                # over the mid-plane (the real garment's construction) was
+                # tried and falsified: with the below-fork wrap still
+                # own-leg, the placement blend drags the flap through the
+                # body and both pieces knot — a proper crossing needs
+                # helical arc-preserving blending, not a sign flip.
                 psi = -x_eff / halfC * math.pi
                 w = max(0.0, -x_eff) / (2.0 * halfC)
             else:
                 psi = math.pi - x_eff / halfC * math.pi
                 w = 0.5 + max(0.0, x_eff) / (2.0 * halfC)
-            grow = 1.0 + w * 24.0 / 160.0
+            grow = 1.0 + w * 24.0 / 160.0 + float(pl.get("layerBias", 0.0)) * 12.0 / 160.0
             hx = A * grow * math.sin(psi)
             hy = -B * grow * math.cos(psi)
             _min_y = min(py for _, py in piece["points"])
@@ -1033,6 +1039,14 @@ try:
     mod.collision_settings.collision_quality = 4
     mod.collision_settings.use_self_collision = True
     mod.collision_settings.self_distance_min = 0.002
+    # Wrap garments (waralee) live or die by layer friction: with the
+    # default, 1.7 turns of free-hanging flap creep around the body until
+    # coverage tears open. Per-block hint; plain blocks keep the default.
+    _fric = DATA.get("sim", {}).get("friction")
+    if _fric is not None:
+        mod.collision_settings.friction = float(_fric)
+        if hasattr(mod.collision_settings, "self_friction"):
+            mod.collision_settings.self_friction = float(_fric)
 except Exception:
     pass
 
