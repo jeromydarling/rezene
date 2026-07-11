@@ -3,6 +3,7 @@ import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { setCompanionContext } from "../../lib/companionContext";
 import { SIZE_STEPS, type SizeStep } from "../../../shared/garments";
 import {
   designMeasurementNames,
@@ -339,6 +340,26 @@ export function PatternStudioPage() {
 
   const adjustables = patternAdjustables(blockId);
   const block = PATTERN_BLOCKS.find((b) => b.id === blockId)!;
+
+  // Tell the Companion what's on the cutting table: the open draft, its
+  // numbers, and the measurements it's cut to — so "does this look right?"
+  // is answered about THIS draft.
+  useEffect(() => {
+    const meas = Object.entries(state.measurements)
+      .filter(([, v]) => typeof v === "number" && v > 0)
+      .map(([k, v]) => `${k} ${v}${state.units}`)
+      .join(", ");
+    const touched = Object.entries(state.advanced)
+      .slice(0, 8)
+      .map(([k, v]) => `${k}=${String(v)}`)
+      .join(", ");
+    setCompanionContext(
+      `Pattern Studio, open draft: "${block.name}" block, size ${state.size}, ease ${state.easePct}%, length ${state.lengthPct}%, seam allowance ${state.saMm}mm.` +
+        (meas ? ` Cut to measurements: ${meas}.` : " No client measurements set — drafting from the size chart.") +
+        (touched ? ` Drafting options touched: ${touched}.` : ""),
+    );
+    return () => setCompanionContext(null);
+  }, [block.name, state]);
 
   const opts: PatternOptions = {
     easePct: state.easePct,

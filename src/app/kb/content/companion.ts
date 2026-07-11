@@ -8,7 +8,7 @@ export const companion: KbArticle[] = [
     part: "getting-started",
     moduleRoute: "/admin",
     keywords: "companion assistant ai chat help ask question voice speak mic talk answer guide school masters citation plain language simple jargon beginner actions",
-    updated: "2026-07-13",
+    updated: "2026-07-14",
     body: `# The Verto Companion
 
 The sparkle button in the corner of every admin page opens the **Companion** — an assistant that has read the Verto School's nine courses (Vincent on trousers, Madison on balance, Picken on finishing, Nystrom on the economics) and every chapter of this Knowledge Base.
@@ -22,6 +22,10 @@ The sparkle button in the corner of every admin page opens the **Companion** —
 ## How it answers
 
 Every reply is **grounded**: the Companion retrieves the relevant lessons and guide chapters first, answers from them, and lists its sources as numbered chips under the reply — tap one to read the original. When it doesn't know, it says so and points to [R&D](/admin/research), where live research runs with citations.
+
+## It sees the work on your table
+
+On the pages where it matters, the Companion can see what's actually open: the **Pattern Studio** shares the draft on the table (block, size, ease, the measurements it's cut to), the **Design Studio** shares the open concept, and a **price study** shares its band and comparables. Ask "does this look right?" and the answer is about *your* numbers — including the polite catch: ease of 0% on a fitted block, a retail sitting between two zones, a measurement that contradicts the size. Anything you've **pinned in the Timeless Library** joins its shelf too, cited like everything else.
 
 ## Plain language, on demand
 

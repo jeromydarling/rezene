@@ -75,13 +75,43 @@ adminCompanionRoutes.post("/ask", async (c) => {
     : [];
 
   const plain = body.plain === true;
+  const pageContext = typeof body.pageContext === "string" ? body.pageContext.slice(0, 1200) : null;
 
   const quota = await reserveCompanionQuota(c);
   if (!quota.ok) return c.json(companionQuotaExceededBody(quota), 429);
 
   try {
     const context = await shopContext(c, route);
-    const result = await companionAnswer(c.env, question, route, history, { plain, shopContext: context });
+    // The shop's own library joins the shelf: pins whose titles or credits
+    // overlap the question arrive as extra cited sources.
+    const questionLc = question.toLowerCase();
+    let pinChunks: { title: string; link: string; keywords: string; text: string }[] = [];
+    try {
+      const pins = await all<{ title: string; credit: string; note: string | null; source_url: string }>(
+        c.var.db,
+        `SELECT title, credit, note, source_url FROM library_pins ORDER BY created_at DESC LIMIT 100`,
+      );
+      pinChunks = pins
+        .filter((p) => {
+          const words = p.title.toLowerCase().split(/[\s,—-]+/).filter((w) => w.length > 3);
+          return words.some((w) => questionLc.includes(w));
+        })
+        .slice(0, 3)
+        .map((p) => ({
+          title: `Pinned in this shop's library: ${p.title}`,
+          link: "/admin/library",
+          keywords: "",
+          text: `${p.credit}${p.note ? ` — ${p.note}` : ""} (${p.source_url})`,
+        }));
+    } catch {
+      /* no pins table yet — the shelf is just smaller */
+    }
+    const result = await companionAnswer(c.env, question, route, history, {
+      plain,
+      shopContext: context,
+      pageContext,
+      extraChunks: pinChunks,
+    });
     return c.json({ ...result, remaining: quota.limit - quota.used });
   } catch (err) {
     if (err instanceof AiUnavailableError) {

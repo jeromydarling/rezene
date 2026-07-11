@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { GraduationCap, Mic, Send, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import { api, ApiRequestError } from "../lib/api";
 import { useToast } from "../lib/toast";
+import { getCompanionContext } from "../lib/companionContext";
 import { Markdown } from "./Markdown";
 
 /**
@@ -123,7 +124,7 @@ export function Companion() {
         const history = turns.map((t) => ({ role: t.role, content: t.content }));
         const res = await api.post<{ answer: string; sources: { title: string; link: string }[]; actions?: Action[] }>(
           "/api/admin/companion/ask",
-          { question: q, route: location.pathname, history, plain },
+          { question: q, route: location.pathname, history, plain, pageContext: getCompanionContext() },
         );
         setTurns((t) => [...t, { role: "assistant", content: res.answer, sources: res.sources, actions: res.actions }]);
         if (speak && speechSupported) {

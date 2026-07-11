@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { setCompanionContext } from "../../../lib/companionContext";
 import { Link } from "react-router";
 import { PageHeader, EmptyState } from "../../../components/admin/ui";
 import { Markdown } from "../../../components/Markdown";
@@ -99,6 +100,15 @@ function StudyCard({
     high: study.bandHighCents !== null ? String(study.bandHighCents / 100) : "",
   });
   const [comp, setComp] = useState({ brand: "", product: "", price: "", url: "", fabric: "", origin: "" });
+  useEffect(() => {
+    const band = [study.bandLowCents, study.bandMidCents, study.bandHighCents]
+      .map((c) => (c !== null ? `$${(c / 100).toFixed(0)}` : "—"))
+      .join(" / ");
+    setCompanionContext(
+      `R&D price study open: "${study.name}"${study.market ? ` (${study.market})` : ""}, status ${study.status}, band low/mid/high: ${band}, ${study.comps?.length ?? 0} comparables recorded.`,
+    );
+    return () => setCompanionContext(null);
+  }, [study]);
   const [applyStyle, setApplyStyle] = useState(study.styleId ?? "");
   const [applyPrice, setApplyPrice] = useState(study.bandMidCents !== null ? String(study.bandMidCents / 100) : "");
 
