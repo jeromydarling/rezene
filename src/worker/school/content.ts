@@ -19,60 +19,19 @@
 
 export const CURRICULUM_VERSION = "2026.07";
 
-export interface SchoolDef {
-  key: string;
-  title: string;
-  tagline: string;
-}
+export type {
+  SchoolDef,
+  Checkpoint,
+  Lesson,
+  QuizQuestion,
+  PracticalDef,
+  CourseDef,
+} from "./types";
 
-export interface Checkpoint {
-  q: string;
-  options: string[];
-  answer: number; // index — SERVER ONLY, stripped by API
-}
-
-export interface Lesson {
-  title: string;
-  minutes: number; // reading floor, enforced via heartbeats
-  bodyMd: string;
-  checkpoints: Checkpoint[];
-  source?: { label: string; url: string };
-}
-
-export interface QuizQuestion {
-  id: string;
-  q: string;
-  options: string[];
-  answer: number; // SERVER ONLY
-}
-
-export interface PracticalDef {
-  kind:
-    | "none"
-    | "client_measurements"
-    | "construction_notes"
-    | "measurement_points"
-    | "bom_linked"
-    | "trend_board"
-    | "design_concept"
-    | "price_study";
-  title: string;
-  instructions: string; // what the student must actually do in Verto
-}
-
-export interface CourseDef {
-  slug: string;
-  school: string;
-  title: string;
-  summary: string;
-  level: "foundation" | "intermediate" | "advanced";
-  sources: { label: string; iaId?: string; url: string }[];
-  lessons: Lesson[];
-  quiz: QuizQuestion[];
-  quizDraw: number; // questions per attempt
-  passPercent: number;
-  practical: PracticalDef;
-}
+import type { SchoolDef, CourseDef } from "./types";
+import { T2, T3 } from "./courses-tailoring2";
+import { S2, S3 } from "./courses-seamstressing2";
+import { F1, F2 } from "./courses-fashion2";
 
 export const SCHOOLS: SchoolDef[] = [
   {
@@ -636,7 +595,7 @@ Pass the quiz, then complete the practical: a real price study, decided, with at
 };
 
 /** Courses in catalog order. PR waves append to this list. */
-export const COURSES: CourseDef[] = [T1, S1, F3];
+export const COURSES: CourseDef[] = [T1, T2, T3, S1, S2, S3, F1, F2, F3];
 
 export function getCourse(slug: string): CourseDef | undefined {
   return COURSES.find((c) => c.slug === slug);
