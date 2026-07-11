@@ -57,6 +57,7 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
+    "mapbox-gl": "^3.26.0",
     "mimetext": "^3.0.28",
     "pdfjs-dist": "^4.10.38",
     "postal-mime": "^2.7.5",

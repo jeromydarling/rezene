@@ -54,6 +54,10 @@ Ask a question in the **Research live** box (optionally tag it with a topic). Ve
 
 Click **Import CSV** to bring in research you did outside Verto — a Perplexity export, a spreadsheet of makers, anything tabular. Verto detects the header row (banner rows are fine), **auto-maps columns** to fields by their names, and lets you correct any mapping before importing. Works for both makers and notes; you can stamp the whole batch with a topic.
 
+## The map
+
+Hit **Map** above the makers list to see every candidate with a resolvable location pinned on a world map, coloured by pipeline status — your emerging supply chain at a glance. (Find a Maker results and Factories & Suppliers have the same map.)
+
 ## Promoting a maker
 
 When a candidate is real, click **Add to suppliers** — the maker is filed in [Factories & Suppliers](/admin/support/kb/suppliers) as an **unverified** lead, with a numeric MOQ and lead time parsed where they're clean and all the research phrasing kept in the notes. The R&D card keeps a link to the supplier record.`,

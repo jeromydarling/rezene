@@ -1,9 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader, EmptyState } from "../../components/admin/ui";
 import { api } from "../../lib/api";
 import { useFetch } from "../../lib/useFetch";
 import { useToast } from "../../lib/toast";
 import { useAutosave, AutosaveChipText } from "../../lib/useAutosave";
+import { MapboxMap, type MapMarker } from "../../components/MapboxMap";
+import { geocodeAll } from "../../lib/geocode";
 
 /**
  * R&D — the shop's research workspace. Where knowledge lives BEFORE it's
@@ -494,9 +496,62 @@ function NoteCard({ note, onChanged }: { note: Note; onChanged: () => void }) {
   );
 }
 
+/** Every maker with a resolvable location, pinned on the house map. Status
+ *  colours match the pipeline chips; locations geocode client-side and
+ *  cache per browser. */
+function MakersMap({ makers }: { makers: Maker[] }) {
+  const [markers, setMarkers] = useState<MapMarker[] | null>(null);
+  const MARKER_TONE: Record<string, string> = {
+    researching: "#8b8578",
+    contacted: "#0369a1",
+    sampling: "#d9a441",
+    approved: "#4a7c59",
+    passed: "#c8c3ba",
+  };
+  const locOf = (m: Maker) =>
+    // Markets often carry flag emoji ("🇲🇦 Morocco") — the geocoder wants words.
+    (m.location || m.market || "").replace(/[^\p{L}\p{N},.\-/ ]/gu, "").trim();
+  const key = makers.map((m) => m.id).join(",");
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const coords = await geocodeAll(makers.map(locOf));
+      if (!live) return;
+      setMarkers(
+        makers.flatMap((m) => {
+          const co = coords.get(locOf(m));
+          if (!co) return [];
+          return [{
+            id: m.id,
+            lng: co[0],
+            lat: co[1],
+            color: MARKER_TONE[m.status] ?? "#1f2a44",
+            label: m.name,
+            sublabel: [m.speciality, m.location || m.market].filter(Boolean).join(" · "),
+          }];
+        }),
+      );
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  if (!markers) return <div className="skeleton h-96 rounded-xl" />;
+  if (!markers.length) {
+    return (
+      <p className="rounded-xl border border-ink/10 bg-white p-4 text-sm text-warmgrey">
+        None of these makers have a mappable location yet — add a city or market and they'll appear here.
+      </p>
+    );
+  }
+  return <MapboxMap markers={markers} className="h-96" />;
+}
+
 export function ResearchPage() {
   const toast = useToast();
   const [tab, setTab] = useState<"makers" | "notes">("makers");
+  const [showMap, setShowMap] = useState(false);
   const makers = useFetch<Maker[]>("/api/admin/research/makers");
   const notes = useFetch<Note[]>("/api/admin/research/notes");
   const cfg = useFetch<{ enabled: boolean }>("/api/admin/research/config");
@@ -642,18 +697,26 @@ export function ResearchPage() {
           className="ml-auto w-48 rounded border border-ink/15 px-2 py-1 text-sm"
         />
         {tab === "makers" && (
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded border border-ink/15 px-2 py-1 text-sm"
-          >
-            <option value="">All statuses</option>
-            {STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {st}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded border border-ink/15 px-2 py-1 text-sm"
+            >
+              <option value="">All statuses</option>
+              {STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowMap(!showMap)}
+              className={`rounded border px-2 py-1 text-sm ${showMap ? "border-navy bg-navy text-white" : "border-ink/15 text-ink/70 hover:border-navy"}`}
+            >
+              Map
+            </button>
+          </>
         )}
       </div>
 
@@ -725,6 +788,7 @@ export function ResearchPage() {
       {tab === "makers" ? (
         filteredMakers.length ? (
           <div className="space-y-2">
+            {showMap && <MakersMap makers={filteredMakers} />}
             {filteredMakers.map((m) => (
               <MakerCard key={m.id} maker={m} onChanged={makers.reload} />
             ))}

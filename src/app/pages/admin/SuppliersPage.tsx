@@ -10,6 +10,7 @@ import {
   SlideOver,
   StatusBadge,
 } from "../../components/admin/ui";
+import { GeoTextMap } from "../../components/MapboxMap";
 import type { AdminSupplier, AdminSupplierInteraction } from "../../../shared/types";
 
 interface SupplierDetail extends AdminSupplier {
@@ -51,6 +52,20 @@ export function SuppliersPage() {
       )}
       {data && data.length > 0 && (
         <div className="admin-card overflow-x-auto">
+          <GeoTextMap
+            className="mb-4 h-72"
+            points={data
+              .filter((sup) => sup.city || sup.country)
+              .map((sup) => ({
+                id: sup.id,
+                query: [sup.city, sup.country].filter(Boolean).join(", "),
+                label: sup.name,
+                sublabel: [titleCase(sup.kind), [sup.city, sup.country].filter(Boolean).join(", ")]
+                  .filter(Boolean)
+                  .join(" · "),
+                color: sup.isVerified ? "#4a7c59" : "#8b8578",
+              }))}
+          />
           <table className="admin-table">
             <thead>
               <tr>

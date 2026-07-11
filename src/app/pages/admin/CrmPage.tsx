@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useSearchParams, useNavigate } from "react-router";
 import {
   Activity,
   CalendarClock,
@@ -21,7 +21,7 @@ import { api } from "../../lib/api";
 import { useFetch } from "../../lib/useFetch";
 import { formatDate } from "../../lib/format";
 import { EmptyState, ErrorNote, LoadingTable, PageHeader, SlideOver, StatCard } from "../../components/admin/ui";
-import { projectPoint, WORLD_LAND_PATH, WORLD_VIEWBOX } from "../../generated/world-land";
+import { MapboxMap } from "../../components/MapboxMap";
 
 /**
  * Verto HQ CRM — the founder's relationship desk. The timeline writes
@@ -697,8 +697,8 @@ const DOT_COLORS: Record<string, string> = {
 };
 
 export function CrmAtlasPage() {
+  const navigate = useNavigate();
   const { data, loading, error } = useFetch<AtlasContact[]>("/api/admin/crm/atlas");
-  const [hover, setHover] = useState<AtlasContact | null>(null);
 
   const byCountry = useMemo(() => {
     const map = new Map<string, number>();
@@ -722,39 +722,26 @@ export function CrmAtlasPage() {
       {loading && <LoadingTable rows={3} />}
       {data && (
         <>
-          <div className="admin-card relative overflow-hidden !bg-navy-deep p-2">
-            <svg viewBox={WORLD_VIEWBOX} className="block w-full">
-              <path d={WORLD_LAND_PATH} fill="#233150" stroke="#2e3f63" strokeWidth="0.5" />
-              {data.map((c) => {
-                const [x, y] = projectPoint(c.longitude, c.latitude);
-                const color = DOT_COLORS[c.status] ?? DOT_COLORS.lead;
-                return (
-                  <Link key={c.id} to={`/admin/crm?open=${c.id}`}>
-                    <g
-                      transform={`translate(${x}, ${y})`}
-                      onMouseEnter={() => setHover(c)}
-                      onMouseLeave={() => setHover(null)}
-                      className="cursor-pointer"
-                    >
-                      <circle r="10" fill={color} opacity="0.15" className="verto-atlas-pulse" />
-                      <circle r="3.5" fill={color} stroke="#faf7f0" strokeWidth="1" />
-                    </g>
-                  </Link>
-                );
-              })}
-            </svg>
-            {hover && (
-              <div className="pointer-events-none absolute left-4 top-4 max-w-64 rounded-md bg-chalk p-3 shadow-lg">
-                <p className="text-sm font-medium">{hover.name ?? hover.email}</p>
-                {hover.company && <p className="text-xs text-ink/70">{hover.company}{hover.shop_slug ? ` · /${hover.shop_slug}` : ""}</p>}
-                <p className="mt-1 text-xs text-warmgrey">
-                  {[hover.city, hover.country].filter(Boolean).join(", ")}
-                  {localTime(hover.timezone) && ` · ${localTime(hover.timezone)} local`}
-                </p>
-                <StatusPill status={hover.status} />
-              </div>
-            )}
-          </div>
+          {/* The real world, not a projection: Mapbox with the house style.
+              Clicking a pin opens the relationship in the CRM. */}
+          <MapboxMap
+            className="h-[520px]"
+            markers={data.map((c) => ({
+              id: c.id,
+              lng: c.longitude,
+              lat: c.latitude,
+              color: DOT_COLORS[c.status] ?? DOT_COLORS.lead,
+              label: c.name ?? c.email,
+              sublabel: [
+                c.company,
+                [c.city, c.country].filter(Boolean).join(", "),
+                localTime(c.timezone) ? `${localTime(c.timezone)} local` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }))}
+            onMarkerClick={(id) => navigate(`/admin/crm?open=${id}`)}
+          />
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <div className="flex flex-wrap gap-3 text-xs text-ink/70">
               {[["active / champion", DOT_COLORS.active], ["trial", DOT_COLORS.trial], ["lead / demo", DOT_COLORS.lead], ["at risk", DOT_COLORS.churn_risk]].map(([label, color]) => (
