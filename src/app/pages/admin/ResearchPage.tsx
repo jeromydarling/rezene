@@ -134,8 +134,11 @@ function autoMap(headers: string[], targets: typeof MAKER_TARGETS): Record<strin
   return map;
 }
 
-function ImportDialog({ mode, onDone, onClose }: { mode: "makers" | "notes"; onDone: () => void; onClose: () => void }) {
+function ImportDialog({ mode: initialMode, onDone, onClose }: { mode: "makers" | "notes"; onDone: () => void; onClose: () => void }) {
   const toast = useToast();
+  // What you're importing is chosen IN the dialog — inheriting it silently
+  // from the active tab trapped people on the maker columns.
+  const [mode, setMode] = useState<"makers" | "notes">(initialMode);
   const [rows, setRows] = useState<string[][] | null>(null);
   const [headerRow, setHeaderRow] = useState(0);
   const [mapping, setMapping] = useState<Record<string, number>>({});
@@ -146,6 +149,16 @@ function ImportDialog({ mode, onDone, onClose }: { mode: "makers" | "notes"; onD
 
   const headers = rows?.[headerRow]?.map((h) => h.trim()) ?? [];
   const dataRows = rows ? rows.slice(headerRow + 1) : [];
+
+  const switchMode = (m: "makers" | "notes") => {
+    if (m === mode) return;
+    setMode(m);
+    // Re-run the auto-mapping against the other record type's columns.
+    if (rows) {
+      const t = m === "makers" ? MAKER_TARGETS : NOTE_TARGETS;
+      setMapping(autoMap(rows[headerRow].map((h) => h.trim()), t));
+    }
+  };
 
   const pickHeaderRow = (parsed: string[][]) => {
     // Research exports often carry a title banner above the real header —
@@ -204,8 +217,19 @@ function ImportDialog({ mode, onDone, onClose }: { mode: "makers" | "notes"; onD
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
       <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-display text-lg">Import {mode === "makers" ? "makers" : "notes"} from CSV</h3>
-        <p className="mt-1 text-xs text-warmgrey">
+        <h3 className="font-display text-lg">Import from CSV</h3>
+        <div className="mt-2 inline-flex overflow-hidden rounded-lg border border-ink/15 text-sm">
+          {(["makers", "notes"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              className={`px-3 py-1.5 ${mode === m ? "bg-navy text-white" : "bg-white text-ink/70 hover:bg-ink/5"}`}
+            >
+              {m === "makers" ? "Makers" : "Notes"}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-warmgrey">
           Export your research as CSV (from Excel or Sheets: File → Save as → CSV). We'll detect the
           header row and map the columns — check the mapping before importing. Nothing is overwritten;
           every row imports as a new {mode === "makers" ? "maker" : "note"}.
