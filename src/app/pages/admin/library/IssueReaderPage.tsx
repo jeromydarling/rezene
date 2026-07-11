@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
-import { ChevronLeft, ChevronRight, Pin } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { ChevronLeft, ChevronRight, Pin, Sparkles } from "lucide-react";
 import { api, ApiRequestError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { iaPage } from "./shared";
@@ -19,6 +19,8 @@ export function IssueReaderPage() {
   const { iaId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const toast = useToast();
+  const navigate = useNavigate();
+  const [porting, setPorting] = useState(false);
   const [meta, setMeta] = useState<IssueMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,25 @@ export function IssueReaderPage() {
     }
   };
 
+  const pageToDesign = async () => {
+    if (!meta) return;
+    setPorting(true);
+    try {
+      await api.post<{ conceptId: string }>("/api/admin/library/to-design", {
+        title: `${meta.title} — p. ${leaf + 1}`,
+        refUrl: iaPage(meta.iaId, leaf, 512),
+        credit: `${meta.title}${meta.date ? ` (${meta.date.slice(0, 10)})` : ""}, page ${leaf + 1} — Internet Archive, public domain`,
+        sourceUrl: `https://archive.org/details/${meta.iaId}`,
+      });
+      toast.success("In the studio — this page is your first reference.");
+      navigate("/admin/ai-concepts");
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Couldn't port the page.");
+    } finally {
+      setPorting(false);
+    }
+  };
+
   if (error) {
     return (
       <div className="mx-auto max-w-2xl py-12 text-center">
@@ -93,6 +114,14 @@ export function IssueReaderPage() {
         <div className="flex items-center gap-2">
           <button onClick={pinPage} className="inline-flex items-center gap-1 rounded border border-ink/15 px-2.5 py-1 text-xs text-ink/80" title="Pin this page with its citation">
             <Pin size={12} /> Pin page
+          </button>
+          <button
+            onClick={pageToDesign}
+            disabled={porting}
+            className="inline-flex items-center gap-1 rounded border border-terracotta/40 px-2.5 py-1 text-xs text-terracotta hover:bg-terracotta/5 disabled:opacity-50"
+            title="Open a new Design Studio concept with this page as a reference"
+          >
+            <Sparkles size={12} /> {porting ? "Porting…" : "Use in a design"}
           </button>
           <button onClick={() => go(leaf - 1)} disabled={leaf === 0} className="rounded border border-ink/15 p-1.5 disabled:opacity-40" aria-label="Previous page">
             <ChevronLeft size={16} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
-import { ExternalLink, Pin, X } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { ExternalLink, Pin, Sparkles, X } from "lucide-react";
 import { api, ApiRequestError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 
@@ -114,9 +114,11 @@ export function ItemDrawer({
   readerLink?: (item: LibraryItem) => string;
 }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const [pin, setPin] = useState<LibraryPin | null>(null);
   const [boards, setBoards] = useState<TrendBoardLite[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [porting, setPorting] = useState(false);
 
   useEffect(() => {
     setPin(null);
@@ -145,6 +147,27 @@ export function ItemDrawer({
       toast.error(err instanceof ApiRequestError ? err.message : "Couldn't pin that.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Port the image into a fresh Design Studio concept: the worker fetches it,
+  // stores it as a shop file, and attaches it as a FLUX reference with the
+  // citation in the brief.
+  const toDesign = async () => {
+    setPorting(true);
+    try {
+      await api.post<{ conceptId: string }>("/api/admin/library/to-design", {
+        title: item.title,
+        refUrl: item.thumb || item.image,
+        credit: item.credit,
+        sourceUrl: item.url,
+      });
+      toast.success("In the studio — the plate is your first reference.");
+      navigate("/admin/ai-concepts");
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Couldn't port that into a design.");
+    } finally {
+      setPorting(false);
     }
   };
 
@@ -238,6 +261,14 @@ export function ItemDrawer({
           ) : (
             <span className="text-xs text-warmgrey">No trend boards yet — start one in R&D → Trends.</span>
           )}
+          <button
+            onClick={toDesign}
+            disabled={porting}
+            className="inline-flex items-center gap-1.5 rounded border border-terracotta/40 px-3 py-1.5 text-sm text-terracotta hover:bg-terracotta/5 disabled:opacity-50"
+            title="Open a new Design Studio concept with this image as a reference"
+          >
+            <Sparkles size={14} /> {porting ? "Porting…" : "Use in a new design"}
+          </button>
           <a
             href={item.url}
             target="_blank"

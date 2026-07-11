@@ -192,6 +192,92 @@ adminLibraryRoutes.delete("/pins/:id", requireAdminWrite, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- Port into a new design ---------------------------------------------------
+// Fetches the archive image server-side (host-allowlisted), stores it in R2 as
+// a shop file, and opens a fresh Design Studio concept with the image attached
+// as a FLUX reference and the citation in the brief. The archive becomes raw
+// material, provenance intact.
+
+const REF_HOSTS = ["images.metmuseum.org", "iiif.archive.org", "archive.org"];
+
+adminLibraryRoutes.post("/to-design", requireAdminWrite, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const title = s(body.title, 200);
+  const refUrl = s(body.refUrl, 600);
+  const credit = s(body.credit, 500);
+  const sourceUrl = s(body.sourceUrl, 600);
+  if (!title || !refUrl || !credit) return c.json({ error: "Need the item, its image, and its credit." }, 400);
+  let host: string;
+  try {
+    host = new URL(refUrl).hostname;
+  } catch {
+    return c.json({ error: "Bad image URL." }, 400);
+  }
+  if (!REF_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    return c.json({ error: "Only archive sources can be ported." }, 400);
+  }
+
+  // Fetch the image at reference size.
+  let bytes: ArrayBuffer;
+  let contentType = "image/jpeg";
+  try {
+    const res = await fetch(refUrl);
+    if (!res.ok) throw new Error(String(res.status));
+    contentType = res.headers.get("content-type") || contentType;
+    if (!contentType.startsWith("image/")) throw new Error("not an image");
+    bytes = await res.arrayBuffer();
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("too large");
+  } catch {
+    return c.json({ error: "Couldn't fetch that image from the archive — try again in a minute." }, 502);
+  }
+
+  // New concept, the citation in its brief.
+  const conceptId = newId("aic");
+  await run(
+    c.var.db,
+    `INSERT INTO ai_concepts (id, title, brief, tags, created_by) VALUES (?, ?, ?, ?, ?)`,
+    conceptId,
+    title,
+    `Quoted from the archive: ${credit}${sourceUrl ? `\n${sourceUrl}` : ""}`,
+    JSON.stringify(["archive"]),
+    c.var.userId,
+  );
+
+  // The image lands in R2 as a shop file, attached as a generation reference.
+  const fileId = newId("file");
+  const ext = contentType.includes("png") ? "png" : "jpg";
+  const r2Key = `uploads/concept/${conceptId}/${fileId}-library-reference.${ext}`;
+  await c.env.FILES.put(r2Key, bytes, { httpMetadata: { contentType } });
+  await run(
+    c.var.db,
+    `INSERT INTO files (id, r2_key, filename, content_type, size_bytes, entity_type, entity_id, is_public, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, 'concept', ?, 0, ?)`,
+    fileId,
+    r2Key,
+    `library-reference.${ext}`,
+    contentType,
+    bytes.byteLength,
+    conceptId,
+    c.var.userId,
+  );
+  await run(
+    c.var.db,
+    `INSERT INTO concept_references (id, concept_id, file_id, label) VALUES (?, ?, ?, ?)`,
+    newId("cref"),
+    conceptId,
+    fileId,
+    credit.slice(0, 160),
+  );
+  await run(
+    c.var.db,
+    `INSERT INTO analytics_events (id, event, entity_type, entity_id) VALUES (?, 'concept_created', 'ai_concept', ?)`,
+    newId("evt"),
+    conceptId,
+  );
+  await writeAudit(c.var.db, c.var.userId, "library.to_design", "ai_concept", conceptId, { title });
+  return c.json({ conceptId }, 201);
+});
+
 // ---- Pin → trend board (the school's method, one click) -----------------------
 
 adminLibraryRoutes.post("/pins/:id/to-trend/:boardId", requireAdminWrite, async (c) => {
