@@ -327,6 +327,19 @@ def place(piece, x, y):
                         break
                 else:
                     x = x + _xs[-1][1]
+        # A cowl front (Diana) drafts its neckline ABOVE the HPS line — that
+        # cloth is worn folded forward-down over the upper chest, sagging as
+        # the drape-neck. Left to the normal top-edge logic it collapses
+        # into the neck stub and self-collision tears the chest open (bake
+        # 1). Fold it at placement: mirror the above-line rows below the
+        # fold line and layer them outward the deeper they fold — free
+        # cloth with no seam partners, so the relax finds the true sag.
+        _cowl_ou = 0.0
+        cw = pl.get("cowl")
+        if cw and y < cw["y0"]:
+            d = cw["y0"] - y
+            y = cw["y0"] + d
+            _cowl_ou = 8.0 + 0.15 * d
         # Wrap pattern x around the shell by arc length. Front centre sits at
         # (0, -B), back centre at (0, +B); both walk toward the sides so the
         # side seams nearly meet. side = -1 for front, +1 for back.

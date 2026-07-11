@@ -1895,6 +1895,16 @@ if (cfg.trousers) {
   front.pinSegments = ["waistR", "waistL"];
   back.pinSegments = ["waistR", "waistL"];
   bodyPieces = [front, back, gusset];
+} else if (cfg.cowlFront) {
+  // Drape-neck top (Diana): the tee recipe, except the front's cowl zone
+  // (drafted above the neck-side shoulder point) pre-folds forward-down
+  // over the chest at placement — free cloth the relax sags into folds.
+  const front = bodyPiece(cfg.parts.front, "front");
+  const back = bodyPiece(cfg.parts.back, "back");
+  const FPd = set[cfg.parts.front].points;
+  front.placement = { kind: "plane", y: -160, cowl: { y0: FPd.neck.y } };
+  back.placement = { kind: "plane", y: 160 };
+  bodyPieces = [front, back];
 } else if (cfg.bruce) {
   // Boxer briefs: hip panels (front pouch, back, two sides) + two thigh
   // insets. The crotch closes from three directions — back wings meet the
