@@ -327,6 +327,19 @@ def place(piece, x, y):
                         break
                 else:
                     x = x + _xs[-1][1]
+        # A cowl front (Diana) drafts its neckline ABOVE the HPS line — that
+        # cloth is worn folded forward-down over the upper chest, sagging as
+        # the drape-neck. Left to the normal top-edge logic it collapses
+        # into the neck stub and self-collision tears the chest open (bake
+        # 1). Fold it at placement: mirror the above-line rows below the
+        # fold line and layer them outward the deeper they fold — free
+        # cloth with no seam partners, so the relax finds the true sag.
+        _cowl_ou = 0.0
+        cw = pl.get("cowl")
+        if cw and y < cw["y0"]:
+            d = cw["y0"] - y
+            y = cw["y0"] + d
+            _cowl_ou = 8.0 + 0.15 * d
         # Wrap pattern x around the shell by arc length. Front centre sits at
         # (0, -B), back centre at (0, +B); both walk toward the sides so the
         # side seams nearly meet. side = -1 for front, +1 for back.
@@ -686,11 +699,18 @@ def place(piece, x, y):
     elif y <= 0:
         w = pl["w0"]  # cap region keeps the biceps width
         r = w / math.pi + 1
+        # Negative-ease knit sleeves (Diana: 40% stretch) compute a tube
+        # radius that grazes the arm stub — placement noise starts cloth
+        # INSIDE the collider and the ejection tears the underarm seam
+        # (the leg placement learnt this first). Wrap at the stub's own
+        # radius + clearance; the strain stays real.
+        r = max(r, ARM_R + 4.0)
         theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))
     else:
         t = min(1.0, y / max(1.0, pl["y1"]))
         w = pl["w0"] + (pl["w1"] - pl["w0"]) * t
         r = w / math.pi + 1  # ~exact wrap; slack only invites ruffling
+        r = max(r, ARM_R + (WRIST_R - ARM_R) * t + 4.0)  # stub-radius clamp
         # Slightly less than a full wrap: the underarm edges must NOT start
         # coincident (self-collision fights zero-length sewing and explodes).
         theta = max(-math.pi, min(math.pi, (x / w) * (math.pi - 6.0 / r)))

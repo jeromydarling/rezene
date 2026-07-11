@@ -4,6 +4,7 @@ import { all, first, run } from "../services/db";
 import { parseBody } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
+import { emit } from "../services/activity";
 import type { AppContext } from "../types/env";
 
 /**
@@ -230,7 +231,23 @@ adminCommissionRoutes.put("/:id", requireAdminWrite, async (c) => {
     );
   }
   const row = await first<CommissionRow>(c.var.db, `${COMMISSION_SELECT} WHERE co.id = ?`, id);
-  return c.json(mapCommission(row!));
+  const commission = mapCommission(row!);
+  if (body.stage && body.stage !== existing.stage) {
+    await emit(c.var.db, {
+      kind: "commission.stage_changed",
+      entityType: "commission",
+      entityId: id,
+      title: `${commission.title} → ${STAGE_LABELS[body.stage] ?? body.stage}`,
+      payload: {
+        stage: body.stage,
+        title: commission.title,
+        clientName: commission.clientName,
+        styleId: commission.styleId,
+        dueAt: commission.dueAt,
+      },
+    });
+  }
+  return c.json(commission);
 });
 
 adminCommissionRoutes.delete("/:id", requireAdminWrite, async (c) => {

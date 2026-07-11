@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
+  Zap,
   BookUser,
   BarChart3,
   HeartHandshake,
@@ -156,6 +157,7 @@ const NAV_SECTIONS: {
     title: "System",
     items: [
       { to: "/admin/settings", label: "Settings", icon: Settings },
+      { to: "/admin/automations", label: "Automations", icon: Zap },
       { to: "/admin/domain", label: "Custom Domain", icon: Globe },
       { to: "/admin/team", label: "Team", icon: UsersRound },
       { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },

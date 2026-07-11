@@ -31,6 +31,7 @@ import { KnowledgeBasePage } from "./pages/admin/KnowledgeBasePage";
 import { LaunchPlaybookPage } from "./pages/admin/LaunchPlaybookPage";
 import { SourcingPage } from "./pages/admin/SourcingPage";
 import { ResearchPage } from "./pages/admin/ResearchPage";
+import { AutomationsPage } from "./pages/admin/AutomationsPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
@@ -215,6 +216,7 @@ export function AppRouter() {
           <Route path="duties" element={<DutiesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="automations" element={<AutomationsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="domain" element={<DomainPage />} />
           <Route path="support" element={<KnowledgeBasePage />} />

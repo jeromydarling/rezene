@@ -5,6 +5,35 @@ import type { DashboardSummary } from "../../shared/types";
 
 export const adminDashboardRoutes = new Hono<AppContext>();
 
+/** "Needs your attention" — what's STUCK, as opposed to what's scheduled
+ *  (the calendar) or what happened (the activity feed). Pure queries; each
+ *  is best-effort so one missing table never blanks the card. */
+adminDashboardRoutes.get("/attention", async (c) => {
+  const db = c.var.db;
+  const items: { label: string; count: number; href: string }[] = [];
+  const check = async (label: string, href: string, sql: string) => {
+    try {
+      const row = await first<{ n: number }>(db, sql);
+      if (row && row.n > 0) items.push({ label, count: row.n, href });
+    } catch {
+      /* module not provisioned on this shop */
+    }
+  };
+  await check("overdue production tasks", "/admin/production",
+    `SELECT COUNT(*) AS n FROM production_tasks WHERE status NOT IN ('done','cancelled') AND due_date IS NOT NULL AND due_date < date('now')`);
+  await check("orders past their ex-factory date", "/admin/purchase-orders",
+    `SELECT COUNT(*) AS n FROM production_orders WHERE status IN ('sent','confirmed','in_production','qc') AND ex_factory_date IS NOT NULL AND ex_factory_date < date('now')`);
+  await check("sample rounds waiting over two weeks", "/admin/samples",
+    `SELECT COUNT(*) AS n FROM samples WHERE status IN ('requested','in_progress','shipped') AND created_at < datetime('now','-14 days')`);
+  await check("maker messages needing a response", "/admin/suppliers",
+    `SELECT COUNT(*) AS n FROM supplier_interactions WHERE needs_response = 1`);
+  await check("commissions past their due date", "/admin/commissions",
+    `SELECT COUNT(*) AS n FROM commissions WHERE stage NOT IN ('done','cancelled') AND due_at IS NOT NULL AND due_at < datetime('now')`);
+  await check("unconfirmed consult requests", "/admin/commissions",
+    `SELECT COUNT(*) AS n FROM booking_requests WHERE status = 'new'`);
+  return c.json({ items });
+});
+
 adminDashboardRoutes.get("/", async (c) => {
   const db = c.var.db;
   const today = new Date().toISOString().slice(0, 10);
