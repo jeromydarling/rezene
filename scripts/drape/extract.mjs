@@ -440,6 +440,15 @@ const BLOCKS = {
     // fronts, so they drape on the leg placement, not the hip plane.
     bruce: true,
     parts: { back: "bruce.back", front: "bruce.front", side: "bruce.side", inset: "bruce.inset" },
+    // Draped at a moderate 8-degree bulge (documented in the KB): the
+    // default 20-degree pouch is a deep pre-sewn fold — five seams (dart
+    // pair, two tusks, two inset tips) converge at the crotch cross-point,
+    // and across bakes 7-12 the solver baked that convergence as a hanging
+    // knot however the seams were sprung or bridged. At 8 degrees the
+    // fold is shallow enough to assemble in situ. Pre-folded placement
+    // (rotating the tusk regions about the dart before the bake) is the
+    // machinery that would unlock the full pouch.
+    draftOptions: { bulge: 8 },
     // 580 puts the waistband at the hip-widest and the whole under-crotch
     // assembly (gussetTop ~730, tusks ~750, wings just under the keel) AT
     // the keel. The cross-seam arithmetic demands it: the body's back-
@@ -489,6 +498,10 @@ const { [cfg.design]: Design } = await import(cfg.module);
 // Only pass options this design actually declares.
 const declared = Design.patternConfig?.options ?? {};
 const options = Object.fromEntries(Object.entries(wanted).filter(([k]) => k in declared));
+// Per-block draft options: where a design's DEFAULT drafts construction the
+// solver cannot yet assemble (Bruce's 20-degree pouch fold), the block
+// drapes at a documented alternative the studio can equally draft.
+Object.assign(options, cfg.draftOptions ?? {});
 // Length/sleeve bonuses are RELATIVE to the design's own default (mirrors the
 // Pattern Studio's slider semantics): Sandy drafts its entire skirt length
 // from lengthBonus (default 50), so overriding with the raw slider value
