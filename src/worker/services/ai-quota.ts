@@ -135,3 +135,31 @@ export function fittingQuotaExceededBody(q: QuotaResult) {
     limit: q.limit,
   };
 }
+
+const DEFAULT_COMPANION_LIMIT = 80;
+
+/**
+ * Per-shop daily cap on Companion messages. Answers run on the shop's own
+ * Anthropic key when configured, else Workers AI Llama — cheap either way,
+ * but a runaway chat loop shouldn't be free. Tune with COMPANION_DAILY_LIMIT.
+ */
+export async function reserveCompanionQuota(c: Context<AppContext>): Promise<QuotaResult> {
+  const raw = c.env.COMPANION_DAILY_LIMIT;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_COMPANION_LIMIT;
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `aiq:${c.var.shopId}:companion:${day}`;
+  const used = parseInt((await c.env.KV.get(key)) ?? "0", 10);
+  if (used >= limit) return { ok: false, used, limit };
+  await c.env.KV.put(key, String(used + 1), { expirationTtl: 172800 });
+  return { ok: true, used: used + 1, limit };
+}
+
+export function companionQuotaExceededBody(q: QuotaResult) {
+  return {
+    error: `The companion has answered ${q.limit} questions today — it rests at midnight UTC.`,
+    code: "companion_quota_exceeded" as const,
+    used: q.used,
+    limit: q.limit,
+  };
+}

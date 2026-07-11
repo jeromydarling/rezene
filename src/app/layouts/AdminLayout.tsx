@@ -59,6 +59,7 @@ import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
 import { BrandMark } from "../components/BrandMark";
 import { isDemoShop } from "../lib/shop";
+import { Companion } from "../components/Companion";
 
 const NAV_SECTIONS: {
   title: string;
@@ -435,6 +436,7 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+      <Companion />
     </div>
   );
 }
