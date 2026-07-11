@@ -220,15 +220,24 @@ export const F2: CourseDef = {
 
 **Heads as the unit.** The classical figure stands 7.5–8 heads tall; the fashion figure of her era stretches to 8.5 (today's stretches further — the *convention* moves, the *method* doesn't). Landmarks fall on head-lines: chin at 1, bust near 2, waist near 3, hips at 4, knees around 5.5–6, ankles just above 8. Draw the ruler-of-heads first; hang the figure on it.
 
+![Diagram of a standing female figure divided into head-length units with labeled proportion lines](/school/fashion-drawing/lesson0-heads-tall-grid.jpg)
+*Ethel Traphagen, Costume Design and Illustration (1918) — the figure ruled into head units, every landmark labeled against the count.*
+
 **The action line.** Before anatomy, one long stroke establishes the pose — the spine's sweep from head to weight-bearing heel. Every convincing figure drawing starts as this single line; stiff figures are figures whose action line was never drawn.
 
 **Weight and the standing leg.** A standing figure bears weight on one leg; the weight-bearing ankle sits under the pit of the neck (drop a plumb line — the era's test and the studio's still). The hip over the standing leg rises; the shoulder above it drops: the counterpose that makes a figure stand instead of float.
 
 **Simplify the anatomy.** Young's era drew ovals and cylinders — egg head, cylinder neck, oval ribcage and hip masses, tapered cylinder limbs — assembled on the action line, refined only after the assembly stands. Anatomy in a fashion drawing is scaffolding for cloth; the drawing exists to carry the garment.
 
+![Side-by-side line drawings showing a fashion figure first as construction guide lines, then as a finished outline](/school/fashion-drawing/lesson0-figure-construction-steps.jpg)
+*Edna Woolman Young, A Student's Manual of Fashion Drawing (1919) — the same figure blocked in with guide lines, then cleaned up and ready to dress.*
+
 Her practice regime is the unglamorous secret: **a page of figures a day**, thirty seconds to five minutes each, from life or photographs, drawn *through* (light lines continuing where limbs pass behind cloth or each other, so the body under the clothes is never guessed). Thirty lessons of it and the hand stops negotiating with the pencil — which is the entire point: a designer's drawing speed is a design speed.
 
-> **Adapting the era:** Young's proportions and poses reflect 1919's figure conventions. Draw today's variety of bodies with the same method — the head-unit scaffold, action line and plumb test are body-neutral tools; the convention layered on top is yours to set.`,
+> **Adapting the era:** Young's proportions and poses reflect 1919's figure conventions. Draw today's variety of bodies with the same method — the head-unit scaffold, action line and plumb test are body-neutral tools; the convention layered on top is yours to set.
+
+![Rows of head-construction drawings above a chart of figures at different ages measured in head units](/school/fashion-drawing/lesson0-proportions-by-age.jpg)
+*Traphagen — heads constructed in five views, and how many heads tall the figure stands at every age.*`,
       checkpoints: [
         {
           q: "The plumb test for a standing figure drops from…",
@@ -266,7 +275,13 @@ Her practice regime is the unglamorous secret: **a page of figures a day**, thir
 
 **Falling/cascade folds** — the flared zigzag edge of a bias or circular piece: a jabot, a cascade ruffle, a circle skirt's hem.
 
+![Line drawings of five draped skirts showing cascading folds, pleats, and gathered fabric](/school/fashion-drawing/lesson1-skirt-drapery-on-the-form.jpg)
+*Young — five skirts on the form: where cascades, accordion pleats, gathers and tucks each fall.*
+
 Two principles govern all of them. **Folds radiate from points of support or tension** — shoulder, bust, belt, knee; begin every fold at its cause and the drawing explains the garment. And **fabric weight sets fold scale**: chiffon makes many small soft folds, melton few large firm ones; the pencil pressure and stroke length should change with the cloth. An era exercise worth stealing whole: drape one meter of muslin, then of charmeuse, then of coating over the same chair and draw all three — same support, three languages.
+
+![Chart of fabric texture strokes and four skirt studies showing folds rendered in different materials](/school/fashion-drawing/lesson1-rendering-fabric-folds.jpg)
+*Young — the same folds rendered as velvet, taffeta, chiffon and crepe: fabric weight is the drawing's real subject.*
 
 Traphagen adds the drawing-from-history discipline this school loves: her assignments send students to redraw silhouettes from museum plates *as working sketches* — not to copy the rendering but to extract the line. Drawing a garment is the fastest way to understand its cut; her book is a bridge between F1's plates and your own croquis.`,
       checkpoints: [
@@ -300,11 +315,20 @@ Traphagen adds the drawing-from-history discipline this school loves: her assign
 
 **The working drawing** — the era's name for what production calls the **flat**: garment drawn off the body (or on a neutral figure), both halves, true proportions, with the seams, darts, closures and construction lines *drawn where they actually are*. Its audience is the maker; its virtue is truth. Traphagen's rules for it read like a tech-pack standard a century early: show every seam; indicate the closure (which side laps, how far it opens); draw the back; note the fabric; if a detail can't be drawn clearly, draw it enlarged in a corner ("detail sketches," her term — the ancestor of every tech pack's callout).
 
+![Drawing of a shirred and scalloped dress with enlarged margin studies of lacing, fringe, and tassels](/school/fashion-drawing/lesson2-shirring-scallops-lacing.jpg)
+*Young — trims specified in a sketch: shirring, scalloped tiers, lacing and tassels, each redrawn enlarged in the margin.*
+
 Between them sits her **presentation drawing** — the rendered, attitudinal illustration for the client or the page. It borrows the croquis's life and the working drawing's honesty, and its era-specific techniques (wash, line economy, the dramatically elongated figure) are style; borrow what suits your brand.
 
 The modern mapping is exact and worth saying aloud: croquis → your sketchbook and Design Studio prompts; working drawing → the flat sketch on your tech pack; presentation drawing → your lookbook and product page imagery. One design, three drawings, three audiences — and the discipline of knowing which one you're making at any moment.
 
-Her assignment structure also survives translation: design *in series* (six variations on one block beat one masterpiece), and **annotate every sketch** — fabric, key measure, the one construction note that makes it buildable. An annotated croquis is halfway to a spec; an unannotated beauty is halfway to nothing.`,
+![Line drawing of a plaid dress with the pattern following seams and folds, surrounded by plaid swatch studies](/school/fashion-drawing/lesson2-plaids-follow-construction.jpg)
+*Young — a check pattern bending truthfully around bodice, sleeve and gored skirt: the working drawing's honesty applied to cloth.*
+
+Her assignment structure also survives translation: design *in series* (six variations on one block beat one masterpiece), and **annotate every sketch** — fabric, key measure, the one construction note that makes it buildable. An annotated croquis is halfway to a spec; an unannotated beauty is halfway to nothing.
+
+![Line drawings of two blouses on the waist form with detail studies of collars, cuffs, and a buckle](/school/fashion-drawing/lesson2-waists-collars-details.jpg)
+*Young — waists on the form with their collars, cuffs and frills drawn as separate construction studies.*`,
       checkpoints: [
         {
           q: "The working drawing's audience and virtue are…",
@@ -334,11 +358,20 @@ Her assignment structure also survives translation: design *in series* (six vari
 
 **Line survives; rendering seduces.** The era's reproduction processes rewarded confident line drawings (halftones were costly), which trained a virtue worth keeping: if the design reads in pure line, it is a design; if it needs the rendering to read, it is a mood. Test your croquis by what a pattern maker could do with them.
 
+![Art-deco fashion plate of a woman in a Paquin travel coat standing between two dark stylized trees](/school/fashion-drawing/lesson3-barbier-les-colchiques.jpg)
+*George Barbier, 'Les Colchiques' (1913), for a Paquin coat, reproduced in Traphagen — line economy carrying an entire composition.*
+
 **Draw for the brief, in series.** Young's later lessons assign garments to constraints — a walking suit for such a figure, a frock in such a cloth — never "draw something beautiful." Series thinking (six necklines on one bodice; four sleeve volumes on one jacket) is design's real motion, and it maps directly onto how you'd brief a generation batch in the Design Studio: one block, one fabric truth, several disciplined variations.
 
 **The sketch is a contract with the make.** Every drawing that leaves your hands toward a maker is a promise about grain, volume and construction — which is why the era annotated relentlessly and why your flats live *inside* tech packs, not beside them. A sleeve drawn with pipe folds promises gathering; drawn smooth it promises a fitted cap; the maker will price and sew what you drew.
 
+![Soft etching of a woman in a broad-brimmed hat and long dress holding an open parasol](/school/fashion-drawing/lesson3-steinmetz-parasol-etching.jpg)
+*E. M. A. Steinmetz for Harper's Bazar, in Traphagen — atmosphere as a brand voice: the presentation drawing at full power.*
+
 **Practice remains the engine.** Thirty lessons, a page a day — the books end where they began. A studio habit that survives a century of technology deserves the last word: designers who draw daily see garments more precisely, brief makers and machines more precisely, and recognize in a fitting what others only feel.
+
+![Decorative cover illustration of a masked couple in costume among fireworks, flowers, and night sky](/school/fashion-drawing/lesson3-brunelleschi-cover-design.jpg)
+*Umberto Brunelleschi's cover design, in Traphagen — how far a costume drawing can carry mood and story.*
 
 Your practical closes the loop with the modern instrument: save a concept in the Design Studio — a disciplined brief in the era's spirit (block, fabric, three variations) rather than an adjective cloud. The school verifies the concept exists; the discipline it verifies is Young's and Traphagen's.`,
       checkpoints: [

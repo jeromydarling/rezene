@@ -32,9 +32,18 @@ export const T2: CourseDef = {
 - **The seat angle** — the slant of the back rise away from the vertical. This is the trouser's *balance*: a steep seat angle gives room for movement and a fuller seat; a shallow one gives a cleaner back on a flat seat and less room to sit.
 - **The leg lines** — from fork and seat, straight runs to knee and bottom, split evenly around the **crease line**, which is the leg's grain and plumb line. A trouser hangs from the crease the way a coat hangs from the shoulder.
 
+![Pattern draft of walking trousers showing topside and underside pieces with numbered construction lines](/school/the-trouser/lesson0-walking-trousers-draft.jpg)
+*W.D.F. Vincent, The Cutter's Practical Guide: Trousers (c. 1905), plate 2 — the complete walking-trouser draft: topside, underside and the fork gusset.*
+
 Vincent's method (and Croonborg's American variant) drafts the frame from four measures — side length, leg (inseam), waist, seat — with the crutch line placed by the difference between side and leg. Widths at waist and seat are quarter-girths plus ease; the fork extensions are fractions of the seat, because the fork wraps a body whose depth scales with its girth.
 
+![Trouser underside drafted over the topside with measuring tapes marking the additions](/school/the-trouser/lesson0-underside-development.jpg)
+*Vincent, plate 3 — developing the underside over the topside, graduated tapes marking exactly what is added at seat and side.*
+
 Two period disciplines worth keeping verbatim. First, **the seat measure is taken easy, never tight** — a trouser that measures exactly the seat cannot be sat in. Second, **the leg is measured to the heel seam of the shoe the trouser will be worn with**; a trouser has no hem length in the abstract.
+
+![Clean line diagram of a proportionate trouser draft with lettered points, front and back combined](/school/the-trouser/lesson0-proportionate-trousers.jpg)
+*Frederick Croonborg, Grand Edition of Supreme System (1907) — the American proportionate draft, front and back in one lettered diagram.*
 
 > **Term note:** *crutch* = crotch; *small* = the narrowest waist point; *dress* = the side on which the wearer, historically, "dresses" — period drafts cut the left fork slightly larger. Modern blocks usually ignore it; bespoke cutters still ask.`,
       checkpoints: [
@@ -64,9 +73,18 @@ Two period disciplines worth keeping verbatim. First, **the seat measure is take
       source: { label: "Vincent, breeches & seat chapters", url: "https://archive.org/details/cutters-practical-guide-trousers" },
       bodyMd: `Everything a trouser must do that a skirt need not do comes down to one motion: sitting. Sitting lengthens the back of the body from waist to fork by several centimeters and does nothing to the front. The draft has exactly one tool for that asymmetry: the **seat angle** on the back panel.
 
+![Five figures in standing, sitting, cross-legged and kneeling poses showing how trousers behave in each attitude](/school/the-trouser/lesson1-body-attitudes.jpg)
+*Vincent — the varied relations of body and legs: everything the seat of a trouser must accommodate.*
+
 Swing the back rise away from vertical and you *bank* extra back length that standing hides in soft vertical folds under the seat and sitting spends. Vincent's rule of thumb: a **normal figure takes a moderate slant; an erect, flat-seated figure less; a stooped or full-seated figure more.** Breeches and riding trousers — cut for a permanently "sitting" posture in the saddle — take the steepest angles in the book, which is why the breeches chapters are the clearest demonstration of the principle.
 
+![Anatomical diagrams of leg bones inside body outlines, including a seated figure showing length gained over the seat](/school/the-trouser/lesson1-bones-and-outline.jpg)
+*Vincent — the bones inside the leg line, and the length a seated figure gains over seat and knee.*
+
 The seat angle trades against cleanliness. More angle = more sitting room and more standing slack; less angle = a cleaner standing back that binds when seated. Where the customer lives on that trade is a question about their life, not their body: a barrister who stands to speak wants clean; a driver wants room. Period cutters asked. So should a modern studio brief.
+
+![Five trouser drafts from different cutting systems stacked for comparison of seat angles](/school/the-trouser/lesson1-seat-angle-systems.jpg)
+*Vincent, plate 22 — five rival systems folded on the crease line, their seat angles laid bare for comparison.*
 
 Companion decisions that live with the angle:
 
@@ -100,6 +118,9 @@ Companion decisions that live with the angle:
       source: { label: "Vincent, 'Fitting' section", url: "https://archive.org/details/cutters-practical-guide-trousers" },
       bodyMd: `The glory of Vincent's volume is its remedies section — a diagnostic table for trouser faults that reads today like it was written for your last fitting. The faults, their signatures, and the cuts that cure them:
 
+![Eighteen small pattern diagrams marking trouser fitting defects and the corresponding pattern remedies](/school/the-trouser/lesson2-defects-and-remedies-1.jpg)
+*Vincent, plate 25 — defects and their remedies: seat and fork faults with their pattern cures.*
+
 **Folds under the seat (standing).** Some slack is the price of sitting room; *excessive* horizontal folds mean the back fork or seat angle over-banked for this figure. Remedy: lift the back — take a wedge out of the back rise at the seat seam (period cutters pinned the surplus at the waist and transferred it to the draft).
 
 **Tight, dragging seat; front pockets gape.** The opposite fault: not enough seat room. Drags radiate from the fork toward the hip; sitting strains the seam. Remedy: let out the center-back seam (that inlay again), or re-cut with more seat angle and fork.
@@ -111,6 +132,9 @@ Companion decisions that live with the angle:
 **Diagonal drags from the knee, front.** The leg is dressed straighter than the wearer's actual leg-line; period books politely call the cause "bow legs" or "knock knees." The remedy is honest: swing the leg of the draft to follow the limb.
 
 **Waistband rolls or gapes at back.** Suppression in the wrong place: gaping wants more dart/seam suppression; rolling wants less, or the rise is simply too long for the figure's hollow.
+
+![Trouser legs showing wrinkle patterns of fitting faults with pattern alteration diagrams beside them](/school/the-trouser/lesson2-defects-and-remedies-2.jpg)
+*Vincent, plate 26 — the wrinkles drawn on the worn leg, and the cuts and wedges that cure them.*
 
 The method behind all of these is the method of this whole school: **a wrinkle is a vector.** It points from where the cloth is trapped toward where it wants to go. Read the direction, find which line of the draft governs that region, and change that line — never chase a wrinkle by taking in whatever seam is nearest. Verto's fit map draws these vectors in color before cloth is cut; Vincent taught the same reading on the living customer.`,
       checkpoints: [
@@ -142,13 +166,22 @@ The method behind all of these is the method of this whole school: **a wrinkle i
 
 **The crease is pressed, and it is permanent geometry.** Front crease runs to meet the pleat (or dies into the fly area on a flat front); back crease stops traditionally below the seat. Creases are pressed *before* assembly on the flat panels — trying to find a straight crease on a sewn tube is guesswork.
 
+![Finished pair of trousers shown folded and laid out flat for final examination](/school/the-trouser/lesson3-examining-finished-trousers.jpg)
+*Vincent, plate 24 — examining the finished trousers, folded on their creases: the cutter's last check.*
+
 **Stretch and shrink.** The iron is a shaping tool: the back panel is *stretched* along the inside of the leg at the fork and *shrunk* over the seat, easing the flat cloth toward the body's curves before a stitch is sewn. This is the invisible half of why bespoke trousers hang cleanly; it belongs in construction notes ("shrink back-seat; stretch fork") or it doesn't happen.
 
 **The order of assembly** — pockets and fly details on flat panels first; then side seams; then inseams; the two legs joined at the seat seam *last*, sewn twice for strength. The seat seam is left with its generous inlay and a loose double stitch: it is the alteration seam, and every period book protects it.
 
 **Waistband and finish.** The band is interfaced (period: linen canvas), closed with hook and bar (takes strain better than a button), and carries the brace buttons or belt loops the customer's habits demand — ask, don't assume. Bottoms: plain or cuffed ("permanent turn-up"), hemmed to the shoe with a slight back-drop (the back hem 1–2 cm longer so it sits on the shoe's heel).
 
-Your practical for this course is exactly this translation: take a real trouser (or any lower-body style you're developing) and write its tech pack's **graded measurement points** — waist, seat, thigh, knee, leg opening, front and back rise at minimum. Five points that a factory can measure on the finished garment is the difference between "fits like the sample" and an email thread. The school verifies the points exist.`,
+![Riding trouser pattern draft with shaded reinforcement panels on the inside of the leg](/school/the-trouser/lesson3-riding-trousers-draft.jpg)
+*Vincent, plate 9 — riding trousers: a draft annotated for its end use, reinforcement strapping shaded in.*
+
+Your practical for this course is exactly this translation: take a real trouser (or any lower-body style you're developing) and write its tech pack's **graded measurement points** — waist, seat, thigh, knee, leg opening, front and back rise at minimum. Five points that a factory can measure on the finished garment is the difference between "fits like the sample" and an email thread. The school verifies the points exist.
+
+![Trouser draft altered for small hip, knock knee, short front and large seat, dashed lines showing the standard draft](/school/the-trouser/lesson3-knock-knee-large-seat-variation.jpg)
+*Croonborg — one draft, four figure variations, dashed against the standard: what grading is for.*`,
       checkpoints: [
         {
           q: "The iron's stretch-and-shrink work happens…",
@@ -218,9 +251,18 @@ export const T3: CourseDef = {
 
 The frame of Vincent's jacket draft sets three depths from the nape: **depth of scye**, natural waist, full length. Across it hang the three widths: back width, chest width, over-shoulder. Between back and chest widths lives the scye — and the first law of the scye is that *smaller is better than bigger*. A high, snug armhole moves with the arm; a deep, generous one drags the whole coat every time the arm lifts. Beginners lower the scye for comfort and achieve the opposite; the comfort lives in the **sleeve**, not the hole.
 
+![Four-stage tailoring draft showing system lines and completed lounge jacket outline](/school/the-jacket-and-coat/lesson0-lounge-draft-system-lines.jpg)
+*W.D.F. Vincent, The Cutter's Practical Guide: Jackets (1897), plate 3 — the lounge draft built up in four stages: system lines, sweeps, completed outline.*
+
 The **shoulder seam** carries balance, exactly as in T1 but with sharper consequences: square shoulders on a sloping draft throw drags from the neck; sloping shoulders on a square draft collapse the chest. Vincent drafts a standard slope and immediately lists its corrections — the era assumed bodies vary; the draft is a starting position.
 
+![Diagrams of jacket forepart and scye corrections for fulness at the sideseam](/school/the-jacket-and-coat/lesson0-scye-fulness-corrections.jpg)
+*Vincent, plate 30 — the corrections: eight diagrams on fulness at the sideseam, and how a badly balanced scye hangs wrong.*
+
 **Waist suppression** turns the tube into a figure: front dart, side-body seam (the panel between front and back that period coats made much of), and the center-back seam each take a share. How the shares are distributed is house style — a soft Neapolitan-adjacent jacket suppresses gently and low; a structured English coat takes more, higher. The draft is the same geometry either way; the *distribution* is design.
+
+![Full overcoat pattern draft with construction and balance lines](/school/the-jacket-and-coat/lesson0-overcoat-draft-cpg-system.jpg)
+*Vincent, Body Coats volume, plate 3 — a complete overcoat draft, balance lines drawn through body and skirt.*
 
 > **Term note:** the *side-body* is the underarm panel of a body coat; the *forepart* is the front panel; the *top-side/under-side* are a sleeve's two pieces. The *break* is where the lapel turns; the *gorge* is the seam where collar meets lapel.`,
       checkpoints: [
@@ -252,9 +294,15 @@ The **shoulder seam** carries balance, exactly as in T1 but with sharper consequ
 
 **Crown ease is not optional.** The sleeve head is deliberately longer than the scye and is *worked in* — fulled over the shoulder region so the sleeve rounds over the deltoid instead of denting under it. A sleeve set clean like a shirt sleeve reads flat and cheap on a tailored shoulder. This is Vincent's "fulling on" from T1 at its most visible.
 
+![Sleeve drafting plate showing arm pitches on the jacket body and sleeve pattern diagrams](/school/the-jacket-and-coat/lesson1-sleeve-draft-and-pitch.jpg)
+*Vincent, plate 7 — fore-arm and hind-arm pitch marked on the forepart, with the top- and under-sleeve drafts beside it.*
+
 **Pitch** is the sleeve's rotation in the scye, and it is the most common sleeve fault in ready-to-wear. The arm does not hang straight; it hangs slightly forward. The sleeve must be pitched to match — its seams rotated so the sleeve's natural curve follows the arm. Mis-pitched sleeves announce themselves precisely: **drags from the sleeve head spiraling around the arm.** Forward drags (toward the chest): pitched too far back. Backward spirals: too far forward. The remedy is never pressing and never the sleeve seams — the sleeve comes out and goes back in rotated. Period fitters marked pitch at the try-on with a chalk line down the hanging arm; nothing better has been invented.
 
 **The elbow bend** is drafted, not eased: the top-side is longer at the back seam through the elbow, the under-side shorter, so the empty sleeve already crooks the way an arm does. A dead-straight sleeve on a hanger is a warning sign.
+
+![Pattern diagrams of working man's sleeve, Talma sleeve, and seamless lounge variations](/school/the-jacket-and-coat/lesson1-sleeve-style-variations.jpg)
+*Vincent, plate 19 — sleeve variations: the working man's easy sleeve and the one-piece Talma, cut changing the hang.*
 
 Cuff and finish carry the signatures — working buttonholes ("surgeon's cuffs") are period bespoke's calling card — but the craft is above: a small high scye, a fulled crown, correct pitch, a drafted bend. Get those four right and the jacket moves like clothing; miss one and no button will save it.`,
       checkpoints: [
@@ -284,9 +332,15 @@ Cuff and finish carry the signatures — working buttonholes ("surgeon's cuffs")
       source: { label: "Vincent, making-up; trade practice", url: "https://archive.org/details/cutters-prac-guide-jacket-cutting" },
       bodyMd: `Take the cloth off a tailored jacket and a ghost of the jacket remains: the **canvas** — a shaped interior of hair cloth and linen that gives the front its body, the lapel its roll, and the chest its quiet fullness. The era's making chapters treat it as the making; everything else is assembly.
 
+![Foreparts with shaded areas marking wadding and canvas placement inside the jacket](/school/the-jacket-and-coat/lesson2-making-up-wadding-foreparts.jpg)
+*Vincent, plate 6, 'Hints on Making Up' — foreparts shaded where wadding and canvas build the chest and scye.*
+
 The classic structure, unchanged from Vincent's day to today's bespoke: a **body canvas** of wool-and-hair interlining through the forepart; over its chest, a **hair-cloth chest piece** feathered out with a softer **domette** layer so no edge telegraphs; the whole shaped to the body's curve not by cutting but by **pad stitching** — rows of small diagonal stitches through canvas and cloth (or canvas alone), each row rolling the layers slightly over the fingers as it is sewn. Pad stitching is how flat materials are *taught a curve they keep*.
 
 Nowhere does pad stitching matter more than the **lapel**: stitched in rows parallel to the roll line, curling the lapel toward the body so it rolls — not creases — at the break. A lapel that lies flat as paper was fused, not padded; the roll is the tell.
+
+![Lapel construction diagrams on coat foreparts with shaded lapel layers](/school/the-jacket-and-coat/lesson2-lapel-construction.jpg)
+*Vincent, Body Coats volume, plate 1 — lapels: how the lapel and its inner layer are cut, turned and built onto the forepart.*
 
 The **roll line itself is taped** — a stay tape sewn along it slightly tight, so the break hugs the chest and never bows away. Edges, too: tape the front edge and the gorge, or the bias-adjacent curves grow in wear and the front swings open. Period books are absolute about taping; modern factories skip it at price points, and the fronts tell you.
 
