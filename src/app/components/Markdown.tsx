@@ -2,15 +2,34 @@ import { Fragment, type ReactNode } from "react";
 
 /**
  * Minimal, safe markdown renderer for trusted-ish editorial content
- * (headings, paragraphs, bold, lists, pipe tables). Renders to React
- * elements — never innerHTML — so script injection is structurally
+ * (headings, paragraphs, bold, lists, pipe tables, figures). Renders to
+ * React elements — never innerHTML — so script injection is structurally
  * impossible. Extend or swap for a full parser when content needs grow.
  */
-export function Markdown({ text, headingBase = 1 }: { text: string; headingBase?: 1 | 2 }) {
-  const blocks = text
+
+/** The block split the renderer uses — exported so features that walk the
+ *  same text (the lesson audio reader) index blocks identically. */
+export function markdownBlocks(text: string): string[] {
+  return text
     .replaceAll("\\n", "\n")
     .split(/\n{2,}/)
     .map((b) => b.trim());
+}
+
+export function Markdown({
+  text,
+  headingBase = 1,
+  activeBlock = null,
+  onBlockSelect,
+}: {
+  text: string;
+  headingBase?: 1 | 2;
+  /** Index of the block to visually highlight (the audio reader's cursor). */
+  activeBlock?: number | null;
+  /** When set, blocks become clickable (jump the audio reader here). */
+  onBlockSelect?: (index: number) => void;
+}) {
+  const blocks = markdownBlocks(text);
   // Accessible heading structure: when the page already owns the h1
   // (headingBase = 2), remap whatever depths the author used onto
   // sequential levels starting at h2 — no h1 collisions, no skips.
@@ -21,10 +40,29 @@ export function Markdown({ text, headingBase = 1 }: { text: string; headingBase?
   )].sort((a, b) => a - b);
   const levelFor = (depth: number): number =>
     headingBase === 2 ? Math.min(6, 2 + depths.indexOf(depth)) : Math.min(6, depth);
+  if (activeBlock === null && !onBlockSelect) {
+    return (
+      <div className="space-y-5">
+        {blocks.map((block, i) => (
+          <Fragment key={i}>{renderBlock(block, levelFor)}</Fragment>
+        ))}
+      </div>
+    );
+  }
+  // Audio-reader mode: each block gets a wrapper so the current paragraph can
+  // glow and a click can jump the reader there.
   return (
     <div className="space-y-5">
       {blocks.map((block, i) => (
-        <Fragment key={i}>{renderBlock(block, levelFor)}</Fragment>
+        <div
+          key={i}
+          onClick={onBlockSelect ? () => onBlockSelect(i) : undefined}
+          className={`${onBlockSelect ? "cursor-pointer" : ""} ${
+            activeBlock === i ? "-mx-2 rounded-md bg-navy/[0.06] px-2 py-1 ring-1 ring-navy/10" : ""
+          }`.trim()}
+        >
+          {renderBlock(block, levelFor)}
+        </div>
       ))}
     </div>
   );
@@ -39,6 +77,22 @@ const HEADING_STYLES: Record<number, string> = {
 
 function renderBlock(block: string, levelFor: (depth: number) => number): ReactNode {
   if (!block) return null;
+  // Figure: an image on its own block, optionally followed by an *italic*
+  // caption line. Alt text carries the description; the caption the credit.
+  const figure = block.match(/^!\[([^\]]*)\]\(([^)\s]+)\)\s*(?:\n\s*\*([^*]+)\*\s*)?$/);
+  if (figure) {
+    return (
+      <figure>
+        <img
+          src={figure[2]}
+          alt={figure[1]}
+          loading="lazy"
+          className="w-full rounded-lg border border-ink/10 bg-white"
+        />
+        {figure[3] && <figcaption className="mt-1.5 text-xs italic text-warmgrey">{figure[3]}</figcaption>}
+      </figure>
+    );
+  }
   const heading = block.match(/^(#{1,4})\s+([\s\S]*)$/);
   if (heading) {
     const level = levelFor(heading[1].length);

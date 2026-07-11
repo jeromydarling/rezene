@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Markdown } from "../../../components/Markdown";
 import { api, ApiRequestError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
+import { ListenBar, useLessonAudio } from "./LessonListen";
 
 /**
  * The lesson reader. Reading time is credited by 30-second heartbeats that
@@ -101,6 +102,12 @@ export function SchoolLessonPage() {
   const [passed, setPassed] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const beatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Listening is reading: while the voice is speaking, heartbeats keep
+  // flowing even if the tab is backgrounded (phone locked, other window).
+  const audioPlayingRef = useRef(false);
+  const audio = useLessonAudio(data?.bodyMd ?? "", (playing) => {
+    audioPlayingRef.current = playing;
+  });
 
   const load = useCallback(async () => {
     try {
@@ -123,7 +130,7 @@ export function SchoolLessonPage() {
   useEffect(() => {
     if (!data || data.completed) return;
     beatRef.current = setInterval(async () => {
-      if (document.hidden) return;
+      if (document.hidden && !audioPlayingRef.current) return;
       try {
         const res = await api.post<{ seconds: number }>(
           `/api/admin/school/course/${slug}/lesson/${lessonIdx}/heartbeat`,
@@ -203,8 +210,15 @@ export function SchoolLessonPage() {
         </p>
       )}
 
+      <ListenBar audio={audio} minutes={data.minutes} />
+
       <div className="mt-6">
-        <Markdown text={data.bodyMd} headingBase={2} />
+        <Markdown
+          text={data.bodyMd}
+          headingBase={2}
+          activeBlock={audio.activeBlock}
+          onBlockSelect={audio.status !== "idle" ? audio.jumpTo : undefined}
+        />
       </div>
 
       <div className="mt-8 space-y-3">

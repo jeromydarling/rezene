@@ -8,8 +8,8 @@ export const school: KbArticle[] = [
     part: "account",
     moduleRoute: "/admin/school",
     screenshot: "/kb/shots/school.png",
-    keywords: "school course lesson quiz examination certificate badge tailoring seamstressing dressmaking fashion learn education lms certified verto",
-    updated: "2026-07-11",
+    keywords: "school course lesson quiz examination certificate badge tailoring seamstressing dressmaking fashion learn education lms certified verto listen audio read aloud voice speech",
+    updated: "2026-07-12",
     body: `# The Verto School
 
 **System → Verto School** is a working education in the three crafts behind your shop — tailoring, seamstressing, and fashion — taught from the golden-age masters. Every course is adapted from verified public-domain books (published before 1931): the Woman's Institute lessons, the great cutting systems, Nystrom's founding economics of fashion. We modernized the language, not the craft; each lesson links its original on the Internet Archive.
@@ -18,6 +18,7 @@ export const school: KbArticle[] = [
 
 1. **Enroll** — courses are included with your shop; there's nothing to buy.
 2. **Read the lessons, in order.** Lessons unlock sequentially, and the school credits **real reading time** — a progress rail fills as you read, and each lesson has checkpoint questions woven in. You can't skip, and you can't skim your way through: completion is earned on the server, not clicked in the browser.
+   - **Prefer to listen?** Every lesson has a **Listen** bar — press play and your browser reads the lesson aloud, highlighting the paragraph being read (tap any paragraph to jump the voice there). Pick a voice and speed that suit you; listening counts as reading time, even with the tab in the background. It's still the lesson, in order, at an honest pace.
 3. **Sit the examination.** Each course draws a random paper from a larger question bank, graded entirely on Verto's servers — the answers never reach your browser, and every attempt sees a different paper. Pass mark is 80%; two misses in a row locks the paper for 24 hours (reread, then return).
 4. **Pass the practical.** The part no quiz site can copy: the school verifies **real work in your own shop** — a recorded measurement set, construction notes that name real techniques, a decided price study with comparables. The work is the exam.
 5. **Claim your certificate.**
