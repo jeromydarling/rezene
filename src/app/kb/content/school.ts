@@ -12,7 +12,7 @@ export const school: KbArticle[] = [
     updated: "2026-07-12",
     body: `# The Verto School
 
-**System → Verto School** is a working education in the three crafts behind your shop — tailoring, seamstressing, and fashion — taught from the golden-age masters. Every course is adapted from verified public-domain books (published before 1931): the Woman's Institute lessons, the great cutting systems, Nystrom's founding economics of fashion. We modernized the language, not the craft; each lesson links its original on the Internet Archive.
+**System → Verto School** is a working education in the three crafts behind your shop — tailoring, seamstressing, and fashion — taught from the golden-age masters. Every course is adapted from verified public-domain books (published before 1931): the Woman's Institute lessons, the great cutting systems, Nystrom's founding economics of fashion. We modernized the language, not the craft; each lesson links its original on the Internet Archive — and the lessons are **illustrated with the books' own plates**: Vincent's trouser drafts, Madison's balance diagrams, the Institute's stitch figures, Racinet's color costume plates, each captioned with its book and placed at the paragraph it teaches.
 
 ## How a course works
 

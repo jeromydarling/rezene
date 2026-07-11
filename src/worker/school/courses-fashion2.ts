@@ -18,7 +18,8 @@ export const F1: CourseDef = {
   sources: [
     { label: "Talbot Hughes — Dress Design: An Account of Costume for Artists & Dressmakers (1920)", iaId: "dressdesignaccou0000unse", url: "https://archive.org/details/dressdesignaccou0000unse" },
     { label: "Katherine Morris Lester — Historic Costume (1925)", iaId: "historiccostume0000kath", url: "https://archive.org/details/historiccostume0000kath" },
-    { label: "Auguste Racinet — Le Costume Historique (1888, Getty scan)", iaId: "gri_33125008521722", url: "https://archive.org/details/gri_33125008521722" },
+    { label: "Auguste Racinet — Le Costume Historique, vol. 1: text & Coupes et Patrons (1888, Getty scan)", iaId: "gri_33125008521722", url: "https://archive.org/details/gri_33125008521722" },
+    { label: "Auguste Racinet — Le Costume Historique, vol. 5: color plates (1888, Getty scan)", iaId: "gri_33125008496388", url: "https://archive.org/details/gri_33125008496388" },
   ],
   lessons: [
     {
@@ -26,6 +27,9 @@ export const F1: CourseDef = {
       minutes: 8,
       source: { label: "Hughes, introduction", url: "https://archive.org/details/dressdesignaccou0000unse" },
       bodyMd: `Talbot Hughes wrote his 1920 costume history *for artists and dressmakers*, and his premise is this course's premise: costume history is not trivia — it is the **working vocabulary of design**. Every silhouette you will ever sketch has been worn before, argued about before, and solved technically before. Knowing where a line comes from lets you quote it on purpose, break it on purpose, and answer a client's "make it feel Edwardian, but modern" with something better than a mood.
+
+![Color plate of seven French 17th-century court ladies in brocade gowns and tall lace headdresses](/school/language-of-costume/lesson0-racinet-court-dress-france-17th-century.jpg)
+*Auguste Racinet, Le Costume Historique (1888), vol. 5 — French court dress under Louis XIV: brocade mantuas and fontange headdresses in chromolithograph.*
 
 His method is the one to copy: Hughes worked from **surviving garments**, not paintings alone — he cut patterns from period pieces in his own collection and printed the diagrams, garment by garment, at the back of the book. (This is why his book, of all era costume histories, remains a working tool: the plates show the look; the pattern diagrams show *how the look is a piece of cutting*.) When this school's tailoring courses talk about balance and suppression, Hughes shows you five centuries of answers.
 
@@ -61,11 +65,20 @@ Three habits of reading a garment historically, from his introduction:
 
 **1800s–1810s · The Empire column.** Waist directly under the bust, fabric falling in a slim column — the neoclassical moment. Structure: almost none (the corset briefly nearly died). The recurring revival whenever fashion wants "liberation."
 
+![Four photographs of women modeling slim high-waisted Empire dresses of 1800-1830](/school/language-of-costume/lesson1-empire-dresses-1800-1830.jpg)
+*Talbot Hughes, Dress Design (1920) — surviving Empire dresses, 1800–1830, photographed on live models: the column itself.*
+
 **1830s · Romantic volume.** The waist returns to place and cinches; sleeves balloon into the **gigot** (leg-of-mutton); skirts bell. Volume high on the body.
 
 **1850s–60s · The crinoline.** Volume moves down: the cage crinoline swings skirts to their widest in history — an engineering solution (steel hoops) replacing dozens of petticoats. Silhouette: a bell on a fitted bodice.
 
+![Color fashion plate of two women in wide hooped crinoline dresses, from Godey's Lady's Book, 1865](/school/language-of-costume/lesson1-crinoline-godeys-lady-book-1865.jpg)
+*Godey's Lady's Book, 1865, reproduced in Lester's Historic Costume (1925) — the crinoline at its widest.*
+
 **1870s–80s · The bustle.** Volume migrates *backward*: skirts flatten in front, project behind over a bustle frame; bodices lengthen into the boned **cuirass**. The most sculptural, upholstered moment of the century.
+
+![Line-drawn plate of five women and one man showing bustle-era to 1890s American dress](/school/language-of-costume/lesson1-bustle-american-costume-1873-1897.jpg)
+*Katherine Morris Lester, Historic Costume (1925), plate XXVIII — American dress 1873–1897: bustle, princess line, and the 1890s skirt-and-waist.*
 
 **1890s · The hourglass.** Bustle collapses; sleeves balloon again (the gigot's revival); skirts gore into smooth flares: the Gibson-girl hourglass. This is Hecklinger's and Vincent's customer.
 
@@ -105,9 +118,18 @@ The pattern to internalize is not the dates but the **mechanism**: volume migrat
 
 **Suppression silhouettes** (the fitted eras: 1840s bodice, 1890s hourglass, 1950s revival): shape made by *removing* — darts, seams, and a boned foundation garment doing the heavy compression. To quote these silhouettes without their corsetry, the structure moves into the garment (S3's boned linings) or the silhouette softens honestly.
 
+![Line diagrams of three 17th-century corset patterns with boning and quilting marked](/school/language-of-costume/lesson2-hughes-corset-patterns-1620-1705.jpg)
+*Hughes, pattern 9 — three boned corsets, 1620–1705, cut open as measured diagrams: the suppression engine itself.*
+
 **Suspension silhouettes** (crinoline, bustle, pannier, the modern ballgown): shape made by *hanging cloth on a frame*. The cloth's own weight is the enemy and the frame's geometry is the design. Quote these and your real design object is the understructure — which is why couture still employs *flou* AND *tailleur*.
 
+![Pattern-diagram plate mixing corset and stays pieces with small drawings of structured court gowns](/school/language-of-costume/lesson2-racinet-stays-and-corset-patterns.jpg)
+*Racinet, 'Coupes et Patrons', tab XI — stays, busks and stomachers beside the court silhouettes they produce.*
+
 **Padding silhouettes** (the gigot sleeve, the Edwardian pouf, the 1980s shoulder): shape made by *filling*. Fast, light, reversible — padding is the cheapest historical quote in the book, which is exactly why it recurs.
+
+![Diagrams of an Elizabethan jerkin and four triangular embroidered stomachers, 1600-1730](/school/language-of-costume/lesson2-hughes-jerkin-and-stomacher-patterns.jpg)
+*Hughes, pattern 5 — an Elizabethan jerkin and four rigid embroidered stomachers: stiffened panels holding the pointed line.*
 
 **Cut silhouettes** (the 1920s tube, the bias 30s, the tent, the cocoon): shape made by *the pattern itself* — geometry, grain and drape doing everything. The hardest to copy from a photograph because the effect IS the pattern; Hughes's diagrams and a muslin are the honest route.
 
@@ -143,13 +165,22 @@ This lesson is the bridge to your practical: a trend board that names a directio
 
 **1. Collect by silhouette, not by decade.** Pull plates that share a *line* — high-waisted columns, say — across periods (Empire 1805, directoire-revival 1910, bias 1935). What survives the periods is the idea; what changes is the technology. The idea is what you're licensing.
 
+![Color plate of French 17th-century women in richly draped, trimmed gowns in interior scenes](/school/language-of-costume/lesson3-racinet-gowns-drape-and-trim.jpg)
+*Racinet, vol. 5 — a plate dense with quotable ideas: looped overskirts, contrast linings, lace engageantes, banded metallic trim.*
+
 **2. Name the mechanism** (lesson 3). A plate is a result; your board needs the cause. "1890s sleeve: volume by padding + pleating onto a fitted armhole" is actionable; "big sleeves" is a mood.
 
 **3. Translate the foundation.** Decide explicitly what plays the corset/crinoline/bustle's role today: interior structure, clever cut, knit stretch, or nothing (accepting the soft version). This single decision separates a modern quote from a costume.
 
-**4. Steal the details literally.** Surfaces date, but *techniques* are timeless and legal tender: a Racinet border becomes an embroidery placement; an 1870s bound edge becomes your signature finish. Period detail on a modern silhouette reads as taste; period silhouette with period detail reads as reenactment.
+**4. Steal the details literally.** Surfaces date, but *techniques* are timeless and legal tender: a Racinet border becomes an embroidery placement; an 1870s bound edge becomes your signature finish.
+
+![Four close-up photographs of embroidered and trimmed bodices from 1798-1830](/school/language-of-costume/lesson3-hughes-embroidered-bodices-detail.jpg)
+*Hughes, plate XXIV — surviving bodices at pinboard scale: sleeve puffs, rouleaux trim, applied embroidery, 1798–1830.* Period detail on a modern silhouette reads as taste; period silhouette with period detail reads as reenactment.
 
 **5. Cite your sources on the board.** Not academically — practically. A trend board whose directions link the plates that seeded them briefs a design team (or a Design Studio prompt) with precision no adjective reaches. "Sleeve per Racinet vol. 5, plate 312, volume moved to the forearm" generates better than "romantic sleeve."
+
+![Color plate of French regional costumes with a column of detailed lace headdress studies](/school/language-of-costume/lesson3-racinet-french-headdresses-and-lace.jpg)
+*Racinet, vol. 5 — regional dress with a margin column of lace and ribbon headdress studies: citation-ready detail.*
 
 That is your practical: build a trend board in R&D with at least three directions, worded as mechanisms, sourced from the archive you now know how to read. (When we open the Timeless Library — the plate collections and magazine runs this school researched — this exercise will have twelve thousand plates one click away; the method is already yours.)`,
       checkpoints: [
