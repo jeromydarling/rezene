@@ -168,12 +168,34 @@ function renderInline(text: string): ReactNode {
 
 function renderItalic(text: string): ReactNode {
   const parts = text.split(/(\*[^*\s][^*]*\*)/g);
-  if (parts.length === 1) return text;
+  if (parts.length === 1) return renderLinks(text);
   return parts.map((part, i) =>
     part.length > 2 && part.startsWith("*") && part.endsWith("*") ? (
       <em key={i}>{part.slice(1, -1)}</em>
     ) : (
-      part
+      <Fragment key={i}>{renderLinks(part)}</Fragment>
     ),
   );
+}
+
+// [label](url) — tolerant of a stray space before the parenthesis, which
+// generated text produces often enough to matter.
+function renderLinks(text: string): ReactNode {
+  const parts = text.split(/(\[[^\]]+\]\s?\([^)\s]+\))/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) => {
+    const m = part.match(/^\[([^\]]+)\]\s?\(([^)\s]+)\)$/);
+    if (!m) return part;
+    const external = /^https?:/i.test(m[2]);
+    return (
+      <a
+        key={i}
+        href={m[2]}
+        {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+        className="text-navy underline decoration-navy/40 hover:decoration-navy"
+      >
+        {m[1]}
+      </a>
+    );
+  });
 }
