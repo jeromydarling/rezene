@@ -108,13 +108,14 @@ else:
 BRIEF_LEG_X = 100.0 * _chest_s
 BRIEF_LEG_TOP = 710.0
 BRIEF_LEG_R0 = 88.0 * _chest_s
-BRIEF_LEG_R1 = 80.0 * _chest_s
 BRIEF_LEG_BOT = _HEM_BY + 80.0
 
 
 def brief_leg_r(by):
-    t = (by - BRIEF_LEG_TOP) / max(1.0, BRIEF_LEG_BOT - BRIEF_LEG_TOP)
-    return BRIEF_LEG_R0 + (BRIEF_LEG_R1 - BRIEF_LEG_R0) * min(1.0, max(0.0, t))
+    """Parted-thigh stub radius: the anatomical taper scaled to the brief
+    body's slimmer parted thighs — so a mid-thigh block ends at a thigh and
+    a calf-length wrap block still meets a calf, not a cylinder."""
+    return leg_r_at(by) * (BRIEF_LEG_R0 / 95.0)
 
 
 def leg_r_at(by):
@@ -452,6 +453,73 @@ def place(piece, x, y):
             lx = lx * (1 - t) + hx * t
             ly = ly * (1 - t) + hy * t
         return (leg * lx * S, ly * S, (HEIGHT - y) * S)
+    if pl["kind"] == "legTube":
+        # Wrap trousers: ONE piece wraps a FULL leg — the tie flaps carry
+        # ~1.7 turns of cloth at the thigh (more at the calf). Pattern x
+        # maps to azimuth around the leg axis with the crotch-notch centre
+        # (x=0) facing the other leg, and the radius grows one layer
+        # (~8mm) per accumulated turn so the overlapping flaps spiral
+        # outward instead of fighting the layer they cover. Above the
+        # notch's bottom the wrap blends onto the hip shell — the waist
+        # ties on the BODY, not the leg — with the same per-turn push so
+        # pinned overlap layers never start coincident.
+        leg = pl["leg"]
+        if BODY_KIND == "brief":
+            _legx, _stub = BRIEF_LEG_X, brief_leg_r
+        else:
+            _legx, _stub = 92.0 * _chest_s, leg_r_at
+        _lby = Y_OFF + y
+        rr0 = _stub(_lby) + 6.0
+        # Anchor the wrap to the crotch-notch edge at this height: both
+        # pieces' seam edges then start ON the inner face (mid-plane) at
+        # every height, instead of spreading over the inner quarter with
+        # gaps growing to ~180mm at the notch's back end.
+        x_eff = x
+        _cp = pl.get("cutoutProfile")
+        if _cp and y < _cp[-1][0]:
+            _xF, _xB = _cp[0][1], _cp[0][2]
+            for (y0, f0, b0), (y1, f1, b1) in zip(_cp, _cp[1:]):
+                if y <= y1:
+                    _tc = (y - y0) / max(1e-6, y1 - y0)
+                    _xF = f0 + (f1 - f0) * _tc
+                    _xB = b0 + (b1 - b0) * _tc
+                    break
+            else:
+                _xF, _xB = _cp[-1][1], _cp[-1][2]
+            x_eff = x - (_xF if x < (_xF + _xB) / 2.0 else _xB)
+        turns = x_eff / (2.0 * math.pi * rr0)
+        rr = rr0 + abs(turns) * 16.0
+        phi = -math.pi / 2.0 - turns * 2.0 * math.pi
+        lx = _legx + rr * math.sin(phi)
+        ly = -rr * math.cos(phi)
+        fork_y = float(pl.get("forkY", 300.0))
+        if y < fork_y:
+            # Body-centric wrap above the fork — the waist ties on the
+            # BODY: the front flap wraps from the CF rise around this
+            # piece's own side, the back flap from the CB rise over it as
+            # the outer layer (radial grow by wrap fraction, so pinned
+            # overlap layers never start coincident). A radial projection
+            # that kept the leg-centric azimuth left the two pieces' rises
+            # standing 90mm apart at the front instead of meeting at the
+            # mid-plane.
+            ta, tb = torso_ab(y)
+            A, B = ta + 15.0, tb + 15.0
+            halfC = math.pi * math.sqrt((A * A + B * B) / 2.0)
+            xf, xb = float(pl["cutF"]), float(pl["cutB"])
+            if x < (xf + xb) / 2.0:
+                psi = -x_eff / halfC * math.pi
+                w = max(0.0, -x_eff) / (2.0 * halfC)
+            else:
+                psi = math.pi - x_eff / halfC * math.pi
+                w = 0.5 + max(0.0, x_eff) / (2.0 * halfC)
+            grow = 1.0 + w * 24.0 / 160.0
+            hx = A * grow * math.sin(psi)
+            hy = -B * grow * math.cos(psi)
+            _min_y = min(py for _, py in piece["points"])
+            t = min(1.0, max(0.0, (fork_y - y) / max(1.0, fork_y - _min_y)))
+            lx = lx * (1 - t) + hx * t
+            ly = ly * (1 - t) + hy * t
+        return (leg * lx * S, ly * S, (HEIGHT - y) * S)
     if pl["kind"] == "gusset":
         # Brief gusset: a sagittal strip from the front panel's bottom edge,
         # under the crotch keel, up to the back panel's bottom edge. t walks
@@ -786,8 +854,10 @@ def body_geometry(include_arms=True):
         # Parted mid-thigh stubs (see the TORSO note): unlike the trouser
         # legs these end IN frame, so cap both ends.
         for d in (1, -1):
-            top = ring(BRIEF_LEG_X * d, BRIEF_LEG_R0, BRIEF_LEG_R0, z_of_body(BRIEF_LEG_TOP))
-            bot = ring(BRIEF_LEG_X * d, BRIEF_LEG_R1, BRIEF_LEG_R1, z_of_body(BRIEF_LEG_BOT))
+            _rt = brief_leg_r(BRIEF_LEG_TOP)
+            _rb2 = brief_leg_r(BRIEF_LEG_BOT)
+            top = ring(BRIEF_LEG_X * d, _rt, _rt, z_of_body(BRIEF_LEG_TOP))
+            bot = ring(BRIEF_LEG_X * d, _rb2, _rb2, z_of_body(BRIEF_LEG_BOT))
             bridge(top, bot)
             c = len(verts)
             verts.append((BRIEF_LEG_X * d * S, 0.0, z_of_body(BRIEF_LEG_TOP - 12)))
