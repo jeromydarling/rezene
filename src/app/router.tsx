@@ -39,6 +39,12 @@ import { StockistsPage } from "./pages/admin/research/StockistsPage";
 import { SchoolHomePage } from "./pages/admin/school/SchoolHomePage";
 import { SchoolCoursePage } from "./pages/admin/school/SchoolCoursePage";
 import { SchoolLessonPage } from "./pages/admin/school/SchoolLessonPage";
+import { LibraryHomePage } from "./pages/admin/library/LibraryHomePage";
+import { PlatesRoomPage } from "./pages/admin/library/PlatesRoomPage";
+import { MagazinesRoomPage } from "./pages/admin/library/MagazinesRoomPage";
+import { IssueReaderPage } from "./pages/admin/library/IssueReaderPage";
+import { BooksRoomPage } from "./pages/admin/library/BooksRoomPage";
+import { PatternsRoomPage } from "./pages/admin/library/PatternsRoomPage";
 import { AutomationsPage } from "./pages/admin/AutomationsPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
@@ -196,6 +202,13 @@ export function AppRouter() {
           <Route path="school" element={<SchoolHomePage />} />
           <Route path="school/:slug" element={<SchoolCoursePage />} />
           <Route path="school/:slug/lesson/:idx" element={<SchoolLessonPage />} />
+          <Route path="library" element={<LibraryHomePage />} />
+          <Route path="library/plates" element={<PlatesRoomPage />} />
+          <Route path="library/magazines" element={<MagazinesRoomPage />} />
+          <Route path="library/magazines/:magKey/:year" element={<MagazinesRoomPage />} />
+          <Route path="library/read/:iaId" element={<IssueReaderPage />} />
+          <Route path="library/books" element={<BooksRoomPage />} />
+          <Route path="library/patterns" element={<PatternsRoomPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
