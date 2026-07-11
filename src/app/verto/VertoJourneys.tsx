@@ -378,8 +378,8 @@ export function VertoJourneys() {
         <div className="md:order-2">
           <Reveal>
             <ParallaxImage
-              src="/verto/wall.jpg"
-              alt="A studio wall of pinned research, swatches and photographs"
+              src="/verto/research.jpg"
+              alt="A studio wall of pinned research — swatches, tearsheets and handwritten notes in raking afternoon light"
               speed={0.3}
               className="aspect-[3/4] max-h-[70vh]"
             />
@@ -431,13 +431,23 @@ export function VertoJourneys() {
             </p>
           </Reveal>
           <StoryTimeline beats={SWITCHER_BEATS} dark />
-          <Reveal delay={200}>
-            <p className="prose-editorial mt-10 max-w-2xl text-lg !text-chalk/80">
-              Sunday she did nothing, because nothing needed her. The catalog, the makers, the
-              season, the domain — all of it moved; none of it broke. The only thing she left
-              behind was the spreadsheet.
-            </p>
-          </Reveal>
+          <div className="mt-12 grid items-center gap-10 md:grid-cols-2">
+            <Reveal delay={200}>
+              <p className="prose-editorial max-w-2xl text-lg !text-chalk/80">
+                Sunday she did nothing, because nothing needed her. The catalog, the makers, the
+                season, the domain — all of it moved; none of it broke. The only thing she left
+                behind was the spreadsheet.
+              </p>
+            </Reveal>
+            <Reveal delay={300}>
+              <ParallaxImage
+                src="/verto/move.jpg"
+                alt="A garment rail of cream linen wheeled down a whitewashed coastal street at golden hour"
+                speed={0.25}
+                className="aspect-[3/4] max-h-[60vh]"
+              />
+            </Reveal>
+          </div>
         </div>
       </section>
 
