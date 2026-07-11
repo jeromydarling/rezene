@@ -37,6 +37,7 @@ The search captures websites and, where it can verify them, phone numbers and ad
     moduleRoute: "/admin/research",
     keywords: "r&d research notes makers directory perplexity citations csv import promote supplier pipeline bespoke moq lead time",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/research.png",
     body: `# R&D — your research workspace
 
 **Sourcing & Production → R&D** is where knowledge lives *before* it's structured enough to be a supplier record or a tech pack. Two kinds of records:

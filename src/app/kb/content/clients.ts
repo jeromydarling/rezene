@@ -52,6 +52,7 @@ Record each fitting against the commission ("take in left shoulder 1 cm"), move 
     moduleRoute: "/admin/clients",
     keywords: "client book made to measure mtm measurements history fitting timeline tailor stylist notes adopt",
     updated: "2026-07-10",
+    screenshot: "/kb/shots/client-book.png",
     body: `# The Client Book
 
 If you sew or style for individual people — made-to-measure clients, styling clients, alterations — the Client Book is where each person lives. One page per client, holding everything that used to be scattered across the studio tools:
@@ -85,6 +86,7 @@ A client's measurements and body photos are theirs. **Delete client & their data
     moduleRoute: "/admin/commissions",
     keywords: "commission pipeline made to measure alteration fitting stages consult delivery tailor bespoke",
     updated: "2026-07-10",
+    screenshot: "/kb/shots/commissions.png",
     body: `# Commissions
 
 A commission is one piece of client work — a made-to-measure garment or an alteration — tracked from the first conversation to the day it's handed over.
