@@ -119,16 +119,31 @@ adminFittingRoutes.post("/looks", requireAdminWrite, async (c) => {
  * both the 3D preview and the real FreeSewing pattern.
  */
 adminFittingRoutes.post("/design", requireAdminWrite, async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { prompt?: string };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    prompt?: string;
+    /** Optional block catalogue from the caller (the Pattern Studio sends its
+     *  full FreeSewing picker), so the model chooses across every real block
+     *  instead of the six stylized 3D silhouettes. Every id is re-validated
+     *  against this same list before it's returned. */
+    blocks?: { id?: string; name?: string; group?: string }[];
+  };
   const prompt = (body.prompt || "").trim();
   if (!prompt) return c.json({ error: "Describe the garment you want." }, 400);
 
-  const garments = GARMENT_LIBRARY.map((g) => `${g.id} (${g.name}, ${g.category})`).join("; ");
+  const blocks = (Array.isArray(body.blocks) ? body.blocks : [])
+    .filter((b) => typeof b.id === "string" && /^[a-z][a-z-]{1,39}$/.test(b.id) && typeof b.name === "string")
+    .slice(0, 80)
+    .map((b) => ({ id: b.id as string, name: (b.name as string).slice(0, 60), group: (b.group ?? "").slice(0, 40) }));
+
+  const garments = blocks.length
+    ? blocks.map((b) => `${b.id} (${b.name}${b.group ? `, ${b.group}` : ""})`).join("; ")
+    : GARMENT_LIBRARY.map((g) => `${g.id} (${g.name}, ${g.category})`).join("; ");
+  const garmentIds = blocks.length ? blocks.map((b) => b.id) : GARMENT_LIBRARY.map((g) => g.id);
   const fabrics = FABRIC_LIBRARY.map((f) => `${f.id} (${f.name})`).join("; ");
   const system =
     `You translate a plain-language garment description into a structured design spec for a stylized fitting studio. ` +
     `Pick the closest base garment and set its proportions using ONLY the given options. ` +
-    `Respond with ONLY JSON: {"garmentId": one of [${GARMENT_LIBRARY.map((g) => g.id).join(", ")}], ` +
+    `Respond with ONLY JSON: {"garmentId": one of [${garmentIds.join(", ")}], ` +
     `"size": one of [XS,S,M,L,XL,XXL] (default M), ` +
     `"ease": number (0.82 slim, 1.0 regular, 1.18 relaxed, 1.42 oversized), ` +
     `"length": number 0.85-1.2 (1.0 standard, lower=cropped, higher=longer), ` +
@@ -143,18 +158,19 @@ adminFittingRoutes.post("/design", requireAdminWrite, async (c) => {
     const out = await aiComplete(c.env, { system, prompt, maxTokens: 500 });
     const p = (parseModelJson(out.text) ?? {}) as Record<string, unknown>;
 
-    const g = GARMENT_LIBRARY.find((x) => x.id === p.garmentId) ?? GARMENT_LIBRARY[0];
+    const garmentId = garmentIds.includes(p.garmentId as string) ? (p.garmentId as string) : garmentIds[0];
     const size = (SIZE_STEPS as readonly string[]).includes(p.size as string) ? (p.size as string) : "M";
     const clamp = (n: unknown, lo: number, hi: number, d: number) => {
       const v = Number(n);
       return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
     };
-    const fabricId = FABRIC_LIBRARY.find((f) => f.id === p.fabricId)?.id ?? g.defaultFabric;
+    const defaultFabric = GARMENT_LIBRARY.find((x) => x.id === garmentId)?.defaultFabric ?? FABRIC_LIBRARY[0].id;
+    const fabricId = FABRIC_LIBRARY.find((f) => f.id === p.fabricId)?.id ?? defaultFabric;
     const color =
       typeof p.color === "string" && /^#[0-9a-fA-F]{6}$/.test(p.color) ? p.color : undefined;
 
     return c.json({
-      garmentId: g.id,
+      garmentId,
       fit: {
         size,
         ease: clamp(p.ease, 0.7, 1.5, 1.0),

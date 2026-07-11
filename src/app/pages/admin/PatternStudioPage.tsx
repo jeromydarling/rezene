@@ -335,6 +335,17 @@ export function PatternStudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A design arriving from the Design Studio: /admin/patterns?describe=<the
+  // concept in words>. The assistant picks the closest block and rough fit
+  // across the whole catalogue — everything lands on the visible controls.
+  useEffect(() => {
+    const desc = new URLSearchParams(window.location.search).get("describe");
+    if (!desc?.trim()) return;
+    setDescribe(desc.trim().slice(0, 500));
+    void draftFromWords(desc.trim().slice(0, 500));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const styles = useFetch<AdminStyle[]>("/api/admin/styles");
   const saved = useFetch<SavedPattern[]>("/api/admin/fitting/looks");
 
@@ -494,15 +505,21 @@ export function PatternStudioPage() {
     }
   }
 
-  async function draftFromWords() {
-    if (!describe.trim()) return;
+  async function draftFromWords(text?: string) {
+    const prompt = (text ?? describe).trim();
+    if (!prompt) return;
     setDrafting(true);
     try {
       const res = await api.post<{
         garmentId: string;
         fit: { size?: string; ease?: number; length?: number; sleeve?: number };
         rationale?: string;
-      }>("/api/admin/fitting/design", { prompt: describe });
+      }>("/api/admin/fitting/design", {
+        prompt,
+        // The full picker, so the assistant chooses across every real block —
+        // the worker re-validates the returned id against this same list.
+        blocks: PATTERN_GROUPS.flatMap((g) => g.blocks.map((b) => ({ id: b.id, name: b.name, group: g.label }))),
+      });
       if (PATTERN_BLOCKS.some((b) => b.id === res.garmentId)) setBlockId(res.garmentId);
       setState((s) => ({ ...s, ...stateFromFit(res.fit as Record<string, unknown>) }));
       toast.success("Pattern drafted", res.rationale || undefined);
@@ -893,7 +910,7 @@ export function PatternStudioPage() {
               <button
                 type="button"
                 className="btn btn-primary flex-1"
-                onClick={draftFromWords}
+                onClick={() => draftFromWords()}
                 disabled={drafting || styling || !describe.trim()}
               >
                 {drafting ? "Drafting…" : "Draft it"}
