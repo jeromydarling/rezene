@@ -1390,14 +1390,18 @@ function bruceInset(pieceName, mirrored) {
   const t = notchLen / SP.topRight.dist(SP.bottomRight);
   const notchY = SP.topRight.y + (SP.bottomRight.y - SP.topRight.y) * t;
   const dy = notchY - P.topLeft.y;
+  // The drafted tip is 30mm wider than the arc from the side seam to CF.
+  // Crossing CF stacked the insets against each other's seam targets (the
+  // crotch seams pulled them through each other — a twisted knot), and a
+  // hard clamp piled the excess at one arc position (a dangling bunch
+  // under the pouch, bakes 5-9). Compress the arc UNIFORMLY instead:
+  // same endpoints (# edge at the side seam, tip at CF+6), the extra
+  // cloth spread as gentle pre-compression the pouch drape absorbs.
+  const x0 = FP.midRight.x;
+  const xTip = x0 - Math.max(...pathPolyline(part.paths.seam).map(([x]) => x));
+  const k = (x0 - 6) / Math.max(1, x0 - xTip);
   const seg = (pts) => {
-    // Clamp at CF+6: the drafted tip is 30mm wider than the arc from the
-    // side seam to centre front, and letting it CROSS CF stacked the two
-    // insets against each other's seam targets — the crotch seams then
-    // pulled them THROUGH each other and the pouch baked as a twisted
-    // knot. Clamped, the tip cloth starts slightly bunched on its own
-    // side and the seams pull it under instead.
-    const ring = pts.map(([x, y]) => [Math.max(6, FP.midRight.x - x), y + dy]);
+    const ring = pts.map(([x, y]) => [6 + (x0 - x - xTip) * k, y + dy]);
     return mirrored ? mirror(ring) : ring;
   };
   return buildPiece(pieceName, [
