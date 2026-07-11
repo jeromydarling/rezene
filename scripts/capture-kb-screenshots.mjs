@@ -9,7 +9,48 @@
  *   # optional: KB_BASE=https://verto.style (default)
  */
 import { chromium } from "playwright-core";
-import { mkdirSync, readdirSync, existsSync } from "node:fs";
+import { mkdirSync, readdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+
+// Perceptual-diff gate (optional deps): a freshly captured page almost never
+// byte-matches the committed PNG — dates, counters, and cache-warm images all
+// shift pixels — so a naive overwrite would churn a commit on every run. Only
+// replace a shot when a meaningful fraction of pixels changed. When the deps
+// aren't installed (bare local runs) the gate degrades to always-write.
+// KB_FORCE=1 bypasses the gate for a deliberate full refresh.
+let PNG = null;
+let pixelmatch = null;
+try {
+  ({ PNG } = await import("pngjs"));
+  pixelmatch = (await import("pixelmatch")).default;
+} catch {
+  console.warn("pixelmatch/pngjs not installed — staleness gate off, always writing.");
+}
+const FORCE = process.env.KB_FORCE === "1";
+const CHANGE_GATE = 0.003; // fraction of pixels that must differ to count as a real change
+// Calibrated against real captures: date/counter noise measures ~0.01-0.1%,
+// while two entirely different admin pages differ by only ~3.4% (the shared
+// sidebar and background dominate the frame) — so 0.3% sits well above the
+// noise floor yet catches a single redesigned card.
+
+function writeIfChanged(outPath, buf) {
+  if (FORCE || !PNG || !pixelmatch || !existsSync(outPath)) {
+    writeFileSync(outPath, buf);
+    return "captured";
+  }
+  const prev = PNG.sync.read(readFileSync(outPath));
+  const next = PNG.sync.read(buf);
+  if (prev.width !== next.width || prev.height !== next.height) {
+    writeFileSync(outPath, buf);
+    return "resized";
+  }
+  const differing = pixelmatch(prev.data, next.data, null, next.width, next.height, { threshold: 0.15 });
+  const frac = differing / (next.width * next.height);
+  if (frac >= CHANGE_GATE) {
+    writeFileSync(outPath, buf);
+    return `refreshed (${(frac * 100).toFixed(1)}% changed)`;
+  }
+  return `unchanged (${(frac * 100).toFixed(2)}% pixel noise)`;
+}
 import { join } from "node:path";
 
 const BASE = process.env.KB_BASE || "https://verto.style";
@@ -119,8 +160,9 @@ for (const [name, route] of SHOTS) {
     // wait for the canvas and give SwiftShader extra time to render a frame.
     const canvas = await page.$("canvas");
     if (canvas) await page.waitForTimeout(2500);
-    await page.screenshot({ path: join(OUT, `${name}.png`) }); // viewport-clipped hero
-    console.log(`✓ ${name}`);
+    const buf = await page.screenshot(); // viewport-clipped hero
+    const verdict = writeIfChanged(join(OUT, `${name}.png`), buf);
+    console.log(`✓ ${name} — ${verdict}`);
     ok++;
   } catch (err) {
     console.warn(`✗ ${name}: ${String(err).slice(0, 120)}`);

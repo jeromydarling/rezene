@@ -12,6 +12,12 @@ name: Capture KB screenshots
 #   KB_BASE      — target site (default https://verto.style)
 #
 # Run it: Actions → "Capture KB screenshots" → Run workflow (pick the branch).
+# Staleness protection: besides the manual dispatch, this re-runs after every
+# production "Migrate & secrets" run on main (i.e. after each merged change
+# ships) and weekly as a backstop. The capture script only rewrites a PNG when
+# >1.5% of its pixels changed, so date text and counters don't churn commits —
+# a shot only updates when a section or feature actually moved. The refresh
+# commit says [skip ci], which also keeps it from re-triggering this workflow.
 on:
   workflow_dispatch:
     inputs:
@@ -19,6 +25,16 @@ on:
         description: "Target site (overrides KB_BASE variable)"
         required: false
         default: ""
+      force:
+        description: "Rewrite every shot even if visually unchanged"
+        required: false
+        default: "false"
+  workflow_run:
+    workflows: ["Migrate & secrets"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * 1" # weekly backstop, Monday 07:00 UTC
 
 concurrency:
   group: kb-screenshots-${{ github.ref }}
@@ -26,8 +42,10 @@ concurrency:
 
 jobs:
   capture:
+    # For deploy-triggered runs, only capture after a successful run.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: write
     steps:
@@ -36,24 +54,49 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
 
+      # Without credentials the run can't sign in — skip quietly instead of
+      # failing every deploy with a red workflow.
+      - name: Check credentials
+        id: creds
+        env:
+          KB_EMAIL: ${{ secrets.KB_EMAIL }}
+        run: |
+          if [ -n "$KB_EMAIL" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "KB_EMAIL / KB_PASSWORD secrets not set — skipping capture."
+          fi
+
+      # Workers Builds ships the code separately from the triggering workflow;
+      # give the new deploy a moment to be what we photograph.
+      - name: Let the deploy settle
+        if: steps.creds.outputs.ok == 'true' && github.event_name == 'workflow_run'
+        run: sleep 180
+
       - name: Node
+        if: steps.creds.outputs.ok == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install Playwright + Chromium
+        if: steps.creds.outputs.ok == 'true'
         run: |
-          npm install playwright@1.48.0 >/dev/null 2>&1
+          npm install playwright@1.48.0 pixelmatch pngjs >/dev/null 2>&1
           npx playwright install --with-deps chromium
 
       - name: Capture screenshots
+        if: steps.creds.outputs.ok == 'true'
         env:
           KB_EMAIL: ${{ secrets.KB_EMAIL }}
           KB_PASSWORD: ${{ secrets.KB_PASSWORD }}
           KB_BASE: ${{ github.event.inputs.base || vars.KB_BASE }}
+          KB_FORCE: ${{ github.event.inputs.force == 'true' && '1' || '' }}
         run: node scripts/capture-kb-screenshots.mjs
 
       - name: Commit screenshots
+        if: steps.creds.outputs.ok == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
