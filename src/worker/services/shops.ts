@@ -31,6 +31,15 @@ export const DEMO_SHOP_SLUG = "maison";
 export const DEMO_SHOP_ID = "shop_demo_maison";
 export const DEMO_VIEWER_EMAIL = "demo-viewer@verto.style";
 
+/**
+ * The demo login is deliberately public: the account is viewer-role only
+ * (every write path is blocked by requireAdminWrite), so a well-known
+ * password costs nothing and means anything that needs to look at the demo
+ * — screenshot pipelines, docs, curious prospects — can sign in without
+ * secrets. Printed on the demo sign-in card.
+ */
+export const DEMO_VIEWER_PASSWORD = "maison-demo";
+
 /** Slugs that can never become shops (platform + app routes). */
 export const RESERVED_SLUGS = new Set([
   "api",

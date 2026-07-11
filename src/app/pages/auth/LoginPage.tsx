@@ -216,6 +216,21 @@ export function LoginPage() {
             <button type="submit" disabled={busy} className="btn btn-primary w-full">
               {busy ? "Signing in…" : "Sign in"}
             </button>
+            {demo && (
+              <p className="text-center text-xs text-warmgrey">
+                Demo sign-in (read-only):{" "}
+                <button
+                  type="button"
+                  className="underline hover:text-ink"
+                  onClick={() => {
+                    setEmail("demo-viewer@verto.style");
+                    setPassword("maison-demo");
+                  }}
+                >
+                  demo-viewer@verto.style · maison-demo
+                </button>
+              </p>
+            )}
           </form>
         )}
       </div>
