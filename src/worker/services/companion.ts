@@ -137,12 +137,88 @@ export interface CompanionTurn {
   content: string;
 }
 
+// ---- proposed actions -----------------------------------------------------
+// The companion never executes anything: it may end a reply with an ACTIONS
+// line proposing up to two concrete next steps. The server validates them
+// against this whitelist, the client renders them as buttons, and the click
+// runs through the same admin APIs (and the same write-permission checks)
+// as doing it by hand.
+
+export interface CompanionAction {
+  type: "open" | "create_concept" | "create_trend_board" | "create_price_study" | "add_research_note";
+  label: string;
+  path?: string;
+  title?: string;
+  brief?: string;
+  name?: string;
+  category?: string;
+  market?: string;
+  bodyMd?: string;
+  directions?: { label: string; note?: string }[];
+}
+
+const cleanStr = (v: unknown, max: number): string | undefined =>
+  typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
+
+function parseActions(raw: string): { answer: string; actions: CompanionAction[] } {
+  const m = raw.match(/\n?ACTIONS:\s*(\[[\s\S]*\])\s*$/);
+  if (!m) return { answer: raw.trim(), actions: [] };
+  const answer = raw.slice(0, m.index).trim();
+  try {
+    const parsed = JSON.parse(m[1]) as unknown[];
+    const actions: CompanionAction[] = [];
+    for (const a of Array.isArray(parsed) ? parsed.slice(0, 2) : []) {
+      const o = a as Record<string, unknown>;
+      const label = cleanStr(o.label, 80);
+      if (!label) continue;
+      switch (o.type) {
+        case "open": {
+          const path = cleanStr(o.path, 200);
+          if (path && path.startsWith("/admin")) actions.push({ type: "open", label, path });
+          break;
+        }
+        case "create_concept": {
+          const title = cleanStr(o.title, 200);
+          if (title) actions.push({ type: "create_concept", label, title, brief: cleanStr(o.brief, 2000) });
+          break;
+        }
+        case "create_trend_board": {
+          const title = cleanStr(o.title, 200);
+          if (!title) break;
+          const directions = Array.isArray(o.directions)
+            ? (o.directions as Record<string, unknown>[])
+                .map((d) => ({ label: cleanStr(d.label, 160) ?? "", note: cleanStr(d.note, 400) }))
+                .filter((d) => d.label)
+                .slice(0, 6)
+            : [];
+          actions.push({ type: "create_trend_board", label, title, directions });
+          break;
+        }
+        case "create_price_study": {
+          const name = cleanStr(o.name, 200) ?? cleanStr(o.title, 200);
+          if (name) actions.push({ type: "create_price_study", label, name, category: cleanStr(o.category, 160), market: cleanStr(o.market, 160) });
+          break;
+        }
+        case "add_research_note": {
+          const title = cleanStr(o.title, 200);
+          if (title) actions.push({ type: "add_research_note", label, title, bodyMd: cleanStr(o.bodyMd, 8000) });
+          break;
+        }
+      }
+    }
+    return { answer, actions };
+  } catch {
+    return { answer, actions: [] };
+  }
+}
+
 export async function companionAnswer(
   env: Env,
   question: string,
   route: string | null,
   history: CompanionTurn[],
-): Promise<{ answer: string; sources: CompanionSource[]; provider: string }> {
+  opts: { plain?: boolean; shopContext?: string | null } = {},
+): Promise<{ answer: string; sources: CompanionSource[]; actions: CompanionAction[]; provider: string }> {
   const chunks = retrieve(question, route);
   const context = chunks
     .map((c, i) => `[${i + 1}] ${c.title}\n${c.text}`)
@@ -159,7 +235,16 @@ Rules:
 - Craft questions deserve craft answers: quote the masters' reasoning (balance, ease, seat angle, price zones), not generic advice.
 - If you genuinely don't know, or the question needs live market data, say so and point to [R&D](/admin/research) where research runs with citations.
 - Never fabricate prices, laws, or measurements. Money in Verto is integer cents; don't do tax or legal advice.
-${where ? `\nContext: ${where}` : ""}`;
+- When a concrete next step in Verto would genuinely help, you may end the reply with ONE line proposing at most 2 actions:
+ACTIONS: [{"type":"open","label":"Open the Pattern Studio","path":"/admin/patterns"}]
+Allowed types (no others): open {path}; create_concept {title, brief}; create_trend_board {title, directions:[{label,note}]}; create_price_study {name, category, market}; add_research_note {title, bodyMd}. The user sees these as buttons and decides — propose them only when they follow directly from your answer.${
+    opts.plain
+      ? `
+
+PLAIN-LANGUAGE MODE IS ON. The user is new to sewing and tailoring. Keep every trade term, but define it in plain words the moment it appears — "the scye (the armhole)", "pitch (the angle the sleeve is rotated when it's sewn in)", "ease (extra room beyond the body's own measurement)". Prefer everyday words, short sentences, and one concrete example over abstraction. Never talk down; explain like a friendly teacher at the cutting table.`
+      : ""
+  }
+${where ? `\nContext: ${where}` : ""}${opts.shopContext ? `\nThis shop right now: ${opts.shopContext}` : ""}`;
 
   const historyText = history
     .slice(-6)
@@ -169,9 +254,11 @@ ${where ? `\nContext: ${where}` : ""}`;
   const prompt = `${context ? `SOURCES:\n\n${context}\n\n---\n\n` : ""}${historyText ? `Conversation so far:\n${historyText}\n\n` : ""}User: ${question}`;
 
   const { text, provider } = await aiComplete(env, { system, prompt, maxTokens: 900 });
+  const { answer, actions } = parseActions(text);
   return {
-    answer: text.trim(),
+    answer,
     sources: chunks.map((c) => ({ title: c.title, link: c.link })),
+    actions,
     provider,
   };
 }

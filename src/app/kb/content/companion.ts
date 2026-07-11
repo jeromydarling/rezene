@@ -7,8 +7,8 @@ export const companion: KbArticle[] = [
     summary: "A grounded assistant on every admin page: schooled on the nine courses and the whole manual, it answers with citations, links you to the right room, and speaks both ways.",
     part: "getting-started",
     moduleRoute: "/admin",
-    keywords: "companion assistant ai chat help ask question voice speak mic talk answer guide school masters citation",
-    updated: "2026-07-12",
+    keywords: "companion assistant ai chat help ask question voice speak mic talk answer guide school masters citation plain language simple jargon beginner actions",
+    updated: "2026-07-13",
     body: `# The Verto Companion
 
 The sparkle button in the corner of every admin page opens the **Companion** — an assistant that has read the Verto School's nine courses (Vincent on trousers, Madison on balance, Picken on finishing, Nystrom on the economics) and every chapter of this Knowledge Base.
@@ -22,6 +22,14 @@ The sparkle button in the corner of every admin page opens the **Companion** —
 ## How it answers
 
 Every reply is **grounded**: the Companion retrieves the relevant lessons and guide chapters first, answers from them, and lists its sources as numbered chips under the reply — tap one to read the original. When it doesn't know, it says so and points to [R&D](/admin/research), where live research runs with citations.
+
+## Plain language, on demand
+
+Tailoring has its own tongue — *scye*, *pitch*, *ease*, *balance* — and the masters use it. If you're new, tap the **graduation-cap toggle** in the Companion's header: in plain-language mode every trade term is defined in plain words the moment it appears ("the scye — the armhole"), with short sentences and a concrete example. The craft stays; the jargon gets a translator. The setting is remembered.
+
+## It can act, with your say-so
+
+When an answer points to a concrete next step, the Companion may offer it as a **button** — *Draft this as a design concept*, *Start a trend board*, *Open a price study*, *Save this to research notes*. Nothing happens until you click, and the click runs through the same permissions as doing it by hand (on the read-only demo shop, the buttons politely decline). The Companion proposes; you decide.
 
 ## Voice
 
