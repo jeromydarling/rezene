@@ -440,7 +440,10 @@ const BLOCKS = {
     // fronts, so they drape on the leg placement, not the hip plane.
     bruce: true,
     parts: { back: "bruce.back", front: "bruce.front", side: "bruce.side", inset: "bruce.inset" },
-    yOffset: 500,
+    // 530 lands the crotch wings (pattern y 216) at the under-keel (~746)
+    // and the leg hems (y 150) at the crotch crease — 500 left the whole
+    // garment floating a hand above the fork.
+    yOffset: 530,
     bodyKind: "brief",
     // Force 6: between uma's 5 (short gusset hauls) and waralee's 8 — the
     // crotch seams span the keel from three directions (back wings, front
@@ -1872,12 +1875,39 @@ if (cfg.trousers) {
   const insetL = bruceInset("insetL", true);
   // Hip panels share ONE wrap frame (the noble/carlita lesson): the sides'
   // arc x continues past the front's edge, so per-piece width scaling would
-  // land the butted seam edges apart.
+  // land the butted seam edges apart. But a RAW shared frame (f=1) fails
+  // the other way: the front face carries front + both sides (~300mm arc
+  // half-extent) — more than the shell's half-circumference — so the wrap
+  // clamps both side panels at the lateral line in a bunched wing and the
+  // back seams start ~200mm open. The honest frame is the garment's own
+  // ring: per height, front-face extent + back extent IS the cloth that
+  // wraps the body's half-circumference, so every piece scales by that
+  // shared sum and the sides' back edges land where the back panel ends
+  // (bruce drafts the back at 31.5% of the girth — the side/back seam
+  // sits well behind the lateral line, and now the wrap agrees).
   front.placement = { kind: "plane", y: -160, hangCollapse: false };
   back.placement = { kind: "plane", y: 160, hangCollapse: false };
   sideL.placement = { kind: "plane", y: -160, hangCollapse: false };
   sideR.placement = { kind: "plane", y: -160, hangCollapse: false };
-  for (const p of [front, back, sideL, sideR]) p.uniformWrap = true;
+  const profOf = (pts) => widthProfile({ points: pts });
+  const wAt = (prof, y) => {
+    if (y <= prof[0][0]) return prof[0][1];
+    for (let i = 1; i < prof.length; i++) {
+      if (y <= prof[i][0]) {
+        const t = (y - prof[i - 1][0]) / Math.max(1e-6, prof[i][0] - prof[i - 1][0]);
+        return prof[i - 1][1] + (prof[i][1] - prof[i - 1][1]) * t;
+      }
+    }
+    return prof[prof.length - 1][1];
+  };
+  const wFront = profOf([...front.points, ...sideL.points, ...sideR.points]);
+  const wBack = profOf(back.points);
+  const ys = [...new Set([...wFront, ...wBack].map(([y]) => y))].sort((a, b) => a - b);
+  const combined = ys.map((y) => [y, wAt(wFront, y) + wAt(wBack, y)]);
+  for (const p of [front, back, sideL, sideR]) {
+    p.uniformWrap = true; // keep the generic pass from overwriting it
+    p.widthProfile = combined;
+  }
   insetR.placement = { kind: "leg", leg: 1, panel: "front" };
   insetL.placement = { kind: "leg", leg: -1, panel: "front" };
   front.pinSegments = ["waistR", "waistL"];
