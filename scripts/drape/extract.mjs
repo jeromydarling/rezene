@@ -2324,13 +2324,17 @@ const seams = cfg.trousers
       { name: "side_lo_L", a: ["insetL", "side"], b: ["sideL", "frontLo"], bridge: true },
       { name: "back_R", a: ["back", "sideR"], b: ["sideR", "back"], bridge: true },
       { name: "back_L", a: ["back", "sideL"], b: ["sideL", "back"], bridge: true },
-      // Sprung pouch curves stayed open across three bakes at two forces —
-      // they fight the ring's wrap tension (waralee's rise story; same
-      // cure: bridge at close range, p50 starts 27-41mm).
-      { name: "pouch_curve_R", a: ["front", "curveR"], b: ["insetR", "curve"], bridge: true },
-      { name: "pouch_curve_L", a: ["front", "curveL"], b: ["insetL", "curve"], bridge: true },
+      // Pouch curves SPRUNG: bridging them baked the 130mm far ends as
+      // standing flap fins (bake 11 — the toothed channel in mild form).
+      { name: "pouch_curve_R", a: ["front", "curveR"], b: ["insetR", "curve"] },
+      { name: "pouch_curve_L", a: ["front", "curveL"], b: ["insetL", "curve"] },
+      // The dart is BRIDGED: it is the pouch's organizing seam — the tusk
+      // edges' home is defined by the closed dart (four seams converge at
+      // the crotch cross-point), and sprung it stayed half-closed while
+      // the cloth around it wandered into a knot (bakes 7-11). Its band
+      // lies INSIDE the pouch, where a tooth can't show.
       ...(bodyPieces[0].segments.dartR
-        ? [{ name: "pouch_dart", a: ["front", "dartR"], b: ["front", "dartL"] }]
+        ? [{ name: "pouch_dart", a: ["front", "dartR"], b: ["front", "dartL"], bridge: true }]
         : []),
       { name: "crotch_tusk_R", a: ["back", "crotchTuskR"], b: ["front", "tuskR"] },
       { name: "crotch_tusk_L", a: ["back", "crotchTuskL"], b: ["front", "tuskL"] },
