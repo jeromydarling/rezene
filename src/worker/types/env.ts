@@ -118,6 +118,7 @@ export interface Env {
   FITTING_DAILY_LIMIT?: string;
   /** Per-shop daily cap on Design Studio Flux generation batches (default 40). */
   DESIGN_DAILY_LIMIT?: string;
+  COMPANION_DAILY_LIMIT?: string;
 }
 
 /** Hono context variables set by middleware. */

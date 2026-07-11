@@ -18,5 +18,11 @@
     "noUncheckedSideEffectImports": true,
     "skipLibCheck": true
   },
-  "include": ["src/worker", "src/shared"]
+  "include": [
+    "src/worker",
+    "src/shared",
+    "src/app/kb/index.ts",
+    "src/app/kb/types.ts",
+    "src/app/kb/content"
+  ]
 }
