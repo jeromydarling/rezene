@@ -29,6 +29,10 @@ The library doesn't store the archive; it **fetches on request and remembers**. 
 
 Pinning saves an item to **your shop's library** with its credit line attached — title, date, source, license. From any pin, one click sends it to a **trend board** in R&D, and the citation rides along automatically. That's the method from [The Language of Costume](/admin/school/language-of-costume): *a board whose directions cite their plates briefs a design team with precision no adjective reaches.*
 
+## From the archive into a design
+
+Any plate — and any magazine page in the reader — has a **Use in a new design** button. Verto fetches the image, stores a copy in your shop's files, and opens a fresh Design Studio concept with the image attached as a **reference** and the citation written into the brief. Generate from there and the model conditions on the plate — a 1924 Vogue sleeve becomes your sleeve, provenance intact. (Everything here is public domain, so this is not just legal; it's the whole point.)
+
 > [!NOTE]
 > Images in the reader are served live by the Internet Archive; a slow page usually just needs a second. Pinned items keep their own copies of the reference URLs, so your library outlives any source hiccup.
 
