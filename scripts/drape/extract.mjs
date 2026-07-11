@@ -2324,8 +2324,11 @@ const seams = cfg.trousers
       { name: "side_lo_L", a: ["insetL", "side"], b: ["sideL", "frontLo"], bridge: true },
       { name: "back_R", a: ["back", "sideR"], b: ["sideR", "back"], bridge: true },
       { name: "back_L", a: ["back", "sideL"], b: ["sideL", "back"], bridge: true },
-      { name: "pouch_curve_R", a: ["front", "curveR"], b: ["insetR", "curve"] },
-      { name: "pouch_curve_L", a: ["front", "curveL"], b: ["insetL", "curve"] },
+      // Sprung pouch curves stayed open across three bakes at two forces —
+      // they fight the ring's wrap tension (waralee's rise story; same
+      // cure: bridge at close range, p50 starts 27-41mm).
+      { name: "pouch_curve_R", a: ["front", "curveR"], b: ["insetR", "curve"], bridge: true },
+      { name: "pouch_curve_L", a: ["front", "curveL"], b: ["insetL", "curve"], bridge: true },
       ...(bodyPieces[0].segments.dartR
         ? [{ name: "pouch_dart", a: ["front", "dartR"], b: ["front", "dartL"] }]
         : []),
