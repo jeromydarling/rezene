@@ -3,6 +3,7 @@ import { PageHeader, EmptyState, LoadingTable } from "../../components/admin/ui"
 import { useFetch } from "../../lib/useFetch";
 import { api } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { MessageDecoder } from "../../components/MessageDecoder";
 
 interface ThreadRow {
   threadId: string;
@@ -133,6 +134,9 @@ export function MessagesPage() {
           </button>
         }
       />
+      <div className="mb-4 flex justify-end">
+        <MessageDecoder defaultKind="maker" />
+      </div>
 
       {picking && (
         <div className="admin-card mb-4 p-4">
