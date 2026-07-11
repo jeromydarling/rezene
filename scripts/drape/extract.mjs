@@ -288,6 +288,20 @@ const BLOCKS = {
     },
     sim: { shellMm: 6, bending: 1.5 },
   },
+  diana: {
+    module: "@freesewing/diana",
+    design: "Diana",
+    fabric: "knit",
+    // Drape-neck top: Brian's body and set-in sleeve with the front neck
+    // point pushed far out (x 250 vs 80) and CF raised ABOVE the HPS line
+    // — the excess neckline cloth hangs as the cowl. That sag is the whole
+    // garment, so the front neckline is NOT pinned (cowlFront names it
+    // past the sim's neck-pinning rule); shoulders and back neck hold.
+    cowlFront: true,
+    parts: { front: "diana.front", back: "diana.back", sleeve: "diana.sleeve" },
+    sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
+    sim: { bending: 1.5 },
+  },
   brian: {
     module: "@freesewing/brian",
     design: "Brian",
@@ -658,14 +672,18 @@ function bodyPiece(partName, pieceName) {
   const armscyeR = slice(poly, P.armhole, P[A.armTop]);
   const shoulderR = slice(poly, P[A.armTop], P[A.neckSide]);
   const neckR = slice(poly, P[A.neckSide], isFront ? P.cfNeck : P.cbNeck);
+  // A cowl front's neckline must HANG, not hold: the sim pins segments
+  // named "neck*" (collar honesty — a neckband keeps its shape), but a
+  // drape-neck's sag IS the garment. Different name, no pin.
+  const neckName = isFront && cfg.cowlFront ? "cowl" : "neck";
   // Full outline: right half then mirrored left half walked back to start.
   return buildPiece(pieceName, [
     ["hemR", hemR],
     ["sideR", sideR],
     ["armscyeR", armscyeR],
     ["shoulderR", shoulderR],
-    ["neckR", neckR],
-    ["neckL", mirror([...neckR].reverse())],
+    [`${neckName}R`, neckR],
+    [`${neckName}L`, mirror([...neckR].reverse())],
     ["shoulderL", mirror([...shoulderR].reverse())],
     ["armscyeL", mirror([...armscyeR].reverse())],
     ["sideL", mirror([...sideR].reverse())],
