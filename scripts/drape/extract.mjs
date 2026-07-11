@@ -467,6 +467,13 @@ const BLOCKS = {
     // ribcage is missing and the top half concertina'd out of the air onto
     // the hip flare (bake 3). Every trouser block pins its waist edge —
     // a corset is one giant waistband, pinned at its top edge.
+    // Draped at the minimum 2% waist reduction (documented in the KB): a
+    // corset's reduction compresses FLESH, and the ghost mannequin is
+    // rigid — at the drafted 10% the hem ring (smaller than the hips)
+    // rode up the taper to where its circumference fits and the shaping
+    // gaps physically could not close. At near-fit the seams close and
+    // the woven fit map still shows the snug truth.
+    draftOptions: { waistReduction: 0.02 },
     // Panel edges under real cinch tension: uma-class hauling force.
     sim: { sewForce: 6, friction: 70 },
   },
@@ -1986,7 +1993,9 @@ if (cfg.trousers) {
     for (const [partKey, pathName] of specs) {
       const piece = cathrinPanel(set[cfg.parts[partKey]], pathName, `${pathName}${side}`, side === "L");
       piece.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
-      piece.pinSegments = ["top"]; // the waistband grip, at underbust
+      // Top AND hem grips: a corset is boned — it holds its shape by
+      // structure, not drape. Both edge rings gripped is the honest stand-in.
+      piece.pinSegments = ["top", "hem"];
       bodyPieces.push(piece);
     }
   }
