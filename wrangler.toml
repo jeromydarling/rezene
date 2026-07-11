@@ -88,6 +88,12 @@ name = "EMAIL"
 [ai]
 binding = "AI"
 
+# Cloudflare Images (transformations): server-side thumbnails for the Files
+# page — a 1MB render becomes a ~3KB webp tile. The thumb route falls back to
+# streaming the original whenever the binding is missing or a transform fails.
+[images]
+binding = "IMAGES"
+
 # Per-shop SQLite databases: every non-primary shop's data lives in its own
 # ShopDatabase Durable Object — physical tenant isolation, one object per
 # shop, schema bootstrapped from the embedded migrations.

@@ -214,7 +214,7 @@ Virtual try-on, refits, and mood-board style-matching use a best-in-class engine
 
 ## Finding things by eye
 
-Every row leads with a preview: **images show a real thumbnail**, and every other kind of file gets a **typed icon** — PDFs, spreadsheets, archives, 3D files (GLB, OBJ, CLO projects), fonts, video and audio each look like what they are. Click the preview (or **Open**) to view the file full-size in a new tab.
+Every row leads with a preview: **images show a real thumbnail** (resized on the server, so even huge renders load instantly), and every other kind of file gets a **typed icon** — PDFs, spreadsheets, archives, 3D files (GLB, OBJ, CLO projects), fonts, video and audio each look like what they are. Click the preview (or **Open**) to view the file full-size in a new tab.
 
 ## Uploading and housekeeping
 

@@ -14,6 +14,18 @@ export interface WorkersAi {
   run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
 }
 
+/**
+ * Minimal Cloudflare Images binding surface (kept local, same reason as
+ * WorkersAi). Used for server-side file thumbnails.
+ */
+export interface ImagesTransformer {
+  transform(options: { width?: number; height?: number; fit?: string }): ImagesTransformer;
+  output(options: { format?: string; quality?: number }): Promise<{ response(): Response }>;
+}
+export interface ImagesBinding {
+  input(stream: ReadableStream): ImagesTransformer;
+}
+
 export interface Env {
   // Bindings
   DB: D1Database;
@@ -22,6 +34,8 @@ export interface Env {
   ASSETS: Fetcher;
   /** Workers AI (optional: absent in very old local dev setups). */
   AI?: WorkersAi;
+  /** Cloudflare Images transformations (optional: thumbs fall back to originals). */
+  IMAGES?: ImagesBinding;
   /** Per-shop SQLite databases (Durable Objects); primary shop uses DB. */
   SHOP_DB: DurableObjectNamespace;
   /** Cloudflare Email Service send binding (optional in local dev). */

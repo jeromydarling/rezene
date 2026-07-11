@@ -225,6 +225,54 @@ adminFileRoutes.get("/:id/download", async (c) => {
   });
 });
 
+/**
+ * Small preview of an image file for list thumbnails: resized server-side
+ * via the Cloudflare Images binding (a ~1MB render becomes a ~3KB webp).
+ * Falls back to streaming the original whenever the binding is missing,
+ * the file isn't an image, or the transform fails — the <img> just gets
+ * more bytes than it needed, never an error.
+ */
+adminFileRoutes.get("/:id/thumb", async (c) => {
+  const row = await first<{ r2_key: string; filename: string; content_type: string | null }>(
+    c.var.db,
+    `SELECT r2_key, filename, content_type FROM files WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!row) return c.json({ error: "File not found" }, 404);
+  const object = await c.env.FILES.get(row.r2_key);
+  if (!object) return c.json({ error: "Object missing from storage" }, 404);
+  const isImage = (row.content_type ?? "").startsWith("image/");
+  if (isImage && c.env.IMAGES) {
+    try {
+      const out = await c.env.IMAGES.input(object.body as ReadableStream)
+        .transform({ width: 160, height: 160, fit: "cover" })
+        .output({ format: "image/webp", quality: 80 });
+      const res = out.response();
+      // Thumbs are immutable per file id (bytes never change in place) —
+      // let the browser keep them for a day.
+      const headers = new Headers(res.headers);
+      headers.set("cache-control", "private, max-age=86400");
+      return new Response(res.body, { status: res.status, headers });
+    } catch {
+      // The transform consumed the stream — re-fetch and fall through.
+      const retry = await c.env.FILES.get(row.r2_key);
+      if (!retry) return c.json({ error: "Object missing from storage" }, 404);
+      return new Response(retry.body as ReadableStream, {
+        headers: {
+          "content-type": row.content_type ?? "application/octet-stream",
+          "cache-control": "private, max-age=3600",
+        },
+      });
+    }
+  }
+  return new Response(object.body as ReadableStream, {
+    headers: {
+      "content-type": row.content_type ?? "application/octet-stream",
+      "cache-control": "private, max-age=3600",
+    },
+  });
+});
+
 adminFileRoutes.delete("/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const row = await first<{ r2_key: string }>(
