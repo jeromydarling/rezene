@@ -207,7 +207,7 @@ Virtual try-on, refits, and mood-board style-matching use a best-in-class engine
     part: "design",
     moduleRoute: "/admin/patterns",
     keywords: "pattern studio sewing pattern freesewing block draft made to measure seam allowance grade size tailor seamstress svg cut",
-    updated: "2026-07-08",
+    updated: "2026-07-11",
     body: `# The Pattern Studio
 
 For the shops with a tailor or seamstress in the room — and for the designers who want to become one — the Pattern Studio drafts **real, manufacturable 2D sewing patterns** in your browser. Genuine flat pattern pieces (front, back, sleeve) you can print at true scale, cut, and sew. Not a picture of a pattern; the pattern. And from the same draft, a **physically simulated drape** and a **photoreal model render**, so one screen carries a design from measurements to a garment you can show a client.
