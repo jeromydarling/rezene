@@ -14,9 +14,12 @@ import { Penelope } from "@freesewing/penelope";
 import { Sven } from "@freesewing/sven";
 import { Sophie } from "@freesewing/sophie";
 import { Aaron } from "@freesewing/aaron";
+import { Albert } from "@freesewing/albert";
+import { Bee } from "@freesewing/bee";
 import { Bella } from "@freesewing/bella";
 import { Bent } from "@freesewing/bent";
 import { Benjamin } from "@freesewing/benjamin";
+import { Bob } from "@freesewing/bob";
 import { Breanna } from "@freesewing/breanna";
 import { Brian } from "@freesewing/brian";
 import { Bruce } from "@freesewing/bruce";
@@ -24,17 +27,34 @@ import { Carlita } from "@freesewing/carlita";
 import { Carlton } from "@freesewing/carlton";
 import { Cathrin } from "@freesewing/cathrin";
 import { Charlie } from "@freesewing/charlie";
+import { Cornelius } from "@freesewing/cornelius";
 import { Diana } from "@freesewing/diana";
+import { Florence } from "@freesewing/florence";
+import { Florent } from "@freesewing/florent";
+import { Holmes } from "@freesewing/holmes";
+import { Hortensia } from "@freesewing/hortensia";
 import { Huey } from "@freesewing/huey";
 import { Hugo } from "@freesewing/hugo";
+import { Jane } from "@freesewing/jane";
+import { Lucy } from "@freesewing/lucy";
+import { Lumina } from "@freesewing/lumina";
+import { Lumira } from "@freesewing/lumira";
+import { Lunetius } from "@freesewing/lunetius";
 import { Noble } from "@freesewing/noble";
+import { Onyx } from "@freesewing/onyx";
+import { Opal } from "@freesewing/opal";
+import { Otis } from "@freesewing/otis";
 import { Paco } from "@freesewing/paco";
 import { Sandy } from "@freesewing/sandy";
+import { Shelly } from "@freesewing/shelly";
 import { Shin } from "@freesewing/shin";
 import { Simon } from "@freesewing/simon";
 import { Simone } from "@freesewing/simone";
 import { Tamiko } from "@freesewing/tamiko";
+import { Tiberius } from "@freesewing/tiberius";
+import { Trayvon } from "@freesewing/trayvon";
 import { Uma } from "@freesewing/uma";
+import { Umbra } from "@freesewing/umbra";
 import { Wahid } from "@freesewing/wahid";
 import { Walburga } from "@freesewing/walburga";
 import { Waralee } from "@freesewing/waralee";
@@ -99,6 +119,29 @@ const DESIGN_MAP: Record<string, PatternEntry> = {
   uma: { design: Uma as unknown as Design, label: "Underwear · FreeSewing \u201cUma\u201d" },
   shin: { design: Shin as unknown as Design, label: "Swim trunks · FreeSewing \u201cShin\u201d" },
   benjamin: { design: Benjamin as unknown as Design, label: "Bow tie · FreeSewing \u201cBenjamin\u201d" },
+  // 2026 catalogue expansion — activewear, workwear, kids, accessories, and
+  // the historical patterns (all verified to draft against the measurement
+  // set by the same probe).
+  lumina: { design: Lumina as unknown as Design, label: "Leggings with pockets · FreeSewing \u201cLumina\u201d" },
+  lumira: { design: Lumira as unknown as Design, label: "Classic leggings · FreeSewing \u201cLumira\u201d" },
+  cornelius: { design: Cornelius as unknown as Design, label: "Cycling breeches · FreeSewing \u201cCornelius\u201d" },
+  onyx: { design: Onyx as unknown as Design, label: "One-piece base · FreeSewing \u201cOnyx\u201d" },
+  shelly: { design: Shelly as unknown as Design, label: "Raglan swim shirt · FreeSewing \u201cShelly\u201d" },
+  bee: { design: Bee as unknown as Design, label: "Bikini top · FreeSewing \u201cBee\u201d" },
+  umbra: { design: Umbra as unknown as Design, label: "Underwear (customizable) · FreeSewing \u201cUmbra\u201d" },
+  albert: { design: Albert as unknown as Design, label: "Apron · FreeSewing \u201cAlbert\u201d" },
+  opal: { design: Opal as unknown as Design, label: "Overalls · FreeSewing \u201cOpal\u201d" },
+  otis: { design: Otis as unknown as Design, label: "Baby romper · FreeSewing \u201cOtis\u201d" },
+  bob: { design: Bob as unknown as Design, label: "Bib · FreeSewing \u201cBob\u201d" },
+  trayvon: { design: Trayvon as unknown as Design, label: "Necktie · FreeSewing \u201cTrayvon\u201d" },
+  florent: { design: Florent as unknown as Design, label: "Flat cap · FreeSewing \u201cFlorent\u201d" },
+  holmes: { design: Holmes as unknown as Design, label: "Sherlock hat · FreeSewing \u201cHolmes\u201d" },
+  hortensia: { design: Hortensia as unknown as Design, label: "Handbag · FreeSewing \u201cHortensia\u201d" },
+  florence: { design: Florence as unknown as Design, label: "Face mask · FreeSewing \u201cFlorence\u201d" },
+  jane: { design: Jane as unknown as Design, label: "1790s shift · FreeSewing \u201cJane\u201d" },
+  lucy: { design: Lucy as unknown as Design, label: "Tie-on pocket (historical) · FreeSewing \u201cLucy\u201d" },
+  tiberius: { design: Tiberius as unknown as Design, label: "Roman tunic · FreeSewing \u201cTiberius\u201d" },
+  lunetius: { design: Lunetius as unknown as Design, label: "Roman cloak · FreeSewing \u201cLunetius\u201d" },
 };
 
 export function hasPattern(garmentId: string): boolean {
@@ -149,11 +192,41 @@ export const PATTERN_GROUPS: readonly { label: string; blocks: readonly { id: st
     { id: "breanna", name: "Bodice block (alt)" },
     { id: "noble", name: "Dart-manipulation bodice" },
   ]},
-  { label: "Underwear, swim & extras", blocks: [
+  { label: "Activewear", blocks: [
+    { id: "lumina", name: "Leggings with pockets" },
+    { id: "lumira", name: "Classic leggings" },
+    { id: "cornelius", name: "Cycling breeches" },
+    { id: "onyx", name: "One-piece base" },
+  ]},
+  { label: "Underwear & swim", blocks: [
     { id: "bruce", name: "Briefs" },
     { id: "uma", name: "Underwear" },
+    { id: "umbra", name: "Underwear (customizable)" },
     { id: "shin", name: "Swim trunks" },
+    { id: "shelly", name: "Raglan swim shirt" },
+    { id: "bee", name: "Bikini top" },
+  ]},
+  { label: "Workwear & aprons", blocks: [
+    { id: "albert", name: "Apron" },
+    { id: "opal", name: "Overalls" },
+  ]},
+  { label: "Kids & baby", blocks: [
+    { id: "otis", name: "Baby romper" },
+    { id: "bob", name: "Bib" },
+  ]},
+  { label: "Accessories", blocks: [
     { id: "benjamin", name: "Bow tie" },
+    { id: "trayvon", name: "Necktie" },
+    { id: "florent", name: "Flat cap" },
+    { id: "holmes", name: "Sherlock hat" },
+    { id: "hortensia", name: "Handbag" },
+    { id: "florence", name: "Face mask" },
+  ]},
+  { label: "Historical & costume", blocks: [
+    { id: "jane", name: "1790s shift" },
+    { id: "lucy", name: "Tie-on pocket" },
+    { id: "tiberius", name: "Roman tunic" },
+    { id: "lunetius", name: "Roman cloak" },
   ]},
 ];
 
@@ -306,6 +379,17 @@ const OPTION_KEYS: Record<string, { ease?: string[]; length?: string[]; sleeve?:
   bella: { ease: ["chestEase", "waistEase"] },
   breanna: { ease: ["chestEase", "waistEase"], sleeve: ["sleeveLengthBonus"] },
   noble: { ease: ["chestEase", "waistEase"] },
+  // Expansion designs. Quick sliders only where the native range comfortably
+  // holds the slider's span (0–25% ease; ±length vs default) — designs with
+  // narrow or negative-ease ranges (bee, florent, holmes, jane, lumina,
+  // lumira, otis's siblings…) rely on their native fit tree, which clamps.
+  onyx: { ease: ["chestEase", "waistEase", "hipsEase", "seatEase"] },
+  opal: { ease: ["waistEase", "seatEase"] },
+  otis: { ease: ["ease"] },
+  shelly: { ease: ["chestEase", "hipsEase"] },
+  albert: { length: ["lengthBonus"] },
+  tiberius: { length: ["lengthBonus"] },
+  trayvon: { length: ["lengthBonus"] },
 };
 
 /** Which sliders make sense for a block — drives the studio UI. */

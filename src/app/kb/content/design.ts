@@ -230,7 +230,7 @@ Pick what the file belongs to (style, tech pack, sample, factory, production ord
     summary: "Draft manufacturable 2D patterns — graded to a size or a person's measurements — and download the SVG.",
     part: "design",
     moduleRoute: "/admin/patterns",
-    keywords: "pattern studio sewing pattern freesewing block draft made to measure seam allowance grade size tailor seamstress svg cut",
+    keywords: "pattern studio sewing pattern freesewing block draft made to measure seam allowance grade size tailor seamstress svg cut leggings activewear apron overalls romper bib necktie flat cap hat handbag face mask historical costume tunic shift",
     updated: "2026-07-11",
     screenshot: "/kb/shots/pattern-studio.png",
     body: `# The Pattern Studio
@@ -243,9 +243,9 @@ For the shops with a tailor or seamstress in the room — and for the designers 
 
 ## 1 · Pick your block
 
-The full FreeSewing apparel catalogue is in — over thirty blocks across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear, foundation bodices, underwear and swim. Three ways in:
+The full FreeSewing catalogue is in — **fifty-one blocks** across tops, shirts, hoodies, dresses, bottoms, tailoring & outerwear, foundation bodices, activewear (leggings with or without pockets, cycling breeches, a one-piece base), underwear & swim (from briefs to a bikini top and a raglan swim shirt), workwear (a proper apron, overalls), kids & baby (romper, bib), accessories (necktie, bow tie, flat cap, Sherlock hat, handbag, face mask) — and a historical & costume shelf (a 1790s shift, a tie-on pocket, a Roman tunic and cloak) that pairs beautifully with the Timeless Library's plates. Three ways in:
 
-- **Browse** the grouped picker (Tops, Shirts, Hoodies & Sweats, Dresses, Bottoms, Tailoring…).
+- **Browse** the grouped picker (Tops, Shirts, Hoodies & Sweats, Dresses, Bottoms, Tailoring, Activewear, Accessories, Historical…).
 - **Describe it** to the ✨ assistant — *"a boxy cropped tee"* — and it picks the block, size and rough fit for you.
 - **Arrive from a fitting** — fit notes sent from the Fitting Studio land here with the right block preselected and the adjustments already on the sliders.
 
