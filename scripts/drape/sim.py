@@ -53,7 +53,12 @@ _biceps_s = float(_body.get("biceps", 1.0))
 _shoulder_s = float(_body.get("shoulder", 1.0))
 _torso_s = float(_body.get("torso", 1.0))
 
-ARM_R = 55.0 * _biceps_s  # arm stub radius — fills the sleeve tube so it can't ruffle
+# Arm stub radius — deliberately fat by default: it fills loose sleeve tubes
+# so they can't ruffle. Fitted knit sleeves (diana) are drafted SMALLER than
+# that stub plus the collision standoff — a real knit stretches over the arm,
+# sim cloth can't — so those blocks pass sim.armScale for a true-scale arm
+# the drafted tube can actually close around.
+ARM_R = 55.0 * _biceps_s * float(DATA.get("sim", {}).get("armScale", 1.0))
 # Arm axis origin distance from centre (mm). Env override for pose experiments.
 SHOULDER_X = float(_os.environ.get("DRAPE_SHOULDER_X", "215.0")) * _shoulder_s
 SHOULDER_PY = 40.0  # pattern-y of the shoulder joint

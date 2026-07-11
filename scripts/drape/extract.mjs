@@ -303,7 +303,13 @@ const BLOCKS = {
     dropShoulder: true,
     parts: { front: "diana.front", back: "diana.back", sleeve: "diana.sleeve" },
     sleeveAnchors: { hemL: "wristLeft", hemR: "wristRight" },
-    sim: { bending: 1.5 },
+    // The fitted knit sleeve drafts SMALLER than the fat arm stub + collision
+    // standoff (wrist tube r34 vs r52 required — a real knit stretches, sim
+    // cloth can't), so the arm poked through the cloth everywhere. armScale
+    // 0.8 gives a true-scale arm; cuffEase 30 buys the last few mm at the
+    // wrist. Together they make the tube geometrically closable.
+    draftOptions: { cuffEase: 0.3 },
+    sim: { bending: 1.5, armScale: 0.8 },
   },
   brian: {
     module: "@freesewing/brian",
@@ -2464,18 +2470,17 @@ const seams = cfg.trousers
       // the next panel's CF-side edge — the drafted shaping gaps close and
       // the waist cinches. The two busk strips meet at CF (bridged: they
       // start coincident, a closed busk front). CB edges stay free (laced).
-      // BRIDGED at near-fit: the 9-22mm gaps are stitch-band scale, and a
-      // sprung ring stays slit open by exactly the collision standoff (the
-      // cloth ring is shorter than the offset circumference — bake 5). The
-      // bridge bands close the ring structurally and read as the boning
-      // channels a corset really has.
+      // SPRUNG, not bridged: bridging all twelve panel seams while both
+      // edge rings are pinned shredded the mesh (bridge faces + double-edge
+      // grip + ring tension = explosion). Sprung stitches leave hairline
+      // slits equal to the collision standoff — the honest render.
       ...["R", "L"].flatMap((s) => [
-        { name: `busk_${s}`, a: [`panel1a${s}`, "cbEdge"], b: [`panel1b${s}`, "cfEdge"], bridge: true },
-        { name: `p1_p2_${s}`, a: [`panel1b${s}`, "cbEdge"], b: [`panel2${s}`, "cfEdge"], bridge: true },
-        { name: `p2_p3_${s}`, a: [`panel2${s}`, "cbEdge"], b: [`panel3${s}`, "cfEdge"], bridge: true },
-        { name: `p3_p4_${s}`, a: [`panel3${s}`, "cbEdge"], b: [`panel4${s}`, "cfEdge"], bridge: true },
-        { name: `p4_p5_${s}`, a: [`panel4${s}`, "cbEdge"], b: [`panel5${s}`, "cfEdge"], bridge: true },
-        { name: `p5_p6_${s}`, a: [`panel5${s}`, "cbEdge"], b: [`panel6${s}`, "cfEdge"], bridge: true },
+        { name: `busk_${s}`, a: [`panel1a${s}`, "cbEdge"], b: [`panel1b${s}`, "cfEdge"] },
+        { name: `p1_p2_${s}`, a: [`panel1b${s}`, "cbEdge"], b: [`panel2${s}`, "cfEdge"] },
+        { name: `p2_p3_${s}`, a: [`panel2${s}`, "cbEdge"], b: [`panel3${s}`, "cfEdge"] },
+        { name: `p3_p4_${s}`, a: [`panel3${s}`, "cbEdge"], b: [`panel4${s}`, "cfEdge"] },
+        { name: `p4_p5_${s}`, a: [`panel4${s}`, "cbEdge"], b: [`panel5${s}`, "cfEdge"] },
+        { name: `p5_p6_${s}`, a: [`panel5${s}`, "cbEdge"], b: [`panel6${s}`, "cfEdge"] },
       ]),
       { name: "cf", a: ["panel1aR", "cfEdge"], b: ["panel1aL", "cfEdge"], bridge: true },
     ]
