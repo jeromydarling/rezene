@@ -217,9 +217,9 @@ export async function companionAnswer(
   question: string,
   route: string | null,
   history: CompanionTurn[],
-  opts: { plain?: boolean; shopContext?: string | null } = {},
+  opts: { plain?: boolean; shopContext?: string | null; pageContext?: string | null; extraChunks?: Chunk[] } = {},
 ): Promise<{ answer: string; sources: CompanionSource[]; actions: CompanionAction[]; provider: string }> {
-  const chunks = retrieve(question, route);
+  const chunks = [...retrieve(question, route), ...(opts.extraChunks ?? []).slice(0, 3)];
   const context = chunks
     .map((c, i) => `[${i + 1}] ${c.title}\n${c.text}`)
     .join("\n\n---\n\n")
@@ -244,7 +244,11 @@ Allowed types (no others): open {path}; create_concept {title, brief}; create_tr
 PLAIN-LANGUAGE MODE IS ON. The user is new to sewing and tailoring. Keep every trade term, but define it in plain words the moment it appears — "the scye (the armhole)", "pitch (the angle the sleeve is rotated when it's sewn in)", "ease (extra room beyond the body's own measurement)". Prefer everyday words, short sentences, and one concrete example over abstraction. Never talk down; explain like a friendly teacher at the cutting table.`
       : ""
   }
-${where ? `\nContext: ${where}` : ""}${opts.shopContext ? `\nThis shop right now: ${opts.shopContext}` : ""}`;
+${where ? `\nContext: ${where}` : ""}${opts.shopContext ? `\nThis shop right now: ${opts.shopContext}` : ""}${
+    opts.pageContext
+      ? `\nON THE USER'S SCREEN RIGHT NOW: ${opts.pageContext}\nWhen the question touches this work, answer about THIS draft/study/concept specifically — check its numbers against good practice, and if something looks off (ease of 0% on a fitted block, a measurement that contradicts the size, a retail between two zones), say so plainly. Catching a mistake before cloth is cut is the best help you can give.`
+      : ""
+  }`;
 
   const historyText = history
     .slice(-6)

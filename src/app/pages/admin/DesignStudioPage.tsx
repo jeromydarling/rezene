@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { setCompanionContext } from "../../lib/companionContext";
 import { EmptyState, ErrorNote, LoadingTable, PageHeader, SlideOver, StatusBadge } from "../../components/admin/ui";
 import { FABRIC_GROUPS, DETAIL_GROUPS, type VocabGroup } from "../../../shared/design-vocab";
 
@@ -209,6 +210,13 @@ function DesignWorkspace({
 }) {
   const toast = useToast();
   const { data, loading, reload } = useFetch<ConceptDetail>(`/api/admin/ai/concepts/${conceptId}`);
+  useEffect(() => {
+    if (!data) return;
+    setCompanionContext(
+      `Design Studio, open concept: "${data.title}" (${data.status}). ${data.brief ? `Brief: ${data.brief.slice(0, 300)}. ` : ""}${data.references.length} reference image${data.references.length === 1 ? "" : "s"} attached, ${data.generations?.length ?? 0} generations so far.`,
+    );
+    return () => setCompanionContext(null);
+  }, [data]);
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [garment, setGarment] = useState("");
