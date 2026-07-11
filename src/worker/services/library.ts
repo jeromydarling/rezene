@@ -88,14 +88,14 @@ interface MetObject {
   department?: string;
 }
 
-async function searchMet(env: Env, q: string, limit = 24): Promise<LibraryItem[]> {
-  const cacheKey = `v1|plates|met|${q.toLowerCase()}`;
+async function searchMet(env: Env, q: string, limit = 24, dept?: number): Promise<LibraryItem[]> {
+  const cacheKey = `v1|plates|met${dept ? `-d${dept}` : ""}|${q.toLowerCase()}`;
   const cached = await readSearchCache(env, cacheKey);
   if (cached) return cached;
 
   // `q` must be the last query parameter — the Met API returns 0 otherwise.
   const search = await fetchJson<{ total: number; objectIDs: number[] | null }>(
-    `https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=${encodeURIComponent(q)}`,
+    `https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true${dept ? `&departmentId=${dept}` : ""}&q=${encodeURIComponent(q)}`,
   );
   const ids = (search.objectIDs || []).slice(0, 60);
   const items: LibraryItem[] = [];
@@ -291,6 +291,7 @@ export async function librarySearch(
   env: Env,
   room: string,
   q: string,
+  opts: { dept?: number } = {},
 ): Promise<{ items: LibraryItem[]; sources: string[] }> {
   if (room === "books" || room === "patterns") {
     // Patterns room searches the same text archive with a drafting bias.
@@ -298,5 +299,5 @@ export async function librarySearch(
     return { items: await searchIABooks(env, query), sources: ["Internet Archive"] };
   }
   // Plates: the Met is the primary source; IA images could join later.
-  return { items: await searchMet(env, q), sources: ["The Met (CC0)"] };
+  return { items: await searchMet(env, q, 24, opts.dept), sources: ["The Met (CC0)"] };
 }
