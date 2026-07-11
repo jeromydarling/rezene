@@ -346,8 +346,9 @@ def place(piece, x, y):
             R = width_at(piece, y) or 1.0
             phi = math.pi * min(1.0, abs(x) / max(1.0, R))
             ta, tb = torso_ab(y)
-            wx = math.copysign((ta + 15.0) * math.sin(phi), x)
-            wy = side * (tb + 15.0) * math.cos(phi)
+            _ou = float(pl.get("outset", 0.0))
+            wx = math.copysign((ta + 15.0 + _ou) * math.sin(phi), x)
+            wy = side * (tb + 15.0 + _ou) * math.cos(phi)
             wx, wy = clamp_out(wx, wy, y)
             return (wx * S, wy * S, (HEIGHT - y) * S)
         # Per-height wrap scale: a flared garment wraps snug where it is

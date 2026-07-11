@@ -1368,10 +1368,14 @@ function bruceSide(pieceName, mirrored) {
 
 /** Bruce inset: the front-of-thigh panel — # side edge to the side panel,
  *  top curve to the pouch, gusset tip to the back's crotch wing, hem free
- *  around the leg. Shaped exactly like a stub trouser front, so it wraps a
- *  leg stub (kind "leg"), not the hip plane: its own frame has the outseam
- *  at x=0 and the tip reaching the inner thigh. y is shifted so the # edge
- *  spans the side panel's below-notch front edge. */
+ *  around the leg. It sits ENTIRELY above the mannequin's fork, so the leg
+ *  placement is wrong for it (a leg tube at those heights starts inside
+ *  the hip volume — bake 3 squeezed both insets flat against the seat).
+ *  Instead it joins the front-face RING: its # edge butts the side seam
+ *  arc (mirror + shift, so drafted x=0 lands at the front panel's edge)
+ *  and its tip crosses CF under the pouch, layered by outset where tips
+ *  and tusks overlap. y is shifted so the # edge spans the side panel's
+ *  below-notch front edge. */
 function bruceInset(pieceName, mirrored) {
   const part = set[cfg.parts.inset];
   const P = part.points;
@@ -1383,27 +1387,15 @@ function bruceInset(pieceName, mirrored) {
   const notchY = SP.topRight.y + (SP.bottomRight.y - SP.topRight.y) * t;
   const dy = notchY - P.topLeft.y;
   const seg = (pts) => {
-    const shifted = pts.map(([x, y]) => [x, y + dy]);
-    return mirrored ? mirror(shifted) : shifted;
+    const ring = pts.map(([x, y]) => [FP.midRight.x - x, y + dy]);
+    return mirrored ? mirror(ring) : ring;
   };
-  const piece = buildPiece(pieceName, [
+  return buildPiece(pieceName, [
     ["gusset", seg(slice(poly, P.bottomRight, P.tip))],
     ["curve", seg(slice(poly, P.tip, P.topLeft))],
     ["side", seg(slice(poly, P.topLeft, P.bottomLeft))],
     ["hem", seg(slice(poly, P.bottomLeft, P.bottomRight))],
   ]);
-  const BIN = 25;
-  const bins = new Map();
-  for (const [x, y] of piece.points) {
-    const b = Math.round(y / BIN) * BIN;
-    const e = bins.get(b) ?? [x, x];
-    bins.set(b, [Math.min(e[0], x), Math.max(e[1], x)]);
-  }
-  piece.edgesProfile = [...bins.entries()].map(([y, [lo, hi]]) => [y, lo, hi]).sort((a, b) => a[0] - b[0]);
-  // The mannequin's fork sits below the whole inset — the leg placement's
-  // above-fork sweep blends it from leg tube (at the hem) to hip shell.
-  piece.forkY = 700 - (Number(cfg.yOffset) || 0);
-  return piece;
 }
 
 /** Split a segment's raw polyline in two at a given arc-length fraction —
@@ -1904,12 +1896,15 @@ if (cfg.trousers) {
   const wBack = profOf(back.points);
   const ys = [...new Set([...wFront, ...wBack].map(([y]) => y))].sort((a, b) => a - b);
   const combined = ys.map((y) => [y, wAt(wFront, y) + wAt(wBack, y)]);
-  for (const p of [front, back, sideL, sideR]) {
+  // The insets ride the same ring, tips layered over the tusks (and each
+  // other) around CF like a placket stack — the crotch seams pull the
+  // layers apart and under during the bake.
+  insetR.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true, outset: 6 };
+  insetL.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true, outset: 12 };
+  for (const p of [front, back, sideL, sideR, insetR, insetL]) {
     p.uniformWrap = true; // keep the generic pass from overwriting it
     p.widthProfile = combined;
   }
-  insetR.placement = { kind: "leg", leg: 1, panel: "front" };
-  insetL.placement = { kind: "leg", leg: -1, panel: "front" };
   front.pinSegments = ["waistR", "waistL"];
   back.pinSegments = ["waistR", "waistL"];
   sideL.pinSegments = ["waist"];
