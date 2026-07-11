@@ -77,7 +77,7 @@ function MiniPatternStudio() {
             </div>
           ))}
           <div className="flex flex-wrap gap-1 pt-0.5">
-            <span className={badge("bg-navy/10 text-navy")}>31 blocks</span>
+            <span className={badge("bg-navy/10 text-navy")}>51 blocks</span>
             <span className={badge("bg-palm/15 text-palm")}>PDF ↓ 100%</span>
           </div>
         </div>
@@ -720,9 +720,9 @@ const FEATURES: Feature[] = [
     id: "pattern-studio",
     eyebrow: "Cut",
     heading: "From picture to pattern you can actually cut.",
-    body: "Real, manufacturable sewing patterns drafted in the browser — over thirty blocks from tees to coats, graded to a size or drafted to a person's exact measurements. Open every drafting option the block defines (six cuff styles on the button-down, collar geometry, plackets), set your seam allowance, and print a true-scale tiled PDF with a scale-check bar on every page. Then see it before you sew it: twenty-six blocks — foundation blocks to trousers, swimwear to corsetry and tailored overcoats — run through a true cloth-physics drape: your exact pattern, in your client's measurements, hung on a mannequin, and that drape anchors a photoreal render, so the picture shows how this pattern actually falls.",
+    body: "Real, manufacturable sewing patterns drafted in the browser — fifty-one blocks from tees to coats, leggings to Roman tunics, graded to a size or drafted to a person's exact measurements. Open every drafting option the block defines (six cuff styles on the button-down, collar geometry, plackets), set your seam allowance, and print a true-scale tiled PDF with a scale-check bar on every page. Then see it before you sew it: twenty-six blocks — foundation blocks to trousers, swimwear to corsetry and tailored overcoats — run through a true cloth-physics drape: your exact pattern, in your client's measurements, hung on a mannequin, and that drape anchors a photoreal render, so the picture shows how this pattern actually falls.",
     points: [
-      "31 pattern blocks — tops, shirts, dresses, trousers, coats, foundation blocks",
+      "51 pattern blocks — tops, dresses, trousers, coats, activewear, workwear, kids, accessories, even historical costume",
       "True made-to-measure: every measurement point the block drafts from, cm or inches",
       "Cloth-physics drape preview on twenty-six blocks — tees and briefs to corsetry and tailored coats — that grounds a photoreal render",
       "Strain fit map on every drape: green where the fabric skims, red where it pulls — measured against your flat pattern, the way garment CAD does it",
