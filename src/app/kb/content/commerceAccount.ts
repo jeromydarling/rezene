@@ -121,6 +121,7 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
     moduleRoute: "/admin/automations",
     keywords: "automations rules triggers workflow auto task draft calendar activity feed toggle",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/automations.png",
     body: `# Automations
 
 Verto watches what happens in your shop and files the obvious next step for you, so nothing falls through the cracks between modules. Every rule is a plain sentence, every rule can be paused, and **no rule ever changes or deletes anything** — automations only create tasks, drafts, and reminders. The worst surprise is a task you delete.

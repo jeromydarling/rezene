@@ -56,6 +56,12 @@ const SHOTS = [
   ["orders", "/admin/orders"],
   ["team", "/admin/team"],
   ["domain", "/admin/domain"],
+  ["pattern-studio", "/admin/patterns"],
+  ["commissions", "/admin/commissions"],
+  ["client-book", "/admin/clients"],
+  ["research", "/admin/research"],
+  ["automations", "/admin/automations"],
+  ["files", "/admin/files"],
 ];
 
 const OUT = "public/kb/shots";

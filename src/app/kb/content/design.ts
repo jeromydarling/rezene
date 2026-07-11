@@ -208,6 +208,7 @@ Virtual try-on, refits, and mood-board style-matching use a best-in-class engine
     moduleRoute: "/admin/files",
     keywords: "files upload download rename delete thumbnail preview pdf csv sketch pattern 3d glb factory documents",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/files.png",
     body: `# Files
 
 **Design Studio → Files** holds every working file — flat sketches, pattern PDFs, 3D exports, factory documents — filed against the style, product, or order it belongs to.
@@ -231,6 +232,7 @@ Pick what the file belongs to (style, tech pack, sample, factory, production ord
     moduleRoute: "/admin/patterns",
     keywords: "pattern studio sewing pattern freesewing block draft made to measure seam allowance grade size tailor seamstress svg cut",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/pattern-studio.png",
     body: `# The Pattern Studio
 
 For the shops with a tailor or seamstress in the room — and for the designers who want to become one — the Pattern Studio drafts **real, manufacturable 2D sewing patterns** in your browser. Genuine flat pattern pieces (front, back, sleeve) you can print at true scale, cut, and sew. Not a picture of a pattern; the pattern. And from the same draft, a **physically simulated drape** and a **photoreal model render**, so one screen carries a design from measurements to a garment you can show a client.

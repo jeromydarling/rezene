@@ -13,6 +13,7 @@ export const howTo: KbArticle[] = [
     moduleRoute: "/admin/ai-concepts",
     keywords: "how to first design studio concept style tech pack send factory maker share link excel start beginning",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/design-studio.png",
     body: `# Your first piece, from idea to a maker's inbox
 
 This is the whole journey — from a spark to a spec a factory can actually build. Half a day of work, most of it the fun kind.
@@ -65,6 +66,7 @@ When the maker responds, [request a sample](/admin/support/kb/samples) — the p
     moduleRoute: "/admin/patterns",
     keywords: "how to made to measure mtm client measurements pattern draft drape preview pdf cutter bespoke",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/pattern-studio.png",
     body: `# A made-to-measure garment for a real client
 
 Bespoke work is where independent designers beat every big brand. Here's the path from a tape measure to a cutting table.
@@ -97,6 +99,7 @@ If this is paid work, run it through [Commissions](/admin/support/kb/commissions
     moduleRoute: "/admin/samples",
     keywords: "how to sample proto fit pp top approve purchase order production run receive reconcile stock",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/samples.png",
     body: `# From approved sample to a production run
 
 The unglamorous middle of fashion — where money is made or lost. Verto keeps the paper trail honest.
@@ -129,6 +132,7 @@ Mark the PO **received** and the automation files a reconciliation task: check t
     moduleRoute: "/admin/products",
     keywords: "how to launch shop first sale product collection storefront domain seo campaign announce",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/products.png",
     body: `# Launch your shop and make the first sale
 
 The piece exists. Now it needs a shelf, an address, and an audience.
@@ -164,6 +168,7 @@ Build a [campaign kit](/admin/support/kb/campaigns) — social posts, a press no
     moduleRoute: "/admin/commissions",
     keywords: "how to commission bespoke enquiry deposit booking fitting handover client portal stages",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/commissions.png",
     body: `# Run a commission from enquiry to handover
 
 Commissions are relationships with a deadline. The craft is yours; this keeps the logistics from eating it.
@@ -199,6 +204,7 @@ Final fitting done, garment wrapped — mark it handed over. The full history (d
     moduleRoute: "/admin/fitting",
     keywords: "how to photos without shoot render model try on colorway fitting studio drape imagery product page",
     updated: "2026-07-11",
+    screenshot: "/kb/shots/fitting.png",
     body: `# Product pages without a photo shoot
 
 A shoot costs more than a sample run. Until the piece earns one, render it — from your real designs, not stock lookalikes.
@@ -221,5 +227,46 @@ Send the keepers straight to the product's gallery. Real photography can replace
 
 > [!NOTE]
 > Taste note: render honestly. Show the garment you will actually ship — imagery that oversells cut or cloth costs you the customer exactly once.`,
+  },
+  {
+    slug: "how-to-onboard-brand",
+    title: "How to: move your existing brand into Verto",
+    summary: "Bring in your catalog, your maker list, and the season already in flight — without retyping your business.",
+    part: "how-to",
+    moduleRoute: "/admin/import",
+    keywords: "how to onboard migrate existing brand import csv shopify catalog suppliers makers season in progress setup switch",
+    updated: "2026-07-11",
+    screenshot: "/kb/shots/import.png",
+    body: `# Move your existing brand into Verto
+
+You have a running brand: a catalog somewhere, a maker list in a spreadsheet, a season half-finished. Bring it all in — in roughly this order, most of it importable.
+
+## 1 · The catalog, by CSV
+
+The [Import Studio](/admin/support/kb/import) takes any tabular export — a Shopify export, a spreadsheet, another platform's CSV — detects the header row, and **maps the columns for you** (you confirm before anything imports). Products, variants, and prices land as real records; stock counts follow in [Inventory](/admin/support/kb/inventory).
+
+## 2 · Your makers, into R&D first
+
+Export your maker list as CSV and import it into the [R&D workspace](/admin/support/kb/rd-research) — the same auto-mapping treatment, and messy research phrasing ("MOQ 1–50 managed", "2–4 wks sample") stays as text instead of being flattened into a lie. Then **promote the makers you actually work with** into [Factories & Suppliers](/admin/support/kb/suppliers) and mark them verified — that's your production-ready shortlist, with the exploratory candidates still warm in R&D.
+
+## 3 · The season in flight
+
+Recreate only what's live — this is an afternoon, not a week:
+
+- **Styles in development** → create each [style](/admin/support/kb/styles-vs-products) and let the assistant rough in its [tech pack](/admin/support/kb/tech-packs) from your notes; paste your real measurement spec over it.
+- **Orders at the factory** → enter them as [purchase orders](/admin/support/kb/purchase-orders) with their real ex-factory dates. The moment one is confirmed, the chase task and calendar entries exist.
+- **Samples on the way** → log the current [round](/admin/support/kb/samples) so approvals land on the record (and draft the next PO automatically).
+- **Committed spend** → the [production board](/admin/support/kb/production) and [cash-flow view](/admin/support/kb/cash-flow) now reflect reality from day one.
+
+## 4 · Fabrics and trims
+
+Add your core cloth to [Fabrics & Materials](/admin/support/kb/materials) with **origin countries** — that single field drives duty qualification in every [cost sheet](/admin/support/kb/costing) later. Start with what's in the current season; backfill the archive never.
+
+## 5 · The team and the address
+
+[Invite your team](/admin/support/kb/team) with the right roles, [connect your domain](/admin/support/kb/domain), and run the [Search Checkup](/admin/support/kb/seo) once the catalog is in.
+
+> [!TIP]
+> Import in the order above and every later module inherits the work: suppliers link to POs, materials feed cost sheets, styles carry tech packs. An hour of clean import beats a month of retyping-as-you-go.`,
   },
 ];
