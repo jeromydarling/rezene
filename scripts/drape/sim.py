@@ -331,6 +331,25 @@ def place(piece, x, y):
         # (0, -B), back centre at (0, +B); both walk toward the sides so the
         # side seams nearly meet. side = -1 for front, +1 for back.
         side = -1.0 if pl["y"] < 0 else 1.0
+        if pl.get("ringWrap"):
+            # Ring wrap (Bruce): garments whose seam lines sit far BEHIND the
+            # lateral line (Bruce's back panel is only 31.5% of the girth, so
+            # the side panels wrap well onto the back of the body). The
+            # classic wrap walks each face CF/CB -> side and dies at the
+            # quarter-circumference: side panels clamp there in a bunched
+            # wing and the side/back seams start ~200mm open. Instead, map
+            # the garment's OWN ring: the shared width profile carries the
+            # per-height half-ring extent R = front-face + back extents, and
+            # phi = pi * |x| / R walks the FULL half-ellipse — the front
+            # face's outboard edge and the back's edge land on the same
+            # azimuth by construction.
+            R = width_at(piece, y) or 1.0
+            phi = math.pi * min(1.0, abs(x) / max(1.0, R))
+            ta, tb = torso_ab(y)
+            wx = math.copysign((ta + 15.0) * math.sin(phi), x)
+            wy = side * (tb + 15.0) * math.cos(phi)
+            wx, wy = clamp_out(wx, wy, y)
+            return (wx * S, wy * S, (HEIGHT - y) * S)
         # Per-height wrap scale: a flared garment wraps snug where it is
         # narrow and full where it is wide; one global scale bunches the
         # excess wherever the garment is narrower than its widest line.

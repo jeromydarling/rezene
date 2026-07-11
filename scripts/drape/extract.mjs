@@ -1885,10 +1885,10 @@ if (cfg.trousers) {
   // shared sum and the sides' back edges land where the back panel ends
   // (bruce drafts the back at 31.5% of the girth — the side/back seam
   // sits well behind the lateral line, and now the wrap agrees).
-  front.placement = { kind: "plane", y: -160, hangCollapse: false };
-  back.placement = { kind: "plane", y: 160, hangCollapse: false };
-  sideL.placement = { kind: "plane", y: -160, hangCollapse: false };
-  sideR.placement = { kind: "plane", y: -160, hangCollapse: false };
+  front.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
+  back.placement = { kind: "plane", y: 160, hangCollapse: false, ringWrap: true };
+  sideL.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
+  sideR.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
   const profOf = (pts) => widthProfile({ points: pts });
   const wAt = (prof, y) => {
     if (y <= prof[0][0]) return prof[0][1];
