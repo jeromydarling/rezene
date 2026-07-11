@@ -27,6 +27,7 @@ const EXCLUDE = new Set([
   "0016_feedback.sql", // Support tickets land in the platform DB, not per-shop
   "0020_kb_overrides.sql", // KB overlay is platform-wide, not per-shop
   "0021_superadmin_role.sql", // Platform-owner role — only the platform DB has HQ
+  "0045_school_certificates.sql", // Public credentials resolve at the platform, not per-shop
 ]);
 
 const files = readdirSync(dir)

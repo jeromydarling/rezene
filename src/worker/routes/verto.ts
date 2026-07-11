@@ -121,3 +121,41 @@ vertoRoutes.post("/demo-bootstrap", async (c) => {
   const result = await bootstrapDemoShop(c.env);
   return c.json({ ok: true, ...result });
 });
+
+/**
+ * Public verification for Verto School certificates. The unguessable id IS
+ * the credential: it resolves only if the certificate was really issued,
+ * and shows exactly what was earned, by whom, and whether it still stands.
+ */
+vertoRoutes.get("/certified/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!/^crt_[0-9a-f]{24}$/.test(id)) return c.json({ error: "Not found" }, 404);
+  const cert = await first<{
+    id: string;
+    shop_slug: string;
+    user_name: string;
+    scope: string;
+    ref: string;
+    title: string;
+    curriculum_version: string;
+    issued_at: string;
+    revoked: number;
+  }>(
+    c.env.DB,
+    `SELECT id, shop_slug, user_name, scope, ref, title, curriculum_version, issued_at, revoked
+     FROM school_certificates WHERE id = ?`,
+    id,
+  );
+  if (!cert) return c.json({ error: "Not found" }, 404);
+  return c.json({
+    id: cert.id,
+    holder: cert.user_name,
+    shopSlug: cert.shop_slug,
+    scope: cert.scope,
+    ref: cert.ref,
+    title: cert.title,
+    curriculumVersion: cert.curriculum_version,
+    issuedAt: cert.issued_at,
+    valid: !cert.revoked,
+  });
+});

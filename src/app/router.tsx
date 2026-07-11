@@ -36,6 +36,9 @@ import { BrandsPage } from "./pages/admin/research/BrandsPage";
 import { PricingPage } from "./pages/admin/research/PricingPage";
 import { TrendsPage } from "./pages/admin/research/TrendsPage";
 import { StockistsPage } from "./pages/admin/research/StockistsPage";
+import { SchoolHomePage } from "./pages/admin/school/SchoolHomePage";
+import { SchoolCoursePage } from "./pages/admin/school/SchoolCoursePage";
+import { SchoolLessonPage } from "./pages/admin/school/SchoolLessonPage";
 import { AutomationsPage } from "./pages/admin/AutomationsPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
@@ -190,6 +193,9 @@ export function AppRouter() {
           <Route path="research/pricing" element={<PricingPage />} />
           <Route path="research/trends" element={<TrendsPage />} />
           <Route path="research/stockists" element={<StockistsPage />} />
+          <Route path="school" element={<SchoolHomePage />} />
+          <Route path="school/:slug" element={<SchoolCoursePage />} />
+          <Route path="school/:slug/lesson/:idx" element={<SchoolLessonPage />} />
           <Route path="materials" element={<MaterialsPage />} />
           <Route path="samples" element={<SamplesPage />} />
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
