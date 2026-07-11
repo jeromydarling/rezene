@@ -343,6 +343,34 @@ def place(piece, x, y):
             # phi = pi * |x| / R walks the FULL half-ellipse — the front
             # face's outboard edge and the back's edge land on the same
             # azimuth by construction.
+            tng = pl.get("tongue")
+            if tng and y > tng["y0"]:
+                # Under-crotch sweep for the crotch-wing region (Bruce's
+                # back below gussetTop): the wings' seam partners live on
+                # the FRONT face — pre-sweep the region under the keel to
+                # them, exactly the uma-gusset arc walked back-to-front.
+                # Springs cannot haul cloth across the keel (uma and
+                # waralee both proved it; bake 5's crotch pairs started
+                # at 286mm and never closed).
+                t = min(1.0, (y - tng["y0"]) / max(1e-6, tng["y1"] - tng["y0"]))
+                hB = Y_OFF + tng["y0"]
+                hF = Y_OFF + tng["yF"]
+                sag = max(0.0, TORSO[-1][0] + 14.0 - (hF + hB) / 2.0)
+                h = hB + (hF - hB) * t + sag * math.sin(math.pi * t)
+                _, dB = torso_ab(tng["y0"])
+                _, dF = torso_ab(tng["yF"])
+                amp = (dB + 15.0) * (1 - t) + (dF + 15.0) * t
+                ly = amp * math.cos(math.pi * t)  # +back face -> -front face
+                lx = x
+                rr = brief_leg_r(h) + 6.0
+                if h >= BRIEF_LEG_TOP:
+                    for d in (1.0, -1.0):
+                        dx = lx - d * BRIEF_LEG_X
+                        if dx * dx < rr * rr:
+                            need = math.sqrt(rr * rr - dx * dx)
+                            if abs(ly) < need:
+                                ly = need if t < 0.5 else -need
+                return (lx * S, ly * S, z_of_body(h))
             R = width_at(piece, y) or 1.0
             phi = math.pi * min(1.0, abs(x) / max(1.0, R))
             ta, tb = torso_ab(y)

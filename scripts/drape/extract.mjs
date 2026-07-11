@@ -1884,7 +1884,14 @@ if (cfg.trousers) {
   // (bruce drafts the back at 31.5% of the girth — the side/back seam
   // sits well behind the lateral line, and now the wrap agrees).
   front.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
-  back.placement = { kind: "plane", y: 160, hangCollapse: false, ringWrap: true };
+  // The wing region (below gussetTop) pre-sweeps under the keel to the
+  // front face where its tusk/inset seam partners sit — bake 5's crotch
+  // pairs started at 286mm on springs alone and never closed.
+  const BPn = set[cfg.parts.back].points;
+  back.placement = {
+    kind: "plane", y: 160, hangCollapse: false, ringWrap: true,
+    tongue: { y0: BPn.gussetTop.y, y1: BPn.gussetBottom.y, yF: FP.rightTuskLeft.y },
+  };
   sideL.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
   sideR.placement = { kind: "plane", y: -160, hangCollapse: false, ringWrap: true };
   const profOf = (pts) => widthProfile({ points: pts });
