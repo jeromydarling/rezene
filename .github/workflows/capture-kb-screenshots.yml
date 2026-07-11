@@ -5,17 +5,17 @@ name: Capture KB screenshots
 # image. Runs on a CI runner because this project's dev sandbox proxies raw
 # browser TLS (ERR_CONNECTION_RESET); a plain GitHub runner has open network.
 #
-# One-time repository setup (Settings → Secrets and variables → Actions):
-#   KB_EMAIL     — an admin login for the shop to photograph
-#   KB_PASSWORD  — that account's password
-# Optional variable (Settings → Variables → Actions):
-#   KB_BASE      — target site (default https://verto.style)
+# No secrets required: by default the capture signs into the public demo shop
+# with its well-known read-only login (see DEMO_VIEWER_PASSWORD in
+# src/worker/services/shops.ts). To photograph a different shop instead, set
+# repository secrets KB_EMAIL / KB_PASSWORD (and optionally the KB_BASE
+# variable) — they override the demo defaults.
 #
 # Run it: Actions → "Capture KB screenshots" → Run workflow (pick the branch).
 # Staleness protection: besides the manual dispatch, this re-runs after every
 # production "Migrate & secrets" run on main (i.e. after each merged change
 # ships) and weekly as a backstop. The capture script only rewrites a PNG when
-# >1.5% of its pixels changed, so date text and counters don't churn commits —
+# >0.3% of its pixels changed, so date text and counters don't churn commits —
 # a shot only updates when a section or feature actually moved. The refresh
 # commit says [skip ci], which also keeps it from re-triggering this workflow.
 on:
@@ -54,41 +54,26 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
 
-      # Without credentials the run can't sign in — skip quietly instead of
-      # failing every deploy with a red workflow.
-      - name: Check credentials
-        id: creds
-        env:
-          KB_EMAIL: ${{ secrets.KB_EMAIL }}
-        run: |
-          if [ -n "$KB_EMAIL" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "KB_EMAIL / KB_PASSWORD secrets not set — skipping capture."
-          fi
-
       # Workers Builds ships the code separately from the triggering workflow;
       # give the new deploy a moment to be what we photograph.
       - name: Let the deploy settle
-        if: steps.creds.outputs.ok == 'true' && github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run'
         run: sleep 180
 
       - name: Node
-        if: steps.creds.outputs.ok == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install Playwright + Chromium
-        if: steps.creds.outputs.ok == 'true'
         run: |
           npm install playwright@1.48.0 pixelmatch pngjs >/dev/null 2>&1
           npx playwright install --with-deps chromium
 
       - name: Capture screenshots
-        if: steps.creds.outputs.ok == 'true'
         env:
+          # Falls back to the public demo shop's read-only login when the
+          # secrets are unset (the capture script owns those defaults).
           KB_EMAIL: ${{ secrets.KB_EMAIL }}
           KB_PASSWORD: ${{ secrets.KB_PASSWORD }}
           KB_BASE: ${{ github.event.inputs.base || vars.KB_BASE }}
@@ -96,7 +81,6 @@ jobs:
         run: node scripts/capture-kb-screenshots.mjs
 
       - name: Commit screenshots
-        if: steps.creds.outputs.ok == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

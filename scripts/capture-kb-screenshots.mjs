@@ -4,9 +4,11 @@
  * each chapter's `screenshot` field). Re-run whenever the UI changes.
  *
  * Requires playwright-core (npm i -D playwright-core) and the pre-installed
- * Chromium. Usage:
- *   KB_EMAIL=you@example.com KB_PASSWORD=... node scripts/capture-kb-screenshots.mjs
- *   # optional: KB_BASE=https://verto.style (default)
+ * Chromium. Usage (no env needed — defaults to the public demo shop's
+ * well-known read-only login):
+ *   node scripts/capture-kb-screenshots.mjs
+ *   # or capture from a real shop:
+ *   KB_EMAIL=you@example.com KB_PASSWORD=... KB_BASE=https://verto.style node scripts/capture-kb-screenshots.mjs
  */
 import { chromium } from "playwright-core";
 import { mkdirSync, readdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -53,9 +55,13 @@ function writeIfChanged(outPath, buf) {
 }
 import { join } from "node:path";
 
-const BASE = process.env.KB_BASE || "https://verto.style";
-const EMAIL = process.env.KB_EMAIL;
-const PASSWORD = process.env.KB_PASSWORD;
+// No env needed: the default target is the public demo shop, whose viewer
+// login is deliberately well-known (read-only role — see
+// DEMO_VIEWER_PASSWORD in src/worker/services/shops.ts). Point KB_EMAIL /
+// KB_PASSWORD / KB_BASE elsewhere to capture from a real shop instead.
+const EMAIL = process.env.KB_EMAIL || "demo-viewer@verto.style";
+const PASSWORD = process.env.KB_PASSWORD || "maison-demo";
+const BASE = process.env.KB_BASE || (process.env.KB_EMAIL ? "https://verto.style" : "https://verto.style/maison");
 if (!EMAIL || !PASSWORD) {
   console.error("Set KB_EMAIL and KB_PASSWORD env vars.");
   process.exit(1);
@@ -141,8 +147,13 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
-// Sign in.
+// Sign in. The demo shop's login defaults to the email gate — flip to the
+// credentials form first when that toggle is present.
 await page.goto(`${BASE}/admin/login`, { waitUntil: "domcontentloaded" });
+const credsToggle = page.getByRole("button", { name: /have credentials/i });
+if (await credsToggle.isVisible().catch(() => false)) {
+  await credsToggle.click();
+}
 await page.fill('input[type="email"]', EMAIL);
 await page.fill('input[type="password"]', PASSWORD);
 await Promise.all([
