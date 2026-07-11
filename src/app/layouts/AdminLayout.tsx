@@ -124,6 +124,7 @@ const NAV_SECTIONS: {
       { to: "/admin/suppliers", label: "Factories & Suppliers", icon: Factory },
       { to: "/admin/messages", label: "Maker Messages", icon: MessagesSquare },
       { to: "/admin/sourcing", label: "Find a Maker", icon: Compass },
+      { to: "/admin/research", label: "R&D", icon: FlaskConical },
       { to: "/admin/materials", label: "Fabrics & Materials", icon: Scissors },
       { to: "/admin/samples", label: "Samples", icon: ClipboardList },
       { to: "/admin/purchase-orders", label: "Purchase Orders", icon: FileText },

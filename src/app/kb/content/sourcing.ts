@@ -30,6 +30,35 @@ The search captures websites and, where it can verify them, phone numbers and ad
 > Maker research and contact lookups draw from a shared **daily research quota** per shop (see [LLM research limits](/admin/support/kb/ai-limits)). Cached results are free.`,
   },
   {
+    slug: "rd-research",
+    title: "R&D — your research workspace",
+    summary: "Save maker research and strategy notes, run live cited research, import CSVs, and promote leads to your supplier CRM.",
+    part: "sourcing",
+    moduleRoute: "/admin/research",
+    keywords: "r&d research notes makers directory perplexity citations csv import promote supplier pipeline bespoke moq lead time",
+    updated: "2026-07-11",
+    body: `# R&D — your research workspace
+
+**Sourcing & Production → R&D** is where knowledge lives *before* it's structured enough to be a supplier record or a tech pack. Two kinds of records:
+
+- **Makers** — candidate ateliers and factories you're researching: contact details, speciality, MOQ, lead time, price ballpark, and what they'd be best used for. Each has a pipeline status: **researching → contacted → sampling → approved** (or **passed**).
+- **Notes** — free-form findings: pasted research, strategy write-ups, pipeline plans, and live research answers with their citations preserved.
+
+MOQ, lead time, and price stay as **text** on purpose — real research says things like "1–50 (managed)" and "2–4 wks sample", and flattening that to a number would lie.
+
+## Live research
+
+Ask a question in the **Research live** box (optionally tag it with a topic). Verto researches the live web and saves the answer as a note **with its citations**, so the sources stay attached to the finding. Answers draw from the shared **daily research quota** per shop (see [LLM research limits](/admin/support/kb/ai-limits)).
+
+## Importing a CSV
+
+Click **Import CSV** to bring in research you did outside Verto — a Perplexity export, a spreadsheet of makers, anything tabular. Verto detects the header row (banner rows are fine), **auto-maps columns** to fields by their names, and lets you correct any mapping before importing. Works for both makers and notes; you can stamp the whole batch with a topic.
+
+## Promoting a maker
+
+When a candidate is real, click **Add to suppliers** — the maker is filed in [Factories & Suppliers](/admin/support/kb/suppliers) as an **unverified** lead, with a numeric MOQ and lead time parsed where they're clean and all the research phrasing kept in the notes. The R&D card keeps a link to the supplier record.`,
+  },
+  {
     slug: "suppliers",
     title: "Factories & Suppliers (your maker CRM)",
     summary: "A working CRM for your makers: profiles, contacts, verification, and history.",

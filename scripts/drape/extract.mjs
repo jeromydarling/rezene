@@ -344,6 +344,25 @@ const BLOCKS = {
     // them as open ruffled gashes even though the relax closes them.
     sim: { sewForce: 6 },
   },
+  waralee: {
+    module: "@freesewing/waralee",
+    design: "Waralee",
+    // Wrap trousers: ONE pattern piece cut twice. Each piece wraps a FULL
+    // leg with ~1.7 turns of cloth (the tie flaps overlap in layers), and
+    // the two pieces join only along the crotch notch cut into the waist
+    // edge — a seam that must close at the body's mid-plane, so it drapes
+    // on the brief body and the seam is BRIDGED (the shin rise lesson).
+    // Waistband/straps are described, not simulated (collar honesty).
+    wrapPants: true,
+    parts: { pants: "waralee.pants" },
+    yOffset: 460,
+    bodyKind: "brief",
+    // Force 8: the crotch seam fights the whole wrap's tension — 5 (the
+    // uma recipe) left the front rise baked open. Friction maxed: the
+    // wrap's overlap layers otherwise creep around the body over the bake
+    // and coverage tears open (more frames = more drift, not less).
+    sim: { sewForce: 8, friction: 80 },
+  },
   breanna: {
     module: "@freesewing/breanna",
     design: "Breanna",
@@ -416,7 +435,7 @@ const cfg = BLOCKS[blockId];
 // the spec overrides its entry.
 const M = {
   ankle: 230, biceps: 335, bustFront: 490, bustPointToUnderbust: 80, bustSpan: 190, chest: 1080,
-  highBustFront: 470,
+  crotchDepth: 280, highBustFront: 470,
   crossSeam: 800, crossSeamFront: 390, head: 560, heel: 330, highBust: 1040, hips: 1000,
   hpsToBust: 270, hpsToWaistBack: 460, hpsToWaistFront: 505, inseam: 790, knee: 420, neck: 400, seat: 1050,
   seatBack: 520, shoulderSlope: 13, shoulderToElbow: 340, shoulderToShoulder: 445, shoulderToWrist: 620,
@@ -1313,6 +1332,44 @@ function circleSkirtPiece() {
 
 /** Bodice front (Bella "frontSideDart"): cut on fold at CF, a waist dart in
  *  the hem and a side bust dart splitting the side seam — both sewn shut. */
+/** Waralee pants piece: one closed outline — waist edges left and right of
+ *  the crotch notch, straight overlap-flap side edges, a calf-length hem,
+ *  and the cutout (the crotch curve, dipping from the waist to hip depth
+ *  at its centre). Cut twice; mirrored for the left leg. */
+function waraleePiece(pieceName, mirrored) {
+  const part = set[cfg.parts.pants];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const seg = (pts) => (mirrored ? mirror(pts) : pts);
+  // Split the crotch curve into the two rises (above the fork, PINNED like
+  // Charlie's riseTopPin — the wrap tension otherwise pulls them open mid-
+  // span during the bake) and the under-crotch portion (sewn through the
+  // brief body's thigh channel).
+  const cutRaw = slice(poly, P.bWaistSide, P.fWaistSide);
+  const yCut = P.mHip.y * 0.75;
+  const cum = [0];
+  for (let i = 1; i < cutRaw.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(cutRaw[i][0] - cutRaw[i - 1][0], cutRaw[i][1] - cutRaw[i - 1][1]));
+  }
+  let i1 = cutRaw.findIndex(([, yy]) => yy > yCut);
+  let i2 = cutRaw.length - 1 - [...cutRaw].reverse().findIndex(([, yy]) => yy > yCut);
+  const total = cum[cum.length - 1];
+  const f1 = cum[Math.max(1, i1)] / total;
+  const f2 = cum[Math.min(cum.length - 1, i2)] / total;
+  const [riseB, rest] = splitAt(cutRaw, f1);
+  const [under, riseF] = splitAt(rest, (f2 - f1) / (1 - f1));
+  return buildPiece(pieceName, [
+    ["waistFront", seg(slice(poly, P.fWaistSide, P.fWaistFrontOverlap))],
+    ["sideFront", seg(slice(poly, P.fWaistFrontOverlap, P.fLegFrontOverlap))],
+    ["hem", seg(slice(poly, P.fLegFrontOverlap, P.bLegBackOverlap))],
+    ["sideBack", seg(slice(poly, P.bLegBackOverlap, P.bWaistBackOverlap))],
+    ["waistBack", seg(slice(poly, P.bWaistBackOverlap, P.bWaistSide))],
+    ["cutoutB", seg(riseB)],
+    ["cutoutU", seg(under)],
+    ["cutoutF", seg(riseF)],
+  ]);
+}
+
 /** Noble inside panels: cut on the fold (CF/CB), carrying the neckline and
  *  the inner shoulder segment; the princess seam is their outer edge. The
  *  back's slight CB shaping folds flat (the Bella 12mm fudge). */
@@ -1665,6 +1722,52 @@ if (cfg.trousers) {
   front.placement = { kind: "plane", y: -160 };
   back.placement = { kind: "plane", y: 160 };
   bodyPieces = [front, back];
+} else if (cfg.wrapPants) {
+  // Both pieces are the SAME cut — no mirror: the placement's leg sign
+  // mirrors world positions, and identical flat coords keep the bridged
+  // crotch pairing exact.
+  const pantsR = waraleePiece("pantsR", false);
+  const pantsL = waraleePiece("pantsL", false);
+  const WP = set[cfg.parts.pants].points;
+  const forkY = WP.mHip.y;
+  // Crotch-notch edge x per height (front branch negative, back positive):
+  // the sim anchors the leg wrap to THIS edge so both pieces' seam edges
+  // start on the mid-plane at every height — and the mapping stays
+  // continuous where the notch closes at the fork (edges -> 0).
+  const cutSeg = (() => {
+    const n = pantsR.points.length;
+    const out = [];
+    for (const nm of ["cutoutB", "cutoutU", "cutoutF"]) {
+      const [s0, e0] = pantsR.segments[nm];
+      let i = s0;
+      for (;;) {
+        out.push(pantsR.points[i % n]);
+        if (i % n === e0 % n) break;
+        i++;
+      }
+    }
+    return out;
+  })();
+  const branchX = (pts, yy) => {
+    let best = pts[0];
+    for (const q of pts) if (Math.abs(q[1] - yy) < Math.abs(best[1] - yy)) best = q;
+    return best[0];
+  };
+  const frontBranch = cutSeg.filter(([x]) => x <= 0);
+  const backBranch = cutSeg.filter(([x]) => x >= 0);
+  const cutoutProfile = [];
+  for (let k = 0; k <= 12; k++) {
+    const yy = ((forkY - 1) * k) / 12;
+    cutoutProfile.push([yy, branchX(frontBranch, yy), branchX(backBranch, yy)]);
+  }
+  const cut = { cutF: WP.fWaistSide.x, cutB: WP.bWaistSide.x, cutoutProfile };
+  pantsR.placement = { kind: "legTube", leg: 1, forkY, layerBias: 0, ...cut };
+  pantsL.placement = { kind: "legTube", leg: -1, forkY, layerBias: 1, ...cut };
+  // The wrap ties at the waist: both waist edges pinned, like every
+  // trouser block's waistband grip.
+  pantsR.pinSegments = ["waistFront", "waistBack"];
+  pantsL.pinSegments = ["waistFront", "waistBack"];
+  bodyPieces = [pantsR, pantsL];
 } else if (cfg.noble) {
   const frontIn = nobleFrontInside();
   const backIn = nobleBackInside();
@@ -2018,6 +2121,24 @@ const seams = cfg.trousers
         : []),
       { name: "dartB_R", a: ["back", "dartLR"], b: ["back", "dartRR"] },
       { name: "dartB_L", a: ["back", "dartLL"], b: ["back", "dartRL"] },
+    ]
+  : cfg.wrapPants
+  ? [
+      // The two pieces join ONLY along the crotch curve, at the body's
+      // mid-plane — SEWN throughout: with the notch-edge-anchored wrap the
+      // pairs start ~8mm apart (uma-gusset territory). A bridge here baked
+      // as a toothed channel; PINNING the rises (the Charlie riseTopPin
+      // idea) froze the seam while the wrap tension tore the cloth around
+      // the pins into a hole — springs strong enough to hold are the
+      // honest middle.
+      // BRIDGED: springs at any force lost the front rise to the wrap's
+      // tension (baked open as a slit), and with the notch-edge-anchored
+      // wrap the pairs start ~8mm apart, so the bridge band is stitch-line
+      // width — the sleeve recipe, not the toothed channel it was at the
+      // old 45mm gaps.
+      { name: "rise_back", a: ["pantsR", "cutoutB"], b: ["pantsL", "cutoutB"], bridge: true },
+      { name: "crotch", a: ["pantsR", "cutoutU"], b: ["pantsL", "cutoutU"], bridge: true },
+      { name: "rise_front", a: ["pantsR", "cutoutF"], b: ["pantsL", "cutoutF"], bridge: true },
     ]
   : cfg.noble
   ? [
