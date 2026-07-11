@@ -426,6 +426,27 @@ const BLOCKS = {
     // worst 5% near 290mm).
     sim: { sewForce: 4, bending: 1.5 },
   },
+  bruce: {
+    module: "@freesewing/bruce",
+    design: "Bruce",
+    fabric: "knit",
+    // Boxer briefs: five panels around the hip — back cut on fold with two
+    // crotch "wings" that wrap under, side quads (carlita-style: they share
+    // the front's wrap frame, x-shifted past the front panel's edge), a
+    // double-layer front pouch whose bulge dart sews its two tusk curves
+    // together (we drape a single layer — layer count is a make note, not a
+    // drape difference), and two INSETS that cover the front of each thigh
+    // from the side seam to the crotch — drafted like very short trouser
+    // fronts, so they drape on the leg placement, not the hip plane.
+    bruce: true,
+    parts: { back: "bruce.back", front: "bruce.front", side: "bruce.side", inset: "bruce.inset" },
+    yOffset: 500,
+    bodyKind: "brief",
+    // Force 6: between uma's 5 (short gusset hauls) and waralee's 8 — the
+    // crotch seams span the keel from three directions (back wings, front
+    // tusks, inset tips) and start wider than uma's gusset pairs.
+    sim: { sewForce: 6, bending: 1.5 },
+  },
 };
 
 const blockId = BLOCKS[spec.block] ? spec.block : "classic-tee";
@@ -1253,6 +1274,135 @@ function briefGusset() {
   ]);
 }
 
+/** Bruce back: cut on fold — unfold across CB (x=0). The bottom edge is a
+ *  W: a notch rising to gussetTop at CB between two crotch "wings" that drop
+ *  to ±gussetRight. Each wing edge (the * crotch seam) is split by length
+ *  ratio into the portion the front's tusk takes (nearest CB) and the
+ *  portion the inset's gusset edge takes (the wing tip) — Bruce's
+ *  gussetInsetRatio made flesh. */
+function bruceBack(tuskFrac) {
+  const part = set[cfg.parts.back];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const crotchR = slice(poly, P.gussetTop, P.gussetRight);
+  const [crotchTuskR, crotchInsetR] = splitAt(crotchR, tuskFrac);
+  const legR = slice(poly, P.gussetRight, P.legRight);
+  const sideR = slice(poly, P.legRight, P.sideRight);
+  const waistR = slice(poly, P.sideRight, P.center);
+  const rev = (pts) => [...pts].reverse();
+  return buildPiece("back", [
+    ["crotchTuskR", crotchTuskR],
+    ["crotchInsetR", crotchInsetR],
+    ["legR", legR],
+    ["sideR", sideR],
+    ["waistR", waistR],
+    ["waistL", mirror(rev(waistR))],
+    ["sideL", mirror(rev(sideR))],
+    ["legL", mirror(rev(legR))],
+    ["crotchInsetL", mirror(rev(crotchInsetR))],
+    ["crotchTuskL", mirror(rev(crotchTuskR))],
+  ]);
+}
+
+/** Bruce front (the pouch): drafted full-width. With bulge > 0 (the default)
+ *  the bottom edge runs tusk → dart curve → dart curve → tusk; the two dart
+ *  curves sew TO EACH OTHER (that fold is what makes the pouch a pouch). */
+function bruceFront() {
+  const part = set[cfg.parts.front];
+  const P = part.points;
+  const poly = pathPolyline(part.paths.seam);
+  const hasDart = P.dartJoin.dist(P.rightTuskLeft) > 2;
+  return buildPiece("front", [
+    ["sideL", slice(poly, P.midLeft, P.topLeft)],
+    ["waistL", slice(poly, P.topLeft, P.topMid)],
+    ["waistR", slice(poly, P.topMid, P.topRight)],
+    ["sideR", slice(poly, P.topRight, P.midRight)],
+    ["curveR", slice(poly, P.midRight, P.rightTuskRight)],
+    ...(hasDart
+      ? [
+          ["tuskR", slice(poly, P.rightTuskRight, P.rightTuskLeft)],
+          ["dartR", slice(poly, P.rightTuskLeft, P.dartJoin)],
+          ["dartL", slice(poly, P.dartJoin, P.leftTuskRight)],
+          ["tuskL", slice(poly, P.leftTuskRight, P.leftTuskLeft)],
+        ]
+      : [
+          ["tuskR", slice(poly, P.rightTuskRight, P.rightTuskLeft)],
+          ["tuskL", slice(poly, P.rightTuskLeft, P.leftTuskLeft)],
+        ]),
+    ["curveL", slice(poly, P.leftTuskLeft, P.midLeft)],
+  ]);
+}
+
+/** Bruce side: a quad sharing the front's wrap frame (carlita's trick) —
+ *  shifted so its FRONT edge butts the front panel's side edge, wrapping
+ *  around to carry its BACK edge toward the back panel's side edge. The
+ *  front edge splits at the drafted notch: the top joins the front panel,
+ *  the rest joins the inset. */
+function bruceSide(pieceName, mirrored) {
+  const part = set[cfg.parts.side];
+  const P = part.points;
+  const FP = set[cfg.parts.front].points;
+  const poly = pathPolyline(part.paths.seam);
+  const notchLen = FP.topRight.dist(FP.midRight);
+  const frontEdge = slice(poly, P.topRight, P.bottomRight);
+  const [frontUp, frontLo] = splitAt(frontEdge, notchLen / segLen(frontEdge));
+  // Butt the # edge (drafted at x = topRight.x) against the front panel's
+  // side edge; as-drafted + shift = body LEFT (arc x negative), mirrored
+  // lands it on the right.
+  const dx = -(P.topRight.x + FP.midRight.x);
+  const seg = (pts) => {
+    const shifted = pts.map(([x, y]) => [x + dx, y]);
+    return mirrored ? mirror(shifted) : shifted;
+  };
+  return buildPiece(pieceName, [
+    ["back", seg(slice(poly, P.bottomLeft, P.topLeft))],
+    ["waist", seg(slice(poly, P.topLeft, P.topRight))],
+    ["frontUp", seg(frontUp)],
+    ["frontLo", seg(frontLo)],
+    ["hem", seg(slice(poly, P.bottomRight, P.bottomLeft))],
+  ]);
+}
+
+/** Bruce inset: the front-of-thigh panel — # side edge to the side panel,
+ *  top curve to the pouch, gusset tip to the back's crotch wing, hem free
+ *  around the leg. Shaped exactly like a stub trouser front, so it wraps a
+ *  leg stub (kind "leg"), not the hip plane: its own frame has the outseam
+ *  at x=0 and the tip reaching the inner thigh. y is shifted so the # edge
+ *  spans the side panel's below-notch front edge. */
+function bruceInset(pieceName, mirrored) {
+  const part = set[cfg.parts.inset];
+  const P = part.points;
+  const SP = set[cfg.parts.side].points;
+  const FP = set[cfg.parts.front].points;
+  const poly = pathPolyline(part.paths.seam);
+  const notchLen = FP.topRight.dist(FP.midRight);
+  const t = notchLen / SP.topRight.dist(SP.bottomRight);
+  const notchY = SP.topRight.y + (SP.bottomRight.y - SP.topRight.y) * t;
+  const dy = notchY - P.topLeft.y;
+  const seg = (pts) => {
+    const shifted = pts.map(([x, y]) => [x, y + dy]);
+    return mirrored ? mirror(shifted) : shifted;
+  };
+  const piece = buildPiece(pieceName, [
+    ["gusset", seg(slice(poly, P.bottomRight, P.tip))],
+    ["curve", seg(slice(poly, P.tip, P.topLeft))],
+    ["side", seg(slice(poly, P.topLeft, P.bottomLeft))],
+    ["hem", seg(slice(poly, P.bottomLeft, P.bottomRight))],
+  ]);
+  const BIN = 25;
+  const bins = new Map();
+  for (const [x, y] of piece.points) {
+    const b = Math.round(y / BIN) * BIN;
+    const e = bins.get(b) ?? [x, x];
+    bins.set(b, [Math.min(e[0], x), Math.max(e[1], x)]);
+  }
+  piece.edgesProfile = [...bins.entries()].map(([y, [lo, hi]]) => [y, lo, hi]).sort((a, b) => a[0] - b[0]);
+  // The mannequin's fork sits below the whole inset — the leg placement's
+  // above-fork sweep blends it from leg tube (at the hem) to hip shell.
+  piece.forkY = 700 - (Number(cfg.yOffset) || 0);
+  return piece;
+}
+
 /** Split a segment's raw polyline in two at a given arc-length fraction —
  *  used to pair one long seam edge against a dart-split opposite edge. */
 function splitAt(pts, frac) {
@@ -1705,6 +1855,36 @@ if (cfg.trousers) {
   front.pinSegments = ["waistR", "waistL"];
   back.pinSegments = ["waistR", "waistL"];
   bodyPieces = [front, back, gusset];
+} else if (cfg.bruce) {
+  // Boxer briefs: hip panels (front pouch, back, two sides) + two thigh
+  // insets. The crotch closes from three directions — back wings meet the
+  // inset tips at the inner thighs and the front tusks under the pouch —
+  // so each wing edge is pre-split at the drafted tusk/inset length ratio.
+  const FP = set[cfg.parts.front].points;
+  const IP = set[cfg.parts.inset].points;
+  const tuskLen = FP.rightTuskRight.dist(FP.rightTuskLeft);
+  const insetGussetLen = IP.bottomRight.dist(IP.tip);
+  const front = bruceFront();
+  const back = bruceBack(tuskLen / (tuskLen + insetGussetLen));
+  const sideL = bruceSide("sideL", false);
+  const sideR = bruceSide("sideR", true);
+  const insetR = bruceInset("insetR", false);
+  const insetL = bruceInset("insetL", true);
+  // Hip panels share ONE wrap frame (the noble/carlita lesson): the sides'
+  // arc x continues past the front's edge, so per-piece width scaling would
+  // land the butted seam edges apart.
+  front.placement = { kind: "plane", y: -160, hangCollapse: false };
+  back.placement = { kind: "plane", y: 160, hangCollapse: false };
+  sideL.placement = { kind: "plane", y: -160, hangCollapse: false };
+  sideR.placement = { kind: "plane", y: -160, hangCollapse: false };
+  for (const p of [front, back, sideL, sideR]) p.uniformWrap = true;
+  insetR.placement = { kind: "leg", leg: 1, panel: "front" };
+  insetL.placement = { kind: "leg", leg: -1, panel: "front" };
+  front.pinSegments = ["waistR", "waistL"];
+  back.pinSegments = ["waistR", "waistL"];
+  sideL.pinSegments = ["waist"];
+  sideR.pinSegments = ["waist"];
+  bodyPieces = [front, back, sideL, sideR, insetR, insetL];
 } else if (cfg.circleSkirt) {
   const skirt = circleSkirtPiece();
   skirt.placement = { kind: "circle", ...skirt.circle };
@@ -2073,6 +2253,30 @@ const seams = cfg.trousers
       { name: "gusset_front_L", a: ["front", "gussetEdgeL"], b: ["gusset", "frontEdgeL"] },
       { name: "gusset_front_R", a: ["front", "gussetEdgeR"], b: ["gusset", "frontEdgeR"] },
       { name: "gusset_back", a: ["back", "gussetEdge"], b: ["gusset", "backEdge"] },
+    ]
+  : cfg.bruce
+  ? [
+      // Hangs from the pinned waistband ring. The sides join the front
+      // panel above the notch and the inset below it; the back closes the
+      // hip wrap. The pouch: each inset's top curve sews to the front's
+      // curve, and the two dart curves sew to each other (the bulge fold).
+      // The crotch closes from three directions: each back wing's inner
+      // portion meets the front tusk, its tip meets the inset's gusset edge.
+      { name: "side_up_R", a: ["front", "sideR"], b: ["sideR", "frontUp"] },
+      { name: "side_up_L", a: ["front", "sideL"], b: ["sideL", "frontUp"] },
+      { name: "side_lo_R", a: ["insetR", "side"], b: ["sideR", "frontLo"] },
+      { name: "side_lo_L", a: ["insetL", "side"], b: ["sideL", "frontLo"] },
+      { name: "back_R", a: ["back", "sideR"], b: ["sideR", "back"] },
+      { name: "back_L", a: ["back", "sideL"], b: ["sideL", "back"] },
+      { name: "pouch_curve_R", a: ["front", "curveR"], b: ["insetR", "curve"] },
+      { name: "pouch_curve_L", a: ["front", "curveL"], b: ["insetL", "curve"] },
+      ...(bodyPieces[0].segments.dartR
+        ? [{ name: "pouch_dart", a: ["front", "dartR"], b: ["front", "dartL"] }]
+        : []),
+      { name: "crotch_tusk_R", a: ["back", "crotchTuskR"], b: ["front", "tuskR"] },
+      { name: "crotch_tusk_L", a: ["back", "crotchTuskL"], b: ["front", "tuskL"] },
+      { name: "crotch_inset_R", a: ["back", "crotchInsetR"], b: ["insetR", "gusset"] },
+      { name: "crotch_inset_L", a: ["back", "crotchInsetL"], b: ["insetL", "gusset"] },
     ]
   : cfg.circleSkirt
   ? [
