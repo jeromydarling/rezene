@@ -34,7 +34,10 @@ export function HelpDot({
       </Link>
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-6 z-30 w-56 -translate-x-1/2 rounded-lg border border-ink/10 bg-white p-2.5 text-left text-xs leading-snug text-ink/80 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        // hidden (not opacity-0): an invisible box still counts toward the
+        // page's scrollable overflow, so a dot near the right edge gave the
+        // whole page a horizontal wobble on phones.
+        className="pointer-events-none absolute left-1/2 top-6 z-30 hidden w-56 max-w-[80vw] -translate-x-1/2 rounded-lg border border-ink/10 bg-white p-2.5 text-left text-xs leading-snug text-ink/80 shadow-lg group-hover:block group-focus-within:block"
       >
         {article && (
           <span className="mb-0.5 block font-semibold text-ink">{article.title}</span>
