@@ -211,7 +211,7 @@ Virtual try-on, refits, and mood-board style-matching use a best-in-class engine
     screenshot: "/kb/shots/files.png",
     body: `# Files
 
-**Design Studio → Files** holds every working file — flat sketches, pattern PDFs, 3D exports, factory documents — filed against the style, product, or order it belongs to.
+**System → Files** holds every working file — flat sketches, pattern PDFs, 3D exports, factory documents — filed against the style, product, or order it belongs to.
 
 ## Finding things by eye
 

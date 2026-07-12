@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   FileText,
   FlaskConical,
+  FolderOpen,
   Images,
   Landmark,
   LayoutDashboard,
@@ -136,18 +137,24 @@ const NAV_SECTIONS: {
     ],
   },
   {
+    // The making tools, in workflow order: imagine it, see it on a body,
+    // draft it, spec it for the maker.
     title: "Studio",
     items: [
-      { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
       { to: "/admin/ai-concepts", label: "Design Studio", icon: Sparkles },
-      { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
-      { to: "/admin/clients", label: "Client Book", icon: BookUser },
-      { to: "/admin/commissions", label: "Commissions", icon: ClipboardList },
       { to: "/admin/fitting", label: "Fitting Studio", icon: PersonStanding },
       { to: "/admin/patterns", label: "Pattern Studio", icon: Ruler },
       { to: "/admin/drafting", label: "Drafting Room", icon: PencilRuler },
-      { to: "/admin/library", label: "Timeless Library", icon: LibraryBig },
-      { to: "/admin/files", label: "Files", icon: FlaskConical },
+      { to: "/admin/3d", label: "3D Simulation", icon: Rotate3d },
+      { to: "/admin/tech-packs", label: "Tech Packs", icon: FileBox },
+    ],
+  },
+  {
+    // The made-to-measure lane: the people you sew for.
+    title: "Clients",
+    items: [
+      { to: "/admin/clients", label: "Client Book", icon: BookUser },
+      { to: "/admin/commissions", label: "Commissions", icon: ClipboardList },
     ],
   },
   {
@@ -160,9 +167,11 @@ const NAV_SECTIONS: {
     ],
   },
   {
-    title: "The School",
+    // Learning and reference: the courses and the archive they teach from.
+    title: "School & Library",
     items: [
       { to: "/admin/school", label: "Verto School", icon: GraduationCap },
+      { to: "/admin/library", label: "Timeless Library", icon: LibraryBig },
     ],
   },
   {
@@ -170,6 +179,7 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/settings", label: "Settings", icon: Settings },
       { to: "/admin/automations", label: "Automations", icon: Zap },
+      { to: "/admin/files", label: "Files", icon: FolderOpen },
       { to: "/admin/domain", label: "Custom Domain", icon: Globe },
       { to: "/admin/team", label: "Team", icon: UsersRound },
       { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },
