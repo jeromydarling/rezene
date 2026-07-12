@@ -125,7 +125,8 @@ adminStrategyRoutes.post("/generate", requireAdminWrite, async (c) => {
       );
     }
     console.error("[strategy] generate failed:", String(err).slice(0, 300));
-    return c.json({ error: "Couldn't draft that one — give it another go in a moment." }, 502);
+    const debug = body.provider === "workers-ai" ? String(err).slice(0, 300) : undefined;
+    return c.json({ error: "Couldn't draft that one — give it another go in a moment.", debug }, 502);
   }
 
   const id = newId("strat");

@@ -218,9 +218,12 @@ Respond with exactly one JSON object and nothing else.`;
           { role: "system", content: system },
           { role: "user", content: prompt },
         ],
-        { maxTokens: MAX_TOKENS },
+        { maxTokens: 2000 },
       );
-      if (!text) throw new AiUnavailableError();
+      if (!text) {
+        const { lastWorkersAiError } = await import("./workers-ai");
+        throw new Error(`workers-ai produced no text: ${lastWorkersAiError ?? "unknown"}`);
+      }
       return { text, provider: "workers-ai" };
     }
     return aiComplete(env, { system, prompt, maxTokens: MAX_TOKENS });
