@@ -180,6 +180,43 @@ Where you write at length (research note bodies today, more editors over time), 
 The Dashboard opens with a card of what's **stuck** — overdue tasks, orders past their ex-factory date, sample rounds waiting over two weeks, maker messages awaiting a response, overdue commissions, unconfirmed consults. The calendar says what's scheduled; this card says what needs a human. It disappears when nothing needs you.`,
   },
   {
+    slug: "workflows",
+    title: "Workflows — build your own automations",
+    summary: "A no-code “when this happens, do that” builder on the same event spine as the built-in rules.",
+    part: "account",
+    moduleRoute: "/admin/workflows",
+    keywords: "workflow custom automation trigger condition action when this then that no-code webhook zapier rule builder",
+    updated: "2026-07-12",
+    body: `# Workflows
+
+The built-in [Automations](/admin/support/kb/automations) cover the obvious moves. **Workflows** let you build your *own* — your shop, your way of working, whether that's the design side or the finance side. Every workflow is one plain sentence: **when** something happens, **only if** it matches your conditions, **then** Verto does what you chose.
+
+Like the built-ins, workflows are **create-only** — they file tasks, notes, drafts and webhooks, but never edit or delete anything. The worst a workflow can do is create a task you delete.
+
+## Building one
+
+On **System → Workflows**, start from an example or hit **New workflow**:
+
+1. **When…** — pick a trigger. These are real events in your shop: a new client, a commission changing stage, a payment marked paid, a product published or running low, a new review, a trend adopted, a sample approved.
+2. **Only if…** *(optional)* — narrow it down. Add conditions on the trigger's own details — *amount is greater than 50000*, *new stage is “delivery”*, *rating is less than 3*. All conditions must match.
+3. **Then…** — choose one or more actions:
+   - **Create a task** on your Production board (use \`{field}\` to drop in details, e.g. \`Follow up with {clientName}\`).
+   - **Post a note to your activity feed** — a gentle heads-up.
+   - **Add a note to the client's timeline** *(client triggers only)*.
+   - **Draft a message to the client** *(client triggers only)* — Verto writes it in your voice into the client's outbox to review and send.
+   - **Send to a webhook** — POST the event to Zapier, Make, or any tool that takes a webhook (see below).
+
+The sentence at the bottom always reads back exactly what your workflow will do. Save it, and it's live. Each workflow shows how many times it's run and its **recent runs** so you can see it working.
+
+## Conditions use the trigger's details
+
+The fields you can filter on change with the trigger — a commission stage change offers the new stage, the title and the client name; a payment offers its label and amount (in cents, so £500 is \`50000\`). Text comparisons ignore case; *greater than* and *less than* compare numbers.
+
+## Reaching other tools (Zapier, Make, Gmail…)
+
+The **webhook** action is your bridge to everything else. Paste a webhook URL from Zapier (or Make, n8n, or your own endpoint) and Verto POSTs the event — its name and all its details — as JSON whenever the workflow fires. From there, your Zap can do anything Zapier can: send a Gmail, add a row to a sheet, ping Slack, create a calendar event. No Google Cloud project, no API keys in Verto — you build the far side in the tool you already know.`,
+  },
+  {
     slug: "ai-limits",
     title: "LLM research limits",
     summary: "How the shared daily quota on paid LLM research works.",

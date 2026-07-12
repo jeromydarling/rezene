@@ -451,6 +451,14 @@ export async function emit(db: DB, ev: ActivityEvent, opts?: EmitOpts): Promise<
       console.log("automation failed", rule.key, err);
     }
   }
+  // Shop-defined workflows (the no-code builder) run on the same spine, after
+  // the built-ins. Fully isolated — never throws back into the caller's save.
+  try {
+    const { runWorkflows } = await import("./workflow-engine");
+    await runWorkflows(db, ev, opts);
+  } catch (err) {
+    console.log("workflows failed", ev.kind, err);
+  }
 }
 
 /** Recent activity, for the automations page feed. */

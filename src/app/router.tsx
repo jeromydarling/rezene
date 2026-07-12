@@ -47,6 +47,7 @@ import { IssueReaderPage } from "./pages/admin/library/IssueReaderPage";
 import { BooksRoomPage } from "./pages/admin/library/BooksRoomPage";
 import { PatternsRoomPage } from "./pages/admin/library/PatternsRoomPage";
 import { AutomationsPage } from "./pages/admin/AutomationsPage";
+import { WorkflowsPage } from "./pages/admin/WorkflowsPage";
 import { DomainPage } from "./pages/admin/DomainPage";
 import { FeedbackInboxPage } from "./pages/admin/FeedbackInboxPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
@@ -259,6 +260,7 @@ export function AppRouter() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="automations" element={<AutomationsPage />} />
+          <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="domain" element={<DomainPage />} />
           <Route path="support" element={<KnowledgeBasePage />} />
