@@ -480,3 +480,343 @@ export function MiniPlatform() {
     </div>
   );
 }
+
+
+export function MiniBrandStudio() {
+  return (
+    <MiniShell title="Brand Studio — Maison Atlantique">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-white p-2 shadow-sm">
+          <p className="font-display text-lg font-light text-ink">Maison Atlantique</p>
+          <p className="text-[8px] uppercase tracking-widest text-warmgrey">The Fashion Desk</p>
+          <div className="mt-2 flex gap-1">
+            {["#16233f", "#c96f4a", "#e9e2d2", "#7a8b6f", "#f7f3ea"].map((c) => (
+              <span key={c} className="h-5 w-5 rounded shadow-sm ring-1 ring-ink/10" style={{ backgroundColor: c }} />
+            ))}
+          </div>
+          <div className="mt-2 space-y-0.5">
+            <p className="font-display text-[11px] text-ink">Display · Cormorant Garamond</p>
+            <p className="text-[9px] text-ink/70">Body · Inter — the working hand</p>
+          </div>
+        </div>
+        <div className="w-32 space-y-1">
+          {[
+            ["Storefront", "✓"],
+            ["Line sheets", "✓"],
+            ["Factory portal", "✓"],
+            ["Emails", "✓"],
+            ["Print Shop", "✓"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between rounded bg-white px-1.5 py-1 shadow-sm">
+              <span className="text-[8px] text-warmgrey">{k}</span>
+              <span className="text-[8px] text-palm">{v}</span>
+            </div>
+          ))}
+          <span className={badge("bg-terracotta/15 text-terracotta")}>✨ brand-in-a-box</span>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniFactoryPortal() {
+  return (
+    <div className="bg-cream/50 p-3">
+      <div className="mb-2 flex items-center justify-between rounded bg-navy px-2 py-1.5">
+        <p className="text-[9px] font-medium text-chalk">Portail usine — Maison Atlantique</p>
+        <span className={badge("bg-saffron/30 text-chalk")}>lien sécurisé</span>
+      </div>
+      <div className="space-y-1.5">
+        {[
+          ["Tangier Trouser — proto", "Éch. attendu 30 oct", "en cours"],
+          ["Corniche Polo — BOM v2", "Confirmer fil 40/2", "à confirmer"],
+        ].map(([t, sub, st]) => (
+          <div key={t} className="flex items-center justify-between rounded bg-white p-2 shadow-sm">
+            <div className="min-w-0">
+              <p className="truncate text-[9px] font-medium text-ink">{t}</p>
+              <p className="truncate text-[8px] text-warmgrey">{sub}</p>
+            </div>
+            <span className={badge("bg-navy/10 text-navy")}>{st}</span>
+          </div>
+        ))}
+        <p className="text-center text-[8px] text-warmgrey">
+          No login, no app — a tokenized link the factory opens in French or English.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function MiniSignup() {
+  return (
+    <MiniShell title="Open your shop — 2 minutes">
+      <div className="mx-auto max-w-[200px] space-y-1.5">
+        <div className="rounded bg-white p-1.5 shadow-sm">
+          <p className="text-[7px] uppercase tracking-wider text-warmgrey">Shop name</p>
+          <p className="text-[9px] font-semibold text-ink">Amara Studio</p>
+        </div>
+        <div className="rounded bg-white p-1.5 shadow-sm">
+          <p className="text-[7px] uppercase tracking-wider text-warmgrey">Your address</p>
+          <p className="text-[9px] text-ink">verto.style/<span className="font-semibold">amara</span> <span className="text-palm">✓ available</span></p>
+        </div>
+        <div className="rounded bg-navy px-2 py-1 text-center text-[8px] font-semibold text-chalk">Create my shop</div>
+        <div className="rounded bg-palm/10 p-1.5 text-[7.5px] text-palm">Studio ready · storefront, Client Book, booking page live</div>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniConsult() {
+  return (
+    <MiniShell title="Book a consult — public page">
+      <div className="rounded bg-white p-2 shadow-sm">
+        <p className="font-display text-[11px] font-light text-ink">Amara Studio</p>
+        <p className="mt-0.5 text-[7.5px] text-warmgrey">Made-to-measure tailoring · book a first consult</p>
+        <div className="mt-1.5 space-y-1">
+          {["What are you after? — “a structured wool jacket”", "Your name & email", "Preferred week"].map((t) => (
+            <div key={t} className="rounded border border-ink/10 px-1.5 py-1 text-[7.5px] text-warmgrey">{t}</div>
+          ))}
+        </div>
+        <div className="mt-1.5 rounded bg-terracotta px-2 py-1 text-center text-[8px] font-semibold text-chalk">Request a consult</div>
+        <p className="mt-1 text-[7px] text-warmgrey">Shared once in her bio — that's the whole launch.</p>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniRequests() {
+  return (
+    <MiniShell title="Client Book — requests">
+      <div className="space-y-1">
+        {[
+          ["Lena M.", "A structured wool jacket — wear to everything", "new"],
+          ["Priya R.", "Trans-seasonal overcoat, camel", "new"],
+          ["Jo T.", "Suit for a courthouse wedding", "new"],
+        ].map(([n, want, tag]) => (
+          <div key={n as string} className="flex items-center justify-between rounded bg-white p-1.5 shadow-sm">
+            <div className="min-w-0">
+              <p className="text-[8px] font-semibold text-ink">{n}</p>
+              <p className="truncate text-[7.5px] text-warmgrey">“{want}”</p>
+            </div>
+            <span className={badge("bg-terracotta/15 text-terracotta")}>{tag} · confirm</span>
+          </div>
+        ))}
+        <p className="text-[7px] text-warmgrey">One tap — the visitor becomes a client, their words already on the timeline.</p>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniCommission() {
+  return (
+    <MiniShell title="Commission — structured wool jacket">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-white p-1.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[8px] font-semibold text-ink">Quote</p>
+            <span className="font-display text-[13px] font-light text-ink">$850</span>
+          </div>
+          {[
+            ["Cloth & trims", "$95"],
+            ["Maker cut-and-sew", "$220"],
+            ["Your eye & fittings", "$535"],
+          ].map(([k, v]) => (
+            <div key={k} className="mt-0.5 flex justify-between text-[7.5px]">
+              <span className="text-warmgrey">{k}</span>
+              <span className="font-medium text-ink">{v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="w-24 space-y-1">
+          <div className="rounded bg-palm/10 p-1.5 text-[7.5px] text-palm">Client approved renders on her own body ✓</div>
+          <span className={badge("bg-navy/10 text-navy")}>margin 63%</span>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniDeposit() {
+  return (
+    <MiniShell title="Client portal — deposit">
+      <div className="mx-auto max-w-[210px] rounded bg-white p-2 shadow-sm">
+        <div className="flex items-center justify-between">
+          <p className="text-[8px] font-semibold text-ink">Deposit — 50% to begin</p>
+          <span className="font-display text-[13px] font-light text-ink">$425</span>
+        </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink/10">
+          <div className="h-full w-1/2 rounded-full bg-palm" />
+        </div>
+        <div className="mt-1 flex justify-between text-[7.5px] text-warmgrey">
+          <span>Paid now · $425</span>
+          <span>At final fitting · $425</span>
+        </div>
+        <div className="mt-1.5 rounded bg-palm/10 px-2 py-1 text-center text-[8px] font-semibold text-palm">Paid ✓ — less than a day after signing up</div>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniDossier() {
+  return (
+    <MiniShell title="R&D — competitor dossiers">
+      <div className="space-y-1">
+        {[
+          ["Maison Lune", "premium linen · $180–320", "3 stockists"],
+          ["Atelier Fauve", "DTC · $95–210", "watch"],
+          ["Rue & Rye", "wholesale-led · $140–260", "watch"],
+        ].map(([n, pos, tag]) => (
+          <div key={n as string} className="flex items-center justify-between rounded bg-white p-1.5 shadow-sm">
+            <div>
+              <p className="text-[8px] font-semibold text-ink">{n}</p>
+              <p className="text-[7.5px] text-warmgrey">{pos}</p>
+            </div>
+            <span className={badge(tag === "watch" ? "bg-terracotta/15 text-terracotta" : "bg-navy/10 text-navy")}>{tag}</span>
+          </div>
+        ))}
+        <p className="text-[7px] text-warmgrey">Every claim with its source sitting underneath it.</p>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniWatch() {
+  return (
+    <MiniShell title="R&D — on watch">
+      <div className="space-y-1">
+        {["Atelier Fauve", "Rue & Rye"].map((n) => (
+          <div key={n} className="flex items-center justify-between rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-semibold text-ink">{n}</p>
+            <span className={badge("bg-terracotta/15 text-terracotta")}>watching</span>
+          </div>
+        ))}
+        <div className="rounded bg-navy/5 p-1.5 text-[7.5px] text-ink">
+          Changes land in the same <span className="font-medium">morning digest</span> that chases late samples — research you never have to remember to do.
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniTrendBoard() {
+  return (
+    <MiniShell title="R&D — trend board · fluid tailoring">
+      <div className="grid grid-cols-4 gap-1">
+        {["bg-navy/70", "bg-terracotta/60", "bg-palm/50", "bg-ink/30", "bg-cream", "bg-terracotta/40", "bg-navy/40", "bg-palm/70"].map((c, i) => (
+          <div key={i} className={"h-8 rounded " + c} />
+        ))}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        <span className={badge("bg-navy/10 text-navy")}>who's showing it</span>
+        <span className={badge("bg-palm/15 text-palm")}>cloths that carry it</span>
+        <span className={badge("bg-ink/5 text-warmgrey")}>→ Design Studio</span>
+      </div>
+      <p className="mt-1 text-[7px] text-warmgrey">Adopted — the brief lands as a concept, directions attached.</p>
+    </MiniShell>
+  );
+}
+
+export function MiniDigest() {
+  return (
+    <MiniShell title="Your morning digest">
+      <div className="space-y-1">
+        <div className="rounded bg-terracotta/10 p-1.5">
+          <p className="text-[8px] font-semibold text-terracotta">Watched brand refreshed — see what changed</p>
+          <p className="text-[7.5px] text-warmgrey">Rue & Rye raised knit prices · +2 new boutiques</p>
+        </div>
+        {["3 samples past their promised date", "Deposit received — Lena M.", "2 POs to confirm"].map((t) => (
+          <p key={t} className="rounded bg-white px-1.5 py-1 text-[7.5px] text-ink shadow-sm">· {t}</p>
+        ))}
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniExport() {
+  return (
+    <MiniShell title="Leaving your old tools">
+      <div className="space-y-1">
+        {[
+          ["products.csv", "40 styles"],
+          ["customers.csv", "1,208 buyers"],
+          ["makers.csv", "9 workshops"],
+        ].map(([f, n]) => (
+          <div key={f} className="flex items-center justify-between rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-medium text-ink">{f}</p>
+            <span className="text-[7.5px] text-warmgrey">{n} · exported ✓</span>
+          </div>
+        ))}
+        <p className="text-[7px] text-warmgrey">Three CSVs out of the spreadsheets, a template store and DM threads — moving stops feeling like moving house.</p>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniSuppliers() {
+  return (
+    <MiniShell title="Factories & Suppliers">
+      <div className="space-y-1">
+        {[
+          ["Coupe & Cousu", "Porto · 1–50 (managed)", "verified"],
+          ["Atelier Nord", "Tunis · 2–4 wks sample", "verified"],
+          ["Maison Sud", "—", "pipeline"],
+        ].map(([n, meta, tag]) => (
+          <div key={n as string} className="flex items-center justify-between rounded bg-white p-1.5 shadow-sm">
+            <div>
+              <p className="text-[8px] font-semibold text-ink">{n}</p>
+              <p className="text-[7.5px] text-warmgrey">{meta}</p>
+            </div>
+            <span className={badge(tag === "verified" ? "bg-palm/15 text-palm" : "bg-ink/5 text-warmgrey")}>{tag}</span>
+          </div>
+        ))}
+        <p className="text-[7px] text-warmgrey">Research phrasing kept intact — flattening “1–50 (managed)” to a number would lie.</p>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniMaterials() {
+  return (
+    <MiniShell title="Materials — origins that work everywhere">
+      <div className="space-y-1">
+        {[
+          ["Irish linen", "IE mill", "duty 12%"],
+          ["Corozo buttons", "IT", "duty 0%"],
+          ["Organic cotton thread", "PT", "duty 4%"],
+        ].map(([m, origin, duty]) => (
+          <div key={m} className="flex items-center justify-between rounded bg-white p-1.5 shadow-sm">
+            <div>
+              <p className="text-[8px] font-semibold text-ink">{m}</p>
+              <p className="text-[7.5px] text-warmgrey">{origin}</p>
+            </div>
+            <span className={badge("bg-navy/10 text-navy")}>{duty}</span>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-1">
+          <span className={badge("bg-palm/15 text-palm")}>→ landed cost</span>
+          <span className={badge("bg-ink/5 text-warmgrey")}>→ product passport</span>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+export function MiniAutomations() {
+  return (
+    <MiniShell title="Automations — the season runs itself">
+      <div className="space-y-1">
+        {[
+          ["Sample approved", "→ drafts its purchase order"],
+          ["PO confirmed", "→ files a chase task for the date"],
+          ["Orders & fittings", "→ fill the calendar, untyped"],
+        ].map(([a, b]) => (
+          <div key={a} className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-semibold text-ink">{a}</p>
+            <p className="text-[7.5px] text-palm">{b}</p>
+          </div>
+        ))}
+        <p className="text-[7px] text-warmgrey">The digest lists the three things that actually need her.</p>
+      </div>
+    </MiniShell>
+  );
+}
