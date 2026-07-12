@@ -3,43 +3,73 @@ import { useNavigate } from "react-router";
 import { MagneticButton, ParallaxImage, ParticleField, Reveal } from "./cinema";
 import {
   BrowserFrame,
+  MiniAutomations,
+  MiniBrandStudio,
   MiniClientBook,
+  MiniCommission,
+  MiniConsult,
   MiniCosting,
+  MiniDeposit,
   MiniDesignStudio,
+  MiniDigest,
+  MiniDossier,
+  MiniExport,
+  MiniFactoryPortal,
   MiniFittingStudio,
   MiniImport,
+  MiniMaterials,
   MiniPatternStudio,
   MiniPlatform,
   MiniProduction,
   MiniRD,
+  MiniRequests,
+  MiniSignup,
   MiniSourcing,
+  MiniSuppliers,
   MiniTechPack,
+  MiniTrendBoard,
+  MiniWatch,
   MiniWholesale,
 } from "./minis";
 
 /**
- * A few beats show the actual tool that moment runs on — the miniature admin
- * screens from the features tour, keyed by the beat's headline. Not every beat
- * has one; the signature-feature moments do, so the story lands on the app.
+ * Every beat shows the actual tool that moment runs on — the miniature admin
+ * screens (shared with the features tour), keyed by the beat's headline. So
+ * each hour of each story lands on the real interface, not just the words.
  */
 const BEAT_SHOTS: Record<string, { url: string; El: () => ReactNode }> = {
   // The stylist
-  "She measures her first client.": { url: "verto.style/maison/admin/clients", El: MiniClientBook },
-  "The jacket exists before the cloth.": { url: "verto.style/maison/admin/pattern", El: MiniPatternStudio },
-  "She finds her maker.": { url: "verto.style/maison/admin/sourcing", El: MiniSourcing },
+  "She signs up.": { url: "verto.style/signup", El: MiniSignup },
+  "She shares one link.": { url: "verto.style/amara/book", El: MiniConsult },
+  "Three requests are waiting.": { url: "verto.style/amara/admin/clients", El: MiniRequests },
+  "She measures her first client.": { url: "verto.style/amara/admin/clients", El: MiniClientBook },
+  "The jacket exists before the cloth.": { url: "verto.style/amara/admin/pattern", El: MiniPatternStudio },
+  "The client says yes from the bus — and the quote is real.": { url: "verto.style/amara/admin/commissions", El: MiniCommission },
+  "The deposit lands.": { url: "verto.style/amara/admin/commissions", El: MiniDeposit },
+  "She finds her maker.": { url: "verto.style/amara/admin/sourcing", El: MiniSourcing },
   // The label
-  "The first capsule appears.": { url: "verto.style/maison/admin/design", El: MiniDesignStudio },
-  "He sees it on real bodies.": { url: "verto.style/maison/admin/fitting", El: MiniFittingStudio },
-  "Designs become specs.": { url: "verto.style/maison/admin/tech-packs", El: MiniTechPack },
-  "Money arrives before production does.": { url: "verto.style/maison/admin/costing", El: MiniCosting },
+  "A name becomes a brand.": { url: "verto.style/theo/admin/brand", El: MiniBrandStudio },
+  "The first capsule appears.": { url: "verto.style/theo/admin/design", El: MiniDesignStudio },
+  "He sees it on real bodies.": { url: "verto.style/theo/admin/fitting", El: MiniFittingStudio },
+  "Designs become specs.": { url: "verto.style/theo/admin/tech-packs", El: MiniTechPack },
+  "He finds his maker.": { url: "verto.style/theo/admin/factory", El: MiniFactoryPortal },
+  "Money arrives before production does.": { url: "verto.style/theo/admin/costing", El: MiniCosting },
   // The founder
-  "The price question gets a study.": { url: "verto.style/maison/admin/research", El: MiniRD },
-  "The number lands in costing.": { url: "verto.style/maison/admin/costing", El: MiniCosting },
-  "She pitches the doors that already believe.": { url: "verto.style/maison/admin/wholesale", El: MiniWholesale },
+  "She names the competition.": { url: "verto.style/leila/admin/research", El: MiniDossier },
+  "Two go on watch.": { url: "verto.style/leila/admin/research", El: MiniWatch },
+  "The price question gets a study.": { url: "verto.style/leila/admin/research", El: MiniRD },
+  "The number lands in costing.": { url: "verto.style/leila/admin/costing", El: MiniCosting },
+  "A direction earns its place.": { url: "verto.style/leila/admin/research", El: MiniTrendBoard },
+  "The digest catches a move.": { url: "verto.style/leila/admin", El: MiniDigest },
+  "She pitches the doors that already believe.": { url: "verto.style/leila/admin/wholesale", El: MiniWholesale },
   // The switcher
-  "The catalog imports itself.": { url: "verto.style/maison/admin/import", El: MiniImport },
-  "The season in flight comes with her.": { url: "verto.style/maison/admin/production", El: MiniProduction },
-  "The domain follows her.": { url: "verto.style/maison/admin/domain", El: MiniPlatform },
+  "She exports four years of business.": { url: "her old tools", El: MiniExport },
+  "The catalog imports itself.": { url: "verto.style/nadia/admin/import", El: MiniImport },
+  "Her makers become records.": { url: "verto.style/nadia/admin/suppliers", El: MiniSuppliers },
+  "The season in flight comes with her.": { url: "verto.style/nadia/admin/production", El: MiniProduction },
+  "Materials carry their origins.": { url: "verto.style/nadia/admin/materials", El: MiniMaterials },
+  "The domain follows her.": { url: "verto.style/nadia/admin/domain", El: MiniPlatform },
+  "The season starts running itself.": { url: "verto.style/nadia/admin/automations", El: MiniAutomations },
 };
 
 /**
