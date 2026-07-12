@@ -1,4 +1,6 @@
 import type { CourseDef } from "./types";
+import { S2_MORE_LESSONS, S2_MORE_QUIZ } from "./more-drafting";
+import { S3_MORE_LESSONS, S3_MORE_QUIZ } from "./more-dressmaking";
 
 /**
  * School of Seamstressing, courses 2–3: drafting & draping, then the
@@ -199,6 +201,7 @@ Fales's protocol for the fitting itself is worth adopting whole: fit over the co
         },
       ],
     },
+    ...S2_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -217,6 +220,7 @@ Fales's protocol for the fitting itself is worth adopting whole: fit over the co
     { id: "s2q12", q: "Hems are leveled…", options: ["with a fixed-height marker from the floor, after balancing at the waist", "by measuring down from the waist everywhere", "by eye from the front only"], answer: 0 },
     { id: "s2q13", q: "Fales's fitting protocol fits…", options: ["one side of the body and transfers corrections symmetrically", "both sides independently", "the garment on a hanger"], answer: 0 },
     { id: "s2q14", q: "Every fitting change must be…", options: ["written down before the client leaves", "memorized", "photographed only"], answer: 0 },
+    ...S2_MORE_QUIZ,
   ],
   practical: {
     kind: "client_measurements",
@@ -419,6 +423,7 @@ And her closing counsel, which is really a business lesson wearing a thimble: de
         },
       ],
     },
+    ...S3_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -437,6 +442,7 @@ And her closing counsel, which is really a business lesson wearing a thimble: de
     { id: "s3q12", q: "A sharp corner is achieved by…", options: ["a stitch across the point before turning", "trimming to zero and poking hard", "pressing only"], answer: 0 },
     { id: "s3q13", q: "A chain in a jacket hem exists to…", options: ["make the cloth hang plumb", "carry keys", "stiffen the lining"], answer: 0 },
     { id: "s3q14", q: "Hems on coats and full skirts are interfaced so that…", options: ["the hem swings instead of fluttering", "they can be shortened later", "the color deepens"], answer: 0 },
+    ...S3_MORE_QUIZ,
   ],
   practical: {
     kind: "bom_linked",

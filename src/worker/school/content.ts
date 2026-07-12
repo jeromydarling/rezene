@@ -29,6 +29,9 @@ export type {
 } from "./types";
 
 import type { SchoolDef, CourseDef } from "./types";
+import { T1_MORE_LESSONS, T1_MORE_QUIZ } from "./more-foundations";
+import { S1_MORE_LESSONS, S1_MORE_QUIZ } from "./more-stitches";
+import { F3_MORE_LESSONS, F3_MORE_QUIZ } from "./more-economics";
 import { T2, T3 } from "./courses-tailoring2";
 import { S2, S3 } from "./courses-seamstressing2";
 import { F1, F2 } from "./courses-fashion2";
@@ -244,6 +247,7 @@ With the frame–widths–curves–style order in your head and those two checks
         },
       ],
     },
+    ...T1_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -262,6 +266,7 @@ With the frame–widths–curves–style order in your head and those two checks
     { id: "t1q12", q: "Walking the seams of a draft checks that…", options: ["the pattern fits the paper", "seam lines to be sewn together match in length (except declared ease)", "the grain is straight"], answer: 1 },
     { id: "t1q13", q: "Diagonal drags from the neck toward the underarm most likely indicate…", options: ["wrong shoulder slope for the body", "waist too tight", "hem out of level"], answer: 0 },
     { id: "t1q14", q: "Ready-to-wear manufacturing leaned on which school of drafting?", options: ["direct-measure", "proportionate", "rock-of-eye draping"], answer: 1 },
+    ...T1_MORE_QUIZ,
   ],
   practical: {
     kind: "client_measurements",
@@ -458,6 +463,7 @@ Finish this lesson, pass the quiz, and complete the practical — documented con
         },
       ],
     },
+    ...S1_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -476,6 +482,7 @@ Finish this lesson, pass the quiz, and complete the practical — documented con
     { id: "s1q12", q: "A bar tack belongs at…", options: ["every point of strain — pocket corners, placket ends, slit tops", "the middle of every seam", "the center back neck only"], answer: 0 },
     { id: "s1q13", q: "Overcasting is the hand ancestor of…", options: ["the overlock/serger finish", "the buttonhole", "topstitching"], answer: 0 },
     { id: "s1q14", q: "The Institute's test for an edge finish is…", options: ["speed of sewing", "whether it survives the garment's life and suits being seen", "whether it uses matching thread"], answer: 1 },
+    ...S1_MORE_QUIZ,
   ],
   practical: {
     kind: "construction_notes",
@@ -645,6 +652,7 @@ Pass the quiz, then complete the practical: a real price study, decided, with at
         },
       ],
     },
+    ...F3_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -663,6 +671,7 @@ Pass the quiz, then complete the practical: a real price study, decided, with at
     { id: "f3q12", q: "'Keepers' in a line should be…", options: ["cut shallow and dropped fast", "produced confidently and improved yearly", "priced between zones"], answer: 1 },
     { id: "f3q13", q: "Modern tools that push fashion-timing risk toward zero include…", options: ["pre-orders, small batches, made-to-measure", "deeper wholesale discounts", "longer seasons"], answer: 0 },
     { id: "f3q14", q: "Roughly, $25 retail in 1928 corresponds to what in 2026 dollars?", options: ["about $45", "about $450", "about $4,500"], answer: 1 },
+    ...F3_MORE_QUIZ,
   ],
   practical: {
     kind: "price_study",
