@@ -7,6 +7,7 @@ import { buildRateRequest, quoteEnabledProviders, type RateQuote } from "../serv
 import { parseBody } from "../services/validators";
 import { rateLimit } from "../middleware/rate-limit";
 import { newId } from "../utils/id";
+import { sumLineItems } from "../services/money";
 import type { AppContext } from "../types/env";
 
 export const commerceRoutes = new Hono<AppContext>();
@@ -171,7 +172,9 @@ commerceRoutes.post(
     if (resolved.some((r) => r.currency !== currency)) {
       return c.json({ error: "Cart items must share a currency" }, 400);
     }
-    const subtotal = resolved.reduce((sum, r) => sum + r.unitPriceCents * r.quantity, 0);
+    const subtotal = sumLineItems(
+      resolved.map((r) => ({ unitPriceCents: r.unitPriceCents, quantity: r.quantity })),
+    );
     const anyPreOrder = resolved.some((r) => r.isPreOrder);
 
     const orderId = newId("ord");
@@ -362,7 +365,9 @@ commerceRoutes.post(
       });
     }
     if (lines.length === 0) return c.json({ quotes: [] });
-    const subtotal = lines.reduce((sum, l) => sum + l.valueCents * l.quantity, 0);
+    const subtotal = sumLineItems(
+      lines.map((l) => ({ unitPriceCents: l.valueCents, quantity: l.quantity })),
+    );
     const req = await buildRateRequest(c.var.db, {
       to: { country: body.country },
       items: lines,

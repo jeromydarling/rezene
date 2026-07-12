@@ -1,5 +1,6 @@
 import { first, run } from "./db";
 import { newId, randomToken, sha256Hex } from "../utils/id";
+import { isExpired } from "../utils/time";
 import type { Env } from "../types/env";
 import type { SessionUser } from "../../shared/types";
 
@@ -169,7 +170,7 @@ export async function consumeResetToken(
     await sha256Hex(secret),
   );
   if (!row || row.used_at) return null;
-  if (row.expires_at < new Date().toISOString()) return null;
+  if (isExpired(row.expires_at)) return null;
   await run(db, `UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`, row.id);
   return { userId, purpose: row.purpose };
 }
@@ -199,7 +200,7 @@ export async function resolveSession(
     id,
   );
   if (!row || !row.is_active) return null;
-  if (row.expires_at < new Date().toISOString()) return null;
+  if (isExpired(row.expires_at)) return null;
   if (row.token_hash !== (await sha256Hex(secret))) return null;
 
   const roles = await db

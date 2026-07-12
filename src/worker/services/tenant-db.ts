@@ -79,8 +79,23 @@ class ShopDbFacade {
  * stays on the bound D1. Callers treat the result as a D1Database.
  */
 export function getShopDb(env: Env, shopId: string, primaryShopId: string): D1Database {
-  if (shopId === primaryShopId && env.PRIMARY_ON_DO !== "1") return env.DB;
+  if (primaryUsesBoundD1(shopId, primaryShopId, env.PRIMARY_ON_DO)) return env.DB;
   return getShopDoDb(env, shopId);
+}
+
+/**
+ * Whether a shop resolves to the bound D1 (true) or its own Durable Object
+ * (false). Only the primary shop can use the bound D1, and only while it hasn't
+ * been migrated to its DO (PRIMARY_ON_DO !== "1"). Pure so tenant resolution —
+ * the rule that keeps one shop's data out of another's database — is unit-
+ * tested directly.
+ */
+export function primaryUsesBoundD1(
+  shopId: string,
+  primaryShopId: string,
+  primaryOnDo: string | undefined,
+): boolean {
+  return shopId === primaryShopId && primaryOnDo !== "1";
 }
 
 /** The shop's Durable Object database, unconditionally — used by the
