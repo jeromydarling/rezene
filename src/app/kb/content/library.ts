@@ -12,7 +12,7 @@ export const library: KbArticle[] = [
     updated: "2026-07-12",
     body: `# The Timeless Library
 
-**Studio → Timeless Library** is the archive of the craft, opened inside your studio: the Metropolitan Museum's open collection, the complete early runs of *Vogue* (1892–1929) and *Harper's Bazar* (1867–1929), the books the Verto School teaches from, and historic patterns you can actually cut. Everything in it is **public domain** — published before 1931 or released CC0 by its museum — so you can pin it, quote it, print it, and design from it freely.
+**School & Library → Timeless Library** is the archive of the craft, opened inside your studio: the Metropolitan Museum's open collection, the complete early runs of *Vogue* (1892–1929) and *Harper's Bazar* (1867–1929), the books the Verto School teaches from, and historic patterns you can actually cut. Everything in it is **public domain** — published before 1931 or released CC0 by its museum — so you can pin it, quote it, print it, and design from it freely.
 
 ## How it works
 

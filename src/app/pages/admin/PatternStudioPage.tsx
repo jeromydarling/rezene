@@ -703,7 +703,7 @@ export function PatternStudioPage() {
       form.set("entityType", "general");
       form.set("isPublic", "1");
       await api.upload("/api/admin/files/upload", form);
-      toast.success("Pattern saved to your media library", "Find it under Studio → Files.");
+      toast.success("Pattern saved to your media library", "Find it under System → Files.");
     } catch {
       toast.error("Couldn't save the file");
     } finally {
