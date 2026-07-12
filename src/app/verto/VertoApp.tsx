@@ -238,6 +238,9 @@ function VertoLayout({ children }: { children: ReactNode }) {
             <Link to="/pricing" className="hover:text-chalk">
               Pricing
             </Link>
+            <Link to="/changelog" className="hover:text-chalk">
+              What's new
+            </Link>
             <a href={DEMO_SHOP_BASE} className="hover:text-chalk">
               See a live shop
             </a>
@@ -1001,6 +1004,88 @@ function VertoSignup() {
   );
 }
 
+// A living changelog — proof the product ships. Kept honest and specific;
+// each entry is a real, shipped capability, newest first.
+const CHANGELOG: { date: string; title: string; items: string[] }[] = [
+  {
+    date: "July 2026",
+    title: "Get selling faster, and see where shops stall",
+    items: [
+      "New “Get Selling Fast” guide on the dashboard — a state-aware setup path that reads your real shop and walks you from a drafted brand to open for business.",
+      "Honest setup status: order-confirmation email now shows whether it's actually sending, so nothing silently no-ops.",
+      "One-click data export for products, customers, orders, accounting and journal — your data is always yours to take.",
+      "Sharper storefront reliability on mobile and a cleaner marketing message.",
+    ],
+  },
+  {
+    date: "July 2026",
+    title: "The School, the Drafting Room & a bigger pattern library",
+    items: [
+      "The Verto School grew to nine twelve-lesson courses taught from the era's own masters, with certificates verified by real work.",
+      "The Drafting Room: period drafting systems (Vincent trousers, Keystone vest, 1917 shirt-waist, circular cape) as working generators.",
+      "The pattern catalogue expanded to 51 blocks, with “Draft it” mapping a described garment to the right block.",
+    ],
+  },
+  {
+    date: "June 2026",
+    title: "Studios, fittings & the Companion",
+    items: [
+      "Design, Fitting, Pattern and 3D studios, with photoreal try-on and a green→red fit map.",
+      "The Verto Companion — an assistant on every page, schooled on the whole manual, that can propose actions you confirm.",
+      "The Timeless Library: the Met's open collection and early fashion magazines, searchable and pinnable with citations.",
+    ],
+  },
+  {
+    date: "Spring 2026",
+    title: "The commerce & production backbone",
+    items: [
+      "Full commerce: checkout, discounts, tax, returns, reviews, wholesale, customer accounts and win-back automations.",
+      "Production: tech packs a factory can build from, samples, size-run POs, costing with duties and landed cost.",
+      "Your own domain, automated — point a CNAME and the certificate issues itself.",
+    ],
+  },
+];
+
+function VertoChangelog() {
+  return (
+    <div className="mx-auto max-w-3xl px-5 pb-32 pt-32 md:pt-40">
+      <p className="eyebrow mb-3">What's new</p>
+      <h1 className="display-hero text-4xl md:text-5xl">Verto is built in the open.</h1>
+      <p className="prose-editorial mt-4 max-w-xl">
+        We ship constantly, and we write it down. Here's what's landed lately — every entry is a
+        real capability you can use today, not a roadmap promise.
+      </p>
+      <div className="mt-12 space-y-12">
+        {CHANGELOG.map((entry, i) => (
+          <div key={i} className="border-l-2 border-terracotta/30 pl-6">
+            <p className="text-[0.66rem] font-medium uppercase tracking-editorial text-terracotta">
+              {entry.date}
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-light text-ink">{entry.title}</h2>
+            <ul className="mt-3 space-y-2">
+              {entry.items.map((it, j) => (
+                <li key={j} className="flex gap-2.5 text-sm text-ink/80">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-terracotta/60" />
+                  <span>{it}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="mt-14 rounded-2xl border border-ink/10 bg-navy p-8 text-center text-chalk">
+        <p className="font-display text-2xl font-light">Want this running your label?</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-chalk/80">
+          Open a shop in two minutes — the setup guide takes it from there.
+        </p>
+        <Link to="/signup" className="btn btn-primary mt-6 inline-flex">
+          Open your shop
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function VertoNotFound() {
   return (
     <div className="mx-auto max-w-xl px-5 pb-32 pt-40 text-center">
@@ -1032,6 +1117,7 @@ export function VertoApp() {
         <Route path="directory" element={<VertoDirectory />} />
         <Route path="makers" element={<VertoMakers />} />
         <Route path="signup" element={<VertoSignup />} />
+        <Route path="changelog" element={<VertoChangelog />} />
         <Route path="*" element={<VertoNotFound />} />
       </Routes>
     </VertoLayout>

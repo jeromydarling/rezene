@@ -1511,7 +1511,52 @@ export function AnalyticsPage() {
 interface SettingsResponse {
   settings: { key: string; value: string; description: string | null }[];
   integrations: { provider: string; status: string; note: string | null }[];
-  secretStatus: { stripe: boolean; stripeWebhook: boolean; anthropic: boolean };
+  secretStatus: {
+    stripe: boolean;
+    stripeWebhook: boolean;
+    anthropic: boolean;
+    buyerEmail: boolean;
+    notifyEmail: boolean;
+  };
+}
+
+/**
+ * Your data is yours — a visible, one-click export of everything. Lowering the
+ * cost of leaving is what makes entering feel safe; a merchant who can walk out
+ * with their catalog and customers trusts moving in.
+ */
+function DataExportCard() {
+  const files: [string, string, string][] = [
+    ["Products", "products.csv", "Your whole catalog — styles, prices, variants."],
+    ["Customers", "customers.csv", "Everyone who's bought or signed up."],
+    ["Orders", "orders.csv", "Every order with totals and status."],
+    ["Accounting", "accounting.csv", "QuickBooks / Xero-ready ledger lines."],
+    ["Journal", "journal.csv", "Your published journal posts."],
+  ];
+  return (
+    <div className="admin-card p-5">
+      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-warmgrey">Your data</h2>
+      <p className="mb-4 text-xs text-warmgrey">
+        Everything in Verto is yours to take, any time — no lock-in. Downloads are plain CSV.
+      </p>
+      <ul className="space-y-2 text-sm">
+        {files.map(([label, file, desc]) => (
+          <li key={file} className="flex items-center justify-between gap-3">
+            <span>
+              <span className="font-medium text-ink">{label}</span>
+              <span className="ml-2 text-xs text-warmgrey">{desc}</span>
+            </span>
+            <a
+              href={`/api/admin/export/${file}`}
+              className="shrink-0 rounded-full border border-ink/15 px-3 py-1 text-xs font-medium text-ink/70 transition hover:bg-ink/5"
+            >
+              Download
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function ChangePasswordCard() {
@@ -1755,6 +1800,14 @@ export function SettingsPage() {
                 </span>
               </li>
               <li className="flex items-center justify-between">
+                <span>Order confirmation emails</span>
+                <span
+                  className={`badge ${data.secretStatus.buyerEmail ? "badge-success" : "badge-neutral"}`}
+                >
+                  {data.secretStatus.buyerEmail ? "sending" : "not sending yet"}
+                </span>
+              </li>
+              <li className="flex items-center justify-between">
                 <span>LLM assistance</span>
                 <span
                   className={`badge ${data.secretStatus.anthropic ? "badge-success" : "badge-neutral"}`}
@@ -1763,11 +1816,20 @@ export function SettingsPage() {
                 </span>
               </li>
             </ul>
+            {!data.secretStatus.buyerEmail && (
+              <p className="mt-4 rounded-lg border border-terracotta/30 bg-terracotta/5 p-3 text-xs text-ink/80">
+                <span className="font-semibold text-terracotta-deep">Heads up:</span> buyers aren't
+                being emailed their order confirmations yet. Orders are still recorded and paid, but
+                the confirmation email won't send until your sending domain is connected. This is a
+                one-time setup — until then, tell buyers to check their order status in their account.
+              </p>
+            )}
             <p className="mt-4 text-xs text-warmgrey">
               Connection keys are stored securely outside the app — they never appear in the
               database or the browser.
             </p>
           </div>
+          <DataExportCard />
           <DirectoryCard />
           <ChangePasswordCard />
         </div>
