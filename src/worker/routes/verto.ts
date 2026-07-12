@@ -121,9 +121,13 @@ vertoRoutes.get("/slug-check", async (c) => {
  * shop with fixed content — there is no caller input to abuse.
  */
 vertoRoutes.post("/demo-bootstrap", async (c) => {
-  const { bootstrapDemoShop } = await import("../services/demo");
-  const result = await bootstrapDemoShop(c.env);
-  return c.json({ ok: true, ...result });
+  try {
+    const { bootstrapDemoShop } = await import("../services/demo");
+    const result = await bootstrapDemoShop(c.env);
+    return c.json({ ok: true, ...result });
+  } catch (err) {
+    return c.json({ ok: false, error: String(err instanceof Error ? err.message : err).slice(0, 300) }, 500);
+  }
 });
 
 /**

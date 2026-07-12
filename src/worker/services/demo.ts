@@ -82,15 +82,20 @@ export async function bootstrapDemoShop(env: Env): Promise<{ created: boolean; s
     db,
     `SELECT value FROM settings WHERE key = 'demo_seed_version'`,
   );
+  let seedErrors: { i: number; msg: string; sql: string }[] = [];
   if (seeded?.value !== DEMO_SEED_VERSION) {
     const statements = splitStatements(DEMO_RICH_SEED_SQL);
-    await db.batch(statements.map((sql) => db.prepare(sql)));
-    await run(
-      db,
-      `INSERT OR REPLACE INTO settings (key, value, description)
-       VALUES ('demo_seed_version', ?, 'Version hash of the applied demo seed — bootstrap re-applies on mismatch.')`,
-      DEMO_SEED_VERSION,
-    );
+    seedErrors = await applySeed(db, statements);
+    // Only advance the version marker on a clean apply, so a later fix
+    // re-runs the reseed instead of being skipped on a version match.
+    if (seedErrors.length === 0) {
+      await run(
+        db,
+        `INSERT OR REPLACE INTO settings (key, value, description)
+         VALUES ('demo_seed_version', ?, 'Version hash of the applied demo seed — bootstrap re-applies on mismatch.')`,
+        DEMO_SEED_VERSION,
+      );
+    }
   }
 
   // The shared gate account: viewer role only, so demo sessions are
@@ -118,7 +123,38 @@ export async function bootstrapDemoShop(env: Env): Promise<{ created: boolean; s
   }
   await run(db, `INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'viewer')`, userId);
 
-  return { created: !existing, slug: DEMO_SHOP_SLUG };
+  return { created: !existing, slug: DEMO_SHOP_SLUG, seedErrors };
+}
+
+/**
+ * Apply the rich seed in small chunks rather than one 200+ statement batch —
+ * some DO/D1 batch implementations cap statements per call. On a chunk failure,
+ * re-run its statements individually to isolate the offender, and collect the
+ * errors instead of throwing so the rest of the seed still lands.
+ */
+async function applySeed(db: D1Database, statements: string[]): Promise<{ i: number; msg: string; sql: string }[]> {
+  const errors: { i: number; msg: string; sql: string }[] = [];
+  const CHUNK = 25;
+  for (let start = 0; start < statements.length; start += CHUNK) {
+    const chunk = statements.slice(start, start + CHUNK);
+    try {
+      await db.batch(chunk.map((sql) => db.prepare(sql)));
+    } catch {
+      // Isolate the failing statement(s) in this chunk.
+      for (let j = 0; j < chunk.length; j++) {
+        try {
+          await db.prepare(chunk[j]).run();
+        } catch (err) {
+          errors.push({
+            i: start + j,
+            msg: String(err instanceof Error ? err.message : err).slice(0, 200),
+            sql: chunk[j].slice(0, 120),
+          });
+        }
+      }
+    }
+  }
+  return errors;
 }
 
 /** Same statement discipline as the DO migrator (comment-stripped, ;\n split). */
