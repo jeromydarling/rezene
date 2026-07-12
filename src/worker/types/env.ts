@@ -48,6 +48,8 @@ export interface Env {
    *  (the bound D1 is then platform-only). Flip AFTER running the
    *  /api/admin/platform/migrate-primary copy. */
   PRIMARY_ON_DO?: string;
+  /** Sentry DSN (publishable). Empty = error monitoring disabled. */
+  SENTRY_DSN?: string;
   BRAND_NAME: string;
   BRAND_SLUG: string;
   R2_PUBLIC_BASE_URL: string;
