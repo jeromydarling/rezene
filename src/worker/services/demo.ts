@@ -26,7 +26,9 @@ import type { Env } from "../types/env";
  *  - the shared viewer login is upserted to the well-known public password
  *    (read-only role — see DEMO_VIEWER_PASSWORD).
  */
-export async function bootstrapDemoShop(env: Env): Promise<{ created: boolean; slug: string }> {
+export async function bootstrapDemoShop(
+  env: Env,
+): Promise<{ created: boolean; slug: string; seedErrors: { i: number; msg: string; sql: string }[] }> {
   const existing = await first<{ id: string }>(
     env.DB,
     `SELECT id FROM shops WHERE slug = ?`,
