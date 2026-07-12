@@ -21,6 +21,7 @@ interface Overview {
     priceStudies: number;
     trendBoards: number;
     stockists: number;
+    strategy: number;
   };
   watched: { kind: string; id: string; name: string; lastResearchedAt: string | null }[];
   recent: { kind: string; title: string; createdAt: string }[];
@@ -63,6 +64,12 @@ const ROOMS: {
     title: "Stockists",
     blurb: "The doors that could carry the label, researched and pitched, from shortlist to stocked.",
   },
+  {
+    key: "strategy",
+    to: "/admin/research/strategy",
+    title: "Business strategy",
+    blurb: "Work with a strategy advisor to build SWOTs, business plans, OKRs, and competitive maps — then put the next steps on your calendar.",
+  },
 ];
 
 const COUNT_LABEL: Record<string, [string, string]> = {
@@ -71,6 +78,7 @@ const COUNT_LABEL: Record<string, [string, string]> = {
   priceStudies: ["study", "studies"],
   trendBoards: ["board", "boards"],
   stockists: ["stockist", "stockists"],
+  strategy: ["document", "documents"],
 };
 
 export function ResearchHomePage() {

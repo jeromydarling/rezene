@@ -52,13 +52,14 @@ adminResearchPlusRoutes.get("/overview", async (c) => {
       return 0; // table not migrated on this shop DB yet
     }
   };
-  const [makers, notes, brands, studies, boards, stockists] = await Promise.all([
+  const [makers, notes, brands, studies, boards, stockists, strategy] = await Promise.all([
     count("research_makers"),
     count("research_notes"),
     count("research_brands"),
     count("price_studies"),
     count("trend_boards"),
     count("research_stockists"),
+    count("strategy_docs"),
   ]);
   let watched: { kind: string; id: string; name: string; lastResearchedAt: string | null }[] = [];
   try {
@@ -92,7 +93,7 @@ adminResearchPlusRoutes.get("/overview", async (c) => {
   const { perplexityConfigured } = await import("../services/perplexity");
   const quota = await peekResearchQuota(c.env, c.var.shopId);
   return c.json({
-    counts: { makers, notes, brands, priceStudies: studies, trendBoards: boards, stockists },
+    counts: { makers, notes, brands, priceStudies: studies, trendBoards: boards, stockists, strategy },
     watched,
     recent,
     research: { enabled: perplexityConfigured(c.env), used: quota.used, limit: quota.limit },

@@ -15,6 +15,7 @@ export const RESEARCH_TABS = [
   { to: "/admin/research/pricing", label: "Pricing" },
   { to: "/admin/research/trends", label: "Trends" },
   { to: "/admin/research/stockists", label: "Stockists" },
+  { to: "/admin/research/strategy", label: "Strategy" },
 ] as const;
 
 export function ResearchNav() {

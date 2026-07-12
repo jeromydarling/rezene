@@ -18,6 +18,7 @@ const RESTORABLE = new Set([
   "production_tasks",
   "samples",
   "production_calendar_events",
+  "strategy_docs",
 ]);
 
 /** Delete with a safety net. Returns the tombstone id, or null if the table
