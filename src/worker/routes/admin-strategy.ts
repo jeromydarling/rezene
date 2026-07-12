@@ -92,7 +92,6 @@ adminStrategyRoutes.post("/generate", requireAdminWrite, async (c) => {
     persona?: string;
     brief?: string;
     plain?: boolean;
-    provider?: string;
   };
 
   const kindMeta = strategyKindMeta(body.kind ?? "");
@@ -109,14 +108,7 @@ adminStrategyRoutes.post("/generate", requireAdminWrite, async (c) => {
 
   let generated;
   try {
-    generated = await generateStrategy(c.env, c.var.db, {
-      kind,
-      variant,
-      persona,
-      brief,
-      plain,
-      forceProvider: body.provider === "workers-ai" ? "workers-ai" : undefined,
-    });
+    generated = await generateStrategy(c.env, c.var.db, { kind, variant, persona, brief, plain });
   } catch (err) {
     if (err instanceof AiUnavailableError) {
       return c.json(
@@ -125,8 +117,7 @@ adminStrategyRoutes.post("/generate", requireAdminWrite, async (c) => {
       );
     }
     console.error("[strategy] generate failed:", String(err).slice(0, 300));
-    const debug = body.provider === "workers-ai" ? String(err).slice(0, 300) : undefined;
-    return c.json({ error: "Couldn't draft that one — give it another go in a moment.", debug }, 502);
+    return c.json({ error: "Couldn't draft that one — give it another go in a moment." }, 502);
   }
 
   const id = newId("strat");
