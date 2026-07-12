@@ -79,6 +79,9 @@ const FittingStudioPage = lazy(() =>
 const PatternStudioPage = lazy(() =>
   import("./pages/admin/PatternStudioPage").then((m) => ({ default: m.PatternStudioPage })),
 );
+const DraftingRoomPage = lazy(() =>
+  import("./pages/admin/DraftingRoomPage").then((m) => ({ default: m.DraftingRoomPage })),
+);
 import { CostingPage, DutiesPage, AnalyticsPage, SettingsPage } from "./pages/admin/FinancePages";
 import { CashFlowPage } from "./pages/admin/CashFlowPage";
 import { ShippingPage } from "./pages/admin/ShippingPage";
@@ -236,6 +239,14 @@ export function AppRouter() {
             element={
               <Suspense fallback={<div className="p-8 text-sm text-warmgrey">Loading the Pattern Studio…</div>}>
                 <PatternStudioPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="drafting"
+            element={
+              <Suspense fallback={<div className="p-8 text-sm text-warmgrey">Opening the Drafting Room…</div>}>
+                <DraftingRoomPage />
               </Suspense>
             }
           />

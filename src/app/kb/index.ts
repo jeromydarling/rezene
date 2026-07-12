@@ -15,6 +15,7 @@ import { library } from "./content/library";
 import { companion } from "./content/companion";
 import { interpreter } from "./content/interpreter";
 import { directory } from "./content/directory";
+import { drafting } from "./content/drafting";
 
 export type { KbArticle, KbPart, KbHeading } from "./types";
 
@@ -50,6 +51,7 @@ export const KB_ARTICLES: KbArticle[] = [
   ...companion,
   ...interpreter,
   ...directory,
+  ...drafting,
 ];
 
 const BASE_ORDER = new Map(KB_ARTICLES.map((a, i) => [a.slug, i]));
