@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { all, first, run } from "../services/db";
+import { emit } from "../services/activity";
 import { sendBuyerEmail } from "../services/buyer-email";
 import { getEmailBrand, renderBrandedEmail } from "../services/email-template";
 import { rateLimit } from "../middleware/rate-limit";
@@ -523,6 +524,31 @@ accountRoutes.post("/orders/:id/review", async (c) => {
   } catch {
     return c.json({ error: "You've already reviewed this piece." }, 409);
   }
+
+  // Marketing automation: draft a tasteful repost of the review (best-effort).
+  try {
+    const prod = await first<{ name: string }>(c.var.db, `SELECT name FROM products WHERE id = ?`, b.productId);
+    await emit(
+      c.var.db,
+      {
+        kind: "review.created",
+        entityType: "product",
+        entityId: b.productId,
+        title: `New ${rating}★ review${prod?.name ? ` for ${prod.name}` : ""}`,
+        payload: {
+          productId: b.productId,
+          productName: prod?.name ?? "",
+          rating,
+          author: (me.name ?? "").split(" ")[0] ?? "",
+          body: (b.body ?? "").slice(0, 800),
+        },
+      },
+      { env: c.env, ctx: c.executionCtx },
+    );
+  } catch {
+    /* automation is best-effort */
+  }
+
   return c.json({ ok: true }, 201);
 });
 

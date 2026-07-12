@@ -94,6 +94,41 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     description:
       "When you publish a product, Verto drafts a launch campaign — an Instagram caption, a launch email, and an SEO article — into Marketing, ready for you to edit, schedule, and send. Nothing posts on its own.",
   },
+  {
+    key: "stock-restocked-post",
+    on: "inventory.restocked",
+    title: "Back in stock → draft an “it's back” post",
+    description:
+      "When a sold-out product is restocked, Verto drafts a warm “back in stock” post into Marketing for you to edit and send. (Your waitlist is emailed separately and automatically.)",
+  },
+  {
+    key: "stock-low-post",
+    on: "inventory.low",
+    title: "Low stock → draft an urgency post",
+    description:
+      "When a product's stock runs low, Verto drafts an honest “selling fast” post into Marketing — real urgency, no fake scarcity — for you to edit and send.",
+  },
+  {
+    key: "stock-soldout-post",
+    on: "inventory.sold_out",
+    title: "Sold out → draft a sold-out note",
+    description:
+      "When a product sells out, Verto drafts a gracious sold-out post into Marketing that points to your waitlist or next drop, for you to edit and send.",
+  },
+  {
+    key: "trend-adopted-angle",
+    on: "research.trend_adopted",
+    title: "Trend adopted → draft a season angle",
+    description:
+      "When you adopt a trend board into the Design Studio, Verto drafts a campaign angle for that season direction into Marketing, for you to edit and send.",
+  },
+  {
+    key: "review-repost",
+    on: "review.created",
+    title: "New review → draft a repost",
+    description:
+      "When a customer leaves a review, Verto drafts a tasteful repost into Marketing that quotes it and credits them, for you to edit and send.",
+  },
 ];
 
 /** Rule toggles: no row means enabled — rules are quiet (create-only). */
@@ -160,7 +195,50 @@ async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts):
       const productId = String(p.productId);
       const name = p.name ? String(p.name) : "your new product";
       opts.ctx.waitUntil(
-        import("./launch-kit").then(({ draftLaunchKit }) => draftLaunchKit(env, db, { productId, name })),
+        import("./marketing-automations").then(({ draftLaunchKit }) => draftLaunchKit(env, db, { productId, name })),
+      );
+      return;
+    }
+    case "stock-low-post":
+    case "stock-restocked-post":
+    case "stock-soldout-post": {
+      if (!opts?.env || !opts?.ctx || !p.productId) return;
+      const env = opts.env;
+      const productId = String(p.productId);
+      const name = p.name ? String(p.name) : "a product";
+      const mode = key === "stock-low-post" ? "low" : key === "stock-restocked-post" ? "restocked" : "soldout";
+      opts.ctx.waitUntil(
+        import("./marketing-automations").then(({ draftStockPost }) =>
+          draftStockPost(env, db, { productId, name, mode }),
+        ),
+      );
+      return;
+    }
+    case "trend-adopted-angle": {
+      if (!opts?.env || !opts?.ctx || !p.conceptId) return;
+      const env = opts.env;
+      const conceptId = String(p.conceptId);
+      const trendTitle = p.trendTitle ? String(p.trendTitle) : "a season direction";
+      const brief = p.brief ? String(p.brief) : null;
+      opts.ctx.waitUntil(
+        import("./marketing-automations").then(({ draftTrendAngle }) =>
+          draftTrendAngle(env, db, { conceptId, trendTitle, brief }),
+        ),
+      );
+      return;
+    }
+    case "review-repost": {
+      if (!opts?.env || !opts?.ctx) return;
+      const env = opts.env;
+      const productId = p.productId ? String(p.productId) : null;
+      const productName = p.productName ? String(p.productName) : "your product";
+      const rating = Number(p.rating) || 5;
+      const author = p.author ? String(p.author) : "";
+      const body = p.body ? String(p.body) : "";
+      opts.ctx.waitUntil(
+        import("./marketing-automations").then(({ draftReviewRepost }) =>
+          draftReviewRepost(env, db, { productId, productName, rating, author, body }),
+        ),
       );
       return;
     }
