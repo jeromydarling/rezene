@@ -157,6 +157,11 @@ function EstablishedLane({ brain, onChanged }: { brain: BrainState; onChanged: (
 
 // ---------------- The Playbook ----------------
 
+/** A field counts as filled when it has a non-empty value (arrays: at least one entry). */
+function fieldFilled(v: unknown): boolean {
+  return Array.isArray(v) ? v.length > 0 : String(v ?? "").trim().length > 0;
+}
+
 function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => void }) {
   const toast = useToast();
   const [answers, setAnswers] = useState<Record<string, unknown>>(brain.answers ?? {});
@@ -168,6 +173,14 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
   const [fillVersion, setFillVersion] = useState(0);
   const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [assisting, setAssisting] = useState<Record<string, boolean>>({});
+  // Progressive reveal: sections unlock one at a time as the previous one is
+  // filled in, so a first-timer isn't staring at the whole form at once. If the
+  // plan was AI-drafted (or they're returning to an already-started plan), we
+  // drop the gate and show everything.
+  const [revealAll, setRevealAll] = useState(
+    () => Boolean(brain.brief) || Object.values(brain.answers ?? {}).filter((v) => (Array.isArray(v) ? v.length : String(v ?? "").trim())).length > 4,
+  );
+  const [manualReveal, setManualReveal] = useState(0);
 
   async function assistSection(sectionId: string) {
     setAssisting((s) => ({ ...s, [sectionId]: true }));
@@ -194,6 +207,33 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
     [answers],
   );
 
+  // A flat, ordered view of every section across all parts, plus each section's
+  // global position — used to gate the progressive reveal.
+  const flatSections = useMemo(() => PLAYBOOK.flatMap((p) => p.sections), []);
+  const sectionIndex = useMemo(() => {
+    const m: Record<string, number> = {};
+    flatSections.forEach((s, i) => (m[s.id] = i));
+    return m;
+  }, [flatSections]);
+
+  // How far down the form we've unlocked. Reveal every section up to and
+  // including the first one that isn't fully filled, so exactly one "next"
+  // section is ever open at a time — unless the user chose to jump ahead or the
+  // whole plan was drafted at once.
+  const revealThrough = useMemo(() => {
+    if (revealAll) return flatSections.length - 1;
+    let firstIncomplete = flatSections.length - 1;
+    for (let i = 0; i < flatSections.length; i++) {
+      if (!flatSections[i].fields.every((f) => fieldFilled(answers[f.id]))) {
+        firstIncomplete = i;
+        break;
+      }
+    }
+    return Math.min(flatSections.length - 1, Math.max(firstIncomplete, manualReveal));
+  }, [answers, flatSections, revealAll, manualReveal]);
+
+  const allRevealed = revealThrough >= flatSections.length - 1;
+
   function setField(id: string, value: unknown) {
     setAnswers((a) => ({ ...a, [id]: value }));
   }
@@ -209,6 +249,9 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
   function mergeAnswers(incoming: Record<string, unknown>) {
     setAnswers((a) => ({ ...a, ...incoming }));
     setFillVersion((v) => v + 1);
+    // A bulk fill (AI draft / paste / PDF) means the whole form is populated —
+    // drop the progressive-reveal gate so they can review it all at once.
+    if (Object.keys(incoming).length > 2) setRevealAll(true);
     void api.put("/api/admin/brain", { answers: incoming }).catch(() => {});
     const n = Object.keys(incoming).length;
     toast.success(`Filled ${n} field${n === 1 ? "" : "s"}`, "Review and tweak anything — it's all yours to edit.");
@@ -233,12 +276,7 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
         eyebrow="Launch"
         title="Launch Playbook"
         help="welcome"
-        description="Fill in the blanks — or let LLM draft them. When you're ready, compile it into a real plan that sets up every section of Verto."
-        actions={
-          <button type="button" className="btn btn-primary" disabled={compiling || filledCount === 0} onClick={() => void compile()}>
-            {compiling ? "Compiling…" : "Compile my plan"}
-          </button>
-        }
+        description="Fill in the blanks — or let LLM draft them. Sections open up as you go, and the Compile button waits for you at the bottom."
       />
 
       <PlanImport onFilled={mergeAnswers} />
@@ -246,12 +284,15 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
       <p className="mb-4 mt-6 text-xs text-warmgrey">{filledCount} field{filledCount === 1 ? "" : "s"} filled · autosaves as you go</p>
 
       <div className="space-y-8">
-        {PLAYBOOK.map((part) => (
+        {PLAYBOOK.map((part) => {
+          const visibleSections = part.sections.filter((s) => sectionIndex[s.id] <= revealThrough);
+          if (visibleSections.length === 0) return null;
+          return (
           <section key={part.slug}>
             <h2 className="font-display text-xl font-light">{part.title}</h2>
             <p className="mb-3 text-sm text-warmgrey">{part.summary}</p>
             <div className="space-y-5">
-              {part.sections.map((section) => (
+              {visibleSections.map((section) => (
                 <div key={section.id} className="admin-card p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -323,7 +364,46 @@ function Playbook({ brain, onChanged }: { brain: BrainState; onChanged: () => vo
               ))}
             </div>
           </section>
-        ))}
+          );
+        })}
+      </div>
+
+      {!allRevealed && (
+        <div className="mt-6 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] px-4 py-5 text-center">
+          <p className="text-xs text-warmgrey">
+            Fill in the section above and the next one opens automatically. In a hurry? Jump ahead.
+          </p>
+          <button
+            type="button"
+            className="rounded-full border border-navy/25 bg-navy/[0.04] px-4 py-1.5 text-xs font-medium text-navy transition hover:bg-navy/10"
+            onClick={() => setManualReveal(Math.min(flatSections.length - 1, revealThrough + 1))}
+          >
+            Show next section ↓
+          </button>
+          <button
+            type="button"
+            className="text-[11px] text-warmgrey underline underline-offset-2 transition hover:text-ink"
+            onClick={() => setRevealAll(true)}
+          >
+            Show me the whole Playbook
+          </button>
+        </div>
+      )}
+
+      <div className="mt-8 flex flex-col items-center gap-2 border-t border-ink/8 pt-6">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={compiling || filledCount === 0}
+          onClick={() => void compile()}
+        >
+          {compiling ? "Compiling…" : "Compile my plan"}
+        </button>
+        <p className="text-[11px] text-warmgrey">
+          {filledCount === 0
+            ? "Fill in a few fields first — then compile them into a real plan that sets up every section of Verto."
+            : "Turns everything above into a real plan that sets up every section of Verto. You can re-compile any time."}
+        </p>
       </div>
 
       {brain.brief && <CompiledPlan brain={brain} />}
