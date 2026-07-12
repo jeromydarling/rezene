@@ -9,6 +9,24 @@ interface Rule {
   title: string;
   description: string;
   enabled: boolean;
+  supportsAutoApprove?: boolean;
+  autoApproveNote?: string | null;
+  autoApprove?: boolean;
+}
+
+function Switch({ on, busy, onClick, label }: { on: boolean; busy: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? "bg-navy" : "bg-ink/20"} ${busy ? "opacity-50" : ""}`}
+    >
+      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+    </button>
+  );
 }
 
 interface ActivityRow {
@@ -40,6 +58,19 @@ export function AutomationsPage() {
     }
   };
 
+  const toggleAuto = async (rule: Rule) => {
+    setBusyKey(rule.key + ":auto");
+    try {
+      await api.patch(`/api/admin/automations/${rule.key}`, { autoApprove: !rule.autoApprove });
+      toast.success(rule.autoApprove ? "Back to review-first — drafts wait for you." : "Auto-approve on for this one.");
+      rules.reload();
+    } catch {
+      /* toast handled by api layer */
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -52,26 +83,34 @@ export function AutomationsPage() {
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-3">
           {(rules.data ?? []).map((rule) => (
-            <div key={rule.key} className="flex items-start justify-between gap-4 rounded-xl border border-ink/10 bg-white p-4">
-              <div>
-                <p className="text-sm font-medium text-ink">{rule.title}</p>
-                <p className="mt-1 text-xs text-warmgrey">{rule.description}</p>
+            <div key={rule.key} className="rounded-xl border border-ink/10 bg-white p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-ink">{rule.title}</p>
+                  <p className="mt-1 text-xs text-warmgrey">{rule.description}</p>
+                </div>
+                <div className="mt-1">
+                  <Switch on={rule.enabled} busy={busyKey === rule.key} onClick={() => toggle(rule)} label={`Enable ${rule.title}`} />
+                </div>
               </div>
-              <button
-                onClick={() => toggle(rule)}
-                disabled={busyKey === rule.key}
-                role="switch"
-                aria-checked={rule.enabled}
-                className={`relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors ${
-                  rule.enabled ? "bg-navy" : "bg-ink/20"
-                } ${busyKey === rule.key ? "opacity-50" : ""}`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    rule.enabled ? "left-[22px]" : "left-0.5"
-                  }`}
-                />
-              </button>
+              {rule.supportsAutoApprove && rule.enabled && (
+                <div className="mt-3 flex items-center justify-between gap-4 border-t border-ink/8 pt-3">
+                  <div>
+                    <p className="text-xs font-medium text-ink/80">Auto-approve</p>
+                    <p className="mt-0.5 text-[11px] text-warmgrey">
+                      {rule.autoApprove
+                        ? `On — Verto will ${rule.autoApproveNote ?? "complete this automatically"}`
+                        : `Off — drafts wait for you to review. Turn on to ${rule.autoApproveNote ?? "let it complete automatically"}`}
+                    </p>
+                  </div>
+                  <Switch
+                    on={Boolean(rule.autoApprove)}
+                    busy={busyKey === rule.key + ":auto"}
+                    onClick={() => toggleAuto(rule)}
+                    label={`Auto-approve ${rule.title}`}
+                  />
+                </div>
+              )}
             </div>
           ))}
           {rules.data && rules.data.length === 0 && (
