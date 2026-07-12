@@ -222,3 +222,48 @@ export async function getActivationState(db: D1Database, env: Env): Promise<Acti
 
   return { steps, percent, open, persisted };
 }
+
+/**
+ * Record a shop's activation milestones at the PLATFORM database so Verto HQ
+ * can read the whole funnel in one query. Idempotent by (shop_id, event): the
+ * first time a milestone is observed it sticks with that timestamp; later loads
+ * are no-ops. Best-effort — analytics must never break a dashboard load.
+ *
+ * Called with the derived state on the shop's own dashboard read ("derive and
+ * log"), so the funnel populates from real activity without instrumenting every
+ * action in the app.
+ */
+export async function recordActivationMilestones(
+  platformDb: D1Database,
+  shopId: string,
+  state: ActivationState,
+): Promise<void> {
+  const events: string[] = [];
+  for (const step of state.steps) if (step.done) events.push(step.id);
+  if (state.open) events.push("open");
+  if (!events.length) return;
+  try {
+    const stmt = platformDb.prepare(
+      `INSERT OR IGNORE INTO activation_events (shop_id, event) VALUES (?, ?)`,
+    );
+    await platformDb.batch(events.map((e) => stmt.bind(shopId, e)));
+  } catch {
+    /* table absent or write failed — analytics is never load-critical */
+  }
+}
+
+/** Record a single named milestone (e.g. 'signup' at provision time). */
+export async function recordActivationEvent(
+  platformDb: D1Database,
+  shopId: string,
+  event: string,
+): Promise<void> {
+  try {
+    await platformDb
+      .prepare(`INSERT OR IGNORE INTO activation_events (shop_id, event) VALUES (?, ?)`)
+      .bind(shopId, event)
+      .run();
+  } catch {
+    /* best-effort */
+  }
+}

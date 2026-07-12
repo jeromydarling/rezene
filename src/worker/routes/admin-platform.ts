@@ -22,6 +22,69 @@ adminPlatformRoutes.use("*", requireAdminOnly, requireSuperAdmin, async (c, next
   await next();
 });
 
+/**
+ * The activation funnel — the answer to "where do new shops drop off?" Counts
+ * distinct shops that have crossed each lifecycle milestone (recorded at the
+ * platform by the derive-and-log helper), in canonical order. The denominator
+ * is the shop registry itself, so a shop that signed up before analytics
+ * existed still counts toward the total.
+ */
+const FUNNEL_STAGES: { event: string; label: string }[] = [
+  { event: "signup", label: "Signed up" },
+  { event: "brand", label: "Brand basics set" },
+  { event: "product", label: "First product ready" },
+  { event: "payments", label: "Payments connected" },
+  { event: "fulfillment", label: "Fulfillment set" },
+  { event: "publish", label: "Storefront published" },
+  { event: "open", label: "Open for business" },
+  { event: "share", label: "Shared / first sale" },
+];
+
+adminPlatformRoutes.get("/activation-funnel", async (c) => {
+  const totalRow = await first<{ n: number }>(
+    c.env.DB,
+    `SELECT COUNT(*) AS n FROM shops WHERE status != 'closed'`,
+  );
+  const total = totalRow?.n ?? 0;
+
+  let counts = new Map<string, number>();
+  try {
+    const rows = await all<{ event: string; n: number }>(
+      c.env.DB,
+      `SELECT event, COUNT(DISTINCT shop_id) AS n FROM activation_events GROUP BY event`,
+    );
+    counts = new Map(rows.map((r) => [r.event, r.n]));
+  } catch {
+    /* table not migrated yet — every stage reads 0 */
+  }
+
+  const stages = FUNNEL_STAGES.map((s) => {
+    const count = counts.get(s.event) ?? 0;
+    return {
+      event: s.event,
+      label: s.label,
+      count,
+      pctOfTotal: total ? Math.round((count / total) * 100) : 0,
+    };
+  });
+
+  // 30-day signup trend, for a sense of top-of-funnel momentum.
+  let signupsByDay: { day: string; n: number }[] = [];
+  try {
+    signupsByDay = await all<{ day: string; n: number }>(
+      c.env.DB,
+      `SELECT substr(created_at,1,10) AS day, COUNT(*) AS n
+         FROM activation_events
+        WHERE event = 'signup' AND created_at >= date('now','-30 days')
+        GROUP BY day ORDER BY day`,
+    );
+  } catch {
+    /* best-effort */
+  }
+
+  return c.json({ total, stages, signupsByDay });
+});
+
 adminPlatformRoutes.get("/shops", async (c) => {
   const rows = await all(
     c.env.DB,

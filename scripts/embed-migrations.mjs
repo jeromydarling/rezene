@@ -30,6 +30,7 @@ const EXCLUDE = new Set([
   "0045_school_certificates.sql", // Public credentials resolve at the platform, not per-shop
   "0047_library_cache.sql", // Library cache is shared across shops at the platform
   "0048_directory.sql", // Directory + maker waitlist live at the platform
+  "0049_activation_events.sql", // Activation funnel — recorded at the platform, read by HQ
 ]);
 
 const files = readdirSync(dir)

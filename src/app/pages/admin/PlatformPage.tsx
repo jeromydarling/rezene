@@ -36,6 +36,83 @@ interface Credentials {
   loginUrl: string;
 }
 
+interface FunnelStage {
+  event: string;
+  label: string;
+  count: number;
+  pctOfTotal: number;
+}
+interface Funnel {
+  total: number;
+  stages: FunnelStage[];
+  signupsByDay: { day: string; n: number }[];
+}
+
+/**
+ * The activation funnel — the answer to "where do new shops drop off?" Each bar
+ * is the share of shops that have crossed that milestone; the biggest step-down
+ * between two adjacent bars is where onboarding is leaking.
+ */
+function ActivationFunnel() {
+  const { data, loading } = useFetch<Funnel>("/api/admin/platform/activation-funnel");
+  if (loading || !data) return null;
+
+  // Find the largest drop between adjacent stages to call out the leak.
+  let worstIdx = -1;
+  let worstDrop = 0;
+  for (let i = 1; i < data.stages.length; i++) {
+    const drop = data.stages[i - 1].count - data.stages[i].count;
+    if (drop > worstDrop) {
+      worstDrop = drop;
+      worstIdx = i;
+    }
+  }
+
+  return (
+    <div className="admin-card mb-6 p-5">
+      <div className="mb-4 flex items-baseline justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-warmgrey">
+          Activation funnel
+        </p>
+        <p className="text-xs text-warmgrey">
+          {data.total} shop{data.total === 1 ? "" : "s"} on the platform
+        </p>
+      </div>
+      <div className="space-y-2">
+        {data.stages.map((s, i) => {
+          const width = data.total ? Math.max(2, (s.count / data.total) * 100) : 0;
+          const leak = i === worstIdx && worstDrop > 0;
+          return (
+            <div key={s.event} className="flex items-center gap-3">
+              <span className="w-40 shrink-0 text-right text-xs text-ink/70">{s.label}</span>
+              <div className="relative h-6 flex-1 overflow-hidden rounded bg-ink/5">
+                <div
+                  className={`h-full rounded ${leak ? "bg-terracotta/70" : "bg-navy/70"}`}
+                  style={{ width: `${width}%` }}
+                />
+                <span className="absolute inset-y-0 left-2 flex items-center text-[0.7rem] font-medium tabular-nums text-ink/80">
+                  {s.count} · {s.pctOfTotal}%
+                </span>
+              </div>
+              {leak && (
+                <span className="w-28 shrink-0 text-[0.62rem] uppercase tracking-wider text-terracotta">
+                  ↓ biggest drop
+                </span>
+              )}
+              {!leak && <span className="w-28 shrink-0" />}
+            </div>
+          );
+        })}
+      </div>
+      {data.total === 0 && (
+        <p className="mt-3 text-xs text-warmgrey">
+          No shops yet — the funnel fills in as shops sign up and set up.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PlatformPage() {
   const { data, loading, error, reload } = useFetch<ShopRow[]>("/api/admin/platform/shops");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -74,6 +151,7 @@ export function PlatformPage() {
         title="Verto Shops"
         description="Every shop on the platform. Signups arrive as pending — provision them to create their database, seed a starter site, and email the owner their login."
       />
+      <ActivationFunnel />
       {error && <ErrorNote message={error} />}
       {actionError && <ErrorNote message={actionError} />}
       {loading && <LoadingTable />}
