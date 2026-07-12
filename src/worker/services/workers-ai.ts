@@ -29,6 +29,34 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * Pull the generated text out of a Workers AI result. The `.run()` return
+ * shape has drifted across model generations — classic text models return
+ * `{ response: string }`, but newer instruct models (llama-4-scout,
+ * llama-3.3-70b) can wrap it as `{ response: { response } }`, an OpenAI-style
+ * `{ choices: [{ message: { content } }] }`, or a `{ result: { response } }`.
+ * Try each known shape rather than assuming one, so a shape change degrades to
+ * "empty" (and a diagnostic) instead of throwing.
+ */
+function extractText(result: unknown): string {
+  if (typeof result === "string") return result;
+  if (!result || typeof result !== "object") return "";
+  const r = result as Record<string, unknown>;
+  if (typeof r.response === "string") return r.response;
+  const resp = r.response as Record<string, unknown> | undefined;
+  if (resp && typeof resp === "object") {
+    if (typeof resp.response === "string") return resp.response;
+    if (typeof resp.text === "string") return resp.text;
+  }
+  const res = r.result as Record<string, unknown> | undefined;
+  if (res && typeof res.response === "string") return res.response;
+  const choices = r.choices as { message?: { content?: unknown } }[] | undefined;
+  if (Array.isArray(choices) && typeof choices[0]?.message?.content === "string") {
+    return choices[0].message!.content as string;
+  }
+  return "";
+}
+
 export async function runWorkersAiChat(
   env: Env,
   messages: ChatMessage[],
@@ -40,12 +68,10 @@ export async function runWorkersAiChat(
   }
   for (let i = workingModelIndex; i < CHAT_MODELS.length; i++) {
     try {
-      const result = (await env.AI.run(CHAT_MODELS[i], { messages, max_tokens: maxTokens })) as {
-        response?: string;
-      };
-      const text = result?.response?.trim();
+      const result = await env.AI.run(CHAT_MODELS[i], { messages, max_tokens: maxTokens });
+      const text = extractText(result).trim();
       if (!text) {
-        lastWorkersAiError = `Model returned an empty response (${JSON.stringify(result).slice(0, 200)})`;
+        lastWorkersAiError = `Model returned an unrecognized/empty response (${JSON.stringify(result).slice(0, 240)})`;
         return null;
       }
       workingModelIndex = i;
