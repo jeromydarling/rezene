@@ -99,7 +99,7 @@ function VertoLayout({ children }: { children: ReactNode }) {
   }, [menuOpen]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-chalk">
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-chalk">
       <header
         className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ${
           onHero && !menuOpen ? "bg-transparent" : "border-b border-ink/10 bg-chalk/90 backdrop-blur"
@@ -222,7 +222,7 @@ function VertoLayout({ children }: { children: ReactNode }) {
               <span aria-hidden>↗</span>
             </a>
           </div>
-          <div className="flex gap-6 text-xs text-chalk/70">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-chalk/70">
             <Link to="/why" className="hover:text-chalk">
               Why Verto
             </Link>
