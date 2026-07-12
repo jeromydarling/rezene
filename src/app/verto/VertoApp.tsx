@@ -384,7 +384,7 @@ const SCENES = [
   {
     number: "03",
     image: "/verto/sell.jpg",
-    alt: "A couple in linen resortwear walking hand in hand along a sunlit rampart above the sea",
+    alt: "A couple in warm-toned resortwear walking side by side at golden hour above the sea",
     eyebrow: "Sell",
     heading: "A storefront that reads like a magazine.",
     body: "Block-composed pages, editorial layouts, lookbooks, a journal — with drafts, scheduling, revision history, and per-page SEO injected at the edge. Wholesale line sheets and pre-order campaigns included.",
