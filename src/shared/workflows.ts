@@ -99,6 +99,15 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     noun: "a sample is approved",
     fields: [{ key: "styleName", label: "Style name", type: "string" }],
   },
+  {
+    event: "inbound.received",
+    label: "Something arrives via an inbound webhook (Zapier)",
+    noun: "an inbound webhook arrives",
+    fields: [
+      { key: "inboundType", label: "Kind (note / client / booking)", type: "string" },
+      { key: "subject", label: "Subject", type: "string" },
+    ],
+  },
 ];
 
 export function triggerByEvent(event: string): WorkflowTrigger | undefined {

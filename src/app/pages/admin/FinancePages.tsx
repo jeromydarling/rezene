@@ -1722,6 +1722,79 @@ function DirectoryCard() {
   );
 }
 
+function InboundWebhookCard() {
+  const { data, reload } = useFetch<{ enabled: boolean; token: string | null; url: string | null }>(
+    "/api/admin/inbound-hook",
+  );
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function rotate() {
+    setBusy(true);
+    try {
+      await api.post("/api/admin/inbound-hook/rotate");
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function disable() {
+    setBusy(true);
+    try {
+      await api.delete("/api/admin/inbound-hook");
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  function copy() {
+    if (!data?.url) return;
+    void navigator.clipboard?.writeText(data.url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  if (!data) return null;
+  return (
+    <div className="admin-card p-4">
+      <h2 className="mb-1 font-medium">Inbound webhook (Zapier)</h2>
+      <p className="mb-3 text-xs text-warmgrey">
+        Feed data <span className="font-medium">into</span> Verto from Zapier, Make, or any tool — turn a new Gmail into a
+        note, a form into a client, a calendar invite into a consult booking. Paste this URL into your webhook step. Keep
+        it secret; anyone with it can post to your shop.
+      </p>
+      {data.enabled && data.url ? (
+        <>
+          <div className="flex items-center gap-2">
+            <input readOnly value={data.url} className="admin-input flex-1 font-mono text-[11px]" onFocus={(e) => e.target.select()} />
+            <button className="admin-btn text-sm" onClick={copy}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-warmgrey">
+            POST JSON like <code className="rounded bg-ink/5 px-1">{'{"type":"note","subject":"…","body":"…"}'}</code> —
+            or <code className="rounded bg-ink/5 px-1">"type":"client"</code> /{" "}
+            <code className="rounded bg-ink/5 px-1">"booking"</code> with a <code className="rounded bg-ink/5 px-1">name</code>.
+            A note with a matching <code className="rounded bg-ink/5 px-1">clientEmail</code> lands on that client's timeline.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button className="admin-btn text-sm" onClick={() => void rotate()} disabled={busy}>
+              Regenerate
+            </button>
+            <button className="text-xs text-warmgrey hover:text-red-700" onClick={() => void disable()} disabled={busy}>
+              Turn off
+            </button>
+          </div>
+        </>
+      ) : (
+        <button className="admin-btn-primary text-sm" onClick={() => void rotate()} disabled={busy}>
+          {busy ? "Generating…" : "Generate webhook URL"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { data, loading, error, reload } = useFetch<SettingsResponse>("/api/admin/settings");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -1830,6 +1903,7 @@ export function SettingsPage() {
             </p>
           </div>
           <DataExportCard />
+          <InboundWebhookCard />
           <DirectoryCard />
           <ChangePasswordCard />
         </div>

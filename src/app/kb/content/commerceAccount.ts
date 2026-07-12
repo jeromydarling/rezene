@@ -214,7 +214,46 @@ The fields you can filter on change with the trigger — a commission stage chan
 
 ## Reaching other tools (Zapier, Make, Gmail…)
 
-The **webhook** action is your bridge to everything else. Paste a webhook URL from Zapier (or Make, n8n, or your own endpoint) and Verto POSTs the event — its name and all its details — as JSON whenever the workflow fires. From there, your Zap can do anything Zapier can: send a Gmail, add a row to a sheet, ping Slack, create a calendar event. No Google Cloud project, no API keys in Verto — you build the far side in the tool you already know.`,
+The **webhook** action is your bridge to everything else. Paste a webhook URL from Zapier (or Make, n8n, or your own endpoint) and Verto POSTs the event — its name and all its details — as JSON whenever the workflow fires. From there, your Zap can do anything Zapier can: send a Gmail, add a row to a sheet, ping Slack, create a calendar event. No Google Cloud project, no API keys in Verto — you build the far side in the tool you already know. See [Connecting Zapier](/admin/support/kb/zapier) for the step-by-step, including the *inbound* direction (feed Gmail and forms back into Verto).`,
+  },
+  {
+    slug: "zapier",
+    title: "Connecting Zapier (and Gmail, Sheets, Slack…)",
+    summary: "Two webhooks — one out, one in — bridge Verto to the thousands of apps Zapier connects, no keys or code.",
+    part: "account",
+    moduleRoute: "/admin/settings",
+    keywords: "zapier make integromat webhook gmail sheets slack integration inbound outbound automation connect no-code n8n",
+    updated: "2026-07-12",
+    body: `# Connecting Zapier
+
+Verto talks to the outside world through **webhooks** — a simple, universal way to move data between apps. Two directions, and between them they reach anything Zapier (or Make, n8n, Pipedream, or your own code) can touch. No Google Cloud project, no OAuth apps, no API keys to store in Verto.
+
+## Out: Verto → your other tools
+
+Use the **webhook** action in a [Workflow](/admin/support/kb/workflows). When your workflow fires, Verto POSTs the event and all its details as JSON to a URL you paste. In Zapier that's a **Catch Hook** trigger:
+
+1. In Zapier, create a Zap with the trigger **Webhooks by Zapier → Catch Hook**. Copy the URL it gives you.
+2. In Verto, add a workflow, choose your trigger, and add the action **Send to a webhook**. Paste the URL.
+3. Add whatever you like on the Zapier side — **send a Gmail**, add a row to **Google Sheets**, post to **Slack**, create a **Calendar** event.
+
+Now, for example: *when a VIP pays a deposit → email them personally from your own Gmail*, entirely in tools you already use.
+
+## In: your other tools → Verto
+
+Use the **inbound webhook** on **Account → Settings → Inbound webhook (Zapier)**. Generate your URL, then in Zapier finish a Zap with the action **Webhooks by Zapier → POST** pointed at it. POST a small JSON body:
+
+- \`{"type":"note","subject":"…","body":"…"}\` — files a note in your activity feed. Add \`"clientEmail":"…"\` and, if it matches a client, it also lands on their timeline. *(Perfect for "new Gmail → note in Verto".)*
+- \`{"type":"client","name":"…","email":"…"}\` — adds a client to your Book.
+- \`{"type":"booking","name":"…","preferredAt":"…"}\` — records a consult request.
+
+Every inbound call also raises an **inbound-webhook** event, so you can build a [Workflow](/admin/support/kb/workflows) that reacts to it — *when an inbound webhook arrives → create a task*.
+
+> [!NOTE]
+> Your inbound URL contains a secret token — treat it like a password. If it ever leaks, hit **Regenerate** and the old one stops working immediately. **Turn off** disables inbound webhooks entirely.
+
+## Why webhooks instead of a Gmail integration?
+
+Because it's yours, and it's honest. You keep Gmail (and everything else) in the tool you trust, wired up the way you want, with no third app holding your Google credentials. Verto stays the studio's brain; Zapier is the wiring to everything around it.`,
   },
   {
     slug: "ai-limits",

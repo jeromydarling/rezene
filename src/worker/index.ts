@@ -34,6 +34,8 @@ import { adminClientRoutes } from "./routes/admin-clients";
 import { adminCommissionRoutes } from "./routes/admin-commissions";
 import { adminClientMessageRoutes } from "./routes/admin-client-messages";
 import { adminWorkflowRoutes } from "./routes/admin-workflows";
+import { adminWebhookRoutes } from "./routes/admin-webhooks";
+import { publicHookRoutes } from "./routes/hooks";
 import { clientPortalRoutes } from "./routes/client-portal";
 import { publicBookingRoutes, adminBookingRoutes } from "./routes/booking";
 import { adminFileRoutes } from "./routes/admin-files";
@@ -358,6 +360,7 @@ app.route("/api/public", commerceRoutes);
 app.route("/api/public/account", accountRoutes);
 app.route("/api/public/portal", clientPortalRoutes);
 app.route("/api/public/booking", publicBookingRoutes);
+app.route("/api/public/hooks", publicHookRoutes);
 app.route("/api/wholesale", wholesalePortalRoutes);
 
 // Verto platform — shop signup + slug availability (public).
@@ -431,6 +434,7 @@ admin.route("/companion", adminCompanionRoutes);
 admin.route("/assist", adminAssistRoutes);
 admin.route("/automations", adminAutomationRoutes);
 admin.route("/workflows", adminWorkflowRoutes);
+admin.route("/inbound-hook", adminWebhookRoutes);
 admin.route("/undo", adminUndoRoutes);
 admin.route("/domain", adminDomainRoutes);
 admin.route("/import", adminImportRoutes);
