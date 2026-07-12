@@ -52,6 +52,10 @@ vertoRoutes.post(
       body.note ?? null,
     );
 
+    // Activation funnel: signup is milestone zero.
+    const { recordActivationEvent } = await import("../services/activation");
+    await recordActivationEvent(c.env.DB, id, "signup");
+
     // CRM: the relationship starts here — contact + timeline + edge geo.
     const { ingestEvent, geoFromRequest } = await import("../services/crm");
     await ingestEvent(c.env, {

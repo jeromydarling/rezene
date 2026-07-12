@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { requireAdminWrite } from "../middleware/auth";
 import { parseBody } from "../services/validators";
-import { getActivationState, writePersisted } from "../services/activation";
+import { getActivationState, recordActivationMilestones, writePersisted } from "../services/activation";
 import { writeAudit } from "../services/db";
 import type { AppContext } from "../types/env";
 
@@ -15,6 +15,8 @@ export const adminOnboardingRoutes = new Hono<AppContext>();
 
 adminOnboardingRoutes.get("/", async (c) => {
   const state = await getActivationState(c.var.db, c.env);
+  // Derive-and-log the funnel to the platform DB, off the response path.
+  c.executionCtx.waitUntil(recordActivationMilestones(c.env.DB, c.var.shopId, state));
   return c.json(state);
 });
 
