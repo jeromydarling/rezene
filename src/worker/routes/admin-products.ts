@@ -510,5 +510,50 @@ adminProductRoutes.post("/inventory/adjust", requireAdminWrite, async (c) => {
       console.error("[inventory] restock notify skipped:", String(err).slice(0, 160));
     }
   }
+
+  // Marketing automations: draft a stock post when the PRODUCT (summed across
+  // its variants — so one variant selling out doesn't read as "sold out")
+  // crosses a threshold. Rules downstream turn the event into an editable draft.
+  try {
+    const prod = await first<{ product_id: string; name: string }>(
+      c.var.db,
+      `SELECT v.product_id, p.name FROM inventory_items i
+         JOIN product_variants v ON v.id = i.variant_id
+         JOIN products p ON p.id = v.product_id
+        WHERE i.id = ?`,
+      item.id,
+    );
+    if (prod?.product_id) {
+      const totalRow = await first<{ total: number }>(
+        c.var.db,
+        `SELECT COALESCE(SUM(i.on_hand), 0) AS total FROM inventory_items i
+           JOIN product_variants v ON v.id = i.variant_id WHERE v.product_id = ?`,
+        prod.product_id,
+      );
+      const after = totalRow?.total ?? 0;
+      const before = after - (newOnHand - item.on_hand);
+      const LOW = 5;
+      let kind: string | null = null;
+      if (before > 0 && after === 0) kind = "inventory.sold_out";
+      else if (before === 0 && after > 0) kind = "inventory.restocked";
+      else if (after > 0 && after <= LOW && before > LOW) kind = "inventory.low";
+      if (kind) {
+        await emit(
+          c.var.db,
+          {
+            kind,
+            entityType: "product",
+            entityId: prod.product_id,
+            title: `${prod.name} — ${kind.slice("inventory.".length).replace("_", " ")}`,
+            payload: { productId: prod.product_id, name: prod.name },
+          },
+          { env: c.env, ctx: c.executionCtx },
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[inventory] stock automation skipped:", String(err).slice(0, 160));
+  }
+
   return c.json({ ok: true, onHand: newOnHand, reserved: newReserved, incoming: newIncoming });
 });

@@ -134,6 +134,13 @@ Verto watches what happens in your shop and files the obvious next step for you,
 - **R&D lead promoted → follow up.** Promote a maker from [R&D](/admin/support/kb/rd-research) and a reach-out task appears, due in a week.
 - **Commission moves stage → next step.** Each stage files its natural follow-up — source the fabric, schedule the fitting, arrange the handover.
 - **Product published → draft the launch kit.** Publish a product and Verto drafts a launch campaign for it in [Marketing](/admin/support/kb/marketing) — an Instagram caption, a launch email, and an SEO article, all in your brand voice and grounded in the product. They land as **editable drafts**: nothing posts or sends on its own. Open the campaign, edit anything, schedule it, and send when you're ready. If your shop has no AI provider configured, Verto still starts the campaign so you can generate it with one click.
+- **Back in stock → “it's back” post.** When a sold-out product is restocked, Verto drafts a warm back-in-stock post. (Your waitlist is emailed automatically and separately — that's transactional, not a draft.)
+- **Low stock → urgency post.** When a product runs low, Verto drafts an honest “selling fast” post — real scarcity, never fake countdowns.
+- **Sold out → sold-out note.** When a product sells out, Verto drafts a gracious sold-out post that points to your waitlist or next drop.
+- **Trend adopted → season angle.** Adopt a trend board into the Design Studio and Verto drafts a campaign angle for that season direction.
+- **New review → repost.** When a customer leaves a review, Verto drafts a tasteful repost that quotes them and credits them by first name.
+
+Every one of these lands as an **editable draft in Marketing** — you edit, schedule, and send. Nothing is posted or emailed to customers without your say-so.
 
 Toggle any rule on the **System → Automations** page. The **Recent activity** feed beside the toggles shows everything Verto noticed — the events your automations react to.
 

@@ -759,13 +759,17 @@ adminResearchPlusRoutes.post("/trends/:id/to-design-studio", requireAdminWrite, 
     id,
   );
   await writeAudit(c.var.db, c.var.userId, "research.trend_adopted", "ai_concept", conceptId, { boardId: id });
-  await emit(c.var.db, {
-    kind: "research.trend_adopted",
-    entityType: "ai_concept",
-    entityId: conceptId,
-    title: `Trend board “${row.title}” moved into the Design Studio`,
-    payload: { boardId: id, conceptId },
-  });
+  await emit(
+    c.var.db,
+    {
+      kind: "research.trend_adopted",
+      entityType: "ai_concept",
+      entityId: conceptId,
+      title: `Trend board “${row.title}” moved into the Design Studio`,
+      payload: { boardId: id, conceptId, trendTitle: row.title, brief: briefParts.join("\n").slice(0, 1500) },
+    },
+    { env: c.env, ctx: c.executionCtx },
+  );
   return c.json({ conceptId });
 });
 
