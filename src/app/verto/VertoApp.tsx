@@ -288,8 +288,8 @@ function Hero() {
         </h1>
         <Reveal delay={1200}>
           <p className="prose-editorial mt-6 max-w-xl text-base !text-chalk/85">
-            Storefront, CMS, production, shipping, wholesale, and an LLM marketing team — built for
-            brands that make clothes, from first sample to sold out.
+            Design, production, storefront, and an AI marketing team in one system — so a fact you
+            enter once is true everywhere, from first sample to sold out.
           </p>
         </Reveal>
         <Reveal delay={1450}>
