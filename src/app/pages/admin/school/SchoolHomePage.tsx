@@ -42,7 +42,7 @@ export function SchoolHomePage() {
     <div>
       <PageHeader
         title="The Verto School"
-        eyebrow="System"
+        eyebrow="School & Library"
         description="Tailoring, seamstressing and fashion — taught from the era's own masters, with timed lessons, real examinations, and certificates you earn with work in your own studio."
         help="school"
       />

@@ -270,7 +270,7 @@ export function BrandStudioPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Studio"
+        eyebrow="Brand"
         title="Brand Studio"
         description="Your logo and colours, in one place — set them here and they carry across your storefront, favicon, and everything you send. New label? Design a wordmark and a palette from scratch."
       />

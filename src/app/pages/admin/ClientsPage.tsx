@@ -135,7 +135,7 @@ export function ClientBookPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Studio"
+        eyebrow="Clients"
         title="Client Book"
         help="client-book"
         description="The people you sew and style for — measurement history, style notes, fittings, and every pattern and photo that belongs to them."
@@ -463,7 +463,7 @@ export function ClientDetailPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Studio"
+        eyebrow="Clients"
         title={data.name}
         help="client-book"
         description={[data.email, data.phone].filter(Boolean).join(" · ") || "No contact details yet — edit below."}
