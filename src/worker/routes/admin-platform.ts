@@ -52,8 +52,36 @@ adminPlatformRoutes.post("/migrate-primary", async (c) => {
     const doTables = await target
       .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_cf%' ESCAPE '\\' AND name != 'd1_migrations'`)
       .all<{ name: string }>();
+    const names = doTables.results.map((t) => t.name);
+
+    // The DO's SQLite enforces foreign keys (D1 historically didn't), so the
+    // copy must respect the FK graph: wipe children-first, insert
+    // parents-first. Kahn's ordering from the schema's own FK metadata;
+    // cycles (self-references) just land at the end.
+    step = "read FK graph";
+    const parentsOf = new Map<string, Set<string>>();
+    for (const name of names) {
+      const fks = await c.env.DB.prepare(`PRAGMA foreign_key_list("${name}")`).all<{ table: string }>().catch(() => ({ results: [] as { table: string }[] }));
+      parentsOf.set(name, new Set(fks.results.map((f) => f.table).filter((p) => p !== name && names.includes(p))));
+    }
+    const ordered: string[] = [];
+    const done = new Set<string>();
+    while (ordered.length < names.length) {
+      const ready = names.filter((n) => !done.has(n) && [...(parentsOf.get(n) ?? [])].every((p) => done.has(p)));
+      const batch = ready.length ? ready : names.filter((n) => !done.has(n)); // break cycles
+      for (const n of batch) {
+        ordered.push(n);
+        done.add(n);
+      }
+    }
+
+    step = "wipe target";
+    for (const name of [...ordered].reverse()) {
+      await target.prepare(`DELETE FROM "${name}"`).run();
+    }
+
     let total = 0;
-    for (const { name } of doTables.results) {
+    for (const name of ordered) {
       step = `copy ${name}`;
       let rows: Record<string, unknown>[];
       try {
