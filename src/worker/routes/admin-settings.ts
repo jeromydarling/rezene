@@ -15,11 +15,15 @@ adminSettingsRoutes.get("/", async (c) => {
     c.var.db,
     `SELECT provider, status, note, last_verified_at FROM integration_credentials_metadata`,
   );
-  // Live secret presence (booleans only — never values).
+  // Live config presence (booleans only — never values). These drive honest
+  // "not live yet" banners so a silently-degraded feature (order emails that
+  // no-op until BUYER_EMAIL_FROM is set) can't quietly cost a merchant a sale.
   const secretStatus = {
     stripe: Boolean(c.env.STRIPE_SECRET_KEY),
     stripeWebhook: Boolean(c.env.STRIPE_WEBHOOK_SECRET),
     anthropic: Boolean(c.env.ANTHROPIC_API_KEY),
+    buyerEmail: Boolean(c.env.EMAIL && c.env.BUYER_EMAIL_FROM),
+    notifyEmail: Boolean(c.env.EMAIL && c.env.NOTIFY_EMAIL_FROM && c.env.NOTIFY_EMAIL_TO),
   };
   return c.json({ settings: rows, integrations, secretStatus });
 });
