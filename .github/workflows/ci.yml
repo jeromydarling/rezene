@@ -22,6 +22,9 @@ jobs:
       - name: Type-check (app + worker)
         run: npx tsc -b
 
+      - name: Unit tests (money, tenancy, sessions, migrations ordering)
+        run: npm test
+
       - name: Build (client + worker bundle)
         run: npx vite build
 

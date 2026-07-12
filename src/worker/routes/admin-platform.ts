@@ -127,16 +127,8 @@ adminPlatformRoutes.post("/migrate-primary", async (c) => {
       const fks = await c.env.DB.prepare(`PRAGMA foreign_key_list("${name}")`).all<{ table: string }>().catch(() => ({ results: [] as { table: string }[] }));
       parentsOf.set(name, new Set(fks.results.map((f) => f.table).filter((p) => p !== name && names.includes(p))));
     }
-    const ordered: string[] = [];
-    const done = new Set<string>();
-    while (ordered.length < names.length) {
-      const ready = names.filter((n) => !done.has(n) && [...(parentsOf.get(n) ?? [])].every((p) => done.has(p)));
-      const batch = ready.length ? ready : names.filter((n) => !done.has(n)); // break cycles
-      for (const n of batch) {
-        ordered.push(n);
-        done.add(n);
-      }
-    }
+    const { topoSortByParents } = await import("../utils/topo");
+    const ordered = topoSortByParents(names, parentsOf);
 
     step = "wipe target";
     for (const name of [...ordered].reverse()) {

@@ -1,5 +1,6 @@
 import { all, first, run } from "./db";
 import { newId } from "../utils/id";
+import { loyaltyEarnCents } from "./money";
 
 /**
  * Loyalty + referral, on store credit. Two things happen when an order is paid:
@@ -39,7 +40,7 @@ export async function accrueLoyalty(db: D1Database, orderId: string): Promise<vo
   // Earn: a % of the subtotal back as credit (guarded to once per order).
   const pct = Number(await setting(db, "loyalty_earn_pct")) || 0;
   if (pct > 0) {
-    const earn = Math.round((order.subtotal_cents * pct) / 100);
+    const earn = loyaltyEarnCents(order.subtotal_cents, pct);
     if (earn > 0) {
       try {
         await run(
