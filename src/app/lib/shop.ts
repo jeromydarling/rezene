@@ -50,13 +50,6 @@ export function getShopBase(): string {
   return getShop()?.basePath ?? "";
 }
 
-/** The platform operator's own shop — the only one that sees Verto HQ tools. */
-export const PRIMARY_SHOP_SLUG = "rezene";
-
-export function isPrimaryShop(): boolean {
-  // The primary shop is also what the bare dev server (no edge injection) serves.
-  return (getShop()?.slug ?? PRIMARY_SHOP_SLUG) === PRIMARY_SHOP_SLUG;
-}
 
 /** The public demo shop (fake brand, email-gated admin). Mirrors the worker constant. */
 export const DEMO_SHOP_SLUG = "maison";

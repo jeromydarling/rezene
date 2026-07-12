@@ -58,6 +58,10 @@ export const tenantMiddleware: MiddlewareHandler<AppContext> = async (c, next) =
 
   c.set("shopId", shopId);
   c.set("shopSlug", shopSlug);
-  c.set("db", getShopDb(c.env, shopId, PRIMARY_SHOP_ID));
+  // No shop selected (bare verto.style/admin, webhooks without context):
+  // that's the PLATFORM context — the bound D1, where HQ accounts live.
+  // Explicitly env.DB (not getShopDb) so it stays the platform database
+  // even after the primary shop moves to its own DO.
+  c.set("db", shopSlug ? getShopDb(c.env, shopId, PRIMARY_SHOP_ID) : c.env.DB);
   await next();
 };

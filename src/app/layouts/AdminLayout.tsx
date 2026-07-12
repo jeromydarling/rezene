@@ -60,7 +60,7 @@ import {
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
 import { BrandMark } from "../components/BrandMark";
-import { isDemoShop } from "../lib/shop";
+import { getShop, isDemoShop } from "../lib/shop";
 import { Companion } from "../components/Companion";
 
 const NAV_SECTIONS: {
@@ -197,10 +197,14 @@ const NAV_SECTIONS: {
   },
 ];
 
-function visibleSections(superAdmin: boolean) {
-  // Verto HQ is platform-operator only. Rezene shares the platform DB, so this
-  // must key off the SuperAdmin identity — never merely "is the primary shop".
-  return NAV_SECTIONS.filter((s) => !s.superAdminOnly || superAdmin);
+/** Platform HQ routes — the only admin surface at bare verto.style/admin. */
+const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform"];
+
+function visibleSections(platformMode: boolean) {
+  // Verto HQ lives at bare verto.style/admin (platform context, SuperAdmin
+  // sessions in the platform database). Shop admins — including the
+  // founder's own shop — never show HQ: every shop is a normal tenant.
+  return NAV_SECTIONS.filter((s) => (platformMode ? s.superAdminOnly : !s.superAdminOnly));
 }
 
 const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
@@ -222,7 +226,9 @@ export function AdminLayout() {
     };
   }, [menuOpen]);
 
-  const superAdmin = Boolean(user?.superAdmin);
+  // Bare verto.style/admin (no shop in the URL) is the platform HQ; a shop's
+  // admin always carries its shop context. Mirrors the worker's tenant rule.
+  const platformMode = !getShop();
   // Unread maker replies — a badge on the nav so new mail is visible anywhere.
   // Refetch on every route change (opening a thread marks it read server-side).
   const [makerUnread, setMakerUnread] = useState(0);
@@ -261,11 +267,11 @@ export function AdminLayout() {
   const matches = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return visibleSections(superAdmin)
+    return visibleSections(platformMode)
       .flatMap((s) => s.items)
       .filter((i) => i.label.toLowerCase().includes(q))
       .slice(0, 6);
-  }, [query, superAdmin]);
+  }, [query, platformMode]);
 
   const breadcrumb = useMemo(() => {
     const current = ALL_ITEMS.filter((i) => i.to !== "/admin").find((i) =>
@@ -284,17 +290,25 @@ export function AdminLayout() {
   if (!user) {
     return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
   }
+  // The platform HQ serves only HQ pages — everything else belongs to a shop.
+  if (platformMode && !HQ_PREFIXES.some((p) => location.pathname.startsWith(p))) {
+    return <Navigate to="/admin/crm" replace />;
+  }
 
   const sidebar = (
     <>
-      <Link to="/admin" className="block border-b border-chalk/10 px-5 py-6">
-        <BrandMark logo={brand.logo} palette={brand.palette} brandName={brand.brandName} onDark height={30} />
+      <Link to={platformMode ? "/admin/crm" : "/admin"} className="block border-b border-chalk/10 px-5 py-6">
+        {platformMode ? (
+          <p className="font-display text-2xl font-light text-chalk">Verto HQ</p>
+        ) : (
+          <BrandMark logo={brand.logo} palette={brand.palette} brandName={brand.brandName} onDark height={30} />
+        )}
         <p className="mt-2 text-[0.58rem] uppercase tracking-editorial text-chalk/55">
-          The Fashion Desk
+          {platformMode ? "Platform operations" : "The Fashion Desk"}
         </p>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {visibleSections(superAdmin).map((section) => {
+        {visibleSections(platformMode).map((section) => {
           const active = section.items.some(
             (i) => location.pathname === i.to || (i.to !== "/admin" && location.pathname.startsWith(i.to)),
           );

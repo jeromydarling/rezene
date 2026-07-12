@@ -44,6 +44,10 @@ export interface Env {
   // Plain vars (wrangler.toml [vars])
   APP_ENV: string;
   APP_URL: string;
+  /** "1" once the primary shop has been migrated to its own ShopDatabase DO
+   *  (the bound D1 is then platform-only). Flip AFTER running the
+   *  /api/admin/platform/migrate-primary copy. */
+  PRIMARY_ON_DO?: string;
   BRAND_NAME: string;
   BRAND_SLUG: string;
   R2_PUBLIC_BASE_URL: string;
