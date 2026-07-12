@@ -47,6 +47,9 @@ function extractText(result: unknown): string {
   if (resp && typeof resp === "object") {
     if (typeof resp.response === "string") return resp.response;
     if (typeof resp.text === "string") return resp.text;
+    // Newer instruct models hand back already-parsed JSON as the response
+    // object itself — re-serialize so JSON-consuming callers can parse it.
+    return JSON.stringify(resp);
   }
   const res = r.result as Record<string, unknown> | undefined;
   if (res && typeof res.response === "string") return res.response;
