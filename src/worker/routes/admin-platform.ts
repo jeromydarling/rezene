@@ -45,32 +45,39 @@ adminPlatformRoutes.post("/migrate-primary", async (c) => {
   }
   const { getShopDoDb } = await import("../services/tenant-db");
   const target = getShopDoDb(c.env, PRIMARY_SHOP_ID);
-  // First touch bootstraps the DO schema; its table list IS the shop schema.
-  const doTables = await target
-    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_cf%' ESCAPE '\\' AND name != 'd1_migrations'`)
-    .all<{ name: string }>();
   const report: Record<string, number | string> = {};
-  let total = 0;
-  for (const { name } of doTables.results) {
-    let rows: Record<string, unknown>[];
-    try {
-      rows = (await c.env.DB.prepare(`SELECT * FROM "${name}"`).all()).results;
-    } catch {
-      report[name] = "absent in D1 — skipped";
-      continue;
+  let step = "list DO tables";
+  try {
+    // First touch bootstraps the DO schema; its table list IS the shop schema.
+    const doTables = await target
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_cf%' ESCAPE '\\' AND name != 'd1_migrations'`)
+      .all<{ name: string }>();
+    let total = 0;
+    for (const { name } of doTables.results) {
+      step = `copy ${name}`;
+      let rows: Record<string, unknown>[];
+      try {
+        rows = (await c.env.DB.prepare(`SELECT * FROM "${name}"`).all()).results;
+      } catch {
+        report[name] = "absent in D1 — skipped";
+        continue;
+      }
+      if (rows.length === 0) continue;
+      const cols = Object.keys(rows[0]);
+      const sql = `INSERT OR REPLACE INTO "${name}" (${cols.map((k) => `"${k}"`).join(",")}) VALUES (${cols.map(() => "?").join(",")})`;
+      const statements = rows.map((r) => target.prepare(sql).bind(...cols.map((k) => r[k] ?? null)));
+      for (let i = 0; i < statements.length; i += 40) {
+        await target.batch(statements.slice(i, i + 40));
+      }
+      report[name] = rows.length;
+      total += rows.length;
     }
-    if (rows.length === 0) continue;
-    const cols = Object.keys(rows[0]);
-    const sql = `INSERT OR REPLACE INTO "${name}" (${cols.map((k) => `"${k}"`).join(",")}) VALUES (${cols.map(() => "?").join(",")})`;
-    const statements = rows.map((r) => target.prepare(sql).bind(...cols.map((k) => r[k] ?? null)));
-    for (let i = 0; i < statements.length; i += 40) {
-      await target.batch(statements.slice(i, i + 40));
-    }
-    report[name] = rows.length;
-    total += rows.length;
+    await writeAudit(c.env.DB, c.var.userId!, "platform.migrate_primary", "shop", PRIMARY_SHOP_ID);
+    return c.json({ ok: true, total, tables: report });
+  } catch (err) {
+    // SuperAdmin-only endpoint: the real error is operational gold, return it.
+    return c.json({ error: `migrate-primary failed at "${step}": ${String(err)}`, tables: report }, 500);
   }
-  await writeAudit(c.env.DB, c.var.userId!, "platform.migrate_primary", "shop", PRIMARY_SHOP_ID);
-  return c.json({ ok: true, total, tables: report });
 });
 
 adminPlatformRoutes.post("/shops/:id/provision", requireAdminOnly, async (c) => {
