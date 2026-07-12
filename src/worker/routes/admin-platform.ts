@@ -31,6 +31,48 @@ adminPlatformRoutes.get("/shops", async (c) => {
   return c.json(rows);
 });
 
+/**
+ * One-shot copy of the primary shop out of the bound D1 into its own
+ * ShopDatabase Durable Object — the last step of making the flagship a
+ * normal tenant. Copies every table the DO schema defines (platform-only
+ * tables aren't in that schema, so they stay behind), INSERT OR REPLACE so
+ * re-runs heal partial copies. Flip PRIMARY_ON_DO to "1" (wrangler.toml)
+ * only after this reports ok.
+ */
+adminPlatformRoutes.post("/migrate-primary", async (c) => {
+  if (c.env.PRIMARY_ON_DO === "1") {
+    return c.json({ error: "The primary shop already resolves to its DO — nothing to migrate." }, 409);
+  }
+  const { getShopDoDb } = await import("../services/tenant-db");
+  const target = getShopDoDb(c.env, PRIMARY_SHOP_ID);
+  // First touch bootstraps the DO schema; its table list IS the shop schema.
+  const doTables = await target
+    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_cf%' ESCAPE '\\' AND name != 'd1_migrations'`)
+    .all<{ name: string }>();
+  const report: Record<string, number | string> = {};
+  let total = 0;
+  for (const { name } of doTables.results) {
+    let rows: Record<string, unknown>[];
+    try {
+      rows = (await c.env.DB.prepare(`SELECT * FROM "${name}"`).all()).results;
+    } catch {
+      report[name] = "absent in D1 — skipped";
+      continue;
+    }
+    if (rows.length === 0) continue;
+    const cols = Object.keys(rows[0]);
+    const sql = `INSERT OR REPLACE INTO "${name}" (${cols.map((k) => `"${k}"`).join(",")}) VALUES (${cols.map(() => "?").join(",")})`;
+    const statements = rows.map((r) => target.prepare(sql).bind(...cols.map((k) => r[k] ?? null)));
+    for (let i = 0; i < statements.length; i += 40) {
+      await target.batch(statements.slice(i, i + 40));
+    }
+    report[name] = rows.length;
+    total += rows.length;
+  }
+  await writeAudit(c.env.DB, c.var.userId!, "platform.migrate_primary", "shop", PRIMARY_SHOP_ID);
+  return c.json({ ok: true, total, tables: report });
+});
+
 adminPlatformRoutes.post("/shops/:id/provision", requireAdminOnly, async (c) => {
   const shop = await first<Shop & { owner_email: string | null }>(
     c.env.DB,

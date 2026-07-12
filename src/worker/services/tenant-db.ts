@@ -72,12 +72,21 @@ class ShopDbFacade {
 }
 
 /**
- * The database handle for a shop: the bound D1 for the primary shop,
- * a ShopDatabase DO facade for everyone else. Callers treat the result
- * as a D1Database — the facade implements the used surface.
+ * The database handle for a shop: a ShopDatabase DO facade — including,
+ * once PRIMARY_ON_DO is flipped, the primary shop, which then lives in its
+ * own DO like every other tenant (the bound D1 becomes platform-only:
+ * registry, CRM, directory, certificates). Until the flip, the primary
+ * stays on the bound D1. Callers treat the result as a D1Database.
  */
 export function getShopDb(env: Env, shopId: string, primaryShopId: string): D1Database {
-  if (shopId === primaryShopId) return env.DB;
+  if (shopId === primaryShopId && env.PRIMARY_ON_DO !== "1") return env.DB;
+  return getShopDoDb(env, shopId);
+}
+
+/** The shop's Durable Object database, unconditionally — used by the
+ *  primary-shop migration, which must write to the DO while reads still
+ *  resolve to the bound D1. */
+export function getShopDoDb(env: Env, shopId: string): D1Database {
   const stub = env.SHOP_DB.get(env.SHOP_DB.idFromName(shopId)) as unknown as Stub;
   return new ShopDbFacade(stub) as unknown as D1Database;
 }
