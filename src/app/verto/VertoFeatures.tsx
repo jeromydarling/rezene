@@ -1435,6 +1435,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
   {
     group: "Sell",
     items: [
+      ["Get selling fast", "After the Launch Playbook, a guided setup that watches your real shop and ticks itself off as you add a priced product, connect payments, set shipping and publish — then tells you you're open for business."],
       ["Real checkout & payments", "Stripe checkout, live carrier rates, pre-orders that can't oversell."],
       ["Discounts & tax", "Make a code your customers type; switch on sales tax/VAT with one toggle."],
       ["Search & merchandising", "Instant search, size/category/price facets, and “only N left” urgency."],

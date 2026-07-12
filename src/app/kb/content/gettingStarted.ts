@@ -136,4 +136,36 @@ A small set of platform-level screens — the **Verto HQ CRM** and **Platform** 
 > [!WARNING]
 > Connection keys (Stripe, LLM providers) are stored as encrypted secrets **outside** the database and never appear in the app or the browser. Never paste an API key into a note, product field, or chat.`,
   },
+  {
+    slug: "get-selling-fast",
+    title: "Get selling fast",
+    summary: "The activation guide on your dashboard — the shortest path from a drafted brand to a shop that can take real orders.",
+    part: "getting-started",
+    moduleRoute: "/admin",
+    keywords: "onboarding activation get selling checklist open shop go live first sale payments shipping publish setup guide progress",
+    updated: "2026-07-12",
+    body: `# Get selling fast
+
+The **Launch Playbook** drafts your brand and your site. **Get Selling Fast** is what comes next: the shortest path from that draft to a shop a stranger can actually buy from. You'll find it at the top of your **Dashboard** as a progress ring with a short, ordered checklist.
+
+## It watches your real shop, not a to-do list
+
+Every step ticks itself off the moment you actually do it — because each one reads your live shop, not a box you check. Add a priced product and the product step goes green on its own. Connect Stripe and payments turns green. There's nothing to mark "done" by hand and nothing to fake: when the ring hits the point where a real order can go through, the guide tells you **you're open for business** and then quietly steps aside.
+
+## The steps
+
+1. **Set your brand basics** — done for you if you've been through the Launch Playbook. Your name, voice, and look so the storefront and every document feel like you.
+2. **Add your first product** — nothing sells until there's something to buy. One product that's **priced** and set to **available** is enough to open. ([Products guide](/admin/support/kb/products).)
+3. **Connect payments** — the step that turns a website into a store. Stripe deposits sales straight to your bank. Set it up under **Account → Settings**.
+4. **Set how orders reach buyers** — add a shipping rate (**Finance → Shipping**), or mark your shop pickup/digital-only, so checkout can total an order.
+5. **Open your storefront** — publish your shop so the world can visit. Your address is live the moment a page is public.
+6. **Make your first sale** — send your shop link to your list and your socials. The **Share your shop** button copies your public address to your clipboard.
+
+## When you don't see it
+
+The guide hides itself on the public demo shop, and once your shop is fully open it collapses out of the way — you can bring it back any time from the **Show steps** control until you dismiss it. If something later regresses (say your only product goes out of stock and gets archived), it reappears so you're never quietly un-sellable without knowing.
+
+> [!TIP]
+> Steps stay useful after they're green — each keeps a **Review** link so you can jump back to add another product, adjust a shipping rate, or check your published pages.`,
+  },
 ];

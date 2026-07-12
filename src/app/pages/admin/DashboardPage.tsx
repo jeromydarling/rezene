@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { formatDate, formatMoney } from "../../lib/format";
 import { ErrorNote, StatCard } from "../../components/admin/ui";
+import { GetSellingGuide } from "../../components/admin/GetSellingGuide";
 import type { DashboardSummary } from "../../../shared/types";
 
 // An issue-style date line for the cover, e.g. "Monday, 7 July 2026".
@@ -61,6 +62,7 @@ export function DashboardPage() {
         </p>
       </div>
 
+      <GetSellingGuide />
       <AttentionCard />
       {error && <ErrorNote message={error} />}
       {loading && (
