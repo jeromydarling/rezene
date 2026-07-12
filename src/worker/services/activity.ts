@@ -145,6 +145,33 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     supportsAutoApprove: true,
     autoApproveNote: "schedule the drafted post onto your content calendar automatically.",
   },
+  {
+    key: "client-created-welcome",
+    on: "client.created",
+    title: "New client → draft a welcome note",
+    description:
+      "When you add a client to the book, Verto drafts a warm welcome note in your voice into their Client Book, for you to edit and send by email or portal.",
+    supportsAutoApprove: true,
+    autoApproveNote: "send the welcome the moment the client is added (email if they have an address, otherwise their portal).",
+  },
+  {
+    key: "client-stage-notify",
+    on: "commission.stage_changed",
+    title: "Commission stage → draft the client's update",
+    description:
+      "When a commission reaches a client-facing stage — design approved, fabric sourced, ready to fit, ready to collect — Verto drafts a personal update to the client, for you to edit and send.",
+    supportsAutoApprove: true,
+    autoApproveNote: "send the update automatically when the stage reaches a client-facing milestone.",
+  },
+  {
+    key: "deposit-paid-thanks",
+    on: "deposit.paid",
+    title: "Payment received → draft a thank-you",
+    description:
+      "When you mark a deposit or milestone payment paid, Verto drafts a warm thank-you to the client, for you to edit and send.",
+    supportsAutoApprove: true,
+    autoApproveNote: "send the thank-you automatically when a payment is marked paid.",
+  },
 ];
 
 /** Rule toggles: no row means enabled — rules are quiet (create-only). */
@@ -274,6 +301,48 @@ async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts):
       opts.ctx.waitUntil(
         import("./marketing-automations").then(({ draftReviewRepost }) =>
           draftReviewRepost(env, db, { productId, productName, rating, author, body, autoApprove }),
+        ),
+      );
+      return;
+    }
+    case "client-created-welcome": {
+      if (!opts?.env || !opts?.ctx || !p.clientId) return;
+      const env = opts.env;
+      const clientId = String(p.clientId);
+      const autoApprove = await ruleAutoApprove(db, key);
+      opts.ctx.waitUntil(
+        import("./client-messages").then(({ draftClientWelcome }) =>
+          draftClientWelcome(env, db, { clientId, autoApprove }),
+        ),
+      );
+      return;
+    }
+    case "client-stage-notify": {
+      if (!opts?.env || !opts?.ctx || !p.clientId || !p.stage) return;
+      const env = opts.env;
+      const clientId = String(p.clientId);
+      const commissionId = ev.entityId;
+      const stage = String(p.stage);
+      const stageLabel = p.stageLabel ? String(p.stageLabel) : undefined;
+      const autoApprove = await ruleAutoApprove(db, key);
+      opts.ctx.waitUntil(
+        import("./client-messages").then(({ draftStageNotify }) =>
+          draftStageNotify(env, db, { clientId, commissionId, stage, stageLabel, autoApprove }),
+        ),
+      );
+      return;
+    }
+    case "deposit-paid-thanks": {
+      if (!opts?.env || !opts?.ctx || !p.clientId) return;
+      const env = opts.env;
+      const clientId = String(p.clientId);
+      const commissionId = p.commissionId ? String(p.commissionId) : null;
+      const label = p.label ? String(p.label) : "your payment";
+      const amountCents = Number(p.amountCents) || 0;
+      const autoApprove = await ruleAutoApprove(db, key);
+      opts.ctx.waitUntil(
+        import("./client-messages").then(({ draftDepositThanks }) =>
+          draftDepositThanks(env, db, { clientId, commissionId, label, amountCents, autoApprove }),
         ),
       );
       return;

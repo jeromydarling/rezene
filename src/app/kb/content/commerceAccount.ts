@@ -119,8 +119,8 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
     summary: "Built-in rules that watch your shop and file the obvious next step: tasks, draft orders, reminders.",
     part: "account",
     moduleRoute: "/admin/automations",
-    keywords: "automations rules triggers workflow auto task draft calendar activity feed toggle",
-    updated: "2026-07-11",
+    keywords: "automations rules triggers workflow auto task draft calendar activity feed toggle client message welcome fitting deposit approvals inbox portal",
+    updated: "2026-07-12",
     screenshot: "/kb/shots/automations.png",
     body: `# Automations
 
@@ -140,11 +140,26 @@ Verto watches what happens in your shop and files the obvious next step for you,
 - **Trend adopted → season angle.** Adopt a trend board into the Design Studio and Verto drafts a campaign angle for that season direction.
 - **New review → repost.** When a customer leaves a review, Verto drafts a tasteful repost that quotes them and credits them by first name.
 
-Every one of these lands as an **editable draft in Marketing** — you edit, schedule, and send. Nothing is posted or emailed to customers without your say-so.
+The marketing rules above land as **editable drafts in Marketing** — you edit, schedule, and send. Nothing is posted or emailed to customers without your say-so.
+
+## Messages to your clients
+
+Three rules write directly to a person in your [Client Book](/admin/support/kb/client-book) — a note, not a marketing post:
+
+- **New client → welcome note.** Add someone to the book (or confirm a consult booking) and Verto drafts a warm welcome in your voice.
+- **Commission stage → the client's update.** When a commission reaches a client-facing moment — design approved, fabric sourced, ready to fit, ready to collect — Verto drafts a personal update. Internal stages (consult, cutting) stay quiet.
+- **Payment received → thank-you.** Mark a deposit or milestone payment paid and Verto drafts a gracious thank-you.
+
+These land in a **client-message outbox**, not in Marketing. You'll find each draft in two places: on that client's page in the Client Book (under **Messages**), and gathered together in the **Approvals** tab on this page. Edit any draft, choose **email** (uses the client's address and your branded email) or **portal** (publishes it on their private portal page), then send. Nothing reaches a client until you send it — and everything you send is written onto their timeline so the page tells one continuous story.
 
 ## Auto-approve — skip the review for the ones you trust
 
-Some automations you'll want to review every time; others you'd rather just happen. Each draft-producing rule has an **Auto-approve** toggle (under the rule, once it's on). Leave it off and drafts wait for you. Turn it on and Verto completes the step itself — for marketing rules that means **scheduling the drafted posts straight onto your content calendar** (Verto can't post to your socials, but it fills the calendar so you're not scheduling each one by hand). Off by default, per rule, so nothing runs on autopilot unless you choose it.
+Some automations you'll want to review every time; others you'd rather just happen. Each draft-producing rule has an **Auto-approve** toggle (under the rule, once it's on). Leave it off and drafts wait for you. Turn it on and Verto completes the step itself:
+
+- **Marketing rules** — the drafted posts are **scheduled straight onto your content calendar** (Verto can't post to your socials, but it fills the calendar so you're not scheduling each one by hand).
+- **Client-message rules** — the message is **sent the moment it's drafted**: emailed if the client has an address, otherwise posted to their portal. Real teeth, so a welcome or a thank-you goes out without you lifting a finger.
+
+Off by default, per rule, so nothing runs on autopilot unless you choose it.
 
 Toggle any rule — and its auto-approve — on the **System → Automations** page. The **Recent activity** feed beside the toggles shows everything Verto noticed — the events your automations react to.
 

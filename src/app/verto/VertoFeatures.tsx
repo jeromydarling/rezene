@@ -1496,6 +1496,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     items: [
       ["Automations", "Approve a sample and the production order drafts itself; the calendar fills in from your orders, fittings and bookings."],
       ["Marketing that drafts itself", "Publish a product and Verto drafts the whole launch — Instagram, email, SEO. Restock, low stock, sold out, an adopted trend, a new review — each one drafts the right post in your voice, waiting in Marketing as an editable draft. Nothing posts on its own; you edit, schedule and send."],
+      ["Client notes, drafted for you", "Add a client, move a commission to a fitting, mark a deposit paid — Verto drafts the warm note that goes with it, in your voice. Edit it, then send by email or post to the client's portal. An Approvals inbox gathers every draft; auto-approve the ones you trust and they send themselves."],
       ["Maps of your network", "Your research leads, makers and suppliers pinned on a live world map — see your supply chain, not just list it."],
       ["Cash flow & open-to-buy", "Money in vs. out and how much of your season budget is left, from real POs and invoices."],
       ["Size-run purchase orders", "Order a style as a size curve — the PO carries the run, and receiving updates stock per size."],

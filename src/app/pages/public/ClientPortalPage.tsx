@@ -25,6 +25,7 @@ interface PortalMe {
   measurements: { takenAt: string; values: Record<string, number | string> } | null;
   renders: { url: string; createdAt: string }[];
   photos: { url: string; label: string }[];
+  messages: { subject: string | null; body: string; sentAt: string | null }[];
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -159,6 +160,21 @@ export function ClientPortalPage() {
                     )
                   )}
                 </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(me.messages?.length ?? 0) > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 font-medium">Notes from your studio</h2>
+          <ul className="space-y-3">
+            {me.messages.map((m, i) => (
+              <li key={i} className="rounded-lg border border-black/10 p-4">
+                {m.subject && <p className="font-medium">{m.subject}</p>}
+                <p className="mt-1 whitespace-pre-wrap text-sm text-ink/80">{m.body}</p>
+                {m.sentAt && <p className="mt-2 text-xs text-warmgrey">{fmtDate(m.sentAt)}</p>}
               </li>
             ))}
           </ul>

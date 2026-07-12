@@ -233,19 +233,25 @@ adminCommissionRoutes.put("/:id", requireAdminWrite, async (c) => {
   const row = await first<CommissionRow>(c.var.db, `${COMMISSION_SELECT} WHERE co.id = ?`, id);
   const commission = mapCommission(row!);
   if (body.stage && body.stage !== existing.stage) {
-    await emit(c.var.db, {
-      kind: "commission.stage_changed",
-      entityType: "commission",
-      entityId: id,
-      title: `${commission.title} → ${STAGE_LABELS[body.stage] ?? body.stage}`,
-      payload: {
-        stage: body.stage,
-        title: commission.title,
-        clientName: commission.clientName,
-        styleId: commission.styleId,
-        dueAt: commission.dueAt,
+    await emit(
+      c.var.db,
+      {
+        kind: "commission.stage_changed",
+        entityType: "commission",
+        entityId: id,
+        title: `${commission.title} → ${STAGE_LABELS[body.stage] ?? body.stage}`,
+        payload: {
+          stage: body.stage,
+          stageLabel: STAGE_LABELS[body.stage] ?? body.stage,
+          title: commission.title,
+          clientId: commission.clientId,
+          clientName: commission.clientName,
+          styleId: commission.styleId,
+          dueAt: commission.dueAt,
+        },
       },
-    });
+      { env: c.env, ctx: c.executionCtx },
+    );
   }
   return c.json(commission);
 });
@@ -363,6 +369,22 @@ adminCommissionRoutes.post("/:id/payments/:pid/mark-paid", requireAdminWrite, as
     commission!.client_id,
     id,
     `${row.label} received for \u201c${commission!.title}\u201d`,
+  );
+  await emit(
+    c.var.db,
+    {
+      kind: "deposit.paid",
+      entityType: "commission",
+      entityId: id,
+      title: `${row.label} received for \u201c${commission!.title}\u201d`,
+      payload: {
+        clientId: commission!.client_id,
+        commissionId: id,
+        label: row.label,
+        amountCents: row.amount_cents,
+      },
+    },
+    { env: c.env, ctx: c.executionCtx },
   );
   return c.json({ ok: true });
 });

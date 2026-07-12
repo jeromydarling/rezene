@@ -5,6 +5,7 @@ import { parseBody } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
 import { newId } from "../utils/id";
+import { emit } from "../services/activity";
 import type { AppContext } from "../types/env";
 
 /**
@@ -101,6 +102,7 @@ adminBookingRoutes.post("/:id/confirm", requireAdminWrite, async (c) => {
   if (!client) {
     client = await first<{ id: string }>(c.var.db, `SELECT id FROM clients WHERE lower(name) = lower(?)`, req.name);
   }
+  let created = false;
   if (!client) {
     const cid = newId("client");
     await run(
@@ -112,6 +114,7 @@ adminBookingRoutes.post("/:id/confirm", requireAdminWrite, async (c) => {
       req.phone,
     );
     client = { id: cid };
+    created = true;
   }
   await run(
     c.var.db,
@@ -128,6 +131,19 @@ adminBookingRoutes.post("/:id/confirm", requireAdminWrite, async (c) => {
     client.id,
     id,
   );
+  if (created) {
+    await emit(
+      c.var.db,
+      {
+        kind: "client.created",
+        entityType: "client",
+        entityId: client.id,
+        title: `New client from a consult booking: ${req.name}`,
+        payload: { clientId: client.id, name: req.name },
+      },
+      { env: c.env, ctx: c.executionCtx },
+    );
+  }
   return c.json({ ok: true, clientId: client.id });
 });
 

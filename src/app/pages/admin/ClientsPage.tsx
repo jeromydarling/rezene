@@ -88,9 +88,164 @@ interface ClientDetail {
   measurements: MeasurementSet[];
   events: ClientEvent[];
   commissions: Commission[];
+  messages: ClientMessage[];
   looks: { id: string; name: string; garmentId: string; styleId: string | null; updatedAt: string }[];
   models: { id: string; label: string; fileId: string; source: string; createdAt: string }[];
   customer: { id: string; email: string; name: string | null } | null;
+}
+
+interface ClientMessage {
+  id: string;
+  commissionId: string | null;
+  trigger: string | null;
+  channel: "email" | "portal";
+  subject: string | null;
+  body: string;
+  status: string;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+const MSG_TRIGGER_LABEL: Record<string, string> = {
+  "client-created-welcome": "Welcome note",
+  "commission-stage-notify": "Stage update",
+  "deposit-paid-thanks": "Payment thank-you",
+  manual: "Written by you",
+};
+
+/** One draft in the Client Book — editable, then sent by email or portal. */
+function ClientMessageDraft({
+  msg,
+  hasEmail,
+  onChange,
+}: {
+  msg: ClientMessage;
+  hasEmail: boolean;
+  onChange: () => void;
+}) {
+  const [subject, setSubject] = useState(msg.subject ?? "");
+  const [body, setBody] = useState(msg.body);
+  const [channel, setChannel] = useState<"email" | "portal">(msg.channel);
+  const [busy, setBusy] = useState(false);
+  const dirty = subject !== (msg.subject ?? "") || body !== msg.body || channel !== msg.channel;
+
+  const send = async () => {
+    setBusy(true);
+    try {
+      if (dirty) await api.patch(`/api/admin/client-messages/${msg.id}`, { subject, body, channel });
+      const res = await api.post<{ emailed: boolean }>(`/api/admin/client-messages/${msg.id}/send`);
+      emitToast({
+        kind: "success",
+        message:
+          channel === "portal" ? "Posted to the client's portal." : res.emailed ? "Sent." : "Marked sent (email isn't configured yet).",
+      });
+      onChange();
+    } catch {
+      /* toast via api layer */
+    } finally {
+      setBusy(false);
+    }
+  };
+  const dismiss = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/client-messages/${msg.id}/dismiss`);
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="rounded border border-navy/20 bg-navy/[0.03] p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[0.65rem] font-medium text-navy">
+          {MSG_TRIGGER_LABEL[msg.trigger ?? "manual"] ?? "Draft"}
+        </span>
+        <span className="text-xs text-warmgrey">Draft — nothing's been sent yet</span>
+      </div>
+      <input
+        className="admin-input mb-2 w-full text-sm"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        placeholder="Subject"
+      />
+      <textarea className="admin-input mb-2 h-28 w-full text-sm" value={body} onChange={(e) => setBody(e.target.value)} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-lg border border-black/10 p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setChannel("email")}
+            disabled={!hasEmail}
+            title={hasEmail ? "" : "This client has no email on file"}
+            className={`rounded-md px-2.5 py-1 ${channel === "email" ? "bg-navy text-white" : "text-ink/70"} ${!hasEmail ? "opacity-40" : ""}`}
+          >
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => setChannel("portal")}
+            className={`rounded-md px-2.5 py-1 ${channel === "portal" ? "bg-navy text-white" : "text-ink/70"}`}
+          >
+            Portal
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" className="text-xs text-warmgrey hover:text-ink" disabled={busy} onClick={dismiss}>
+            Dismiss
+          </button>
+          <button type="button" className="admin-btn-primary text-sm" disabled={busy || !body.trim()} onClick={send}>
+            {channel === "portal" ? "Post to portal" : "Send"}
+          </button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ClientMessagesSection({
+  messages,
+  hasEmail,
+  onChange,
+}: {
+  messages: ClientMessage[];
+  hasEmail: boolean;
+  onChange: () => void;
+}) {
+  const drafts = messages.filter((m) => m.status === "draft");
+  const sent = messages.filter((m) => m.status === "sent");
+  if (!drafts.length && !sent.length) return null;
+  return (
+    <section className="admin-card p-4">
+      <h2 className="mb-1 font-medium">Messages</h2>
+      <p className="mb-3 text-xs text-warmgrey">
+        Notes to this client that Verto drafted for you — a welcome, a stage update, a thank-you. Edit and send by email
+        or post to their portal. Nothing reaches them until you send it.
+      </p>
+      {drafts.length > 0 && (
+        <ul className="mb-3 space-y-2">
+          {drafts.map((m) => (
+            <ClientMessageDraft key={m.id} msg={m} hasEmail={hasEmail} onChange={onChange} />
+          ))}
+        </ul>
+      )}
+      {sent.length > 0 && (
+        <ul className="space-y-2">
+          {sent.map((m) => (
+            <li key={m.id} className="rounded border border-black/5 p-2 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{m.subject || "(no subject)"}</span>
+                <span className="text-xs text-warmgrey">
+                  {m.channel === "portal" ? "Posted to portal" : "Sent"} · {formatDate(m.sentAt ?? m.createdAt)}
+                </span>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-warmgrey">{m.body}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 export function ClientBookPage() {
@@ -717,6 +872,9 @@ export function ClientDetailPage() {
             </button>
           )}
         </section>
+
+        {/* Client-facing messages (drafts + sent) */}
+        <ClientMessagesSection messages={data.messages ?? []} hasEmail={Boolean(data.email)} onChange={reload} />
 
         {/* Timeline */}
         <section className="admin-card p-4">
