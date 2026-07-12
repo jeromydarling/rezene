@@ -24,5 +24,8 @@
     "src/app/kb/index.ts",
     "src/app/kb/types.ts",
     "src/app/kb/content"
+  ],
+  "exclude": [
+    "src/worker/integration.test.ts"
   ]
 }
