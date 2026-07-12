@@ -133,6 +133,7 @@ Verto watches what happens in your shop and files the obvious next step for you,
 - **Order received → reconcile the delivery.** A task to check the delivery against the order and update stock.
 - **R&D lead promoted → follow up.** Promote a maker from [R&D](/admin/support/kb/rd-research) and a reach-out task appears, due in a week.
 - **Commission moves stage → next step.** Each stage files its natural follow-up — source the fabric, schedule the fitting, arrange the handover.
+- **Product published → draft the launch kit.** Publish a product and Verto drafts a launch campaign for it in [Marketing](/admin/support/kb/marketing) — an Instagram caption, a launch email, and an SEO article, all in your brand voice and grounded in the product. They land as **editable drafts**: nothing posts or sends on its own. Open the campaign, edit anything, schedule it, and send when you're ready. If your shop has no AI provider configured, Verto still starts the campaign so you can generate it with one click.
 
 Toggle any rule on the **System → Automations** page. The **Recent activity** feed beside the toggles shows everything Verto noticed — the events your automations react to.
 

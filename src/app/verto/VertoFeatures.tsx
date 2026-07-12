@@ -1495,6 +1495,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     group: "Run the business",
     items: [
       ["Automations", "Approve a sample and the production order drafts itself; the calendar fills in from your orders, fittings and bookings."],
+      ["Publish → launch kit", "Publish a product and Verto drafts the whole launch — an Instagram caption, a launch email, and an SEO article in your voice — waiting in Marketing as editable drafts. Nothing posts on its own; you edit, schedule and send."],
       ["Maps of your network", "Your research leads, makers and suppliers pinned on a live world map — see your supply chain, not just list it."],
       ["Cash flow & open-to-buy", "Money in vs. out and how much of your season budget is left, from real POs and invoices."],
       ["Size-run purchase orders", "Order a style as a size curve — the PO carries the run, and receiving updates stock per size."],

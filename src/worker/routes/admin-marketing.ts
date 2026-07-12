@@ -236,7 +236,7 @@ adminMarketingRoutes.delete("/campaigns/:id", requireAdminWrite, async (c) => {
 
 // ---------- Kit generation ----------
 
-interface CampaignRow {
+export interface CampaignRow {
   id: string;
   name: string;
   objective: string;
@@ -316,7 +316,7 @@ const SYSTEM_MARKETER =
   `"must-have" are banned), sparing with exclamation marks, honest about the product. ` +
   `You always respond with exactly one JSON value and no surrounding prose.`;
 
-async function generateAssets(
+export async function generateAssets(
   env: Env,
   db: D1Database,
   campaign: CampaignRow,

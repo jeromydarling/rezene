@@ -13,8 +13,20 @@
  */
 import { all, first, run } from "./db";
 import { newId } from "../utils/id";
+import type { Env } from "../types/env";
 
 type DB = D1Database;
+
+/**
+ * Optional runtime handles for rules that need to reach the network (AI, Stripe)
+ * or defer work off the request path. DB-only rules ignore these; only call
+ * sites that want those richer automations pass them (e.g. product publish).
+ */
+export interface EmitOpts {
+  env?: Env;
+  /** Anything with waitUntil — Hono's executionCtx or the raw ExecutionContext. */
+  ctx?: { waitUntil: (promise: Promise<unknown>) => void };
+}
 
 export interface ActivityEvent {
   kind: string; // 'sample.approved', 'po.status.confirmed', 'commission.stage_changed', ...
@@ -75,6 +87,13 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     description:
       "When a commission changes stage, Verto files the natural next task — source the fabric, schedule the fitting, arrange the handover.",
   },
+  {
+    key: "product-published-launch-kit",
+    on: "product.published",
+    title: "Product published → draft the launch kit",
+    description:
+      "When you publish a product, Verto drafts a launch campaign — an Instagram caption, a launch email, and an SEO article — into Marketing, ready for you to edit, schedule, and send. Nothing posts on its own.",
+  },
 ];
 
 /** Rule toggles: no row means enabled — rules are quiet (create-only). */
@@ -130,9 +149,21 @@ async function nextPoNumber(db: DB): Promise<string> {
 }
 
 /** What each rule actually does. Create-only, by design. */
-async function runRule(db: DB, key: string, ev: ActivityEvent): Promise<void> {
+async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts): Promise<void> {
   const p = (ev.payload ?? {}) as Record<string, string | null | undefined>;
   switch (key) {
+    case "product-published-launch-kit": {
+      // Needs the network (LLM) — defer off the request path. Skip silently if
+      // this emit site didn't pass env/ctx (then it's feed-only).
+      if (!opts?.env || !opts?.ctx || !p.productId) return;
+      const env = opts.env;
+      const productId = String(p.productId);
+      const name = p.name ? String(p.name) : "your new product";
+      opts.ctx.waitUntil(
+        import("./launch-kit").then(({ draftLaunchKit }) => draftLaunchKit(env, db, { productId, name })),
+      );
+      return;
+    }
     case "sample-approved-po-draft": {
       const styleName = p.styleName ?? "the style";
       if (p.supplierId) {
@@ -211,8 +242,9 @@ async function runRule(db: DB, key: string, ev: ActivityEvent): Promise<void> {
   }
 }
 
-/** Append to the spine and run any enabled rules. Never throws. */
-export async function emit(db: DB, ev: ActivityEvent): Promise<void> {
+/** Append to the spine and run any enabled rules. Never throws. Pass `opts`
+ *  (env/ctx) at call sites whose rules reach the network (AI/Stripe). */
+export async function emit(db: DB, ev: ActivityEvent, opts?: EmitOpts): Promise<void> {
   try {
     await run(
       db,
@@ -231,7 +263,7 @@ export async function emit(db: DB, ev: ActivityEvent): Promise<void> {
   for (const rule of AUTOMATION_RULES) {
     if (rule.on !== ev.kind) continue;
     try {
-      if (await ruleEnabled(db, rule.key)) await runRule(db, rule.key, ev);
+      if (await ruleEnabled(db, rule.key)) await runRule(db, rule.key, ev, opts);
     } catch (err) {
       console.log("automation failed", rule.key, err);
     }

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { all, first, run, writeAudit } from "../services/db";
+import { emit } from "../services/activity";
 import {
   collectionCreateSchema,
   imageReorderSchema,
@@ -141,7 +142,11 @@ adminProductRoutes.get("/:id", async (c) => {
 adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = await parseBody(c, productUpdateSchema);
-  const existing = await first(c.var.db, `SELECT id FROM products WHERE id = ?`, id);
+  const existing = await first<{ id: string; is_published: number; name: string }>(
+    c.var.db,
+    `SELECT id, is_published, name FROM products WHERE id = ?`,
+    id,
+  );
   if (!existing) return c.json({ error: "Product not found" }, 404);
 
   const sets: string[] = [];
@@ -183,6 +188,23 @@ adminProductRoutes.patch("/:id", requireAdminWrite, async (c) => {
   sets.push(`updated_at = datetime('now')`);
   await run(c.var.db, `UPDATE products SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
   await writeAudit(c.var.db, c.var.userId, "product.update", "product", id, body);
+
+  // First publish (false → true) fires the launch-kit automation. Pass env/ctx
+  // so the rule can draft marketing content off the request path.
+  if ("isPublished" in body && body.isPublished && !existing.is_published) {
+    await emit(
+      c.var.db,
+      {
+        kind: "product.published",
+        entityType: "product",
+        entityId: id,
+        title: `Published ${existing.name}`,
+        payload: { productId: id, name: existing.name },
+      },
+      { env: c.env, ctx: c.executionCtx },
+    );
+  }
+
   const row = await first(c.var.db, `${PRODUCT_SELECT} WHERE p.id = ?`, id);
   return c.json(mapProduct(row!));
 });
