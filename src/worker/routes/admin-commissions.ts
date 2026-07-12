@@ -5,6 +5,7 @@ import { parseBody } from "../services/validators";
 import { requireAdminWrite } from "../middleware/auth";
 import { newId } from "../utils/id";
 import { emit } from "../services/activity";
+import { resolvePipeline, savePipeline, ALTERATION_WORKING } from "../services/pipeline";
 import type { AppContext } from "../types/env";
 
 /**
@@ -89,15 +90,43 @@ function mapCommission(r: CommissionRow) {
 
 adminCommissionRoutes.get("/", async (c) => {
   try {
-    const rows = await all<CommissionRow>(
-      c.var.db,
-      `${COMMISSION_SELECT} ORDER BY co.stage IN ('done','cancelled'), co.due_at IS NULL, co.due_at, co.updated_at DESC`,
-    );
-    return c.json(rows.map(mapCommission));
+    const [rows, pipeline] = await Promise.all([
+      all<CommissionRow>(
+        c.var.db,
+        `${COMMISSION_SELECT} ORDER BY co.stage IN ('done','cancelled'), co.due_at IS NULL, co.due_at, co.updated_at DESC`,
+      ),
+      resolvePipeline(c.var.db),
+    ]);
+    return c.json(rows.map((r) => ({ ...mapCommission(r), stageLabel: pipeline.labels[r.stage] ?? STAGE_LABELS[r.stage] ?? r.stage })));
   } catch {
     // Table not migrated on this shop DB yet — an empty pipeline.
     return c.json([]);
   }
+});
+
+// The shop's configured pipeline — order, labels, and which working stages
+// are active. Read by the commissions board and the stage pickers.
+adminCommissionRoutes.get("/pipeline", async (c) => {
+  const pipeline = await resolvePipeline(c.var.db);
+  return c.json({
+    stages: pipeline.stages,
+    labels: pipeline.labels,
+    alteration: (ALTERATION_WORKING as readonly string[]).slice(),
+  });
+});
+
+const pipelineSchema = z.object({
+  stages: z
+    .array(z.object({ key: z.string().max(30), label: z.string().max(40), active: z.boolean() }))
+    .min(1)
+    .max(12),
+});
+
+adminCommissionRoutes.put("/pipeline", requireAdminWrite, async (c) => {
+  const body = await parseBody(c, pipelineSchema);
+  await savePipeline(c.var.db, body.stages);
+  const pipeline = await resolvePipeline(c.var.db);
+  return c.json({ ok: true, stages: pipeline.stages, labels: pipeline.labels });
 });
 
 const commissionSchema = z.object({
@@ -171,8 +200,10 @@ adminCommissionRoutes.get("/:id", async (c) => {
       id,
     ).catch(() => []),
   ]);
+  const pipeline = await resolvePipeline(c.var.db);
   return c.json({
     ...mapCommission(row),
+    stageLabel: pipeline.labels[row.stage] ?? STAGE_LABELS[row.stage] ?? row.stage,
     events: events.map((e) => ({
       id: e.id,
       kind: e.kind,

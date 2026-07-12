@@ -540,6 +540,9 @@ export function ClientDetailPage() {
     () => (allModels.data ?? []).filter((m) => m.source === "uploaded" && !m.clientId),
     [allModels.data],
   );
+  const pipeline = useFetch<{ stages: { key: string; label: string; active: boolean }[]; labels: Record<string, string>; alteration: string[] }>(
+    "/api/admin/commissions/pipeline",
+  );
 
   if (loading) return <LoadingTable />;
   if (error) return <ErrorNote message={error} />;
@@ -720,9 +723,24 @@ export function ClientDetailPage() {
         )}
         <ul className="space-y-2">
           {data.commissions.map((co) => {
-            const stages = co.kind === "alteration"
-              ? ["consult", "fitting", "delivery", "done", "cancelled"]
-              : ["consult", "design", "fabric", "cutting", "fitting", "delivery", "done", "cancelled"];
+            const pl = pipeline.data;
+            const labels = pl?.labels ?? {};
+            const activeKeys = pl
+              ? pl.stages.filter((s) => s.active).map((s) => s.key)
+              : ["consult", "design", "fabric", "cutting", "fitting", "delivery"];
+            const workingKeys =
+              co.kind === "alteration" && pl?.alteration
+                ? activeKeys.filter((k) => pl.alteration.includes(k))
+                : activeKeys;
+            // Always offer the current stage (even if hidden) + the terminal states.
+            const stages = [
+              ...(workingKeys.includes(co.stage) ? [] : [co.stage]),
+              ...workingKeys,
+              "done",
+              "cancelled",
+            ];
+            const stageLabel = (k: string) =>
+              labels[k] ?? (k === "done" ? "Done" : k === "cancelled" ? "Cancelled" : k[0].toUpperCase() + k.slice(1));
             return (
               <li key={co.id} className="rounded border border-black/5 p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -743,7 +761,7 @@ export function ClientDetailPage() {
                     >
                       {stages.map((st) => (
                         <option key={st} value={st}>
-                          {st === "design" ? "Design approved" : st === "fabric" ? "Fabric sourced" : st[0].toUpperCase() + st.slice(1)}
+                          {stageLabel(st)}
                         </option>
                       ))}
                     </select>

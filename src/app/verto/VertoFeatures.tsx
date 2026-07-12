@@ -1457,7 +1457,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     group: "Clients & couture",
     items: [
       ["Client Book for tailors & stylists", "Each client's dated measurement history, style notes, fittings timeline — and their patterns and photos."],
-      ["Commission pipeline", "Made-to-measure work from consult to delivery, with fittings recorded on the client's timeline."],
+      ["Commission pipeline", "Made-to-measure work from consult to delivery, with fittings recorded on the client's timeline. Rename, reorder or hide the stages so the pipeline runs the way your studio does."],
       ["Client portal", "A passwordless page where clients follow their piece, see renders on their own body, and approve the design."],
       ["Deposits & consult booking", "Request deposits and milestone payments per commission, and take consult requests from a public /book page."],
       ["The Interpreter", "Paste any message — a client's tangled question, a maker's reply in another language, a mill's jargon — and get the meaning, the terms explained, and a reply drafted in both languages."],

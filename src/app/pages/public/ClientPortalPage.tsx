@@ -26,6 +26,7 @@ interface PortalMe {
   renders: { url: string; createdAt: string }[];
   photos: { url: string; label: string }[];
   messages: { subject: string | null; body: string; sentAt: string | null }[];
+  stageLabels?: Record<string, string>;
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -127,7 +128,7 @@ export function ClientPortalPage() {
               <li key={co.id} className="rounded-lg border border-black/10 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">{co.title}</span>
-                  <span className="text-sm text-warmgrey">{STAGE_LABELS[co.stage] ?? co.stage}</span>
+                  <span className="text-sm text-warmgrey">{me.stageLabels?.[co.stage] ?? STAGE_LABELS[co.stage] ?? co.stage}</span>
                 </div>
                 {co.payments.length > 0 && (
                   <ul className="mt-2 space-y-0.5 text-xs text-warmgrey">

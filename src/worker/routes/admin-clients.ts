@@ -244,6 +244,8 @@ adminClientRoutes.get("/:id", async (c) => {
      ORDER BY status = 'sent', created_at DESC`,
     id,
   ).catch(() => []);
+  const { resolvePipeline } = await import("../services/pipeline");
+  const pipeline = await resolvePipeline(c.var.db).catch(() => ({ labels: {} as Record<string, string> }));
   return c.json({
     ...mapClient(client),
     measurements: measurements.map((m) => ({
@@ -265,6 +267,7 @@ adminClientRoutes.get("/:id", async (c) => {
       title: co.title,
       kind: co.kind,
       stage: co.stage,
+      stageLabel: pipeline.labels[co.stage] ?? co.stage,
       dueAt: co.due_at,
       priceCents: co.price_cents,
       updatedAt: co.updated_at,
