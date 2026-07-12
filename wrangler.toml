@@ -43,7 +43,7 @@ APP_ENV = "production"
 APP_URL = "https://verto.style"
 # Flip to "1" only after POST /api/admin/platform/migrate-primary has copied
 # the primary shop into its Durable Object (see services/tenant-db.ts).
-PRIMARY_ON_DO = "0"
+PRIMARY_ON_DO = "1"
 BRAND_NAME = "Rezene"
 BRAND_SLUG = "rezene"
 R2_PUBLIC_BASE_URL = ""
