@@ -17,7 +17,7 @@
  * explained inline, but the craft content is faithful to the sources.
  */
 
-export const CURRICULUM_VERSION = "2026.07";
+export const CURRICULUM_VERSION = "2026.07.2";
 
 export type {
   SchoolDef,
