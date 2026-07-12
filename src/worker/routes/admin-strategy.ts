@@ -92,6 +92,7 @@ adminStrategyRoutes.post("/generate", requireAdminWrite, async (c) => {
     persona?: string;
     brief?: string;
     plain?: boolean;
+    provider?: string;
   };
 
   const kindMeta = strategyKindMeta(body.kind ?? "");
@@ -108,7 +109,14 @@ adminStrategyRoutes.post("/generate", requireAdminWrite, async (c) => {
 
   let generated;
   try {
-    generated = await generateStrategy(c.env, c.var.db, { kind, variant, persona, brief, plain });
+    generated = await generateStrategy(c.env, c.var.db, {
+      kind,
+      variant,
+      persona,
+      brief,
+      plain,
+      forceProvider: body.provider === "workers-ai" ? "workers-ai" : undefined,
+    });
   } catch (err) {
     if (err instanceof AiUnavailableError) {
       return c.json(
