@@ -48,6 +48,13 @@ export async function bootstrapDemoShop(env: Env): Promise<{ created: boolean; s
   // that landed since the shop was created).
   const db = getShopDb(env, DEMO_SHOP_ID, PRIMARY_SHOP_ID);
 
+  // Hard stop: demo seeds must NEVER touch the primary shop's bound D1.
+  // (An early pre-DO seeding once bled demo orders into the real primary
+  // shop — this makes that class of accident structurally impossible.)
+  if ((db as unknown) === env.DB) {
+    throw new Error("demo bootstrap refused: resolved to the primary shop database");
+  }
+
   if (!existing) {
     const statements = splitStatements(DEMO_SEED_SQL);
     await db.batch(statements.map((sql) => db.prepare(sql)));
