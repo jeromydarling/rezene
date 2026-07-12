@@ -685,6 +685,202 @@ interface Feature {
   url: string;
 }
 
+function MiniBrandStudio() {
+  return (
+    <MiniShell title="Brand Studio — Maison Atlantique">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-white p-2 shadow-sm">
+          <p className="font-display text-lg font-light text-ink">Maison Atlantique</p>
+          <p className="text-[8px] uppercase tracking-widest text-warmgrey">The Fashion Desk</p>
+          <div className="mt-2 flex gap-1">
+            {["#16233f", "#c96f4a", "#e9e2d2", "#7a8b6f", "#f7f3ea"].map((c) => (
+              <span key={c} className="h-5 w-5 rounded shadow-sm ring-1 ring-ink/10" style={{ backgroundColor: c }} />
+            ))}
+          </div>
+          <div className="mt-2 space-y-0.5">
+            <p className="font-display text-[11px] text-ink">Display · Cormorant Garamond</p>
+            <p className="text-[9px] text-ink/70">Body · Inter — the working hand</p>
+          </div>
+        </div>
+        <div className="w-32 space-y-1">
+          {[
+            ["Storefront", "✓"],
+            ["Line sheets", "✓"],
+            ["Factory portal", "✓"],
+            ["Emails", "✓"],
+            ["Print Shop", "✓"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between rounded bg-white px-1.5 py-1 shadow-sm">
+              <span className="text-[8px] text-warmgrey">{k}</span>
+              <span className="text-[8px] text-palm">{v}</span>
+            </div>
+          ))}
+          <span className={badge("bg-terracotta/15 text-terracotta")}>✨ brand-in-a-box</span>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniRD() {
+  return (
+    <MiniShell title="R&D — price study · linen shirting">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-white p-2 shadow-sm">
+          <p className="text-[9px] font-medium text-ink">Linen shirt · target retail</p>
+          <div className="mt-1.5 h-3 rounded-full bg-cream">
+            <div className="relative h-3 w-3/4 rounded-full bg-gradient-to-r from-palm/40 to-terracotta/60">
+              <span className="absolute -top-3.5 right-0 text-[8px] text-ink">$125 mid</span>
+            </div>
+          </div>
+          <div className="mt-2 space-y-1">
+            {[
+              ["Sézane — Louison", "$110", "cited"],
+              ["Arket — linen overshirt", "$129", "cited"],
+              ["With Nothing Underneath", "$150", "cited"],
+            ].map(([n, p, c]) => (
+              <div key={n} className="flex items-center justify-between rounded bg-cream/60 px-1.5 py-1">
+                <span className="truncate text-[8px] text-ink/80">{n}</span>
+                <span className="text-[8px] font-medium text-ink">{p}</span>
+                <span className={badge("bg-navy/10 text-navy")}>{c}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="w-28 space-y-1">
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-medium text-ink">Dossier · Sézane</p>
+            <span className={badge("bg-terracotta/15 text-terracotta")}>watching weekly</span>
+          </div>
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-medium text-ink">Trend board</p>
+            <div className="mt-1 flex gap-0.5">
+              {["bg-navy/30", "bg-terracotta/40", "bg-palm/40"].map((c, i) => (
+                <span key={i} className={`h-6 w-1/3 rounded-sm ${c}`} />
+              ))}
+            </div>
+          </div>
+          <button className="w-full rounded bg-navy px-1.5 py-1 text-[8px] text-white">→ push to cost sheet</button>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniDraftingRoom() {
+  return (
+    <MiniShell title="Drafting Room — The Vincent trouser system">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-[#fdfbf6] p-2 shadow-sm">
+          <p className="text-[8px] italic text-warmgrey">After W.D.F. Vincent, “The Cutter's Practical Guide” (c. 1893)</p>
+          <div className="relative mt-1 h-24">
+            {/* Stylized forepart with construction lines */}
+            <div className="absolute left-2 top-0 h-24 w-14 rounded-b-sm border border-ink/50 bg-cream/70" style={{ clipPath: "polygon(0 0, 88% 0, 100% 28%, 78% 100%, 30% 100%, 0 30%)" }} />
+            <div className="absolute left-2 top-7 w-14 border-t border-dashed border-ink/30" />
+            <div className="absolute left-9 top-7 h-16 border-l border-dashed border-ink/30" />
+            {["A", "B", "C", "D"].map((l, i) => (
+              <span key={l} className="absolute font-display text-[8px] italic text-ink" style={{ left: `${8 + i * 16}px`, top: `${i % 2 === 0 ? 0 : 26}px` }}>
+                {l}
+              </span>
+            ))}
+            <div className="absolute right-2 top-1 space-y-0.5 text-right">
+              <p className="text-[7px] text-warmgrey">seat scale ÷ 16 + 5</p>
+              <p className="text-[7px] text-warmgrey">rise 30.0 cm</p>
+              <p className="text-[7px] text-warmgrey">crease on grain</p>
+            </div>
+          </div>
+        </div>
+        <div className="w-32 space-y-1">
+          {[
+            ["Vincent trousers", "c. 1893"],
+            ["Keystone vest", "1895"],
+            ["Fales shirt-waist", "1917"],
+            ["Circular cape", "1880s"],
+          ].map(([n, y], i) => (
+            <div key={n} className={`rounded px-1.5 py-1 shadow-sm ${i === 0 ? "bg-navy text-white" : "bg-white"}`}>
+              <p className={`text-[8px] font-medium ${i === 0 ? "text-white" : "text-ink"}`}>{n}</p>
+              <p className={`text-[7px] ${i === 0 ? "text-white/60" : "text-warmgrey"}`}>{y}</p>
+            </div>
+          ))}
+          <span className={badge("bg-palm/15 text-palm")}>true-scale PDF ↓</span>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniSchool() {
+  return (
+    <MiniShell title="Verto School — The Trouser · lesson 7 of 12">
+      <div className="flex gap-2">
+        <div className="flex-1 rounded bg-white p-2 shadow-sm">
+          <p className="text-[9px] font-medium text-ink">Reading trouser wrinkles: the fitting remedies</p>
+          <div className="mt-1 flex items-center gap-1 rounded bg-cream/70 px-1.5 py-1">
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-navy text-[7px] text-white">▶</span>
+            <div className="h-1 flex-1 rounded-full bg-ink/10">
+              <div className="h-1 w-2/3 rounded-full bg-navy/60" />
+            </div>
+            <span className="text-[7px] text-warmgrey">Listen</span>
+          </div>
+          <div className="mt-1.5 space-y-0.5">
+            <div className="h-1.5 w-full rounded bg-ink/10" />
+            <div className="h-1.5 w-5/6 rounded bg-ink/10" />
+            <div className="h-1.5 w-4/6 rounded bg-ink/10" />
+          </div>
+          <div className="mt-1.5 rounded border border-ink/10 bg-cream/50 p-1">
+            <p className="text-[7px] text-ink/70">Checkpoint · Cloth piling below the collar suggests…</p>
+          </div>
+        </div>
+        <div className="w-28 space-y-1">
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-medium text-ink">Progress</p>
+            <div className="mt-1 grid grid-cols-6 gap-0.5">
+              {[...Array(12)].map((_, i) => (
+                <span key={i} className={`h-1.5 rounded-sm ${i < 7 ? "bg-palm/70" : "bg-ink/10"}`} />
+              ))}
+            </div>
+            <p className="mt-0.5 text-[7px] text-warmgrey">real reading time credited</p>
+          </div>
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-medium text-ink">◈ Certificate</p>
+            <p className="text-[7px] text-warmgrey">exam + practical, publicly verifiable</p>
+          </div>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
+function MiniLibrary() {
+  return (
+    <MiniShell title="Timeless Library — Plates · “promenade dress 1895”">
+      <div className="flex gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-1">
+          {["bg-[#d9c9a8]", "bg-[#c4b291]", "bg-[#e3d6bd]", "bg-[#cbb894]", "bg-[#d3c2a0]", "bg-[#bfae8d]"].map((c, i) => (
+            <div key={i} className={`relative h-12 rounded ${c} shadow-sm`}>
+              <span className="absolute inset-x-1 bottom-0.5 truncate text-[6px] text-ink/60">
+                {["Met · CC0", "Vogue 1898", "Racinet pl. 5", "Harper's 1892", "Hughes 1920", "Met · CC0"][i]}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="w-32 space-y-1">
+          <div className="flex gap-0.5">
+            {["Plates", "Magazines", "Books", "Patterns"].map((r, i) => (
+              <span key={r} className={badge(i === 0 ? "bg-navy text-white" : "bg-ink/5 text-ink/60")}>{r}</span>
+            ))}
+          </div>
+          <div className="rounded bg-white p-1.5 shadow-sm">
+            <p className="text-[8px] font-medium text-ink">Pinned to SS27 board</p>
+            <p className="text-[7px] text-warmgrey">“Racinet, Le Costume Historique, pl. 5 (1888)” — credit travels with it</p>
+          </div>
+          <button className="w-full rounded bg-navy px-1.5 py-1 text-[8px] text-white">Use in a new design →</button>
+        </div>
+      </div>
+    </MiniShell>
+  );
+}
+
 const FEATURES: Feature[] = [
   {
     id: "design-studio",
@@ -778,8 +974,14 @@ const FEATURES: Feature[] = [
     id: "production",
     eyebrow: "Make",
     heading: "A production calendar that speaks garment.",
-    body: "Kanban, table, or timeline over the whole season: briefs, sampling, grading, bulk, QC. Every task knows its style, its factory, and its deadline.",
-    points: ["Stages modeled on real apparel production", "Late work surfaces itself", "Linked to styles, samples, and purchase orders"],
+    body: "Kanban, table, or timeline over the whole season: briefs, sampling, grading, bulk, QC. Every task knows its style, its factory, and its deadline — and the rooms around the calendar carry the rest: a fabrics & trims library feeding BOMs, a sample log with reviews, size-run purchase orders, and a maker-messages inbox with an unread badge that follows you around the app.",
+    points: [
+      "Stages modeled on real apparel production; late work surfaces itself",
+      "Fabrics & materials library — the same records your BOMs and cost sheets reference",
+      "Samples with review notes; approve one and the production order drafts itself",
+      "Size-run purchase orders: order a curve, receive per size",
+      "Maker Messages: every factory thread in one inbox, unread count in the nav",
+    ],
     screen: MiniProduction,
     url: "verto.style/maison/admin/production",
   },
@@ -899,6 +1101,76 @@ const FEATURES: Feature[] = [
     screen: MiniPlatform,
     url: "verto.style/signup",
   },
+  {
+    id: "brand",
+    eyebrow: "Identity",
+    heading: "One identity, rendered everywhere.",
+    body: "Set your logo, palette and typography once and Verto carries them through everything a client or factory ever sees — the storefront, line sheets, factory portals, buyer emails, exports. No brand yet? Describe the label you're building and the AI brand-in-a-box proposes a full identity you apply with one click and refine forever.",
+    points: [
+      "Logo, palette & type pairing, applied across storefront, documents and emails",
+      "AI brand-in-a-box: a proposed identity from a description, yours to accept or edit",
+      "The Print Shop: hang tags, care labels, thank-you cards, letterhead as print-ready PDFs",
+      "A living guidelines page + downloadable brand kit for printers and collaborators",
+    ],
+    screen: MiniBrandStudio,
+    url: "verto.style/maison/admin/brand",
+  },
+  {
+    id: "rd",
+    eyebrow: "Research",
+    heading: "A research lab wired into the studio.",
+    body: "Live, cited web research where the work happens: build dossiers on the brands you're measured against, run price studies with real comparables, keep trend boards fed by the Timeless Library, and track stockists worth pitching. Watch a competitor and Verto re-researches them weekly into your digest.",
+    points: [
+      "Brand dossiers, price studies, trend boards, stockist pipelines — every claim cited",
+      "Watches: dossiers and boards re-research themselves weekly, changes land in your digest",
+      "One click pushes a study's target retail into the style's cost sheet",
+      "Research leads promote straight into your supplier book",
+    ],
+    screen: MiniRD,
+    url: "verto.style/maison/admin/research",
+  },
+  {
+    id: "drafting-room",
+    eyebrow: "Cut",
+    heading: "The old masters' systems, as working tools.",
+    body: "The school teaches the period drafting systems; the Drafting Room makes them run. Pick Vincent's trouser system, the Keystone vest, the 1917 shirt-waist or the circular cape, give it measurements, and the draft is struck the way the book strikes it — lettered points, construction lines, the source cited on the sheet.",
+    points: [
+      "Four period systems as deterministic drafting code — no AI guesswork in the geometry",
+      "Standard sizes or full made-to-measure, same as the Pattern Studio",
+      "True-scale tiled PDF with a 5 cm check bar, or SVG for your machinist",
+      "Every sheet cites its book — which sits one shelf away in the Timeless Library",
+    ],
+    screen: MiniDraftingRoom,
+    url: "verto.style/maison/admin/drafting",
+  },
+  {
+    id: "school",
+    eyebrow: "Learn",
+    heading: "A trade school inside your shop.",
+    body: "Nine twelve-lesson courses in tailoring, seamstressing and fashion, adapted from the golden-age masters — read them or listen, with the books' own plates inline. Lessons credit real reading time, examinations draw random papers graded on the server, and the practical verifies real work in your own studio. The certificate is a public link that can't be faked.",
+    points: [
+      "108 lessons adapted from the era's own books, each chapter cited and linked",
+      "A Listen bar on every lesson — the browser reads, the paragraph highlights",
+      "Server-graded exams from randomized banks; two misses locks the paper for 24 hours",
+      "Practicals verified against real artifacts in your shop — the work is the exam",
+    ],
+    screen: MiniSchool,
+    url: "verto.style/maison/admin/school",
+  },
+  {
+    id: "library",
+    eyebrow: "Reference",
+    heading: "A museum wing behind a door in your studio.",
+    body: "The Metropolitan Museum's open collection, every early run of Vogue (1892–1929) and Harper's Bazar (1867–1929) readable page by page, the school's source books, and historic patterns you can actually cut — all public domain, fetched on request and cached. Pin anything to a trend board with its credit line, or port a plate straight into a new design as a studio reference.",
+    points: [
+      "Four rooms: Plates, Magazines, Books, Patterns — searchable across museum and archive",
+      "Everything public domain: pin it, quote it, print it, sell what you design from it",
+      "Pins carry citations, and the Companion reads your pinned plates when it answers",
+      "One click makes any plate the reference image for a new Design Studio concept",
+    ],
+    screen: MiniLibrary,
+    url: "verto.style/maison/admin/library",
+  },
 ];
 
 // ---------- Category killer: tech packs head-to-head ----------
@@ -997,14 +1269,17 @@ function TechPackShowcase() {
 // order — so the tour doubles as a map of the product you'll actually run.
 // Only groups with tour content appear.
 const FEATURE_TABS: { group: string; blurb: string; ids: string[] }[] = [
-  { group: "Catalog", blurb: "Products, styles, SKUs, inventory — and an AI import studio that does the data entry.", ids: ["import"] },
+  { group: "Catalog", blurb: "Products, styles, SKUs, inventory across locations — and an AI import studio that does the data entry.", ids: ["import"] },
   { group: "Content", blurb: "Pages, journal, lookbooks, SEO, translations — a storefront you actually edit.", ids: ["storefront", "seo", "lookbooks", "translations"] },
+  { group: "Brand", blurb: "Logo, palette, type — set once, rendered on everything a client or factory sees.", ids: ["brand"] },
   { group: "Marketing", blurb: "Campaign kits, a content calendar, and a promo-video studio.", ids: ["marketing", "promo-video"] },
-  { group: "Commerce", blurb: "Orders, shipping, wholesale — and the whole modern shop around them.", ids: ["shipping", "wholesale"] },
-  { group: "Production", blurb: "The calendar, your factories, samples — and finding your next maker.", ids: ["production", "sourcing", "factory"] },
-  { group: "Studio", blurb: "Design it, fit it, cut it — the three studios, and tech packs a factory can build from.", ids: ["design-studio", "fitting-studio", "pattern-studio", "techpacks"] },
-  { group: "Finance", blurb: "Costing, duties, analytics — the money picture from real data.", ids: ["costing", "analytics"] },
-  { group: "System", blurb: "Your own domain, your team, your data — a real platform underneath.", ids: ["platform"] },
+  { group: "Commerce", blurb: "Orders, shipping, discounts, returns, reviews, wholesale — the whole modern shop.", ids: ["shipping", "wholesale"] },
+  { group: "Production", blurb: "The calendar, your factories and their messages, fabrics, samples, POs, R&D — and finding your next maker.", ids: ["production", "factory", "sourcing", "rd"] },
+  { group: "Studio", blurb: "Design it, fit it, draft it — four studios, and tech packs a factory can build from.", ids: ["design-studio", "fitting-studio", "pattern-studio", "drafting-room", "techpacks"] },
+  { group: "Clients", blurb: "The made-to-measure lane: the Client Book, commissions, the portal, deposits and booking.", ids: ["client-book"] },
+  { group: "Finance", blurb: "Costing, duties, cash flow and open-to-buy, analytics — the money picture from real data.", ids: ["costing", "analytics"] },
+  { group: "School & Library", blurb: "A trade school taught from the era's masters, and the archive it teaches from.", ids: ["school", "library"] },
+  { group: "System", blurb: "Your own domain, your team, automations, your data — a real platform underneath.", ids: ["platform"] },
 ];
 
 function tabForHash(hash: string): string | null {

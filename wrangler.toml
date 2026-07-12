@@ -45,7 +45,7 @@ APP_URL = "https://verto.style"
 # the primary shop into its Durable Object (see services/tenant-db.ts).
 PRIMARY_ON_DO = "1"
 # Sentry error monitoring (publishable DSN, not a secret). Empty = disabled.
-SENTRY_DSN = ""
+SENTRY_DSN = "https://b1fbaa8166b49eb0f2db38f2fc791193@o4511311951298560.ingest.us.sentry.io/4511720342487040"
 BRAND_NAME = "Rezene"
 BRAND_SLUG = "rezene"
 R2_PUBLIC_BASE_URL = ""
