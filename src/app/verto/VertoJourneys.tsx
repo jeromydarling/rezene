@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { MagneticButton, ParallaxImage, ParticleField, Reveal } from "./cinema";
 
@@ -7,9 +8,10 @@ import { MagneticButton, ParallaxImage, ParticleField, Reveal } from "./cinema";
  * going from zero to a paying client overnight, a label going from a blank
  * screen to money in the till, a founder deciding a season on evidence
  * instead of feelings, and an established brand moving in over one
- * afternoon. Same cinematic grammar as /why: reveals pace the narrative,
- * one anchored image per act, light and dark sections alternating. Every
- * beat is a shipped feature wearing a person; every story ends at money.
+ * afternoon. A tab selector picks one journey at a time — a character
+ * portrait, the hour-by-hour timeline, and the point — so the page stays
+ * short. Every beat is a shipped feature wearing a person; every story ends
+ * at money.
  */
 
 const TAILOR_BEATS: { time: string; beat: string; detail: string }[] = [
@@ -216,8 +218,138 @@ function StoryTimeline({ beats, dark }: { beats: typeof TAILOR_BEATS; dark?: boo
   );
 }
 
+interface Story {
+  key: string;
+  tab: string;
+  who: string;
+  eyebrow: string;
+  heading: string;
+  intro: string;
+  beats: typeof TAILOR_BEATS;
+  closing: string;
+  point?: { heading: string; body: string[] };
+  image: string;
+  alt: string;
+}
+
+const STORIES: Story[] = [
+  {
+    key: "stylist",
+    tab: "The stylist",
+    who: "Amara",
+    eyebrow: "Story one · The stylist",
+    heading: "Zero to a paying client, overnight.",
+    intro:
+      "Amara doesn't need a storefront full of products, and she doesn't need to know how to sew. Her product is her eye. What she needs is the machinery around a client — booking, measurements, a real pattern, a maker, sign-off, money — without hiring anyone or duct-taping five apps together.",
+    beats: TAILOR_BEATS,
+    closing:
+      "The next morning there are two more requests in her book. At $535 kept per jacket, two commissions a week is a living; four is a studio. Nothing about her taste changed overnight. Everything about her business did.",
+    point: {
+      heading: "The craft was never the hard part.",
+      body: [
+        "Every stylist already knows what looks right on a body, and every good maker can sew it. What kept them apart was everything in between: the pattern drafting, the follow-ups in DMs, the measurements on paper scraps, the awkward “so, about the deposit” conversation. Verto turns that whole layer into a link you share, a brief your maker receives, and a page you glance at.",
+        "And the client feels it too — a portal with their own renders, plain-word progress, and a record of what they approved. Professional, before the first stitch.",
+      ],
+    },
+    image: "/verto/story-stylist.jpg",
+    alt: "Amara, a stylist, pinning a half-made jacket on a dress form in her sunlit studio",
+  },
+  {
+    key: "label",
+    tab: "The label",
+    who: "Theo",
+    eyebrow: "Story two · The label",
+    heading: "Spin up a shop. Design the clothes. Get paid before production.",
+    intro:
+      "Theo's problem is the opposite of Amara's: no clients yet, just a line he can see with his eyes closed — and no idea how solo designers get from picture to product to payment.",
+    beats: LABEL_BEATS,
+    closing:
+      "Week three, the samples arrive. The pre-orders already paid for them — and the margin was never a guess: 68 points, printed on his cost sheet before he sold a single piece.",
+    image: "/verto/story-label.jpg",
+    alt: "Theo, a designer, sketching at his desk beside a laptop of generated looks",
+  },
+  {
+    key: "founder",
+    tab: "The founder",
+    who: "Leila",
+    eyebrow: "Story three · The founder",
+    heading: "A season decided on evidence, not vibes.",
+    intro:
+      "Leila can design and she can make. What has always been foggy is everything around the work: what the competition actually charges, what her linen maxi should retail for, which direction deserves the season, and which boutiques would ever say yes. Big brands have research departments for those questions. She has a Sunday afternoon and R&D.",
+    beats: FOUNDER_BEATS,
+    closing:
+      "Nothing in her season is a feeling anymore. The price has comparables, the direction has sources, the pitch list came from evidence — and the watching continues while she cuts. She spent one afternoon deciding and kept the receipts.",
+    point: {
+      heading: "Research you can act on keeps its receipts.",
+      body: [
+        "Every founder does this research already — in seventeen tabs, a screenshot folder, and a note that says “competitor raised prices??”. It evaporates. In Verto every answer lands with its sources attached, every dossier remembers what it said last month, and the decisions flow into the tools that spend the money: the cost sheet, the Design Studio, the pitch list.",
+        "And the watching runs on the same allowance as your own questions, capped and honest — an assistant, not a meter that spins while you sleep.",
+      ],
+    },
+    image: "/verto/story-founder.jpg",
+    alt: "Leila, a founder, studying a wall of pinned research and swatches in raking afternoon light",
+  },
+  {
+    key: "switcher",
+    tab: "The switcher",
+    who: "Nadia",
+    eyebrow: "Story four · The switcher",
+    heading: "Four years of business, moved in one afternoon.",
+    intro:
+      "Nadia isn't starting — she's switching, which is scarier. A real catalog, real makers, a season already at the factory, customers who know her address. The move only works if nothing gets dropped and nobody notices the seams.",
+    beats: SWITCHER_BEATS,
+    closing:
+      "Sunday she did nothing, because nothing needed her. The catalog, the makers, the season, the domain — all of it moved; none of it broke. The only thing she left behind was the spreadsheet.",
+    image: "/verto/story-switcher.jpg",
+    alt: "Nadia, an established label owner, reviewing a laptop beside a full rail of finished pieces",
+  },
+];
+
+function StoryPanel({ story }: { story: Story }) {
+  return (
+    <div>
+      <div className="grid items-center gap-10 md:grid-cols-2">
+        <Reveal>
+          <ParallaxImage src={story.image} alt={story.alt} speed={0.3} className="aspect-[3/4] max-h-[68vh]" />
+        </Reveal>
+        <div>
+          <Reveal delay={100}>
+            <p className="eyebrow mb-3">{story.eyebrow}</p>
+          </Reveal>
+          <Reveal delay={200}>
+            <h2 className="font-display text-3xl font-light md:text-5xl">{story.heading}</h2>
+          </Reveal>
+          <Reveal delay={300}>
+            <p className="prose-editorial mt-4 max-w-xl">{story.intro}</p>
+          </Reveal>
+        </div>
+      </div>
+
+      <StoryTimeline beats={story.beats} />
+
+      <Reveal delay={150}>
+        <p className="prose-editorial mt-10 max-w-2xl text-lg">{story.closing}</p>
+      </Reveal>
+
+      {story.point && (
+        <div className="mt-12 rounded-2xl border border-ink/10 bg-white/60 p-8">
+          <p className="eyebrow mb-3">The point</p>
+          <h3 className="font-display text-2xl font-light md:text-3xl">{story.point.heading}</h3>
+          {story.point.body.map((p, i) => (
+            <p key={i} className="prose-editorial mt-4 max-w-2xl">
+              {p}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function VertoJourneys() {
   const navigate = useNavigate();
+  const [active, setActive] = useState(0);
+  const story = STORIES[active];
   return (
     <>
       {/* Opening: two people, one platform. */}
@@ -251,204 +383,28 @@ export function VertoJourneys() {
         </div>
       </section>
 
-      {/* Story one: the tailor — zero to a paying client overnight. */}
-      <section className="mx-auto max-w-6xl px-5 py-24">
-        <Reveal>
-          <p className="eyebrow mb-3">Story one · The stylist</p>
-        </Reveal>
-        <Reveal delay={150}>
-          <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
-            Zero to a paying client, overnight.
-          </h2>
-        </Reveal>
-        <Reveal delay={250}>
-          <p className="prose-editorial mt-4 max-w-2xl">
-            Amara doesn't need a storefront full of products, and she doesn't need to know how
-            to sew. Her product is her eye. What she needs is the machinery around a client —
-            booking, measurements, a real pattern, a maker, sign-off, money — without hiring
-            anyone or duct-taping five apps together.
-          </p>
-        </Reveal>
-        <StoryTimeline beats={TAILOR_BEATS} />
-        <Reveal delay={200}>
-          <p className="prose-editorial mt-10 max-w-2xl text-lg">
-            The next morning there are two more requests in her book. At $535 kept per jacket,
-            two commissions a week is a living; four is a studio. Nothing about her taste changed
-            overnight. Everything about her business did.
-          </p>
-        </Reveal>
-      </section>
-
-      {/* Interlude image. */}
-      <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-24 md:grid-cols-2">
-        <Reveal>
-          <ParallaxImage
-            src="/verto/atelier.jpg"
-            alt="A tailor pressing a seam on cream linen trousers"
-            speed={0.3}
-            className="aspect-[3/4] max-h-[70vh]"
-          />
-        </Reveal>
-        <div>
-          <Reveal delay={150}>
-            <p className="eyebrow mb-3">The point</p>
-          </Reveal>
-          <Reveal delay={250}>
-            <h2 className="font-display text-3xl font-light md:text-4xl">
-              The craft was never the hard part.
-            </h2>
-          </Reveal>
-          <Reveal delay={350}>
-            <p className="prose-editorial mt-4">
-              Every stylist already knows what looks right on a body, and every good maker can sew
-              it. What kept them apart was everything in between: the pattern drafting, the
-              follow-ups in DMs, the measurements on paper scraps, the awkward “so, about the
-              deposit” conversation. Verto turns that whole layer into a link you share, a brief
-              your maker receives, and a page you glance at.
-            </p>
-          </Reveal>
-          <Reveal delay={450}>
-            <p className="prose-editorial mt-4">
-              And the client feels it too — a portal with their own renders, plain-word progress,
-              and a record of what they approved. Professional, before the first stitch.
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Story two: the label — spin up, design, make money. */}
-      <section className="bg-navy text-chalk">
-        <div className="mx-auto max-w-6xl px-5 py-24">
-          <Reveal>
-            <p className="eyebrow mb-3 !text-chalk/50">Story two · The label</p>
-          </Reveal>
-          <Reveal delay={150}>
-            <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
-              Spin up a shop. Design the clothes. Get paid before production.
-            </h2>
-          </Reveal>
-          <Reveal delay={250}>
-            <p className="prose-editorial mt-4 max-w-2xl !text-chalk/80">
-              Theo's problem is the opposite of Amara's: no clients yet, just a line he can see
-              with his eyes closed — and no idea how solo designers get from picture to product
-              to payment.
-            </p>
-          </Reveal>
-          <StoryTimeline beats={LABEL_BEATS} dark />
-          <Reveal delay={200}>
-            <p className="prose-editorial mt-10 max-w-2xl text-lg !text-chalk/80">
-              Week three, the samples arrive. The pre-orders already paid for them — and the
-              margin was never a guess: 68 points, printed on his cost sheet before he sold a
-              single piece.
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Story three: the founder — a season decided on evidence. */}
-      <section className="mx-auto max-w-6xl px-5 py-24">
-        <Reveal>
-          <p className="eyebrow mb-3">Story three · The founder</p>
-        </Reveal>
-        <Reveal delay={150}>
-          <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
-            A season decided on evidence, not vibes.
-          </h2>
-        </Reveal>
-        <Reveal delay={250}>
-          <p className="prose-editorial mt-4 max-w-2xl">
-            Leila can design and she can make. What has always been foggy is everything around the
-            work: what the competition actually charges, what her linen maxi should retail for,
-            which direction deserves the season, and which boutiques would ever say yes. Big brands
-            have research departments for those questions. She has a Sunday afternoon and R&D.
-          </p>
-        </Reveal>
-        <StoryTimeline beats={FOUNDER_BEATS} />
-        <Reveal delay={200}>
-          <p className="prose-editorial mt-10 max-w-2xl text-lg">
-            Nothing in her season is a feeling anymore. The price has comparables, the direction
-            has sources, the pitch list came from evidence — and the watching continues while she
-            cuts. She spent one afternoon deciding and kept the receipts.
-          </p>
-        </Reveal>
-      </section>
-
-      {/* Interlude image two. */}
-      <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-24 md:grid-cols-2">
-        <div className="md:order-2">
-          <Reveal>
-            <ParallaxImage
-              src="/verto/research.jpg"
-              alt="A studio wall of pinned research — swatches, tearsheets and handwritten notes in raking afternoon light"
-              speed={0.3}
-              className="aspect-[3/4] max-h-[70vh]"
-            />
-          </Reveal>
-        </div>
-        <div className="md:order-1">
-          <Reveal delay={150}>
-            <p className="eyebrow mb-3">The point</p>
-          </Reveal>
-          <Reveal delay={250}>
-            <h2 className="font-display text-3xl font-light md:text-4xl">
-              Research you can act on keeps its receipts.
-            </h2>
-          </Reveal>
-          <Reveal delay={350}>
-            <p className="prose-editorial mt-4">
-              Every founder does this research already — in seventeen tabs, a screenshot folder,
-              and a note that says “competitor raised prices??”. It evaporates. In Verto every
-              answer lands with its sources attached, every dossier remembers what it said last
-              month, and the decisions flow into the tools that spend the money: the cost sheet,
-              the Design Studio, the pitch list.
-            </p>
-          </Reveal>
-          <Reveal delay={450}>
-            <p className="prose-editorial mt-4">
-              And the watching runs on the same allowance as your own questions, capped and
-              honest — an assistant, not a meter that spins while you sleep.
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Story four: the switcher — an established brand moves in. */}
-      <section className="bg-navy text-chalk">
-        <div className="mx-auto max-w-6xl px-5 py-24">
-          <Reveal>
-            <p className="eyebrow mb-3 !text-chalk/50">Story four · The switcher</p>
-          </Reveal>
-          <Reveal delay={150}>
-            <h2 className="max-w-3xl font-display text-3xl font-light md:text-5xl">
-              Four years of business, moved in one afternoon.
-            </h2>
-          </Reveal>
-          <Reveal delay={250}>
-            <p className="prose-editorial mt-4 max-w-2xl !text-chalk/80">
-              Nadia isn't starting — she's switching, which is scarier. A real catalog, real
-              makers, a season already at the factory, customers who know her address. The move
-              only works if nothing gets dropped and nobody notices the seams.
-            </p>
-          </Reveal>
-          <StoryTimeline beats={SWITCHER_BEATS} dark />
-          <div className="mt-12 grid items-center gap-10 md:grid-cols-2">
-            <Reveal delay={200}>
-              <p className="prose-editorial max-w-2xl text-lg !text-chalk/80">
-                Sunday she did nothing, because nothing needed her. The catalog, the makers, the
-                season, the domain — all of it moved; none of it broke. The only thing she left
-                behind was the spreadsheet.
-              </p>
-            </Reveal>
-            <Reveal delay={300}>
-              <ParallaxImage
-                src="/verto/move.jpg"
-                alt="A garment rail of cream linen wheeled down a whitewashed coastal street at golden hour"
-                speed={0.25}
-                className="aspect-[3/4] max-h-[60vh]"
-              />
-            </Reveal>
+      {/* Story selector — pick a journey; only one shows at a time. */}
+      <div className="mx-auto max-w-6xl px-5 pt-16">
+        <div className="-mx-5 overflow-x-auto px-5">
+          <div className="flex w-max gap-2 rounded-full border border-ink/10 bg-white/70 p-1.5 backdrop-blur">
+            {STORIES.map((s, i) => (
+              <button
+                key={s.key}
+                onClick={() => setActive(i)}
+                className={`whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition ${
+                  i === active ? "bg-navy text-chalk shadow-sm" : "text-ink/70 hover:bg-ink/5"
+                }`}
+              >
+                {s.tab}
+                <span className="ml-2 hidden text-xs opacity-60 sm:inline">{s.who}</span>
+              </button>
+            ))}
           </div>
         </div>
+      </div>
+
+      <section key={story.key} className="mx-auto max-w-6xl px-5 py-16">
+        <StoryPanel story={story} />
       </section>
 
       {/* Close: the invitation. */}
