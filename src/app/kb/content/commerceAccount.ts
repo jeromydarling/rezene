@@ -221,8 +221,8 @@ The **webhook** action is your bridge to everything else. Paste a webhook URL fr
     title: "Connecting Zapier (and Gmail, Sheets, Slack…)",
     summary: "Two webhooks — one out, one in — bridge Verto to the thousands of apps Zapier connects, no keys or code.",
     part: "account",
-    moduleRoute: "/admin/settings",
-    keywords: "zapier make integromat webhook gmail sheets slack integration inbound outbound automation connect no-code n8n",
+    moduleRoute: "/admin/connect",
+    keywords: "zapier make integromat webhook gmail sheets slack integration inbound outbound automation connect no-code n8n calendar google",
     updated: "2026-07-12",
     body: `# Connecting Zapier
 

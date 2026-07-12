@@ -1777,6 +1777,9 @@ function InboundWebhookCard() {
             <code className="rounded bg-ink/5 px-1">"booking"</code> with a <code className="rounded bg-ink/5 px-1">name</code>.
             A note with a matching <code className="rounded bg-ink/5 px-1">clientEmail</code> lands on that client's timeline.
           </p>
+          <p className="mt-2 text-[11px]">
+            <a href="/admin/connect" className="text-navy underline">Step-by-step recipes for Gmail & Google Calendar →</a>
+          </p>
           <div className="mt-3 flex items-center gap-2">
             <button className="admin-btn text-sm" onClick={() => void rotate()} disabled={busy}>
               Regenerate
