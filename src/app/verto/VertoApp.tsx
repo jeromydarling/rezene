@@ -275,7 +275,7 @@ function Hero() {
     <section className="relative flex min-h-screen items-end overflow-hidden bg-navy">
       <img
         src="/verto/hero.jpg"
-        alt="Three friends in linen resortwear walking Morocco's Atlantic ramparts at golden hour"
+        alt="Two people in flowing linen resortwear walking a stone terrace toward the golden-hour sea"
         fetchPriority="high"
         decoding="async"
         className="verto-kenburns absolute inset-0 h-full w-full object-cover"
