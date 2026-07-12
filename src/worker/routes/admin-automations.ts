@@ -14,42 +14,69 @@ import type { AppContext } from "../types/env";
 export const adminAutomationRoutes = new Hono<AppContext>();
 
 adminAutomationRoutes.get("/", async (c) => {
-  let overrides = new Map<string, boolean>();
+  const enabledMap = new Map<string, boolean>();
+  const autoMap = new Map<string, boolean>();
   try {
-    const rows = await all<{ rule_key: string; enabled: number }>(
+    const rows = await all<{ rule_key: string; enabled: number; auto_approve: number }>(
       c.var.db,
-      `SELECT rule_key, enabled FROM automation_settings`,
+      `SELECT rule_key, enabled, auto_approve FROM automation_settings`,
     );
-    overrides = new Map(rows.map((r) => [r.rule_key, Boolean(r.enabled)]));
+    for (const r of rows) {
+      enabledMap.set(r.rule_key, Boolean(r.enabled));
+      autoMap.set(r.rule_key, Boolean(r.auto_approve));
+    }
   } catch {
-    /* table not provisioned yet — defaults apply */
+    /* table/column not provisioned yet — defaults apply */
   }
   return c.json(
     AUTOMATION_RULES.map((r) => ({
       key: r.key,
       title: r.title,
       description: r.description,
-      enabled: overrides.get(r.key) ?? true,
+      enabled: enabledMap.get(r.key) ?? true,
+      supportsAutoApprove: Boolean(r.supportsAutoApprove),
+      autoApproveNote: r.autoApproveNote ?? null,
+      autoApprove: autoMap.get(r.key) ?? false,
     })),
   );
 });
 
-const toggleSchema = z.object({ enabled: z.boolean() });
+const toggleSchema = z.object({ enabled: z.boolean().optional(), autoApprove: z.boolean().optional() });
 
 adminAutomationRoutes.patch("/:key", requireAdminWrite, async (c) => {
   const key = c.req.param("key");
-  if (!AUTOMATION_RULES.some((r) => r.key === key)) {
-    return c.json({ error: "Unknown automation rule" }, 404);
-  }
+  const rule = AUTOMATION_RULES.find((r) => r.key === key);
+  if (!rule) return c.json({ error: "Unknown automation rule" }, 404);
   const body = await parseBody(c, toggleSchema);
+  if (body.enabled === undefined && body.autoApprove === undefined) {
+    return c.json({ error: "Nothing to update" }, 400);
+  }
+  // Ensure a row exists, then patch only the provided fields.
   await run(
     c.var.db,
-    `INSERT INTO automation_settings (rule_key, enabled, updated_at)
-     VALUES (?, ?, datetime('now'))
-     ON CONFLICT(rule_key) DO UPDATE SET enabled = excluded.enabled, updated_at = datetime('now')`,
+    `INSERT INTO automation_settings (rule_key, enabled, auto_approve, updated_at)
+     VALUES (?, 1, 0, datetime('now'))
+     ON CONFLICT(rule_key) DO NOTHING`,
     key,
-    body.enabled ? 1 : 0,
   );
+  if (body.enabled !== undefined) {
+    await run(
+      c.var.db,
+      `UPDATE automation_settings SET enabled = ?, updated_at = datetime('now') WHERE rule_key = ?`,
+      body.enabled ? 1 : 0,
+      key,
+    );
+  }
+  if (body.autoApprove !== undefined) {
+    // Auto-approve only meaningful for rules that produce a sendable draft.
+    const value = rule.supportsAutoApprove && body.autoApprove ? 1 : 0;
+    await run(
+      c.var.db,
+      `UPDATE automation_settings SET auto_approve = ?, updated_at = datetime('now') WHERE rule_key = ?`,
+      value,
+      key,
+    );
+  }
   return c.json({ ok: true });
 });
 

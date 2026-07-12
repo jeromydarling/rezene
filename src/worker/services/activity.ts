@@ -41,6 +41,10 @@ export interface AutomationRule {
   on: string; // event kind this rule listens for
   title: string; // short name for the settings page
   description: string; // plain-language "when X, Verto does Y"
+  /** Rule produces a sendable draft, so an "auto-approve" toggle is offered. */
+  supportsAutoApprove?: boolean;
+  /** What auto-approve does for this rule, shown under the toggle. */
+  autoApproveNote?: string;
 }
 
 /** The built-in rules, in the order the settings page lists them. */
@@ -93,6 +97,8 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     title: "Product published → draft the launch kit",
     description:
       "When you publish a product, Verto drafts a launch campaign — an Instagram caption, a launch email, and an SEO article — into Marketing, ready for you to edit, schedule, and send. Nothing posts on its own.",
+    supportsAutoApprove: true,
+    autoApproveNote: "schedule the drafts onto your content calendar automatically (Verto can't post to your socials, but it fills the calendar).",
   },
   {
     key: "stock-restocked-post",
@@ -100,6 +106,8 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     title: "Back in stock → draft an “it's back” post",
     description:
       "When a sold-out product is restocked, Verto drafts a warm “back in stock” post into Marketing for you to edit and send. (Your waitlist is emailed separately and automatically.)",
+    supportsAutoApprove: true,
+    autoApproveNote: "schedule the drafted post onto your content calendar automatically.",
   },
   {
     key: "stock-low-post",
@@ -107,6 +115,8 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     title: "Low stock → draft an urgency post",
     description:
       "When a product's stock runs low, Verto drafts an honest “selling fast” post into Marketing — real urgency, no fake scarcity — for you to edit and send.",
+    supportsAutoApprove: true,
+    autoApproveNote: "schedule the drafted post onto your content calendar automatically.",
   },
   {
     key: "stock-soldout-post",
@@ -114,6 +124,8 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     title: "Sold out → draft a sold-out note",
     description:
       "When a product sells out, Verto drafts a gracious sold-out post into Marketing that points to your waitlist or next drop, for you to edit and send.",
+    supportsAutoApprove: true,
+    autoApproveNote: "schedule the drafted post onto your content calendar automatically.",
   },
   {
     key: "trend-adopted-angle",
@@ -121,6 +133,8 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     title: "Trend adopted → draft a season angle",
     description:
       "When you adopt a trend board into the Design Studio, Verto drafts a campaign angle for that season direction into Marketing, for you to edit and send.",
+    supportsAutoApprove: true,
+    autoApproveNote: "schedule the drafts onto your content calendar automatically.",
   },
   {
     key: "review-repost",
@@ -128,6 +142,8 @@ export const AUTOMATION_RULES: AutomationRule[] = [
     title: "New review → draft a repost",
     description:
       "When a customer leaves a review, Verto drafts a tasteful repost into Marketing that quotes it and credits them, for you to edit and send.",
+    supportsAutoApprove: true,
+    autoApproveNote: "schedule the drafted post onto your content calendar automatically.",
   },
 ];
 
@@ -142,6 +158,20 @@ async function ruleEnabled(db: DB, key: string): Promise<boolean> {
     return row ? Boolean(row.enabled) : true;
   } catch {
     return true;
+  }
+}
+
+/** Auto-approve: off unless the shop opted this rule in. */
+async function ruleAutoApprove(db: DB, key: string): Promise<boolean> {
+  try {
+    const row = await first<{ auto_approve: number }>(
+      db,
+      `SELECT auto_approve FROM automation_settings WHERE rule_key = ?`,
+      key,
+    );
+    return row ? Boolean(row.auto_approve) : false;
+  } catch {
+    return false;
   }
 }
 
@@ -194,8 +224,11 @@ async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts):
       const env = opts.env;
       const productId = String(p.productId);
       const name = p.name ? String(p.name) : "your new product";
+      const autoApprove = await ruleAutoApprove(db, key);
       opts.ctx.waitUntil(
-        import("./marketing-automations").then(({ draftLaunchKit }) => draftLaunchKit(env, db, { productId, name })),
+        import("./marketing-automations").then(({ draftLaunchKit }) =>
+          draftLaunchKit(env, db, { productId, name, autoApprove }),
+        ),
       );
       return;
     }
@@ -207,9 +240,10 @@ async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts):
       const productId = String(p.productId);
       const name = p.name ? String(p.name) : "a product";
       const mode = key === "stock-low-post" ? "low" : key === "stock-restocked-post" ? "restocked" : "soldout";
+      const autoApprove = await ruleAutoApprove(db, key);
       opts.ctx.waitUntil(
         import("./marketing-automations").then(({ draftStockPost }) =>
-          draftStockPost(env, db, { productId, name, mode }),
+          draftStockPost(env, db, { productId, name, mode, autoApprove }),
         ),
       );
       return;
@@ -220,9 +254,10 @@ async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts):
       const conceptId = String(p.conceptId);
       const trendTitle = p.trendTitle ? String(p.trendTitle) : "a season direction";
       const brief = p.brief ? String(p.brief) : null;
+      const autoApprove = await ruleAutoApprove(db, key);
       opts.ctx.waitUntil(
         import("./marketing-automations").then(({ draftTrendAngle }) =>
-          draftTrendAngle(env, db, { conceptId, trendTitle, brief }),
+          draftTrendAngle(env, db, { conceptId, trendTitle, brief, autoApprove }),
         ),
       );
       return;
@@ -235,9 +270,10 @@ async function runRule(db: DB, key: string, ev: ActivityEvent, opts?: EmitOpts):
       const rating = Number(p.rating) || 5;
       const author = p.author ? String(p.author) : "";
       const body = p.body ? String(p.body) : "";
+      const autoApprove = await ruleAutoApprove(db, key);
       opts.ctx.waitUntil(
         import("./marketing-automations").then(({ draftReviewRepost }) =>
-          draftReviewRepost(env, db, { productId, productName, rating, author, body }),
+          draftReviewRepost(env, db, { productId, productName, rating, author, body, autoApprove }),
         ),
       );
       return;

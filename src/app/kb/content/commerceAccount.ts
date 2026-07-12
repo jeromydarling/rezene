@@ -142,7 +142,11 @@ Verto watches what happens in your shop and files the obvious next step for you,
 
 Every one of these lands as an **editable draft in Marketing** — you edit, schedule, and send. Nothing is posted or emailed to customers without your say-so.
 
-Toggle any rule on the **System → Automations** page. The **Recent activity** feed beside the toggles shows everything Verto noticed — the events your automations react to.
+## Auto-approve — skip the review for the ones you trust
+
+Some automations you'll want to review every time; others you'd rather just happen. Each draft-producing rule has an **Auto-approve** toggle (under the rule, once it's on). Leave it off and drafts wait for you. Turn it on and Verto completes the step itself — for marketing rules that means **scheduling the drafted posts straight onto your content calendar** (Verto can't post to your socials, but it fills the calendar so you're not scheduling each one by hand). Off by default, per rule, so nothing runs on autopilot unless you choose it.
+
+Toggle any rule — and its auto-approve — on the **System → Automations** page. The **Recent activity** feed beside the toggles shows everything Verto noticed — the events your automations react to.
 
 ## The calendar fills itself in
 
