@@ -1473,6 +1473,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["The Timeless Library", "The Met's open collection, every early Vogue and Harper's Bazar readable page by page, and the school's books — public domain, searchable, pinnable to trend boards with citations, and one click ports any plate into a new design as a studio reference."],
       ["The Drafting Room", "The school's period drafting systems as working generators — Vincent's trousers, the Keystone vest, the 1917 shirt-waist, the circular cape — your measurements in, a lettered period draft out, the source cited on the sheet."],
       ["R&D research studio", "Maker research, brand dossiers, price studies, trend boards and stockist pipelines — live cited research in every room, one daily allowance."],
+      ["Business strategy on tap", "Sit down with a strategy advisor, investor, operating partner or coach and draft a SWOT, a lean or full business plan, quarterly OKRs, or a competitive map — each grounded in your own brand, and every next step drops onto your calendar."],
       ["Competition on watch", "Watch a competitor's dossier and Verto re-researches it weekly — price moves, new stockists and launches land in your digest with sources."],
       ["Price studies → cost sheets", "Real comparables at real prices, a defensible band, and one click pushes the target retail into the style's cost sheet."],
     ],
