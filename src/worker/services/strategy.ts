@@ -1,5 +1,6 @@
 import { all, first } from "./db";
 import { aiComplete, AiUnavailableError } from "./ai";
+import { runWorkersAiChat } from "./workers-ai";
 import { parseModelJson } from "./anthropic";
 import type { Env } from "../types/env";
 import {
@@ -165,6 +166,8 @@ export interface GenerateStrategyInput {
   persona: StrategyPersona;
   brief: string;
   plain: boolean;
+  /** Force a specific provider (comparison/testing). Default: aiComplete's own preference. */
+  forceProvider?: "workers-ai";
 }
 
 export interface GeneratedStrategy {
@@ -207,8 +210,24 @@ TASK: Produce the ${strategyDocLabel(input.kind, input.variant)} described above
 
 Respond with exactly one JSON object and nothing else.`;
 
+  const complete = async (): Promise<{ text: string; provider: string }> => {
+    if (input.forceProvider === "workers-ai") {
+      const text = await runWorkersAiChat(
+        env,
+        [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+        { maxTokens: MAX_TOKENS },
+      );
+      if (!text) throw new AiUnavailableError();
+      return { text, provider: "workers-ai" };
+    }
+    return aiComplete(env, { system, prompt, maxTokens: MAX_TOKENS });
+  };
+
   const run = async (): Promise<GeneratedStrategy> => {
-    const completion = await aiComplete(env, { system, prompt, maxTokens: MAX_TOKENS });
+    const completion = await complete();
     const parsed = parseModelJson(completion.text) as Record<string, unknown>;
     const content = normalizeContent(parsed);
     if (!content.sections.length) throw new Error("Empty strategy document");
