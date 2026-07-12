@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import * as Sentry from "@sentry/cloudflare";
 import { sessionMiddleware, requireAdminRead } from "./middleware/auth";
 import { ValidationError } from "./services/validators";
 import { authRoutes } from "./routes/auth";
@@ -435,7 +436,19 @@ app.get("*", serveDocument);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
-export default {
+// Error monitoring: a no-op until SENTRY_DSN is set (wrangler.toml), then
+// every unhandled exception across fetch/cron/email lands in Sentry with the
+// request context attached. DSNs are publishable identifiers, not secrets.
+export default Sentry.withSentry(
+  (env: Env) => ({
+    dsn: env.SENTRY_DSN,
+    enabled: Boolean(env.SENTRY_DSN),
+    environment: env.APP_ENV,
+    // Keep performance tracing light — errors are the point here.
+    tracesSampleRate: 0.05,
+    sendDefaultPii: false,
+  }),
+  {
   fetch: app.fetch,
 
   /**
@@ -474,7 +487,8 @@ export default {
     const { handleInboundEmail } = await import("./services/crm-inbox");
     await handleInboundEmail(message, env);
   },
-} satisfies ExportedHandler<Env>;
+  } satisfies ExportedHandler<Env>,
+);
 
 /** Flip due scheduled drafts live (publish_at in the past) — every shop. */
 async function publishDueContent(env: Env): Promise<void> {
