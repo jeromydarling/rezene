@@ -1,4 +1,6 @@
 import type { CourseDef } from "./types";
+import { F1_MORE_LESSONS, F1_MORE_QUIZ } from "./more-costume";
+import { F2_MORE_LESSONS, F2_MORE_QUIZ } from "./more-drawing";
 
 /**
  * School of Fashion, courses 1–2: costume literacy and fashion drawing —
@@ -204,6 +206,7 @@ That is your practical: build a trend board in R&D with at least three direction
         },
       ],
     },
+    ...F1_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -222,6 +225,7 @@ That is your practical: build a trend board in R&D with at least three direction
     { id: "f1q12", q: "Period detail on a modern silhouette reads as…", options: ["taste; period-on-period reads as reenactment", "always costume", "plagiarism"], answer: 0 },
     { id: "f1q13", q: "A useful trend-board direction names…", options: ["the mechanism (pad/cut/suspend/suppress), not just the mood", "a celebrity", "a decade only"], answer: 0 },
     { id: "f1q14", q: "Racinet's Costume Historique is best used as…", options: ["a visual atlas to browse and cite", "a drafting system", "a sewing manual"], answer: 0 },
+    ...F1_MORE_QUIZ,
   ],
   practical: {
     kind: "trend_board",
@@ -422,6 +426,7 @@ Your practical closes the loop with the modern instrument: save a concept in the
         },
       ],
     },
+    ...F2_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -440,6 +445,7 @@ Your practical closes the loop with the modern instrument: save a concept in the
     { id: "f2q12", q: "Designing 'in series' means…", options: ["disciplined variations on one block/constraint", "drawing many unrelated garments", "copying a series of magazines"], answer: 0 },
     { id: "f2q13", q: "An unannotated beautiful sketch is…", options: ["halfway to nothing — annotation makes it buildable", "ready for the factory", "a working drawing"], answer: 0 },
     { id: "f2q14", q: "Redrawing museum plates as working sketches (Traphagen) trains…", options: ["extracting the line and cut, not copying the rendering", "watercolor technique", "handwriting"], answer: 0 },
+    ...F2_MORE_QUIZ,
   ],
   practical: {
     kind: "design_concept",

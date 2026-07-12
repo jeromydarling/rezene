@@ -160,13 +160,18 @@ const NAV_SECTIONS: {
     ],
   },
   {
+    title: "The School",
+    items: [
+      { to: "/admin/school", label: "Verto School", icon: GraduationCap },
+    ],
+  },
+  {
     title: "System",
     items: [
       { to: "/admin/settings", label: "Settings", icon: Settings },
       { to: "/admin/automations", label: "Automations", icon: Zap },
       { to: "/admin/domain", label: "Custom Domain", icon: Globe },
       { to: "/admin/team", label: "Team", icon: UsersRound },
-      { to: "/admin/school", label: "Verto School", icon: GraduationCap },
       { to: "/admin/support", label: "Help & Support", icon: LifeBuoy },
     ],
   },

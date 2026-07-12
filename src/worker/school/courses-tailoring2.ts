@@ -1,4 +1,6 @@
 import type { CourseDef } from "./types";
+import { T2_MORE_LESSONS, T2_MORE_QUIZ } from "./more-trouser";
+import { T3_MORE_LESSONS, T3_MORE_QUIZ } from "./more-jacket";
 
 /**
  * School of Tailoring, courses 2–3: the trouser and the coat — adapted from
@@ -203,6 +205,7 @@ Your practical for this course is exactly this translation: take a real trouser 
         },
       ],
     },
+    ...T2_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -221,6 +224,7 @@ Your practical for this course is exactly this translation: take a real trouser 
     { id: "t2q12", q: "'Shrink back-seat, stretch fork' is an instruction for…", options: ["the iron shaping flat cloth toward body curves", "the washing instructions", "grading between sizes"], answer: 0 },
     { id: "t2q13", q: "The back hem sits slightly lower than the front because…", options: ["it covers the shoe's heel cleanly", "cloth stretches in wear", "it saves fabric"], answer: 0 },
     { id: "t2q14", q: "A wrinkle in fitting should be read as…", options: ["a vector pointing from trapped cloth toward where it wants to go", "a fabric defect", "a pressing error, always"], answer: 0 },
+    ...T2_MORE_QUIZ,
   ],
   practical: {
     kind: "measurement_points",
@@ -404,6 +408,7 @@ With this course's quiz passed and a construction-documented tech pack from the 
         },
       ],
     },
+    ...T3_MORE_LESSONS,
   ],
   quizDraw: 10,
   passPercent: 80,
@@ -422,6 +427,7 @@ With this course's quiz passed and a construction-documented tech pack from the 
     { id: "t3q12", q: "Pressing a curved region on a flat board…", options: ["presses the curve out of it", "sets the curve permanently", "is required for wool"], answer: 0 },
     { id: "t3q13", q: "Copeland's three jobs of the iron are…", options: ["setting, shaping, finishing", "steaming, drying, folding", "basting, felling, hemming"], answer: 0 },
     { id: "t3q14", q: "Before pressing a let-out seam's new line you must…", options: ["steam and work out the old crease ghost", "wash the garment", "trim the inlay away"], answer: 0 },
+    ...T3_MORE_QUIZ,
   ],
   practical: {
     kind: "construction_notes",
