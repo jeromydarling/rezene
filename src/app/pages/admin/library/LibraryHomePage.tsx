@@ -52,7 +52,7 @@ export function LibraryHomePage() {
     <div>
       <PageHeader
         title="The Timeless Library"
-        eyebrow="Studio"
+        eyebrow="School & Library"
         description="The public-domain archive of the craft — the Met's plates, the great magazine runs, the books the school teaches from. It builds itself as you search; what you pin is yours, citation included."
         help="timeless-library"
       />

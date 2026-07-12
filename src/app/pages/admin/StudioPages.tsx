@@ -218,7 +218,7 @@ export function FilesPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Studio"
+        eyebrow="System"
         title="Files"
         help="files"
         description="Every working file — sketches, patterns, 3D files, renders, and factory documents — filed against the style, product, or order it belongs to."

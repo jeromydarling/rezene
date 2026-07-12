@@ -39,7 +39,7 @@ export function CommissionsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Studio"
+        eyebrow="Clients"
         title="Commissions"
         help="commissions"
         description="Every piece of client work, from first consult to delivery. Open a card to run fittings and move it along on the client's page."
