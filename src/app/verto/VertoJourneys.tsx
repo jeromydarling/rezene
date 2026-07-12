@@ -1,6 +1,46 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { MagneticButton, ParallaxImage, ParticleField, Reveal } from "./cinema";
+import {
+  BrowserFrame,
+  MiniClientBook,
+  MiniCosting,
+  MiniDesignStudio,
+  MiniFittingStudio,
+  MiniImport,
+  MiniPatternStudio,
+  MiniPlatform,
+  MiniProduction,
+  MiniRD,
+  MiniSourcing,
+  MiniTechPack,
+  MiniWholesale,
+} from "./minis";
+
+/**
+ * A few beats show the actual tool that moment runs on — the miniature admin
+ * screens from the features tour, keyed by the beat's headline. Not every beat
+ * has one; the signature-feature moments do, so the story lands on the app.
+ */
+const BEAT_SHOTS: Record<string, { url: string; El: () => ReactNode }> = {
+  // The stylist
+  "She measures her first client.": { url: "verto.style/maison/admin/clients", El: MiniClientBook },
+  "The jacket exists before the cloth.": { url: "verto.style/maison/admin/pattern", El: MiniPatternStudio },
+  "She finds her maker.": { url: "verto.style/maison/admin/sourcing", El: MiniSourcing },
+  // The label
+  "The first capsule appears.": { url: "verto.style/maison/admin/design", El: MiniDesignStudio },
+  "He sees it on real bodies.": { url: "verto.style/maison/admin/fitting", El: MiniFittingStudio },
+  "Designs become specs.": { url: "verto.style/maison/admin/tech-packs", El: MiniTechPack },
+  "Money arrives before production does.": { url: "verto.style/maison/admin/costing", El: MiniCosting },
+  // The founder
+  "The price question gets a study.": { url: "verto.style/maison/admin/research", El: MiniRD },
+  "The number lands in costing.": { url: "verto.style/maison/admin/costing", El: MiniCosting },
+  "She pitches the doors that already believe.": { url: "verto.style/maison/admin/wholesale", El: MiniWholesale },
+  // The switcher
+  "The catalog imports itself.": { url: "verto.style/maison/admin/import", El: MiniImport },
+  "The season in flight comes with her.": { url: "verto.style/maison/admin/production", El: MiniProduction },
+  "The domain follows her.": { url: "verto.style/maison/admin/domain", El: MiniPlatform },
+};
 
 /**
  * /stories — founding journeys, told hour by hour. The features page says
@@ -211,6 +251,14 @@ function StoryTimeline({ beats, dark }: { beats: typeof TAILOR_BEATS; dark?: boo
             </p>
             <h3 className="mt-1 font-display text-2xl font-light">{b.beat}</h3>
             <p className={"prose-editorial mt-2 max-w-2xl " + (dark ? "!text-chalk/75" : "")}>{b.detail}</p>
+            {BEAT_SHOTS[b.beat] && (
+              <div className="mt-5 max-w-md">
+                <BrowserFrame url={BEAT_SHOTS[b.beat].url}>{BEAT_SHOTS[b.beat].El()}</BrowserFrame>
+                <p className={"mt-2 text-[0.68rem] uppercase tracking-editorial " + (dark ? "text-chalk/40" : "text-warmgrey")}>
+                  The actual screen
+                </p>
+              </div>
+            )}
           </li>
         </Reveal>
       ))}
