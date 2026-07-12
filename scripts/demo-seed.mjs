@@ -14,12 +14,23 @@ import { writeFileSync } from "node:fs";
 
 const q = (s) => (s == null ? "NULL" : `'${String(s).replaceAll("'", "''")}'`);
 const stmts = [];
+// Upsert on the primary key (first column, always `id` here) rather than
+// INSERT OR REPLACE. REPLACE deletes the conflicting row first, which trips a
+// foreign-key violation when a child row references it (e.g. a supplier with
+// interactions/fabrics). ON CONFLICT DO UPDATE refreshes the row in place — the
+// idempotent-refresh the seed intends — without ever deleting.
 const ins = (table, cols, rows) => {
+  const pk = cols[0];
+  const setClause = cols
+    .slice(1)
+    .map((col) => `${col} = excluded.${col}`)
+    .join(", ");
   for (const r of rows) {
+    const values = r.map((v) => (typeof v === "number" ? v : q(v))).join(", ");
     stmts.push(
-      `INSERT OR REPLACE INTO ${table} (${cols.join(", ")}) VALUES (${r
-        .map((v) => (typeof v === "number" ? v : q(v)))
-        .join(", ")});`,
+      setClause
+        ? `INSERT INTO ${table} (${cols.join(", ")}) VALUES (${values}) ON CONFLICT(${pk}) DO UPDATE SET ${setClause};`
+        : `INSERT INTO ${table} (${cols.join(", ")}) VALUES (${values}) ON CONFLICT(${pk}) DO NOTHING;`,
     );
   }
 };
