@@ -400,6 +400,53 @@ function DocCard({ doc, onChanged }: { doc: StrategyDoc; onChanged: () => void }
   );
 }
 
+/**
+ * What the strategy engine is grounded in, made visible — and, when the Brand
+ * Brain is empty, an honest nudge to fill the Launch Playbook first (that's
+ * where the real specificity comes from). You can still draft from the brief.
+ */
+function GroundingStrip() {
+  const brain = useFetch<{ answers: Record<string, unknown> }>("/api/admin/brain");
+  const overview = useFetch<{ counts: { brands: number; trendBoards: number } }>("/api/admin/research/overview");
+  if (brain.loading) return null;
+
+  const answers = brain.data?.answers ?? {};
+  const brainFilled = Object.values(answers).filter((v) =>
+    Array.isArray(v) ? v.length : String(v ?? "").trim(),
+  ).length;
+  const brands = overview.data?.counts.brands ?? 0;
+  const trends = overview.data?.counts.trendBoards ?? 0;
+
+  if (brainFilled === 0) {
+    return (
+      <div className="mb-4 rounded-xl border border-saffron/30 bg-saffron/[0.06] p-3 text-sm">
+        <p className="font-medium text-ink">Fill the Launch Playbook first for brand-specific plans</p>
+        <p className="mt-0.5 text-warmgrey">
+          Strategy reads your <Link to="/admin/launch" className="text-navy underline">Launch Playbook</Link> (your brand,
+          customer, price position, collection) and your R&amp;D. With none of it filled in yet, drafts will lean on
+          general best practice — still useful, but not yet about <em>your</em> brand. You can also just describe the
+          situation in the brief box below.
+        </p>
+      </div>
+    );
+  }
+
+  const parts = [
+    `your brand profile (${brainFilled} field${brainFilled === 1 ? "" : "s"})`,
+    brands > 0 ? `${brands} competitor dossier${brands === 1 ? "" : "s"}` : null,
+    trends > 0 ? `${trends} trend board${trends === 1 ? "" : "s"}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mb-4 rounded-lg border border-palm/25 bg-palm/[0.05] px-3 py-2 text-xs text-ink/75">
+      <span className="mr-1">✓</span>
+      Grounded in {parts.join(", ")}. The more of your{" "}
+      <Link to="/admin/launch" className="text-navy underline">Launch Playbook</Link> and{" "}
+      <Link to="/admin/research/brands" className="text-navy underline">R&amp;D</Link> you fill in, the sharper every draft.
+    </div>
+  );
+}
+
 export function StrategyPage() {
   const docs = useFetch<StrategyDoc[]>("/api/admin/strategy");
   const [showArchived, setShowArchived] = useState(false);
@@ -417,6 +464,8 @@ export function StrategyPage() {
         help="rd-strategy"
       />
       <ResearchNav />
+
+      <GroundingStrip />
 
       <Generator onCreated={() => docs.reload()} />
 

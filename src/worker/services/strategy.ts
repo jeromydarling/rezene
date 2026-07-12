@@ -76,7 +76,11 @@ function toolInstructions(kind: StrategyKind, variant: StrategyVariant | null): 
 
 // --- Shop grounding ----------------------------------------------------------
 
+// Pulled from the Launch Playbook (the Brand Brain). Field IDs match
+// shared/playbook.ts exactly — a wrong ID silently grounds on nothing, so keep
+// these in sync with the Playbook. Only filled fields make it into the prompt.
 const BRAIN_FIELDS: { id: string; label: string }[] = [
+  // Identity & positioning
   { id: "brand.name", label: "Brand" },
   { id: "brand.category", label: "Category" },
   { id: "brand.target", label: "Target customer" },
@@ -84,7 +88,26 @@ const BRAIN_FIELDS: { id: string; label: string }[] = [
   { id: "brand.gap", label: "Market gap" },
   { id: "brand.thesis", label: "Thesis" },
   { id: "brand.words", label: "Positioning words" },
-  { id: "price.position", label: "Price position" },
+  // Collection
+  { id: "collection.categories", label: "Categories" },
+  { id: "collection.skuCount", label: "SKU count" },
+  { id: "collection.hero", label: "Hero product" },
+  // Price & margin
+  { id: "cost.avgRetail", label: "Target average retail" },
+  { id: "cost.targetMargin", label: "Target DTC gross margin %" },
+  { id: "cost.markets", label: "Primary selling markets" },
+  { id: "cost.wholesale", label: "Wholesale approach" },
+  // Production
+  { id: "prod.region", label: "Production region" },
+  { id: "prod.fabrics", label: "Key fabrics" },
+  // Commerce & launch
+  { id: "commerce.phase", label: "Distribution focus" },
+  { id: "launch.date", label: "Target launch date" },
+  { id: "launch.campaign", label: "Launch campaign angle" },
+  // Finance
+  { id: "fin.budget", label: "Launch budget" },
+  { id: "fin.launchUnits", label: "Planned launch units" },
+  { id: "fin.risks", label: "Known risks" },
 ];
 
 /** Build a compact, defensive context block from the shop's own data. */
