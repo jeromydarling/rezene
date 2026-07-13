@@ -262,7 +262,16 @@ With a token you can, over \`https://<your-shop>/api/v1/…\` (\`Authorization: 
 - **Poll events** (\`GET /api/v1/events?event=…\`) — every trigger the [Workflow](/admin/support/kb/workflows) builder lists.
 - **Subscribe** a URL to an event (\`POST /api/v1/subscriptions\`) for instant delivery; each delivery is **signed** (HMAC-SHA256, \`x-verto-signature\` header) so you can verify it's really from Verto.
 
-A one-click native Zapier app is being built on top of this — until it lists publicly, the recipes above are the way in, and the API keys already work for anything you wire yourself.
+## The native app (beta) — the one-click way
+
+There's now a **native Verto app in Zapier**, so you don't have to hand-wire webhooks at all. On **Connect apps**, click **Add Verto to Zapier** to add it to your account, then:
+
+1. Create an API key (**Settings → API keys**).
+2. Accept the invite (the button opens the app in your Zapier account).
+3. Start a Zap, pick **Verto**, and paste your API key to connect — it shows your shop's name.
+4. Choose a trigger (New Client, Payment Received, Product Published…) or an action (Create Client, Create Note…), and turn it on.
+
+The copy-paste recipes above still work if you prefer them, and the API keys power anything else you build.
 
 ## Why webhooks instead of a Gmail integration?
 
