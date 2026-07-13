@@ -84,6 +84,9 @@ function Recipe({ title, subtitle, children }: { title: string; subtitle: string
   );
 }
 
+// Public invite link for the native Verto Zapier app (anyone can add it).
+const ZAPIER_INVITE_URL = "https://zapier.com/developer/public-invite/243866/40008b561df8e8bb52fad62b9148bce7/";
+
 export function ConnectAppsPage() {
   const hook = useFetch<{ enabled: boolean; token: string | null; url: string | null }>("/api/admin/inbound-hook");
   const [busy, setBusy] = useState(false);
@@ -124,16 +127,47 @@ export function ConnectAppsPage() {
         )}
       </div>
 
-      <div className="mb-5 rounded-xl border border-ink/10 bg-white p-4">
-        <p className="text-sm font-medium text-ink">
-          Native Zapier app <span className="ml-1 rounded bg-navy/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-navy">beta</span>
-        </p>
-        <p className="mt-1 text-xs text-warmgrey">
-          A one-click Verto app is on the way — triggers, actions and search built in, authenticated with an{" "}
-          <strong>API key</strong> instead of the copy-paste recipes below. Create your key under{" "}
-          <a href="/admin/settings" className="underline">Settings → API keys</a>; it powers both the coming app and any
-          tool you build against the Verto developer API today.
-        </p>
+      <div className="mb-6 rounded-xl border border-navy/25 bg-navy/[0.04] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <p className="text-base font-medium text-ink">
+              Native Zapier app{" "}
+              <span className="ml-1 rounded bg-navy/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-navy">beta</span>
+            </p>
+            <p className="mt-1 text-sm text-warmgrey">
+              The one-click way to connect. Add Verto to your Zapier account, then build Zaps with Verto's own triggers
+              and actions — no webhook wiring, no copy-paste.
+            </p>
+          </div>
+          <a
+            href={ZAPIER_INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-navy-deep"
+          >
+            Add Verto to Zapier →
+          </a>
+        </div>
+
+        <ol className="mt-4 space-y-2.5 border-t border-navy/15 pt-4">
+          <Step n={1}>
+            <strong>Create an API key.</strong> Go to{" "}
+            <a href="/admin/settings" className="underline">Settings → API keys</a> → <em>Create key</em>, and copy it
+            (it's shown once).
+          </Step>
+          <Step n={2}>
+            <strong>Click “Add Verto to Zapier”</strong> above and accept the invite — it opens the app in your Zapier
+            account.
+          </Step>
+          <Step n={3}>
+            In Zapier, start a Zap and pick <strong>Verto</strong>. When it asks to connect, paste your API key — the
+            connection will show your shop's name.
+          </Step>
+          <Step n={4}>
+            Choose a <strong>trigger</strong> (New Client, Payment Received, Product Published…) or an{" "}
+            <strong>action</strong> (Create Client, Create Note…), and turn the Zap on.
+          </Step>
+        </ol>
       </div>
 
       <p className="mb-3 text-xs text-warmgrey">
