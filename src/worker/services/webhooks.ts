@@ -39,6 +39,7 @@ export async function deliverToSubscriptions(db: D1Database, ev: ActivityEvent, 
   if (!subs.length) return;
 
   const body = JSON.stringify({
+    id: crypto.randomUUID(),
     event: ev.kind,
     title: ev.title,
     payload: ev.payload ?? {},
