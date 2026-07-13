@@ -124,6 +124,20 @@
     @apply bg-cream/50;
   }
 
+  /* ---- Admin form controls (sentence-case, not the uppercase editorial .btn).
+   * Referenced across the admin pages (Client Book, Commissions, Workflows,
+   * Settings cards, Connect apps); defined here so they render as real
+   * controls, not bare text. */
+  .admin-input {
+    @apply w-full rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink placeholder:text-warmgrey/70 focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy;
+  }
+  .admin-btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-ink/20 bg-white px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .admin-btn-primary {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-navy bg-navy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy-deep disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
   .input {
     @apply w-full rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink placeholder:text-warmgrey/70 focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy;
   }

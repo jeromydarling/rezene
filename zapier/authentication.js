@@ -26,12 +26,16 @@ const authentication = {
       helpText: 'Leave as-is unless your Verto runs on a different host.',
     },
   ],
-  // Verify the key and label the connection with the shop name.
-  test: {
-    url: '{{bundle.authData.base_url}}/api/v1/me',
-    method: 'GET',
+  // Verify the key and label the connection with the shop name. connectionLabel
+  // only reads TOP-LEVEL fields of the test response, so the test flattens the
+  // nested shop.name into a top-level `shopName`.
+  test: async (z, bundle) => {
+    const baseUrl = (bundle.authData && bundle.authData.base_url) || 'https://verto.style';
+    const res = await z.request({ url: `${baseUrl}/api/v1/me`, method: 'GET' });
+    const data = res.data || {};
+    return { ...data, shopName: (data.shop && data.shop.name) || 'Verto' };
   },
-  connectionLabel: '{{json.shop.name}}',
+  connectionLabel: '{{json.shopName}}',
 };
 
 // Inject the bearer token on every request.

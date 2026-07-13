@@ -77,14 +77,18 @@ jobs:
 
       - name: Register (one-time — creates the CLI app)
         if: ${{ inputs.mode == 'register' }}
+        # NOTE: the title is a POSITIONAL argument, not --title. --yes avoids
+        # yes/no prompts; the enum flags (audience/role/category) are passed so
+        # the wizard never blocks on a choice prompt in CI.
         run: |
-          npx zapier register \
-            --title "Verto" \
+          npx zapier register "Verto" \
             --desc "Connect Verto — clients, commissions, payments, products — to 7,000+ apps." \
             --url "https://verto.style" \
             --audience private \
             --role employee \
-            --category crm
+            --category crm \
+            --no-subscribe \
+            --yes
           echo "----- .zapierapprc -----"
           cat .zapierapprc
 
