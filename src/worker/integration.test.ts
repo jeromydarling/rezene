@@ -8,6 +8,7 @@ import { savePipeline, resolvePipeline } from "./services/pipeline";
 import { sendClientMessage } from "./services/client-messages";
 import { mintApiKey, verifyApiKey, revokeApiKey } from "./services/api-keys";
 import { recordAiUsage, estimateCostCents } from "./services/ai-usage";
+import { computeShopDay, rollupFleetMetrics } from "./services/shop-metrics";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -346,5 +347,75 @@ describe("AI usage ledger", () => {
     );
     expect(byShop.find((r) => r.shopId === "shop_rezene")?.calls).toBe(2);
     expect(byShop.find((r) => r.shopId === null)?.calls).toBe(1);
+  });
+});
+
+describe("fleet revenue rollup", () => {
+  // The test DB doubles as the primary shop's DO (getShopDb(primary) → bound D1),
+  // so seeding orders/refunds/customers here is exactly what the rollup reads.
+  const today = new Date().toISOString().slice(0, 10);
+  const ts = `${today} 12:00:00`;
+
+  beforeAll(async () => {
+    await run(db, `INSERT INTO customers (id, email, name, created_at) VALUES ('cust_r1', 'a@example.com', 'A', ?)`, ts);
+    await run(
+      db,
+      `INSERT INTO orders (id, order_number, customer_id, currency, subtotal_cents, total_cents, payment_status, created_at)
+       VALUES ('ord_r1', 'RZ-1', 'cust_r1', 'USD', 5000, 5000, 'paid', ?)`,
+      ts,
+    );
+    await run(
+      db,
+      `INSERT INTO orders (id, order_number, currency, total_cents, payment_status, created_at)
+       VALUES ('ord_r2', 'RZ-2', 'USD', 3000, 'paid', ?)`,
+      ts,
+    );
+    // An unpaid order must NOT count toward GMV.
+    await run(
+      db,
+      `INSERT INTO orders (id, order_number, currency, total_cents, payment_status, created_at)
+       VALUES ('ord_r3', 'RZ-3', 'USD', 9999, 'pending', ?)`,
+      ts,
+    );
+    await run(
+      db,
+      `INSERT INTO refunds (id, order_id, amount_cents, currency, status, created_at)
+       VALUES ('ref_r1', 'ord_r1', 1000, 'USD', 'succeeded', ?)`,
+      ts,
+    );
+  });
+
+  it("aggregates one shop's day from its own DO (paid only)", async () => {
+    const m = await computeShopDay(env, "shop_rezene", today);
+    expect(m).toBeTruthy();
+    expect(m!.gmvCents).toBe(8000); // 5000 + 3000, pending excluded
+    expect(m!.orders).toBe(2);
+    expect(m!.refundsCents).toBe(1000);
+    expect(m!.newCustomers).toBe(1);
+    expect(m!.currency).toBe("USD");
+  });
+
+  it("rolls the fleet up into the platform shop_metrics_daily table", async () => {
+    const written = await rollupFleetMetrics(env, { days: [today] });
+    expect(written).toBeGreaterThanOrEqual(1);
+    const row = await first<{ gmv: number; orders: number; refunds: number; customers: number }>(
+      db,
+      `SELECT gmv_cents AS gmv, orders, refunds_cents AS refunds, new_customers AS customers
+         FROM shop_metrics_daily WHERE shop_id='shop_rezene' AND day=?`,
+      today,
+    );
+    expect(row?.gmv).toBe(8000);
+    expect(row?.orders).toBe(2);
+    expect(row?.refunds).toBe(1000);
+    expect(row?.customers).toBe(1);
+
+    // Idempotent: a second rollup overwrites, not doubles.
+    await rollupFleetMetrics(env, { days: [today] });
+    const again = await first<{ gmv: number }>(
+      db,
+      `SELECT gmv_cents AS gmv FROM shop_metrics_daily WHERE shop_id='shop_rezene' AND day=?`,
+      today,
+    );
+    expect(again?.gmv).toBe(8000);
   });
 });

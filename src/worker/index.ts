@@ -496,6 +496,9 @@ export default Sentry.withSentry(
             // R&D: refresh watched brand dossiers / trend boards that went stale.
             const { researchWatchSweep } = await import("./services/research-lab");
             await researchWatchSweep(env).catch((err) => console.error("[research] watch sweep failed:", err));
+            // Fleet revenue: roll each shop's day up into the platform table for HQ.
+            const { rollupFleetMetrics } = await import("./services/shop-metrics");
+            await rollupFleetMetrics(env).catch((err) => console.error("[metrics] rollup failed:", err));
           }),
       );
     }
