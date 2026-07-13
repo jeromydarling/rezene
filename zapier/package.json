@@ -1,6 +1,6 @@
 {
   "name": "verto-zapier",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Native Zapier integration for Verto — triggers, actions and search over the Verto developer API.",
   "private": true,
   "main": "index.js",
