@@ -22,7 +22,26 @@ developer API (`/api/v1`), authenticated with a personal access token.
 - **Creates** (`creates/`) — Create Client / Booking / Note.
 - **Search** (`searches/`) — Find Client by email (pairs as search-or-create).
 
-## Develop & ship
+## Ship from CI (no local terminal)
+
+The `.github/workflows/zapier.yml` workflow runs the whole CLI headlessly.
+From the repo's **Actions** tab → **Zapier deploy** → **Run workflow**:
+
+1. One-time setup (Settings → Secrets and variables → Actions):
+   - Secret **`ZAPIER_DEPLOY_KEY`** — from the Zapier developer dashboard
+     (developer.zapier.com → account → Deploy Keys). The only credential to fetch.
+   - Optional: **`ZAPIER_TEST_API_KEY`** (a live Verto PAT) and
+     **`ZAPIER_TEST_BASE_URL`** for an end-to-end test.
+2. Run with **mode = register** once → it creates the CLI app and prints/uploads
+   `.zapierapprc`; copy its numeric `id` into an Actions **Variable**
+   `ZAPIER_APP_ID`.
+3. Run with **mode = push** to validate, test, and upload a new version.
+   Run **mode = validate** any time for a dry check.
+
+Then finish in the Zapier web UI: open the integration, add a test Zap, connect
+with a PAT, and share the private invite link.
+
+## Or develop locally
 
 ```bash
 cd zapier
