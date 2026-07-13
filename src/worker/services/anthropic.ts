@@ -1,4 +1,5 @@
 import type { Env } from "../types/env";
+import { recordAiUsage, type UsageContext } from "./ai-usage";
 
 /**
  * Server-side Anthropic client (raw fetch — no SDK dependency needed in
@@ -38,6 +39,8 @@ export async function askClaude(
     image?: { base64: string; mediaType: string };
     /** Several images (front + side photos, contact sheets). Wins over `image`. */
     images?: { base64: string; mediaType: string }[];
+    /** Optional attribution for the AI-usage ledger (shop + operation). */
+    usage?: UsageContext;
   },
 ): Promise<ClaudeResult> {
   if (!env.ANTHROPIC_API_KEY) throw new AnthropicNotConfiguredError();
@@ -77,12 +80,18 @@ export async function askClaude(
     .filter((c) => c.type === "text" && c.text)
     .map((c) => c.text)
     .join("\n");
-  return {
-    text,
-    tokensIn: data.usage?.input_tokens ?? 0,
-    tokensOut: data.usage?.output_tokens ?? 0,
-    model: data.model ?? model,
-  };
+  const tokensIn = data.usage?.input_tokens ?? 0;
+  const tokensOut = data.usage?.output_tokens ?? 0;
+  const resolvedModel = data.model ?? model;
+  void recordAiUsage(env, {
+    shopId: opts.usage?.shopId,
+    provider: "anthropic",
+    model: resolvedModel,
+    operation: opts.usage?.operation,
+    tokensIn,
+    tokensOut,
+  });
+  return { text, tokensIn, tokensOut, model: resolvedModel };
 }
 
 /** Extract the first JSON object/array from a model response. */

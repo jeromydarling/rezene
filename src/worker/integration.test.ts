@@ -7,6 +7,7 @@ import { emit } from "./services/activity";
 import { savePipeline, resolvePipeline } from "./services/pipeline";
 import { sendClientMessage } from "./services/client-messages";
 import { mintApiKey, verifyApiKey, revokeApiKey } from "./services/api-keys";
+import { recordAiUsage, estimateCostCents } from "./services/ai-usage";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -305,5 +306,45 @@ describe("webhook fan-out to external subscribers", () => {
     const parsed = JSON.parse(received!.body);
     expect(parsed.event).toBe("test.ping");
     expect(parsed.payload.name).toBe("Linen Shirt");
+  });
+});
+
+describe("AI usage ledger", () => {
+  it("estimates cost from the price table (tokens and units)", () => {
+    // Opus: $15/M in, $75/M out → 1M in + 1M out = $90 = 9000 cents.
+    expect(estimateCostCents({ provider: "anthropic", model: "claude-opus-4-8", tokensIn: 1_000_000, tokensOut: 1_000_000 })).toBeCloseTo(9000, 2);
+    // Workers AI (Llama/Flux) is per-neuron → treated as $0 here.
+    expect(estimateCostCents({ provider: "workers-ai", model: "@cf/meta/llama-4-scout", tokensIn: 5_000_000, tokensOut: 5_000_000 })).toBe(0);
+    expect(estimateCostCents({ provider: "workers-ai", model: "@cf/black-forest-labs/flux-1-schnell", units: 3 })).toBe(0);
+    // External try-on model at $0.075/unit → 2 units = $0.15 = 15 cents.
+    expect(estimateCostCents({ provider: "fashn", model: "fashn/tryon-v1.5", units: 2 })).toBeCloseTo(15, 2);
+  });
+
+  it("records rows to the platform ledger and aggregates by provider/model", async () => {
+    await recordAiUsage(env, { shopId: "shop_rezene", provider: "anthropic", model: "claude-sonnet-5", operation: "marketing.kit", tokensIn: 1000, tokensOut: 500 });
+    await recordAiUsage(env, { shopId: "shop_rezene", provider: "anthropic", model: "claude-sonnet-5", operation: "marketing.kit", tokensIn: 2000, tokensOut: 800 });
+    await recordAiUsage(env, { shopId: null, provider: "perplexity", model: "sonar-pro", operation: "research.ask", tokensIn: 4000, tokensOut: 1200 });
+
+    const byModel = await all<{ provider: string; model: string; calls: number; tokensIn: number; costCents: number }>(
+      db,
+      `SELECT provider, model, COUNT(*) AS calls, COALESCE(SUM(tokens_in),0) AS tokensIn, COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage GROUP BY provider, model ORDER BY calls DESC`,
+    );
+    const sonnet = byModel.find((r) => r.model === "claude-sonnet-5");
+    expect(sonnet?.calls).toBe(2);
+    expect(sonnet?.tokensIn).toBe(3000);
+    // 3000 in @ $3/M + 1300 out @ $15/M = $0.009 + $0.0195 = $0.0285 = 2.85 cents.
+    expect(sonnet?.costCents).toBeCloseTo(2.85, 2);
+
+    const perplexity = byModel.find((r) => r.model === "sonar-pro");
+    expect(perplexity?.calls).toBe(1);
+
+    // NULL shop_id attributes to the platform, non-null to the shop.
+    const byShop = await all<{ shopId: string | null; calls: number }>(
+      db,
+      `SELECT shop_id AS shopId, COUNT(*) AS calls FROM ai_usage GROUP BY shop_id`,
+    );
+    expect(byShop.find((r) => r.shopId === "shop_rezene")?.calls).toBe(2);
+    expect(byShop.find((r) => r.shopId === null)?.calls).toBe(1);
   });
 });

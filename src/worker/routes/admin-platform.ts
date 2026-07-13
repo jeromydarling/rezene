@@ -85,6 +85,126 @@ adminPlatformRoutes.get("/activation-funnel", async (c) => {
   return c.json({ total, stages, signupsByDay });
 });
 
+/**
+ * AI usage tracker — the fleet's AI/model spend in one read. Every low-level AI
+ * call (Anthropic, Workers AI chat, Perplexity, Flux images) best-effort logs a
+ * row to the platform `ai_usage` ledger; here we roll it up so HQ can see how
+ * much is going through each model and API, and roughly what it costs. Cost is
+ * an ESTIMATE (public price table in services/ai-usage.ts); token/unit counts
+ * are exact. `?days=` bounds the window (default 30, capped at 365).
+ */
+adminPlatformRoutes.get("/ai-usage", async (c) => {
+  const days = Math.min(365, Math.max(1, Number(c.req.query("days")) || 30));
+  const since = `-${days} days`;
+  const empty = {
+    days,
+    totals: { calls: 0, tokensIn: 0, tokensOut: 0, units: 0, costCents: 0 },
+    byProvider: [] as unknown[],
+    byModel: [] as unknown[],
+    byOperation: [] as unknown[],
+    byShop: [] as unknown[],
+    byDay: [] as unknown[],
+  };
+  try {
+    const totals = await first<{
+      calls: number;
+      tokensIn: number;
+      tokensOut: number;
+      units: number;
+      costCents: number;
+    }>(
+      c.env.DB,
+      `SELECT COUNT(*) AS calls,
+              COALESCE(SUM(tokens_in),0) AS tokensIn,
+              COALESCE(SUM(tokens_out),0) AS tokensOut,
+              COALESCE(SUM(units),0) AS units,
+              COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage WHERE created_at >= datetime('now', ?)`,
+      since,
+    );
+
+    const byProvider = await all(
+      c.env.DB,
+      `SELECT provider,
+              COUNT(*) AS calls,
+              COALESCE(SUM(tokens_in),0) AS tokensIn,
+              COALESCE(SUM(tokens_out),0) AS tokensOut,
+              COALESCE(SUM(units),0) AS units,
+              COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage WHERE created_at >= datetime('now', ?)
+        GROUP BY provider ORDER BY costCents DESC, calls DESC`,
+      since,
+    );
+
+    const byModel = await all(
+      c.env.DB,
+      `SELECT provider, model,
+              COUNT(*) AS calls,
+              COALESCE(SUM(tokens_in),0) AS tokensIn,
+              COALESCE(SUM(tokens_out),0) AS tokensOut,
+              COALESCE(SUM(units),0) AS units,
+              COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage WHERE created_at >= datetime('now', ?)
+        GROUP BY provider, model ORDER BY costCents DESC, calls DESC LIMIT 40`,
+      since,
+    );
+
+    const byOperation = await all(
+      c.env.DB,
+      `SELECT COALESCE(operation,'(unlabeled)') AS operation,
+              COUNT(*) AS calls,
+              COALESCE(SUM(tokens_in),0) AS tokensIn,
+              COALESCE(SUM(tokens_out),0) AS tokensOut,
+              COALESCE(SUM(units),0) AS units,
+              COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage WHERE created_at >= datetime('now', ?)
+        GROUP BY operation ORDER BY calls DESC LIMIT 40`,
+      since,
+    );
+
+    // Attribute spend to shops by name where we can; NULL shop_id = platform-level.
+    const byShop = await all(
+      c.env.DB,
+      `SELECT u.shop_id AS shopId,
+              COALESCE(s.name, CASE WHEN u.shop_id IS NULL THEN '(platform)' ELSE u.shop_id END) AS shopName,
+              COUNT(*) AS calls,
+              COALESCE(SUM(u.tokens_in),0) AS tokensIn,
+              COALESCE(SUM(u.tokens_out),0) AS tokensOut,
+              COALESCE(SUM(u.units),0) AS units,
+              COALESCE(SUM(u.cost_cents),0) AS costCents
+         FROM ai_usage u LEFT JOIN shops s ON s.id = u.shop_id
+        WHERE u.created_at >= datetime('now', ?)
+        GROUP BY u.shop_id ORDER BY costCents DESC, calls DESC LIMIT 40`,
+      since,
+    );
+
+    const byDay = await all(
+      c.env.DB,
+      `SELECT substr(created_at,1,10) AS day,
+              COUNT(*) AS calls,
+              COALESCE(SUM(tokens_in),0) AS tokensIn,
+              COALESCE(SUM(tokens_out),0) AS tokensOut,
+              COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage WHERE created_at >= datetime('now', ?)
+        GROUP BY day ORDER BY day`,
+      since,
+    );
+
+    return c.json({
+      days,
+      totals: totals ?? empty.totals,
+      byProvider,
+      byModel,
+      byOperation,
+      byShop,
+      byDay,
+    });
+  } catch {
+    // Table not migrated yet (or empty) — return a well-formed empty shape.
+    return c.json(empty);
+  }
+});
+
 adminPlatformRoutes.get("/shops", async (c) => {
   const rows = await all(
     c.env.DB,

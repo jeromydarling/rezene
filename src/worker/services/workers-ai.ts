@@ -1,4 +1,5 @@
 import type { Env } from "../types/env";
+import { recordAiUsage, type UsageContext } from "./ai-usage";
 
 /**
  * Workers AI chat helper with a model fallback chain. Cloudflare retires
@@ -63,7 +64,7 @@ function extractText(result: unknown): string {
 export async function runWorkersAiChat(
   env: Env,
   messages: ChatMessage[],
-  { maxTokens = 2048 } = {},
+  { maxTokens = 2048, usage }: { maxTokens?: number; usage?: UsageContext } = {},
 ): Promise<string | null> {
   if (!env.AI) {
     lastWorkersAiError = "AI binding is not available on this deployment";
@@ -78,6 +79,16 @@ export async function runWorkersAiChat(
         return null;
       }
       workingModelIndex = i;
+      // Workers AI sometimes returns token usage; capture it when present.
+      const u = (result as { usage?: { prompt_tokens?: number; completion_tokens?: number } })?.usage;
+      void recordAiUsage(env, {
+        shopId: usage?.shopId,
+        provider: "workers-ai",
+        model: CHAT_MODELS[i],
+        operation: usage?.operation,
+        tokensIn: u?.prompt_tokens ?? 0,
+        tokensOut: u?.completion_tokens ?? 0,
+      });
       return text;
     } catch (err) {
       const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);

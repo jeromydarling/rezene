@@ -453,6 +453,7 @@ adminResearchRoutes.post("/ask", requireAdminWrite, async (c) => {
         "with short sections. Flag anything uncertain as uncertain — never invent contacts.",
       prompt,
       maxTokens: 2000,
+      usage: { shopId: c.var.shopId, operation: "research.ask" },
     });
     const id = newId("rnote");
     await run(

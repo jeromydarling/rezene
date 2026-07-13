@@ -5,6 +5,7 @@
  * the first that answers.
  */
 import type { Env } from "../types/env";
+import { recordAiUsage, type UsageContext } from "./ai-usage";
 
 const FLUX_MODELS = [
   "@cf/black-forest-labs/flux-1-schnell",
@@ -23,7 +24,7 @@ const FLUX_REF_MODELS = ["@cf/black-forest-labs/flux-2-klein-9b", "@cf/black-for
  */
 export async function generateFluxWithReferences(
   env: Env,
-  opts: { prompt: string; references: Uint8Array[]; seed?: number },
+  opts: { prompt: string; references: Uint8Array[]; seed?: number; usage?: UsageContext },
 ): Promise<{ bytes: Uint8Array; seed: number; model: string }> {
   if (!env.AI) throw new FluxUnavailableError("no AI binding");
   const seed = opts.seed ?? randomSeed();
@@ -47,7 +48,10 @@ export async function generateFluxWithReferences(
         multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") },
       })) as { image?: string } | Uint8Array | ReadableStream;
       const bytes = await toBytes(res);
-      if (bytes && bytes.length > 0) return { bytes, seed, model };
+      if (bytes && bytes.length > 0) {
+        void recordAiUsage(env, { shopId: opts.usage?.shopId, provider: "workers-ai", model, operation: opts.usage?.operation ?? "design.references", units: 1 });
+        return { bytes, seed, model };
+      }
       lastErr = "empty image";
     } catch (err) {
       lastErr = String(err).slice(0, 200);
@@ -77,7 +81,7 @@ export function randomSeed(): number {
  */
 export async function generateFluxImage(
   env: Env,
-  opts: { prompt: string; seed?: number; steps?: number },
+  opts: { prompt: string; seed?: number; steps?: number; usage?: UsageContext },
 ): Promise<{ bytes: Uint8Array; seed: number; model: string }> {
   if (!env.AI) throw new FluxUnavailableError("no AI binding");
   const seed = opts.seed ?? randomSeed();
@@ -91,7 +95,10 @@ export async function generateFluxImage(
         steps,
       })) as { image?: string } | Uint8Array | ReadableStream;
       const bytes = await toBytes(res);
-      if (bytes && bytes.length > 0) return { bytes, seed, model };
+      if (bytes && bytes.length > 0) {
+        void recordAiUsage(env, { shopId: opts.usage?.shopId, provider: "workers-ai", model, operation: opts.usage?.operation ?? "design.generate", units: 1 });
+        return { bytes, seed, model };
+      }
       lastErr = "empty image";
     } catch (err) {
       lastErr = String(err).slice(0, 200);

@@ -4,6 +4,7 @@
  * every shop gets it, degrades to a clear "not configured" when absent.
  */
 import type { Env } from "../types/env";
+import { recordAiUsage, type UsageContext } from "./ai-usage";
 
 export function perplexityConfigured(env: Env): boolean {
   return Boolean(env.PERPLEXITY_API_KEY);
@@ -16,7 +17,7 @@ export interface ResearchResult {
 
 export async function perplexityResearch(
   env: Env,
-  opts: { system: string; prompt: string; maxTokens?: number },
+  opts: { system: string; prompt: string; maxTokens?: number; usage?: UsageContext },
 ): Promise<ResearchResult> {
   if (!env.PERPLEXITY_API_KEY) throw new Error("Perplexity is not configured.");
   const res = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -43,9 +44,18 @@ export async function perplexityResearch(
     choices?: { message?: { content?: string } }[];
     citations?: string[];
     search_results?: { url?: string }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   const text = data.choices?.[0]?.message?.content ?? "";
   const citations =
     data.citations ?? (data.search_results ?? []).map((s) => s.url ?? "").filter(Boolean);
+  void recordAiUsage(env, {
+    shopId: opts.usage?.shopId,
+    provider: "perplexity",
+    model: "sonar-pro",
+    operation: opts.usage?.operation ?? "research",
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
+  });
   return { text, citations };
 }

@@ -31,6 +31,7 @@ const EXCLUDE = new Set([
   "0047_library_cache.sql", // Library cache is shared across shops at the platform
   "0048_directory.sql", // Directory + maker waitlist live at the platform
   "0049_activation_events.sql", // Activation funnel — recorded at the platform, read by HQ
+  "0055_ai_usage.sql", // AI usage ledger — platform-wide, read by HQ
 ]);
 
 const files = readdirSync(dir)
