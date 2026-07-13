@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { captureError } from "./sentry";
 
 /**
  * App-wide toast notifications. Two entry points:
@@ -33,14 +34,12 @@ export function emitToast(t: Omit<Toast, "id">): void {
 }
 
 /**
- * Single reporting hook. Console today; swap the body for Sentry.captureException
- * when the account is connected. Kept separate from display so we can report
- * silently as well as toast.
+ * Single reporting hook. Ships to Sentry when configured (via captureError),
+ * falling back to console otherwise. Kept separate from display so we can
+ * report silently as well as toast.
  */
 export function reportError(error: unknown, context?: Record<string, unknown>): void {
-  // eslint-disable-next-line no-console
-  console.error("[reportError]", error, context);
-  // Future: Sentry.captureException(error, { extra: context });
+  captureError(error, context);
 }
 
 interface ToastApi {

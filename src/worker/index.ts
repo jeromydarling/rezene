@@ -224,7 +224,11 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
     const ld = await buildProductLd(c.env, shopDb, decodeURIComponent(productMatch[1]), canonicalUrl).catch(() => null);
     if (ld) html = html.replace("</head>", `    ${ld}\n  </head>`);
   }
-  html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
+  html = injectShopContext(
+    html,
+    shop ? { slug: shop.slug, name: shop.name, basePath } : null,
+    { sentryDsn: c.env.SENTRY_DSN, env: c.env.APP_ENV },
+  );
   // The shell must never be stale: it pins the hashed bundle URL, and a
   // cached copy that outlives a deploy points at assets that no longer
   // exist — the whole app goes blank. no-cache = always revalidate.
