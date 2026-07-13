@@ -1722,6 +1722,187 @@ function DirectoryCard() {
   );
 }
 
+function InboundWebhookCard() {
+  const { data, reload } = useFetch<{ enabled: boolean; token: string | null; url: string | null }>(
+    "/api/admin/inbound-hook",
+  );
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function rotate() {
+    setBusy(true);
+    try {
+      await api.post("/api/admin/inbound-hook/rotate");
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function disable() {
+    setBusy(true);
+    try {
+      await api.delete("/api/admin/inbound-hook");
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  function copy() {
+    if (!data?.url) return;
+    void navigator.clipboard?.writeText(data.url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  if (!data) return null;
+  return (
+    <div className="admin-card p-4">
+      <h2 className="mb-1 font-medium">Inbound webhook (Zapier)</h2>
+      <p className="mb-3 text-xs text-warmgrey">
+        Feed data <span className="font-medium">into</span> Verto from Zapier, Make, or any tool — turn a new Gmail into a
+        note, a form into a client, a calendar invite into a consult booking. Paste this URL into your webhook step. Keep
+        it secret; anyone with it can post to your shop.
+      </p>
+      {data.enabled && data.url ? (
+        <>
+          <div className="flex items-center gap-2">
+            <input readOnly value={data.url} className="admin-input flex-1 font-mono text-[11px]" onFocus={(e) => e.target.select()} />
+            <button className="admin-btn text-sm" onClick={copy}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-warmgrey">
+            POST JSON like <code className="rounded bg-ink/5 px-1">{'{"type":"note","subject":"…","body":"…"}'}</code> —
+            or <code className="rounded bg-ink/5 px-1">"type":"client"</code> /{" "}
+            <code className="rounded bg-ink/5 px-1">"booking"</code> with a <code className="rounded bg-ink/5 px-1">name</code>.
+            A note with a matching <code className="rounded bg-ink/5 px-1">clientEmail</code> lands on that client's timeline.
+          </p>
+          <p className="mt-2 text-[11px]">
+            <a href="/admin/connect" className="text-navy underline">Step-by-step recipes for Gmail & Google Calendar →</a>
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button className="admin-btn text-sm" onClick={() => void rotate()} disabled={busy}>
+              Regenerate
+            </button>
+            <button className="text-xs text-warmgrey hover:text-red-700" onClick={() => void disable()} disabled={busy}>
+              Turn off
+            </button>
+          </div>
+        </>
+      ) : (
+        <button className="admin-btn-primary text-sm" onClick={() => void rotate()} disabled={busy}>
+          {busy ? "Generating…" : "Generate webhook URL"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+interface ApiKey {
+  id: string;
+  label: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+function ApiKeysCard() {
+  const { data, reload } = useFetch<ApiKey[]>("/api/admin/api-keys");
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [freshToken, setFreshToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function mint() {
+    setBusy(true);
+    try {
+      const res = await api.post<{ token: string }>("/api/admin/api-keys", { label: label.trim() || null });
+      setFreshToken(res.token);
+      setLabel("");
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function revoke(id: string) {
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/api-keys/${id}/revoke`);
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const keys = data ?? [];
+  return (
+    <div className="admin-card p-4">
+      <h2 className="mb-1 font-medium">API keys (developer / Zapier)</h2>
+      <p className="mb-3 text-xs text-warmgrey">
+        Personal access tokens for the Verto developer API — the machine auth behind the native Zapier app and any tool
+        that reads your events or creates records. A token is shown <span className="font-medium">once</span>; store it
+        safely. Revoke anytime.
+      </p>
+
+      {freshToken && (
+        <div className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+          <p className="text-xs font-medium text-emerald-900">Your new key — copy it now, it won't be shown again:</p>
+          <div className="mt-2 flex items-center gap-2">
+            <input readOnly value={freshToken} className="admin-input flex-1 font-mono text-[11px]" onFocus={(e) => e.target.select()} />
+            <button
+              className="admin-btn text-sm"
+              onClick={() => {
+                void navigator.clipboard?.writeText(freshToken);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <button className="mt-2 text-[11px] text-emerald-900 underline" onClick={() => setFreshToken(null)}>
+            Done — hide it
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          className="admin-input flex-1 text-sm"
+          placeholder="Label (e.g. Zapier)"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+        <button className="admin-btn-primary text-sm" onClick={() => void mint()} disabled={busy}>
+          Create key
+        </button>
+      </div>
+
+      {keys.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {keys.map((k) => (
+            <li key={k.id} className="flex items-center justify-between gap-2 text-xs">
+              <span className={k.revokedAt ? "text-warmgrey line-through" : ""}>
+                <span className="font-mono">{k.prefix}…</span>
+                {k.label ? <span className="ml-1.5 text-warmgrey">{k.label}</span> : null}
+                {k.lastUsedAt && !k.revokedAt ? <span className="ml-1.5 text-warmgrey">· used {k.lastUsedAt.slice(0, 10)}</span> : null}
+              </span>
+              {k.revokedAt ? (
+                <span className="text-warmgrey">revoked</span>
+              ) : (
+                <button className="text-warmgrey hover:text-red-700" onClick={() => void revoke(k.id)} disabled={busy}>
+                  Revoke
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { data, loading, error, reload } = useFetch<SettingsResponse>("/api/admin/settings");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -1830,6 +2011,8 @@ export function SettingsPage() {
             </p>
           </div>
           <DataExportCard />
+          <InboundWebhookCard />
+          <ApiKeysCard />
           <DirectoryCard />
           <ChangePasswordCard />
         </div>

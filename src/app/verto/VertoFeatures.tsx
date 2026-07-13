@@ -1457,7 +1457,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     group: "Clients & couture",
     items: [
       ["Client Book for tailors & stylists", "Each client's dated measurement history, style notes, fittings timeline — and their patterns and photos."],
-      ["Commission pipeline", "Made-to-measure work from consult to delivery, with fittings recorded on the client's timeline."],
+      ["Commission pipeline", "Made-to-measure work from consult to delivery, with fittings recorded on the client's timeline. Rename, reorder or hide the stages so the pipeline runs the way your studio does."],
       ["Client portal", "A passwordless page where clients follow their piece, see renders on their own body, and approve the design."],
       ["Deposits & consult booking", "Request deposits and milestone payments per commission, and take consult requests from a public /book page."],
       ["The Interpreter", "Paste any message — a client's tangled question, a maker's reply in another language, a mill's jargon — and get the meaning, the terms explained, and a reply drafted in both languages."],
@@ -1496,6 +1496,10 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     items: [
       ["Automations", "Approve a sample and the production order drafts itself; the calendar fills in from your orders, fittings and bookings."],
       ["Marketing that drafts itself", "Publish a product and Verto drafts the whole launch — Instagram, email, SEO. Restock, low stock, sold out, an adopted trend, a new review — each one drafts the right post in your voice, waiting in Marketing as an editable draft. Nothing posts on its own; you edit, schedule and send."],
+      ["Client notes, drafted for you", "Add a client, move a commission to a fitting, mark a deposit paid — Verto drafts the warm note that goes with it, in your voice. Edit it, then send by email or post to the client's portal. An Approvals inbox gathers every draft; auto-approve the ones you trust and they send themselves."],
+      ["Workflows you build yourself", "A no-code “when this happens, do that” builder on the same event spine as the built-ins. When a VIP pays a deposit, draft them a thank-you; when a piece is ready to collect, file the handover task; when anything happens, POST it to Zapier and connect Gmail, Sheets or Slack — no keys, no code."],
+      ["Zapier, both ways", "Webhooks out and in bridge Verto to the thousands of apps Zapier connects. Send events out to fire your own Gmail; POST notes, clients or bookings back in from a form or an inbox — no Google Cloud project, no OAuth, your tools stay yours."],
+      ["A real developer API", "Mint a personal access token and talk to Verto directly: create clients, notes and bookings, search, poll every event, or subscribe a signed webhook. It's the machine surface a native Zapier app rides on — and it's open for anything you build."],
       ["Maps of your network", "Your research leads, makers and suppliers pinned on a live world map — see your supply chain, not just list it."],
       ["Cash flow & open-to-buy", "Money in vs. out and how much of your season budget is left, from real POs and invoices."],
       ["Size-run purchase orders", "Order a style as a size curve — the PO carries the run, and receiving updates stock per size."],

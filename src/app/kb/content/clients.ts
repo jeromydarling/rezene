@@ -84,8 +84,8 @@ A client's measurements and body photos are theirs. **Delete client & their data
     summary: "A staged pipeline for made-to-measure pieces and alterations, with fittings on the client's timeline.",
     part: "clients",
     moduleRoute: "/admin/commissions",
-    keywords: "commission pipeline made to measure alteration fitting stages consult delivery tailor bespoke",
-    updated: "2026-07-10",
+    keywords: "commission pipeline made to measure alteration fitting stages consult delivery tailor bespoke custom pipeline rename reorder hide stage",
+    updated: "2026-07-12",
     screenshot: "/kb/shots/commissions.png",
     body: `# Commissions
 
@@ -96,6 +96,10 @@ A commission is one piece of client work — a made-to-measure garment or an alt
 **Consult → Design approved → Fabric sourced → Cutting → Fittings → Delivery.** Move a commission along from the client's page (or see everything at once on the **Commissions** pipeline). Every stage change is written to the client's timeline automatically, so their page reads as one story.
 
 **Alterations** use a shorter path — consult → fitting → delivery — because there's nothing to design or cut from scratch.
+
+## Make the pipeline yours
+
+Not every studio works the same way. On the **Commissions** page, **Customise pipeline** lets you **rename** each stage to your own language (call *Fittings* your *Muslin*, if that's your word), **reorder** them, and **hide** the ones you don't use. Your names show everywhere — the board, the client's page, and the client's portal. The underlying stages stay fixed, so your [Automations](/admin/support/kb/automations) and [Workflows](/admin/support/kb/workflows) keep firing exactly as before; you're changing the wording and the flow, not breaking the machinery. Nothing ever disappears: a commission sitting on a stage you've hidden still shows up until you move it on.
 
 ## Fittings
 

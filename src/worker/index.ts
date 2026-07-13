@@ -32,6 +32,11 @@ import { admin3dRoutes } from "./routes/admin-3d";
 import { adminFittingRoutes } from "./routes/admin-fitting";
 import { adminClientRoutes } from "./routes/admin-clients";
 import { adminCommissionRoutes } from "./routes/admin-commissions";
+import { adminClientMessageRoutes } from "./routes/admin-client-messages";
+import { adminWorkflowRoutes } from "./routes/admin-workflows";
+import { adminWebhookRoutes } from "./routes/admin-webhooks";
+import { adminApiKeyRoutes } from "./routes/admin-api-keys";
+import { publicHookRoutes } from "./routes/hooks";
 import { clientPortalRoutes } from "./routes/client-portal";
 import { publicBookingRoutes, adminBookingRoutes } from "./routes/booking";
 import { adminFileRoutes } from "./routes/admin-files";
@@ -356,7 +361,13 @@ app.route("/api/public", commerceRoutes);
 app.route("/api/public/account", accountRoutes);
 app.route("/api/public/portal", clientPortalRoutes);
 app.route("/api/public/booking", publicBookingRoutes);
+app.route("/api/public/hooks", publicHookRoutes);
 app.route("/api/wholesale", wholesalePortalRoutes);
+
+// Developer API — bearer-authenticated (personal access tokens), tenant scoped
+// by the token itself. Powers the native Zapier app and any external tool.
+import { apiV1Routes } from "./routes/api-v1";
+app.route("/api/v1", apiV1Routes);
 
 // Verto platform — shop signup + slug availability (public).
 import { vertoRoutes } from "./routes/verto";
@@ -404,6 +415,7 @@ admin.route("/3d", admin3dRoutes);
 admin.route("/fitting", adminFittingRoutes);
 admin.route("/clients", adminClientRoutes);
 admin.route("/commissions", adminCommissionRoutes);
+admin.route("/client-messages", adminClientMessageRoutes);
 admin.route("/bookings", adminBookingRoutes);
 admin.route("/files", adminFileRoutes);
 admin.route("/settings", adminSettingsRoutes);
@@ -427,6 +439,9 @@ admin.route("/library", adminLibraryRoutes);
 admin.route("/companion", adminCompanionRoutes);
 admin.route("/assist", adminAssistRoutes);
 admin.route("/automations", adminAutomationRoutes);
+admin.route("/workflows", adminWorkflowRoutes);
+admin.route("/inbound-hook", adminWebhookRoutes);
+admin.route("/api-keys", adminApiKeyRoutes);
 admin.route("/undo", adminUndoRoutes);
 admin.route("/domain", adminDomainRoutes);
 admin.route("/import", adminImportRoutes);

@@ -4,6 +4,7 @@ import { all, first, run } from "../services/db";
 import { parseBody } from "../services/validators";
 import { requireAdminWrite, requireAdminOnly } from "../middleware/auth";
 import { newId, randomToken, sha256Hex } from "../utils/id";
+import { emit } from "../services/activity";
 import type { AppContext } from "../types/env";
 
 /**
@@ -96,6 +97,17 @@ adminClientRoutes.post("/", requireAdminWrite, async (c) => {
     body.status ?? "active",
   );
   const row = await first<ClientRow>(c.var.db, `SELECT * FROM clients WHERE id = ?`, id);
+  await emit(
+    c.var.db,
+    {
+      kind: "client.created",
+      entityType: "client",
+      entityId: id,
+      title: `New client added: ${row!.name}`,
+      payload: { clientId: id, name: row!.name },
+    },
+    { env: c.env, ctx: c.executionCtx },
+  );
   return c.json(mapClient(row!), 201);
 });
 
@@ -214,6 +226,26 @@ adminClientRoutes.get("/:id", async (c) => {
      ORDER BY created_at`,
     id,
   ).catch(() => []);
+  // Client-facing message drafts + sent history (the outbox for this client).
+  const messages = await all<{
+    id: string;
+    commission_id: string | null;
+    trigger: string | null;
+    channel: string;
+    subject: string | null;
+    body_md: string;
+    status: string;
+    sent_at: string | null;
+    created_at: string;
+  }>(
+    c.var.db,
+    `SELECT id, commission_id, trigger, channel, subject, body_md, status, sent_at, created_at
+     FROM client_messages WHERE client_id = ? AND status != 'dismissed'
+     ORDER BY status = 'sent', created_at DESC`,
+    id,
+  ).catch(() => []);
+  const { resolvePipeline } = await import("../services/pipeline");
+  const pipeline = await resolvePipeline(c.var.db).catch(() => ({ labels: {} as Record<string, string> }));
   return c.json({
     ...mapClient(client),
     measurements: measurements.map((m) => ({
@@ -235,6 +267,7 @@ adminClientRoutes.get("/:id", async (c) => {
       title: co.title,
       kind: co.kind,
       stage: co.stage,
+      stageLabel: pipeline.labels[co.stage] ?? co.stage,
       dueAt: co.due_at,
       priceCents: co.price_cents,
       updatedAt: co.updated_at,
@@ -254,6 +287,17 @@ adminClientRoutes.get("/:id", async (c) => {
       label: m.label,
       fileId: m.file_id,
       source: m.source,
+      createdAt: m.created_at,
+    })),
+    messages: messages.map((m) => ({
+      id: m.id,
+      commissionId: m.commission_id,
+      trigger: m.trigger,
+      channel: m.channel,
+      subject: m.subject,
+      body: m.body_md,
+      status: m.status,
+      sentAt: m.sent_at,
       createdAt: m.created_at,
     })),
     customer,

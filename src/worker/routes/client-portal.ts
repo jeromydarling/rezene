@@ -131,6 +131,16 @@ clientPortalRoutes.get("/me", async (c) => {
         me.id,
       ).catch(() => [])
     : [];
+  const { resolvePipeline } = await import("../services/pipeline");
+  const pipeline = await resolvePipeline(c.var.db).catch(() => ({ labels: {} as Record<string, string> }));
+  // Messages the studio published to the client's portal (channel='portal').
+  const messages = await all<{ subject: string | null; body_md: string; sent_at: string | null }>(
+    c.var.db,
+    `SELECT subject, body_md, sent_at FROM client_messages
+     WHERE client_id = ? AND channel = 'portal' AND status = 'sent'
+     ORDER BY sent_at DESC LIMIT 20`,
+    me.id,
+  ).catch(() => []);
   return c.json({
     name: me.name,
     studio: brand?.value ?? null,
@@ -151,6 +161,8 @@ clientPortalRoutes.get("/me", async (c) => {
       : null,
     renders: renders.map((r) => ({ url: `/media/${r.file_id}`, createdAt: r.created_at })),
     photos: photos.map((p) => ({ url: `/media/${p.file_id}`, label: p.label })),
+    messages: messages.map((m) => ({ subject: m.subject, body: m.body_md, sentAt: m.sent_at })),
+    stageLabels: pipeline.labels,
   });
 });
 

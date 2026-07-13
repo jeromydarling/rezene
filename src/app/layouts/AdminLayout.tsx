@@ -56,6 +56,8 @@ import {
   Users,
   GraduationCap,
   LibraryBig,
+  Workflow,
+  Cable,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
@@ -179,6 +181,8 @@ const NAV_SECTIONS: {
     items: [
       { to: "/admin/settings", label: "Settings", icon: Settings },
       { to: "/admin/automations", label: "Automations", icon: Zap },
+      { to: "/admin/workflows", label: "Workflows", icon: Workflow },
+      { to: "/admin/connect", label: "Connect apps", icon: Cable },
       { to: "/admin/files", label: "Files", icon: FolderOpen },
       { to: "/admin/domain", label: "Custom Domain", icon: Globe },
       { to: "/admin/team", label: "Team", icon: UsersRound },

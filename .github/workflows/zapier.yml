@@ -1,0 +1,111 @@
+# Deploy the native Zapier integration (zapier/) from CI — no local terminal.
+#
+# Drive it from the Actions tab: pick this workflow → "Run workflow" → choose a
+# mode. Zapier's CLI runs headlessly when ZAPIER_DEPLOY_KEY is set, so there's
+# no interactive login.
+#
+# One-time repository setup (Settings → Secrets and variables → Actions):
+#   Secret  ZAPIER_DEPLOY_KEY   (required) — a Zapier deploy key. Create one in
+#           the Zapier developer dashboard (developer.zapier.com → your account
+#           → Deploy Keys). This is the only credential you need to fetch.
+#   Variable ZAPIER_APP_ID      (set after the first "register" run) — the CLI
+#           app's numeric id. The register job prints it and uploads a
+#           .zapierapprc artifact; copy the id into this Actions Variable so the
+#           push/validate jobs know which app to target.
+#   Secret  ZAPIER_TEST_API_KEY (optional) — a live Verto PAT for an end-to-end
+#           test against a real shop. Secret ZAPIER_TEST_BASE_URL (optional,
+#           defaults to https://verto.style).
+#
+# Typical flow: run once with mode=register → set ZAPIER_APP_ID → thereafter
+# mode=push to ship a new version. mode=validate is a dry check.
+
+name: Zapier deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "What to do"
+        required: true
+        default: validate
+        type: choice
+        options: [validate, register, push]
+
+concurrency:
+  group: zapier-deploy
+  cancel-in-progress: false
+
+jobs:
+  zapier:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: zapier
+    env:
+      ZAPIER_DEPLOY_KEY: ${{ secrets.ZAPIER_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Guard — deploy key present
+        run: |
+          if [ -z "$ZAPIER_DEPLOY_KEY" ]; then
+            echo "::error::ZAPIER_DEPLOY_KEY is not set. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Install
+        run: npm install
+
+      # Link the checkout to the registered CLI app (unless we're registering).
+      # .zapierapprc is {"id": <id>, "key": "App<id>CLI"} — synthesised from the
+      # ZAPIER_APP_ID variable so it never has to be committed.
+      - name: Write .zapierapprc
+        if: ${{ inputs.mode != 'register' }}
+        env:
+          ZAPIER_APP_ID: ${{ vars.ZAPIER_APP_ID }}
+        run: |
+          if [ -z "$ZAPIER_APP_ID" ]; then
+            echo "::error::ZAPIER_APP_ID variable is not set. Run this workflow with mode=register first, then set the id."
+            exit 1
+          fi
+          printf '{"id":%s,"key":"App%sCLI"}\n' "$ZAPIER_APP_ID" "$ZAPIER_APP_ID" > .zapierapprc
+          echo "Targeting Zapier app $ZAPIER_APP_ID"
+
+      - name: Register (one-time — creates the CLI app)
+        if: ${{ inputs.mode == 'register' }}
+        run: |
+          npx zapier register \
+            --title "Verto" \
+            --desc "Connect Verto — clients, commissions, payments, products — to 7,000+ apps." \
+            --url "https://verto.style" \
+            --audience private \
+            --role employee \
+            --category crm
+          echo "----- .zapierapprc -----"
+          cat .zapierapprc
+
+      - name: Upload .zapierapprc (grab the app id from here)
+        if: ${{ inputs.mode == 'register' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapierapprc
+          path: zapier/.zapierapprc
+
+      - name: Validate
+        if: ${{ inputs.mode == 'validate' || inputs.mode == 'push' }}
+        run: npx zapier validate
+
+      - name: Test (structural; end-to-end if a PAT is provided)
+        if: ${{ inputs.mode == 'push' }}
+        env:
+          API_KEY: ${{ secrets.ZAPIER_TEST_API_KEY }}
+          BASE_URL: ${{ secrets.ZAPIER_TEST_BASE_URL || 'https://verto.style' }}
+        run: npx zapier test
+
+      - name: Push
+        if: ${{ inputs.mode == 'push' }}
+        run: npx zapier push
