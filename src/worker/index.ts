@@ -35,6 +35,7 @@ import { adminCommissionRoutes } from "./routes/admin-commissions";
 import { adminClientMessageRoutes } from "./routes/admin-client-messages";
 import { adminWorkflowRoutes } from "./routes/admin-workflows";
 import { adminWebhookRoutes } from "./routes/admin-webhooks";
+import { adminApiKeyRoutes } from "./routes/admin-api-keys";
 import { publicHookRoutes } from "./routes/hooks";
 import { clientPortalRoutes } from "./routes/client-portal";
 import { publicBookingRoutes, adminBookingRoutes } from "./routes/booking";
@@ -363,6 +364,11 @@ app.route("/api/public/booking", publicBookingRoutes);
 app.route("/api/public/hooks", publicHookRoutes);
 app.route("/api/wholesale", wholesalePortalRoutes);
 
+// Developer API — bearer-authenticated (personal access tokens), tenant scoped
+// by the token itself. Powers the native Zapier app and any external tool.
+import { apiV1Routes } from "./routes/api-v1";
+app.route("/api/v1", apiV1Routes);
+
 // Verto platform — shop signup + slug availability (public).
 import { vertoRoutes } from "./routes/verto";
 app.route("/api/verto", vertoRoutes);
@@ -435,6 +441,7 @@ admin.route("/assist", adminAssistRoutes);
 admin.route("/automations", adminAutomationRoutes);
 admin.route("/workflows", adminWorkflowRoutes);
 admin.route("/inbound-hook", adminWebhookRoutes);
+admin.route("/api-keys", adminApiKeyRoutes);
 admin.route("/undo", adminUndoRoutes);
 admin.route("/domain", adminDomainRoutes);
 admin.route("/import", adminImportRoutes);

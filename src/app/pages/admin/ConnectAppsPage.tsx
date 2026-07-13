@@ -124,6 +124,18 @@ export function ConnectAppsPage() {
         )}
       </div>
 
+      <div className="mb-5 rounded-xl border border-ink/10 bg-white p-4">
+        <p className="text-sm font-medium text-ink">
+          Native Zapier app <span className="ml-1 rounded bg-navy/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-navy">beta</span>
+        </p>
+        <p className="mt-1 text-xs text-warmgrey">
+          A one-click Verto app is on the way — triggers, actions and search built in, authenticated with an{" "}
+          <strong>API key</strong> instead of the copy-paste recipes below. Create your key under{" "}
+          <a href="/admin/settings" className="underline">Settings → API keys</a>; it powers both the coming app and any
+          tool you build against the Verto developer API today.
+        </p>
+      </div>
+
       <p className="mb-3 text-xs text-warmgrey">
         A quick honesty note: Zapier's marketing makes this sound like one click. It isn't — but it's not hard either.
         Follow a recipe below step by step and you'll have it running in a few minutes. Each “Catch Hook” URL comes from

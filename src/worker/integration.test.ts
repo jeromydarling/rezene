@@ -2,9 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { Miniflare } from "miniflare";
+import { createServer, type Server } from "node:http";
 import { emit } from "./services/activity";
 import { savePipeline, resolvePipeline } from "./services/pipeline";
 import { sendClientMessage } from "./services/client-messages";
+import { mintApiKey, verifyApiKey, revokeApiKey } from "./services/api-keys";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -77,6 +79,16 @@ beforeAll(async () => {
       }
     }
   }
+
+  // Minimal shop registry so verifyApiKey can resolve the slug. Using the
+  // primary shop id makes getShopDb return the bound D1 (this same test db).
+  await db.exec(
+    `CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, slug TEXT, name TEXT, status TEXT, custom_domain TEXT)`,
+  );
+  await run(
+    db,
+    `INSERT INTO shops (id, slug, name, status) VALUES ('shop_rezene', 'teststudio', 'Test Studio', 'active')`,
+  );
 
   env = { DB: db, BRAND_NAME: "Test Studio" } as unknown as Env;
 }, 60_000);
@@ -216,5 +228,82 @@ describe("inbound webhook → workflow chaining", () => {
     await flush();
     const task = await first<{ id: string }>(db, `SELECT id FROM production_tasks WHERE title = 'Follow up on: New enquiry from the site'`);
     expect(task).toBeTruthy();
+  });
+});
+
+describe("developer API — personal access tokens", () => {
+  it("mints a hashed key, verifies a valid token, and rejects tampered/revoked/expired", async () => {
+    const minted = await mintApiKey(db, "teststudio", { label: "Zapier" });
+    expect(minted.token.startsWith("vrto_teststudio_")).toBe(true);
+    expect(minted.prefix).toBe(`vrto_teststudio_${minted.id}`);
+    // The plaintext secret is NOT stored — only its hash.
+    const row = await first<{ token_hash: string }>(db, `SELECT token_hash FROM api_keys WHERE id = ?`, minted.id);
+    expect(row!.token_hash).not.toContain(minted.token.split(".")[1]);
+
+    const ok = await verifyApiKey(env, minted.token);
+    expect(ok?.shopSlug).toBe("teststudio");
+    expect(ok?.keyId).toBe(minted.id);
+
+    // Tampered secret → rejected.
+    expect(await verifyApiKey(env, minted.token.slice(0, -3) + "xyz")).toBeNull();
+    // Unknown shop slug → rejected.
+    expect(await verifyApiKey(env, `vrto_nope_${minted.id}.whatever`)).toBeNull();
+
+    // Revoked → rejected.
+    await revokeApiKey(db, minted.id);
+    expect(await verifyApiKey(env, minted.token)).toBeNull();
+
+    // Expired → rejected.
+    const past = await mintApiKey(db, "teststudio", { label: "old", expiresAt: "2000-01-01 00:00:00" });
+    expect(await verifyApiKey(env, past.token)).toBeNull();
+  });
+});
+
+describe("webhook fan-out to external subscribers", () => {
+  let server: Server;
+  let received: { headers: Record<string, string | string[] | undefined>; body: string } | null = null;
+  let url = "";
+
+  beforeAll(async () => {
+    server = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        received = { headers: req.headers, body };
+        res.writeHead(200);
+        res.end("ok");
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    url = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}/hook` : "";
+  });
+  afterAll(() => server?.close());
+
+  it("delivers a signed POST to a registered subscription when its event fires", async () => {
+    // A neutral event kind (nothing reacts to it) — keeps the test off the
+    // marketing-automation code path, which transitively imports the
+    // Workers-only `cloudflare:email` module. The fan-out matches by kind
+    // regardless, so this exercises the delivery path directly.
+    await run(
+      db,
+      `INSERT INTO webhook_subscriptions (id, event, target_url, secret, source)
+       VALUES ('whs_1', 'test.ping', ?, 'sub-secret', 'zapier')`,
+      url,
+    );
+    await emit(
+      db,
+      { kind: "test.ping", entityType: "product", entityId: "p1", title: "Launched the Linen Shirt", payload: { productId: "p1", name: "Linen Shirt" } },
+      { env, ctx },
+    );
+    await flush();
+    // Give the http server a tick to record the request.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(received).toBeTruthy();
+    expect(received!.headers["x-verto-event"]).toBe("test.ping");
+    expect(String(received!.headers["x-verto-signature"])).toMatch(/^sha256=[0-9a-f]{64}$/);
+    const parsed = JSON.parse(received!.body);
+    expect(parsed.event).toBe("test.ping");
+    expect(parsed.payload.name).toBe("Linen Shirt");
   });
 });

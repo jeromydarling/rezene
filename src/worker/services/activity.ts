@@ -459,6 +459,13 @@ export async function emit(db: DB, ev: ActivityEvent, opts?: EmitOpts): Promise<
   } catch (err) {
     console.log("workflows failed", ev.kind, err);
   }
+  // Fan the event out to external subscribers (Zapier REST Hooks, etc.).
+  try {
+    const { deliverToSubscriptions } = await import("./webhooks");
+    await deliverToSubscriptions(db, ev, opts);
+  } catch (err) {
+    console.log("webhook fan-out failed", ev.kind, err);
+  }
 }
 
 /** Recent activity, for the automations page feed. */

@@ -1798,6 +1798,111 @@ function InboundWebhookCard() {
   );
 }
 
+interface ApiKey {
+  id: string;
+  label: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+function ApiKeysCard() {
+  const { data, reload } = useFetch<ApiKey[]>("/api/admin/api-keys");
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [freshToken, setFreshToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function mint() {
+    setBusy(true);
+    try {
+      const res = await api.post<{ token: string }>("/api/admin/api-keys", { label: label.trim() || null });
+      setFreshToken(res.token);
+      setLabel("");
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function revoke(id: string) {
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/api-keys/${id}/revoke`);
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const keys = data ?? [];
+  return (
+    <div className="admin-card p-4">
+      <h2 className="mb-1 font-medium">API keys (developer / Zapier)</h2>
+      <p className="mb-3 text-xs text-warmgrey">
+        Personal access tokens for the Verto developer API — the machine auth behind the native Zapier app and any tool
+        that reads your events or creates records. A token is shown <span className="font-medium">once</span>; store it
+        safely. Revoke anytime.
+      </p>
+
+      {freshToken && (
+        <div className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+          <p className="text-xs font-medium text-emerald-900">Your new key — copy it now, it won't be shown again:</p>
+          <div className="mt-2 flex items-center gap-2">
+            <input readOnly value={freshToken} className="admin-input flex-1 font-mono text-[11px]" onFocus={(e) => e.target.select()} />
+            <button
+              className="admin-btn text-sm"
+              onClick={() => {
+                void navigator.clipboard?.writeText(freshToken);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <button className="mt-2 text-[11px] text-emerald-900 underline" onClick={() => setFreshToken(null)}>
+            Done — hide it
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          className="admin-input flex-1 text-sm"
+          placeholder="Label (e.g. Zapier)"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+        <button className="admin-btn-primary text-sm" onClick={() => void mint()} disabled={busy}>
+          Create key
+        </button>
+      </div>
+
+      {keys.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {keys.map((k) => (
+            <li key={k.id} className="flex items-center justify-between gap-2 text-xs">
+              <span className={k.revokedAt ? "text-warmgrey line-through" : ""}>
+                <span className="font-mono">{k.prefix}…</span>
+                {k.label ? <span className="ml-1.5 text-warmgrey">{k.label}</span> : null}
+                {k.lastUsedAt && !k.revokedAt ? <span className="ml-1.5 text-warmgrey">· used {k.lastUsedAt.slice(0, 10)}</span> : null}
+              </span>
+              {k.revokedAt ? (
+                <span className="text-warmgrey">revoked</span>
+              ) : (
+                <button className="text-warmgrey hover:text-red-700" onClick={() => void revoke(k.id)} disabled={busy}>
+                  Revoke
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { data, loading, error, reload } = useFetch<SettingsResponse>("/api/admin/settings");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -1907,6 +2012,7 @@ export function SettingsPage() {
           </div>
           <DataExportCard />
           <InboundWebhookCard />
+          <ApiKeysCard />
           <DirectoryCard />
           <ChangePasswordCard />
         </div>

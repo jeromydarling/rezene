@@ -1,12 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { first, run } from "../services/db";
+import { first } from "../services/db";
 import { parseBody } from "../services/validators";
-import { newId } from "../utils/id";
-import { emit } from "../services/activity";
+import { ingestClient, ingestBooking, ingestNote } from "../services/inbound";
 import { getShopBySlug, PRIMARY_SHOP_ID } from "../services/shops";
 import { getShopDb } from "../services/tenant-db";
-import type { AppContext, Env } from "../types/env";
+import type { AppContext } from "../types/env";
 
 /**
  * Inbound webhooks — the other half of the Zapier bridge. Zapier (or Make,
@@ -60,93 +59,18 @@ publicHookRoutes.post("/:shopSlug/in/:token", async (c) => {
 
   if (type === "client") {
     if (!body.name?.trim()) return c.json({ error: "A client needs a name." }, 400);
-    const id = newId("client");
-    await run(
-      db,
-      `INSERT INTO clients (id, name, email, phone, style_notes) VALUES (?, ?, ?, ?, ?)`,
-      id,
-      body.name.trim(),
-      body.email?.trim() || null,
-      body.phone?.trim() || null,
-      body.note?.trim() || null,
-    );
-    await emit(
-      db,
-      {
-        kind: "client.created",
-        entityType: "client",
-        entityId: id,
-        title: `New client via webhook: ${body.name.trim()}`,
-        payload: { clientId: id, name: body.name.trim() },
-      },
-      opts,
-    );
-    await emitInbound(db, "client", `Client added via webhook: ${body.name.trim()}`, opts);
+    const { id } = await ingestClient(db, { ...body, name: body.name }, opts, "webhook");
     return c.json({ ok: true, created: "client", id }, 201);
   }
 
   if (type === "booking") {
     if (!body.name?.trim()) return c.json({ error: "A booking needs a name." }, 400);
-    const id = newId("book");
-    await run(
-      db,
-      `INSERT INTO booking_requests (id, name, email, phone, note, preferred_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      id,
-      body.name.trim(),
-      body.email?.trim() || null,
-      body.phone?.trim() || null,
-      body.note?.trim() || null,
-      body.preferredAt?.trim() || null,
-    );
-    await emitInbound(db, "booking", `Consult request via webhook: ${body.name.trim()}`, opts);
+    const { id } = await ingestBooking(db, { ...body, name: body.name }, opts, "webhook");
     return c.json({ ok: true, created: "booking", id }, 201);
   }
 
   // Default: a note. Lands in the activity feed, and — if it names a known
   // client by email — on that client's timeline too.
-  const subject = body.subject?.trim() || "Inbound note";
-  const noteBody = body.body?.trim() || "";
-  let clientId: string | null = null;
-  if (body.clientEmail?.trim()) {
-    const match = await first<{ id: string }>(
-      db,
-      `SELECT id FROM clients WHERE lower(email) = lower(?)`,
-      body.clientEmail.trim(),
-    ).catch(() => null);
-    if (match) {
-      clientId = match.id;
-      await run(
-        db,
-        `INSERT INTO client_events (id, client_id, kind, subject, body_md, event_at)
-         VALUES (?, ?, 'note', ?, ?, datetime('now'))`,
-        newId("cev"),
-        clientId,
-        subject.slice(0, 200),
-        noteBody || null,
-      ).catch(() => {});
-    }
-  }
-  await emitInbound(db, "note", subject.slice(0, 200), opts, { subject, body: noteBody, clientId });
+  const { clientId } = await ingestNote(db, body, opts, "webhook");
   return c.json({ ok: true, created: "note", clientId }, 201);
 });
-
-async function emitInbound(
-  db: D1Database,
-  kind: string,
-  title: string,
-  opts: { env: Env; ctx: { waitUntil: (p: Promise<unknown>) => void } },
-  extra?: Record<string, unknown>,
-) {
-  await emit(
-    db,
-    {
-      kind: "inbound.received",
-      entityType: "webhook",
-      entityId: kind,
-      title,
-      payload: { inboundType: kind, ...extra },
-    },
-    opts,
-  );
-}

@@ -251,6 +251,19 @@ Every inbound call also raises an **inbound-webhook** event, so you can build a 
 > [!NOTE]
 > Your inbound URL contains a secret token — treat it like a password. If it ever leaks, hit **Regenerate** and the old one stops working immediately. **Turn off** disables inbound webhooks entirely.
 
+## The developer API & the native app (beta)
+
+Beyond the copy-paste recipes, Verto has a proper **developer API** — the machine surface a native Zapier app (and any tool you build) uses. Create a **personal access token** under **Account → Settings → API keys**: it's shown once, stored only as a hash, and revocable anytime.
+
+With a token you can, over \`https://<your-shop>/api/v1/…\` (\`Authorization: Bearer <token>\`):
+
+- **Create** a note, client, or booking (\`POST /api/v1/notes | /clients | /bookings\`) — the same records the inbound webhook makes.
+- **Search** clients by email (\`GET /api/v1/clients?email=…\`) so an automation can dedupe.
+- **Poll events** (\`GET /api/v1/events?event=…\`) — every trigger the [Workflow](/admin/support/kb/workflows) builder lists.
+- **Subscribe** a URL to an event (\`POST /api/v1/subscriptions\`) for instant delivery; each delivery is **signed** (HMAC-SHA256, \`x-verto-signature\` header) so you can verify it's really from Verto.
+
+A one-click native Zapier app is being built on top of this — until it lists publicly, the recipes above are the way in, and the API keys already work for anything you wire yourself.
+
 ## Why webhooks instead of a Gmail integration?
 
 Because it's yours, and it's honest. You keep Gmail (and everything else) in the tool you trust, wired up the way you want, with no third app holding your Google credentials. Verto stays the studio's brain; Zapier is the wiring to everything around it.`,
