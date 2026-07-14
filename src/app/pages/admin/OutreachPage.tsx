@@ -44,9 +44,30 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+interface SequenceRow {
+  key: string;
+  label: string;
+  description: string;
+  steps: number;
+  enabled: boolean;
+  queued: number;
+  sent: number;
+}
+
 export function OutreachPage() {
   const toast = useToast();
   const overview = useFetch<Overview>("/api/admin/platform/marketing");
+  const sequences = useFetch<SequenceRow[]>("/api/admin/platform/marketing/sequences");
+
+  async function toggleSequence(s: SequenceRow) {
+    try {
+      await api.post(`/api/admin/platform/marketing/sequences/${s.key}`, { enabled: !s.enabled });
+      toast.success(s.enabled ? `${s.label} paused` : `${s.label} on`, s.enabled ? undefined : "The daily sweep picks up eligible contacts from tomorrow morning.");
+      sequences.reload();
+    } catch (err) {
+      toast.error("Couldn't update", err instanceof ApiRequestError ? err.message : undefined);
+    }
+  }
 
   const [segment, setSegment] = useState("active_shops");
   const [brief, setBrief] = useState("");
@@ -238,6 +259,35 @@ export function OutreachPage() {
             Every email carries one-click unsubscribe; unsubscribes are honored instantly and permanently.
           </p>
         </div>
+      </div>
+
+      {/* Lifecycle sequences */}
+      <div className="admin-card space-y-3 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Automations</h2>
+        <p className="text-xs text-warmgrey">
+          Behavior-keyed sequences over your own data — who signed up, who's stuck, who went quiet. The daily sweep
+          queues due steps; nobody gets more than one email every three days.
+        </p>
+        {sequences.data?.map((s) => (
+          <div key={s.key} className="flex items-center justify-between gap-4 rounded border border-navy/10 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {s.label} <span className="ml-1 text-xs font-normal text-warmgrey">{s.steps} step{s.steps === 1 ? "" : "s"}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-warmgrey">{s.description}</p>
+              {(s.queued > 0 || s.sent > 0) && (
+                <p className="mt-0.5 text-xs text-warmgrey">{s.sent} sent · {s.queued - s.sent} in queue</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleSequence(s)}
+              className={`btn whitespace-nowrap ${s.enabled ? "btn-primary" : "btn-secondary"}`}
+            >
+              {s.enabled ? "On" : "Off"}
+            </button>
+          </div>
+        ))}
       </div>
 
       {/* Past broadcasts */}

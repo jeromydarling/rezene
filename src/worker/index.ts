@@ -539,6 +539,9 @@ export default Sentry.withSentry(
             // Fleet revenue: roll each shop's day up into the platform table for HQ.
             const { rollupFleetMetrics } = await import("./services/shop-metrics");
             await rollupFleetMetrics(env).catch((err) => console.error("[metrics] rollup failed:", err));
+            // HQ marketing: advance lifecycle sequences (welcome, stuck-shop, win-back).
+            const { runMarketingSequences } = await import("./services/hq-marketing-sequences");
+            await runMarketingSequences(env).catch((err) => console.error("[marketing] sequences failed:", err));
           }),
       );
     }
