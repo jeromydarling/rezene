@@ -331,6 +331,63 @@ adminPlatformRoutes.get("/shop-progress", async (c) => {
   return c.json(buildShopProgress(shops, events, Date.now()));
 });
 
+/**
+ * Error/incident view — what's breaking across the fleet, for whom, how often.
+ * Reads the platform_errors log (written best-effort by the worker's onError
+ * hook), open incidents first. Sentry holds the full stack trace; this is the
+ * at-a-glance triage surface. `?days=` bounds the window (default 30).
+ */
+adminPlatformRoutes.get("/errors", async (c) => {
+  const days = Math.min(365, Math.max(1, Number(c.req.query("days")) || 30));
+  const since = `-${days} days`;
+  try {
+    const errors = await all<{
+      id: number;
+      shopId: string | null;
+      method: string;
+      path: string;
+      status: number;
+      message: string;
+      count: number;
+      firstSeen: string;
+      lastSeen: string;
+      resolvedAt: string | null;
+    }>(
+      c.env.DB,
+      `SELECT id, shop_id AS shopId, method, path, status, message, count,
+              first_seen AS firstSeen, last_seen AS lastSeen, resolved_at AS resolvedAt
+         FROM platform_errors
+        WHERE last_seen >= datetime('now', ?)
+        ORDER BY (resolved_at IS NULL) DESC, last_seen DESC
+        LIMIT 200`,
+      since,
+    );
+    const open = errors.filter((e) => !e.resolvedAt);
+    return c.json({
+      days,
+      errors,
+      summary: {
+        openIncidents: open.length,
+        openEvents: open.reduce((n, e) => n + e.count, 0),
+        totalIncidents: errors.length,
+      },
+    });
+  } catch {
+    return c.json({ days, errors: [], summary: { openIncidents: 0, openEvents: 0, totalIncidents: 0 } });
+  }
+});
+
+/** Mark an incident handled. A later recurrence re-opens it automatically. */
+adminPlatformRoutes.post("/errors/:id/resolve", requireAdminOnly, async (c) => {
+  const result = await run(
+    c.env.DB,
+    `UPDATE platform_errors SET resolved_at = datetime('now') WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!result.meta.changes) return c.json({ error: "Not found" }, 404);
+  return c.json({ ok: true });
+});
+
 adminPlatformRoutes.get("/shops", async (c) => {
   const rows = await all(
     c.env.DB,

@@ -20,6 +20,7 @@ import {
   FlaskConical,
   FolderOpen,
   Gauge,
+  TriangleAlert,
   Images,
   Landmark,
   LayoutDashboard,
@@ -201,12 +202,13 @@ const NAV_SECTIONS: {
       { to: "/admin/shop-progress", label: "Shop Progress", icon: Rocket },
       { to: "/admin/revenue", label: "Fleet Revenue", icon: CircleDollarSign },
       { to: "/admin/ai-usage", label: "AI Usage", icon: Gauge },
+      { to: "/admin/errors", label: "Errors", icon: TriangleAlert },
     ],
   },
 ];
 
 /** Platform HQ routes — the only admin surface at bare verto.style/admin. */
-const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/shop-progress", "/admin/revenue", "/admin/ai-usage"];
+const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/shop-progress", "/admin/revenue", "/admin/ai-usage", "/admin/errors"];
 
 function visibleSections(platformMode: boolean) {
   // Verto HQ lives at bare verto.style/admin (platform context, SuperAdmin

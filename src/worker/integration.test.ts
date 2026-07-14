@@ -9,6 +9,7 @@ import { sendClientMessage } from "./services/client-messages";
 import { mintApiKey, verifyApiKey, revokeApiKey } from "./services/api-keys";
 import { recordAiUsage, estimateCostCents } from "./services/ai-usage";
 import { computeShopDay, rollupFleetMetrics } from "./services/shop-metrics";
+import { recordPlatformError, normalizePath } from "./services/platform-errors";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -417,5 +418,35 @@ describe("fleet revenue rollup", () => {
       today,
     );
     expect(again?.gmv).toBe(8000);
+  });
+});
+
+describe("platform error/incident log", () => {
+  it("normalizes id-ish path segments so instances group", () => {
+    expect(normalizePath("/api/admin/products/ord_r1/items")).toBe("/api/admin/products/:id/items");
+    expect(normalizePath("/api/admin/shops")).toBe("/api/admin/shops");
+  });
+
+  it("dedupes by signature (count rises) and re-opens on recurrence", async () => {
+    const e = { method: "POST", path: "/api/admin/products/ord_9", status: 500, message: "TypeError: boom" };
+    await recordPlatformError(env, { ...e, shopId: "shop_rezene" });
+    await recordPlatformError(env, { ...e, shopId: "shop_rezene" });
+    const row = await first<{ id: number; count: number; path: string; resolvedAt: string | null }>(
+      db,
+      `SELECT id, count, path, resolved_at AS resolvedAt FROM platform_errors WHERE message = 'TypeError: boom'`,
+    );
+    expect(row?.count).toBe(2); // two hits, one row
+    expect(row?.path).toBe("/api/admin/products/:id"); // normalized
+
+    // Resolve it, then a recurrence must re-open it.
+    await run(db, `UPDATE platform_errors SET resolved_at = datetime('now') WHERE id = ?`, row!.id);
+    await recordPlatformError(env, { ...e, shopId: "shop_rezene" });
+    const after = await first<{ count: number; resolvedAt: string | null }>(
+      db,
+      `SELECT count, resolved_at AS resolvedAt FROM platform_errors WHERE id = ?`,
+      row!.id,
+    );
+    expect(after?.count).toBe(3);
+    expect(after?.resolvedAt).toBeNull(); // re-opened
   });
 });

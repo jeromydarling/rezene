@@ -85,6 +85,22 @@ app.onError((err, c) => {
     return c.json({ error: "Validation failed", details: err.details }, 400);
   }
   console.error(`[api] ${c.req.method} ${c.req.path}:`, err);
+  // Record the incident for the HQ error view (Sentry gets the full trace via
+  // the outer withSentry wrapper). Best-effort, off the response path.
+  try {
+    const record = import("./services/platform-errors").then(({ recordPlatformError }) =>
+      recordPlatformError(c.env, {
+        shopId: c.var.shopId ?? null,
+        method: c.req.method,
+        path: c.req.path,
+        status: 500,
+        message: String(err),
+      }),
+    );
+    c.executionCtx.waitUntil(record);
+  } catch {
+    /* executionCtx may be absent in some contexts — never block the error response */
+  }
   // Never leak stack traces or internals to clients.
   const message = c.env.APP_ENV === "development" ? String(err) : "Internal error";
   return c.json({ error: message }, 500);
