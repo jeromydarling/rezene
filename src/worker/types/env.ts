@@ -81,6 +81,8 @@ export interface Env {
   LULU_MARKUP_PCT?: string;
   /** HQ marketing sender address (falls back to BUYER_EMAIL_FROM). */
   MARKETING_EMAIL_FROM?: string;
+  /** Reply-To on HQ marketing + platform email — the founder's real inbox. */
+  MARKETING_REPLY_TO?: string;
   /** Sends per 5-minute drain tick (default "10", capped at 50). */
   MARKETING_BATCH_PER_TICK?: string;
   /** Postal address for the CAN-SPAM footer on marketing email. */

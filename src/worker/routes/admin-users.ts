@@ -63,6 +63,7 @@ async function emailInvite(c: Context<AppContext>, email: string, link: string):
   const inviter = c.var.userEmail ? ` by ${c.var.userEmail}` : "";
   return sendBuyerEmail(c.env, {
     to: email.toLowerCase(),
+    db: c.var.db,
     fromName: brand,
     subject: `You've been invited to ${brand} on Verto`,
     text: `You've been invited${inviter} to help run ${brand}.\n\nSet your password to get started (link valid for 7 days):\n${link}\n\nIf you weren't expecting this, you can ignore it.`,

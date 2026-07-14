@@ -17,9 +17,34 @@ export function buyerEmailConfigured(env: Env): boolean {
   return Boolean(env.EMAIL && env.BUYER_EMAIL_FROM);
 }
 
+/** The shop's preferred Reply-To, from its settings ('' / unset → none). */
+export async function shopReplyTo(db: D1Database): Promise<string | null> {
+  try {
+    const row = await db
+      .prepare(`SELECT value FROM settings WHERE key = 'reply_to_email'`)
+      .first<{ value: string }>();
+    const v = row?.value?.trim();
+    return v && v.includes("@") ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendBuyerEmail(
   env: Env,
-  opts: { to: string; subject: string; text: string; html?: string; fromName?: string },
+  opts: {
+    to: string;
+    subject: string;
+    text: string;
+    html?: string;
+    fromName?: string;
+    /** Explicit Reply-To (platform sends use MARKETING_REPLY_TO). */
+    replyTo?: string;
+    /** Shop database — when given (and no explicit replyTo), the shop's
+     *  reply_to_email setting becomes the Reply-To, so replies reach a real
+     *  inbox even though the From address is no-reply. */
+    db?: D1Database;
+  },
 ): Promise<boolean> {
   if (!buyerEmailConfigured(env)) {
     console.log(`[buyer-email] skipped (not configured): ${opts.subject}`);
@@ -30,6 +55,8 @@ export async function sendBuyerEmail(
     msg.setSender({ name: opts.fromName ?? (await getBrandName(env)), addr: env.BUYER_EMAIL_FROM });
     msg.setRecipient(opts.to);
     msg.setSubject(opts.subject);
+    const replyTo = opts.replyTo?.trim() || (opts.db ? await shopReplyTo(opts.db) : null);
+    if (replyTo) msg.setHeader("Reply-To", replyTo);
     // multipart/alternative: text first, HTML second (clients prefer the last
     // part they can render), so styled inboxes get the branded version and
     // everything else falls back cleanly to plain text.

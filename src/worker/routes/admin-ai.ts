@@ -512,6 +512,7 @@ adminAiRoutes.post("/concepts/:id/ship", requireAdminWrite, async (c) => {
       const imgAbs = imageUrl ? `${appUrl}${imageUrl}` : "";
       emailed = await sendBuyerEmail(c.env, {
         to: supplier.email,
+        db: c.var.db,
         fromName: brand,
         subject: `${brand} — new design to sample: ${concept.title}`,
         text: `Hi${supplier.name ? ` ${supplier.name}` : ""},

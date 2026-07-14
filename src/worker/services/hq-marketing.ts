@@ -379,6 +379,10 @@ async function sendMarketingEmail(env: Env, opts: { to: string; subject: string;
   msg.setSender({ name: "Verto", addr: from });
   msg.setRecipient(opts.to);
   msg.setSubject(opts.subject);
+  // The From is a no-reply on the onboarded domain; replies route to the
+  // founder's real inbox ("just reply" in the sequence copy is a promise).
+  const replyTo = env.MARKETING_REPLY_TO?.trim();
+  if (replyTo) msg.setHeader("Reply-To", replyTo);
   // RFC 8058 one-click unsubscribe — required by Gmail/Yahoo bulk-sender rules.
   msg.setHeader("List-Unsubscribe", `<${unsubUrl}>`);
   msg.setHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");

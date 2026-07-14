@@ -111,6 +111,7 @@ wholesalePortalRoutes.post(
       });
       await sendBuyerEmail(c.env, {
         to: email,
+        db: c.var.db,
         subject: `Sign in to ${brand.name} wholesale`,
         text: `Sign in to the wholesale portal:\n\n${link}\n\nWorks once, expires in ${LINK_MINUTES} minutes.`,
         html,

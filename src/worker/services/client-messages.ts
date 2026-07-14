@@ -277,6 +277,7 @@ export async function sendClientMessage(
       const configured = buyerEmailConfigured(env);
       await sendBuyerEmail(env, {
         to: client.email,
+        db,
         subject: msg.subject ?? `A note from ${brand.name}`,
         text: msg.body_md,
         html,

@@ -101,6 +101,7 @@ authRoutes.post(
       const brand = await getBrandName(c.env);
       await sendBuyerEmail(c.env, {
         to: email.toLowerCase(),
+        db: c.var.db,
         fromName: brand,
         subject: `Reset your ${brand} password`,
         text: `Someone asked to reset the password for your ${brand} admin account.\n\nSet a new password (link valid for 2 hours):\n${link}\n\nIf this wasn't you, ignore this email — your password won't change.`,
