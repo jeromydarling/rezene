@@ -281,6 +281,44 @@ export async function verifyLuluWebhook(secret: string, rawBody: string, signatu
   }
 }
 
+export interface LuluWebhook {
+  id: string;
+  url: string;
+  topics: string[];
+  isActive: boolean;
+}
+
+/** Register a webhook subscription (Lulu has no dashboard UI for this — API only). */
+export async function registerLuluWebhook(env: Env, url: string): Promise<LuluWebhook> {
+  const res = await luluFetch(env, "/webhooks/", {
+    method: "POST",
+    body: JSON.stringify({ topics: ["PRINT_JOB_STATUS_CHANGED"], url, is_active: true }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Lulu webhook create ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return parseWebhook(await res.json());
+}
+
+export async function listLuluWebhooks(env: Env): Promise<LuluWebhook[]> {
+  const res = await luluFetch(env, "/webhooks/", { method: "GET" });
+  if (!res.ok) throw new Error(`Lulu webhook list ${res.status}`);
+  const data = (await res.json()) as { results?: unknown[] } | unknown[];
+  const rows = Array.isArray(data) ? data : (data.results ?? []);
+  return rows.map(parseWebhook);
+}
+
+export async function deleteLuluWebhook(env: Env, id: string): Promise<void> {
+  const res = await luluFetch(env, `/webhooks/${encodeURIComponent(id)}/`, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) throw new Error(`Lulu webhook delete ${res.status}`);
+}
+
+function parseWebhook(data: unknown): LuluWebhook {
+  const d = (data ?? {}) as { id?: number | string; url?: string; topics?: string[]; is_active?: boolean };
+  return { id: String(d.id ?? ""), url: d.url ?? "", topics: d.topics ?? [], isActive: Boolean(d.is_active) };
+}
+
 export class LuluNotConfiguredError extends Error {
   constructor() {
     super("Lulu print-on-demand is not configured (set LULU_CLIENT_KEY / LULU_CLIENT_SECRET).");
