@@ -483,6 +483,150 @@ adminPlatformRoutes.delete("/lulu/webhook/:id", requireAdminOnly, async (c) => {
   }
 });
 
+// ---------- HQ marketing: audience, broadcasts, suppression ----------
+
+/** Overview: config status, segments with live counts, recent broadcasts. */
+adminPlatformRoutes.get("/marketing", async (c) => {
+  const { SEGMENTS, resolveSegment, marketingConfigured, batchPerTick } = await import("../services/hq-marketing");
+  const segments = [] as { key: string; label: string; description: string; count: number }[];
+  for (const s of SEGMENTS) {
+    const recipients = await resolveSegment(c.env, s.key);
+    segments.push({ ...s, count: recipients.length });
+  }
+  const broadcasts = await all(
+    c.env.DB,
+    `SELECT id, subject, segment, status, recipient_count, sent_count, failed_count, created_at, completed_at
+       FROM hq_marketing_broadcasts ORDER BY created_at DESC LIMIT 30`,
+  );
+  const suppressed = await first<{ n: number }>(c.env.DB, `SELECT COUNT(*) AS n FROM hq_marketing_suppression`);
+  return c.json({
+    configured: marketingConfigured(c.env),
+    // Pace ceiling, for honest UI copy: sends per tick × 12 ticks/hour.
+    maxPerHour: batchPerTick(c.env) * 12,
+    segments,
+    broadcasts,
+    suppressedCount: suppressed?.n ?? 0,
+  });
+});
+
+adminPlatformRoutes.get("/marketing/audience", async (c) => {
+  const { resolveSegment } = await import("../services/hq-marketing");
+  const recipients = await resolveSegment(c.env, c.req.query("segment") ?? "all");
+  return c.json(recipients);
+});
+
+const draftSchema = z.object({ brief: z.string().min(5).max(4000), segment: z.string().max(40) });
+adminPlatformRoutes.post("/marketing/draft", async (c) => {
+  const body = await parseBody(c, draftSchema);
+  const { draftBroadcast } = await import("../services/hq-marketing");
+  try {
+    return c.json(await draftBroadcast(c.env, { brief: body.brief, segmentKey: body.segment }));
+  } catch (err) {
+    return c.json({ error: String(err instanceof Error ? err.message : err).slice(0, 300) }, 502);
+  }
+});
+
+const broadcastSchema = z.object({
+  subject: z.string().min(1).max(200),
+  preheader: z.string().max(200).optional(),
+  body_md: z.string().min(1).max(20000),
+  segment: z.string().max(40),
+});
+adminPlatformRoutes.post("/marketing/broadcasts", async (c) => {
+  const body = await parseBody(c, broadcastSchema);
+  const { newId } = await import("../utils/id");
+  const id = newId("bc");
+  await run(
+    c.env.DB,
+    `INSERT INTO hq_marketing_broadcasts (id, subject, preheader, body_md, segment, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    id,
+    body.subject,
+    body.preheader ?? null,
+    body.body_md,
+    body.segment,
+    c.var.userId ?? null,
+  );
+  await writeAudit(c.env.DB, c.var.userId!, "marketing.broadcast_create", "broadcast", id);
+  return c.json({ id }, 201);
+});
+
+adminPlatformRoutes.patch("/marketing/broadcasts/:id", async (c) => {
+  const body = await parseBody(c, broadcastSchema.partial());
+  const bc = await first<{ status: string }>(c.env.DB, `SELECT status FROM hq_marketing_broadcasts WHERE id = ?`, c.req.param("id"));
+  if (!bc) return c.json({ error: "Not found" }, 404);
+  if (bc.status !== "draft") return c.json({ error: "Only drafts can be edited." }, 400);
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const k of ["subject", "preheader", "body_md", "segment"] as const) {
+    if (body[k] !== undefined) {
+      sets.push(`${k} = ?`);
+      params.push(body[k]);
+    }
+  }
+  if (sets.length) {
+    await run(c.env.DB, `UPDATE hq_marketing_broadcasts SET ${sets.join(", ")}, updated_at = datetime('now') WHERE id = ?`, ...params, c.req.param("id"));
+  }
+  return c.json({ ok: true });
+});
+
+/** Detail + the send ledger (statuses per recipient). */
+adminPlatformRoutes.get("/marketing/broadcasts/:id", async (c) => {
+  const bc = await first(c.env.DB, `SELECT * FROM hq_marketing_broadcasts WHERE id = ?`, c.req.param("id"));
+  if (!bc) return c.json({ error: "Not found" }, 404);
+  const sends = await all(
+    c.env.DB,
+    `SELECT email, status, attempts, last_error, sent_at FROM hq_marketing_sends WHERE broadcast_id = ? ORDER BY created_at LIMIT 500`,
+    c.req.param("id"),
+  );
+  return c.json({ broadcast: bc, sends });
+});
+
+/** Test send to the signed-in founder — never counts against the broadcast. */
+adminPlatformRoutes.post("/marketing/broadcasts/:id/test", async (c) => {
+  const bc = await first<{ subject: string; body_md: string }>(
+    c.env.DB,
+    `SELECT subject, body_md FROM hq_marketing_broadcasts WHERE id = ?`,
+    c.req.param("id"),
+  );
+  if (!bc) return c.json({ error: "Not found" }, 404);
+  if (!c.var.userEmail) return c.json({ error: "No email on your session." }, 400);
+  const { queueTestSend } = await import("../services/hq-marketing");
+  try {
+    await queueTestSend(c.env, { to: c.var.userEmail, subject: `[test] ${bc.subject}`, bodyMd: bc.body_md });
+    return c.json({ ok: true, to: c.var.userEmail });
+  } catch (err) {
+    return c.json({ error: String(err instanceof Error ? err.message : err).slice(0, 300) }, 502);
+  }
+});
+
+/** Queue the real send — recipients resolve now, the cron drains at pace. */
+adminPlatformRoutes.post("/marketing/broadcasts/:id/send", async (c) => {
+  const { queueBroadcast, marketingConfigured } = await import("../services/hq-marketing");
+  if (!marketingConfigured(c.env)) {
+    return c.json({ error: "Email sending isn't configured yet (set MARKETING_EMAIL_FROM or BUYER_EMAIL_FROM on an onboarded domain)." }, 400);
+  }
+  try {
+    const r = await queueBroadcast(c.env, c.req.param("id"));
+    await writeAudit(c.env.DB, c.var.userId!, "marketing.broadcast_send", "broadcast", c.req.param("id"));
+    return c.json(r);
+  } catch (err) {
+    return c.json({ error: String(err instanceof Error ? err.message : err).slice(0, 300) }, 400);
+  }
+});
+
+adminPlatformRoutes.get("/marketing/suppression", async (c) => {
+  return c.json(await all(c.env.DB, `SELECT email, reason, created_at FROM hq_marketing_suppression ORDER BY created_at DESC LIMIT 500`));
+});
+
+const suppressSchema = z.object({ email: z.string().email() });
+adminPlatformRoutes.post("/marketing/suppression", async (c) => {
+  const body = await parseBody(c, suppressSchema);
+  const { suppress } = await import("../services/hq-marketing");
+  await suppress(c.env, body.email, "manual", "manual");
+  return c.json({ ok: true });
+});
+
 adminPlatformRoutes.get("/shops", async (c) => {
   const rows = await all(
     c.env.DB,

@@ -38,6 +38,7 @@ import { adminWebhookRoutes } from "./routes/admin-webhooks";
 import { adminApiKeyRoutes } from "./routes/admin-api-keys";
 import { publicHookRoutes } from "./routes/hooks";
 import { luluWebhookRoutes } from "./routes/lulu-webhook";
+import { marketingPublicRoutes } from "./routes/marketing-public";
 import { clientPortalRoutes } from "./routes/client-portal";
 import { publicBookingRoutes, adminBookingRoutes } from "./routes/booking";
 import { adminFileRoutes } from "./routes/admin-files";
@@ -393,6 +394,7 @@ app.route("/api/public/portal", clientPortalRoutes);
 app.route("/api/public/booking", publicBookingRoutes);
 app.route("/api/public/hooks", publicHookRoutes);
 app.route("/api/public/lulu", luluWebhookRoutes);
+app.route("/api/public/marketing", marketingPublicRoutes);
 app.route("/api/wholesale", wholesalePortalRoutes);
 
 // Developer API — bearer-authenticated (personal access tokens), tenant scoped
@@ -504,11 +506,21 @@ export default Sentry.withSentry(
 
   /**
    * Crons (wrangler.toml):
+   *  - every 5 min: drain the HQ marketing send queue at a controlled pace
    *  - hourly (:30): publish scheduled pages/journal posts that are due
    *  - daily (06:00): ops sweep — late tasks, abandoned checkouts, digest
    */
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (controller.cron === "30 * * * *") {
+    if (controller.cron === "*/5 * * * *") {
+      ctx.waitUntil(
+        import("./services/hq-marketing").then(({ drainMarketingQueue }) =>
+          drainMarketingQueue(env).then((r) => {
+            if (r.sent || r.failed || r.skipped)
+              console.log(`[marketing] drain: sent=${r.sent} failed=${r.failed} suppressed=${r.skipped}`);
+          }),
+        ),
+      );
+    } else if (controller.cron === "30 * * * *") {
       ctx.waitUntil(publishDueContent(env));
     } else {
       // Daily also runs the publisher — belt and braces if the hourly missed.

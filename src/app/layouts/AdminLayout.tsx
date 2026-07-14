@@ -61,6 +61,7 @@ import {
   LibraryBig,
   Workflow,
   Cable,
+  Send,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useBrand } from "../lib/brand";
@@ -206,12 +207,13 @@ const NAV_SECTIONS: {
       { to: "/admin/revenue", label: "Fleet Revenue", icon: CircleDollarSign },
       { to: "/admin/ai-usage", label: "AI Usage", icon: Gauge },
       { to: "/admin/errors", label: "Errors", icon: TriangleAlert },
+      { to: "/admin/outreach", label: "Outreach", icon: Send },
     ],
   },
 ];
 
 /** Platform HQ routes — the only admin surface at bare verto.style/admin. */
-const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/shop-progress", "/admin/activity", "/admin/revenue", "/admin/ai-usage", "/admin/errors"];
+const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/shop-progress", "/admin/activity", "/admin/revenue", "/admin/ai-usage", "/admin/errors", "/admin/outreach"];
 
 function visibleSections(platformMode: boolean) {
   // Verto HQ lives at bare verto.style/admin (platform context, SuperAdmin

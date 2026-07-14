@@ -79,6 +79,12 @@ export interface Env {
   LULU_ENV?: string;
   /** Verto's markup on Lulu wholesale (print + shipping), as a percent string. Default "35". */
   LULU_MARKUP_PCT?: string;
+  /** HQ marketing sender address (falls back to BUYER_EMAIL_FROM). */
+  MARKETING_EMAIL_FROM?: string;
+  /** Sends per 5-minute drain tick (default "10", capped at 50). */
+  MARKETING_BATCH_PER_TICK?: string;
+  /** Postal address for the CAN-SPAM footer on marketing email. */
+  MARKETING_POSTAL_ADDRESS?: string;
 
   // Secrets
   /** Lulu Print API OAuth2 client key + secret (platform-brokered account). */
