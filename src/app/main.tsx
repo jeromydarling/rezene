@@ -16,6 +16,14 @@ initSentry();
 // platform root boots Verto's marketing site.
 const shop = getShop();
 
+// Verto HQ lives at the bare platform root under /admin (no shop context —
+// the SuperAdmin session is in the platform database). Without a shop, the
+// marketing app owns routing and has no /admin routes, so we must boot the
+// admin AppRouter for /admin paths on the platform root. Shop admins already
+// boot AppRouter via their shop context; this only covers the shopless HQ.
+const path = typeof window !== "undefined" ? window.location.pathname : "";
+const isPlatformAdmin = !shop && (path === "/admin" || path.startsWith("/admin/"));
+
 /** Full-page fallback when a render crashes — captured by Sentry, friendly to the user. */
 function CrashFallback() {
   return (
@@ -59,8 +67,8 @@ function CrashFallback() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<CrashFallback />}>
-      {shop ? (
-        <BrowserRouter basename={shop.basePath}>
+      {shop || isPlatformAdmin ? (
+        <BrowserRouter basename={shop?.basePath ?? ""}>
           <AppRouter />
         </BrowserRouter>
       ) : (
