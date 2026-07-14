@@ -615,6 +615,43 @@ adminPlatformRoutes.post("/marketing/broadcasts/:id/send", async (c) => {
   }
 });
 
+/** Lifecycle sequences: definitions + switches + how many steps each queued. */
+adminPlatformRoutes.get("/marketing/sequences", async (c) => {
+  const { SEQUENCE_DEFS, sequenceSettings } = await import("../services/hq-marketing-sequences");
+  const enabled = await sequenceSettings(c.env);
+  const counts = await all<{ sequence_key: string; total: number; sent: number }>(
+    c.env.DB,
+    `SELECT sequence_key, COUNT(*) AS total,
+            SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent
+       FROM hq_marketing_sends WHERE sequence_key IS NOT NULL GROUP BY sequence_key`,
+  );
+  const byKey = new Map(counts.map((r) => [r.sequence_key, r]));
+  return c.json(
+    SEQUENCE_DEFS.map((d) => ({
+      key: d.key,
+      label: d.label,
+      description: d.description,
+      steps: d.steps.length,
+      enabled: enabled[d.key] ?? false,
+      queued: byKey.get(d.key)?.total ?? 0,
+      sent: byKey.get(d.key)?.sent ?? 0,
+    })),
+  );
+});
+
+const seqToggleSchema = z.object({ enabled: z.boolean() });
+adminPlatformRoutes.post("/marketing/sequences/:key", async (c) => {
+  const body = await parseBody(c, seqToggleSchema);
+  const { setSequenceEnabled } = await import("../services/hq-marketing-sequences");
+  try {
+    await setSequenceEnabled(c.env, c.req.param("key"), body.enabled);
+    await writeAudit(c.env.DB, c.var.userId!, "marketing.sequence_toggle", "sequence", c.req.param("key"));
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: String(err instanceof Error ? err.message : err).slice(0, 200) }, 400);
+  }
+});
+
 adminPlatformRoutes.get("/marketing/suppression", async (c) => {
   return c.json(await all(c.env.DB, `SELECT email, reason, created_at FROM hq_marketing_suppression ORDER BY created_at DESC LIMIT 500`));
 });
