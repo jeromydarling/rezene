@@ -35,12 +35,14 @@ interface OrderDetail {
   recipients: { id: string; name: string; city: string; country_code: string; lulu_status: string | null; tracking_url: string | null; error: string | null }[];
 }
 
+// A lookbook is a lightweight saddle-stitch booklet, and Lulu only offers the
+// mail tiers for it — the courier tiers (Ground/Expedited/Express) are for
+// heavier boxed products and Lulu rejects them for a booklet ("no shipping
+// option found"). Offer only the levels that actually price so a merchant can
+// never pick one the order would fail on.
 const SHIPPING = [
-  { id: "MAIL", label: "Mail (cheapest)" },
-  { id: "GROUND", label: "Ground" },
-  { id: "PRIORITY_MAIL", label: "Priority" },
-  { id: "EXPEDITED", label: "Expedited" },
-  { id: "EXPRESS", label: "Express (fastest)" },
+  { id: "MAIL", label: "Mail (cheapest, no tracking)" },
+  { id: "PRIORITY_MAIL", label: "Priority (tracked)" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -97,7 +99,7 @@ export function PrintOrderPanel({ lookbookId }: { lookbookId: string }) {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [draft, setDraft] = useState<Recipient>(EMPTY);
   const [copies, setCopies] = useState(1);
-  const [shipping, setShipping] = useState("GROUND");
+  const [shipping, setShipping] = useState("MAIL");
   const [placing, setPlacing] = useState(false);
 
   // On return from Stripe checkout, activate the order (confirm hold → render).
