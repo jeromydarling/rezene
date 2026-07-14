@@ -35,6 +35,64 @@ adminLookbookRoutes.get("/:id", async (c) => {
   return c.json(model);
 });
 
+/**
+ * A print & mail cost estimate (beta). Always returns the page count so the UI
+ * can show the shape of an issue; a live Lulu quote (marked up to the shop's
+ * price) only when Lulu is configured. To a representative US destination — a
+ * ballpark, not a final total (that's computed per real recipient at order).
+ */
+const ESTIMATE_DEST = {
+  name: "Sample",
+  street1: "123 Main St",
+  city: "New York",
+  state_code: "NY",
+  postcode: "10001",
+  country_code: "US",
+  phone_number: "+12125550100",
+} as const;
+
+const estimateSchema = z.object({ quantity: z.number().int().min(1).max(500).optional() });
+
+adminLookbookRoutes.post("/:id/print-estimate", async (c) => {
+  const model = await resolveRenderModel(c.var.db, c.req.param("id"));
+  if (!model) return c.json({ error: "Lookbook not found" }, 404);
+  const body = await parseBody(c, estimateSchema);
+  const quantity = body.quantity ?? 1;
+  const { magazinePageCount, luluConfigured, luluMarkup, applyMarkup, calculatePrintCost } = await import(
+    "../services/lulu"
+  );
+  const pageCount = magazinePageCount(model.spreads.length);
+  const markupPct = Math.round(luluMarkup(c.env) * 100);
+  if (!luluConfigured(c.env)) {
+    return c.json({ configured: false, pageCount, quantity, markupPct });
+  }
+  try {
+    const cost = await calculatePrintCost(c.env, {
+      pageCount,
+      quantity,
+      shippingAddress: ESTIMATE_DEST,
+      shippingLevel: "GROUND",
+    });
+    const retailCents = applyMarkup(cost.totalCents, luluMarkup(c.env));
+    return c.json({
+      configured: true,
+      pageCount,
+      quantity,
+      markupPct,
+      quote: {
+        wholesaleCents: cost.totalCents,
+        printCents: cost.printCostCents,
+        shippingCents: cost.shippingCostCents,
+        retailCents,
+        perCopyRetailCents: Math.round(retailCents / quantity),
+        currency: cost.currency,
+      },
+    });
+  } catch (err) {
+    return c.json({ configured: true, pageCount, quantity, markupPct, error: String(err).slice(0, 200) });
+  }
+});
+
 const createSchema = z.object({
   title: z.string().max(200).optional(),
   subtitle: z.string().max(200).optional(),

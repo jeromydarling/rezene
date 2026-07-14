@@ -64,6 +64,11 @@ BUYER_EMAIL_FROM = ""
 # Renders stay disabled (free preview still works) until both are set.
 RENDER_REPO = "jeromydarling/rezene"
 VIDEO_EXPORT_PRICE_CENTS = "1900"
+# Lulu print-on-demand (branded lookbook print & mail). Platform-brokered:
+# Verto's own Lulu account fulfils, marked up by LULU_MARKUP_PCT. Set
+# LULU_CLIENT_KEY / LULU_CLIENT_SECRET as secrets; start in sandbox.
+LULU_ENV = "sandbox"
+LULU_MARKUP_PCT = "35"
 # Hostname a shop points a CNAME record at to connect their own domain.
 # Set to the Cloudflare-for-SaaS fallback origin once configured.
 CUSTOM_DOMAIN_TARGET = "verto.style"

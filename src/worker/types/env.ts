@@ -75,8 +75,15 @@ export interface Env {
   RENDER_REPO?: string;
   /** Per-video export price in minor units, as a string var. Default 1900. */
   VIDEO_EXPORT_PRICE_CENTS?: string;
+  /** Lulu print-on-demand environment: "sandbox" (default) or "production". */
+  LULU_ENV?: string;
+  /** Verto's markup on Lulu wholesale (print + shipping), as a percent string. Default "35". */
+  LULU_MARKUP_PCT?: string;
 
   // Secrets
+  /** Lulu Print API OAuth2 client key + secret (platform-brokered account). */
+  LULU_CLIENT_KEY?: string;
+  LULU_CLIENT_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
