@@ -58,6 +58,11 @@ NOTIFY_EMAIL_TO = ""
 # Sending to arbitrary recipients requires the domain to be onboarded to
 # Email Sending; set this to an address on that domain to activate.
 BUYER_EMAIL_FROM = ""
+# HQ marketing (Verto's own audience): sender falls back to BUYER_EMAIL_FROM;
+# batch is sends per 5-min drain tick; postal address is the CAN-SPAM footer.
+MARKETING_EMAIL_FROM = ""
+MARKETING_BATCH_PER_TICK = "10"
+MARKETING_POSTAL_ADDRESS = ""
 # Promo-video render backend. RENDER_REPO's GitHub Actions do the heavy
 # Playwright→ffmpeg render off-Worker; set the matching secrets with
 # `wrangler secret put RENDER_CALLBACK_SECRET` and `... GITHUB_DISPATCH_TOKEN`.
@@ -119,7 +124,9 @@ new_sqlite_classes = ["ShopDatabase"]
 # :30 hourly — publish scheduled pages & journal posts that are due.
 # (see scheduled handler in src/worker/index.ts)
 [triggers]
-crons = ["0 6 * * *", "30 * * * *"]
+# 06:00 daily ops sweep · :30 hourly publisher · every 5 min: HQ marketing
+# send-queue drain (paced sends through Email Sending's reputation quota).
+crons = ["0 6 * * *", "30 * * * *", "*/5 * * * *"]
 
 # --- Future bindings (uncomment when the account has them enabled) -----------
 # Async pipelines (webhook fan-out, AI batch jobs, export rendering):

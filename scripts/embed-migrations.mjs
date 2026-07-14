@@ -34,6 +34,7 @@ const EXCLUDE = new Set([
   "0055_ai_usage.sql", // AI usage ledger — platform-wide, read by HQ
   "0056_shop_metrics.sql", // Fleet revenue rollup — platform-wide, read by HQ
   "0057_platform_errors.sql", // Error/incident log — platform-wide, read by HQ
+  "0060_hq_marketing.sql", // HQ marketing suite — Verto's own audience/sends, platform-only
 ]);
 
 const files = readdirSync(dir)
