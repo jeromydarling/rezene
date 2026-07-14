@@ -5,6 +5,19 @@
  * time so the magazine always reflects current pricing/imagery.
  */
 
+import type { BrandLogo, BrandPalette } from "./types";
+
+/** Brand identity the print composer needs (client + worker build the same shape). */
+export interface LookbookBrand {
+  name: string;
+  tagline: string;
+  website: string;
+  logo: BrandLogo | null;
+  palette: BrandPalette;
+  headingFamily: string;
+  bodyFamily: string;
+}
+
 export type LookbookLayout = "hero" | "editorial" | "clean";
 
 export const LOOKBOOK_LAYOUTS: { id: LookbookLayout; label: string; hint: string }[] = [

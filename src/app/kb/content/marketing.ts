@@ -139,7 +139,17 @@ Pages are composed from your catalogue: product **photos**, **names**, **prices*
 - Write an **editorial story** on a few key pieces so the *Editorial* layout has something to say.
 - 12–24 pieces makes a satisfying issue; you can always split a big collection into two.
 
-> [!TIP]
-> Coming next: **one-click print & mail** — send a printed copy straight to your customers from an uploaded list, printed on demand and shipped for you.`,
+## Print &amp; mail (beta)
+
+Once your issue looks right, the **Print &amp; mail** panel prints it on demand and drop-ships a copy straight to each recipient — no minimum order, no press.
+
+1. Add recipients by hand, or **upload a CSV** (columns like name, street1, city, state, postcode, country, phone, email).
+2. Choose how many **copies each** and a **shipping** speed.
+3. **Order &amp; pay** — you're taken to a secure checkout and charged only once the print jobs are actually placed.
+
+Each copy is printed as a full-colour saddle-stitch magazine and mailed with tracking; the **Orders** list shows live status and a tracking link per recipient.
+
+> [!NOTE]
+> Print &amp; mail is a platform service — pricing is print + postage plus a small platform margin, shown before you pay.`,
   },
 ];

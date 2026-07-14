@@ -15,6 +15,7 @@ import {
 } from "../../../shared/lookbook";
 import type { BrandSettings } from "../../../shared/types";
 import { PageHeader, ErrorNote, LoadingTable, EmptyState } from "../../components/admin/ui";
+import { PrintOrderPanel } from "./LookbookOrderPanel";
 
 /**
  * Lookbook builder: compose a print-ready seasonal magazine from your own
@@ -22,29 +23,6 @@ import { PageHeader, ErrorNote, LoadingTable, EmptyState } from "../../component
  * relayout, and add copy; preview live and Save as PDF at magazine trim.
  */
 
-interface PrintEstimate {
-  configured: boolean;
-  pageCount: number;
-  quantity: number;
-  markupPct: number;
-  error?: string;
-  quote?: {
-    wholesaleCents: number;
-    printCents: number;
-    shippingCents: number;
-    retailCents: number;
-    perCopyRetailCents: number;
-    currency: string;
-  };
-}
-
-function fmt(cents: number, currency = "USD"): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);
-  } catch {
-    return `$${(cents / 100).toFixed(2)}`;
-  }
-}
 
 function useBrand() {
   const settings = useFetch<BrandSettings>("/api/public/settings");
@@ -197,21 +175,6 @@ function LookbookEditor({ id, onBack }: { id: string; onBack: () => void }) {
   const addPiece = (productId: string) =>
     saveSpreads([...spreads, { productId, layout: "clean", caption: "" }]);
 
-  // Print & mail estimate (beta).
-  const [copies, setCopies] = useState(25);
-  const [estimate, setEstimate] = useState<PrintEstimate | null>(null);
-  const [estimating, setEstimating] = useState(false);
-  async function getEstimate() {
-    setEstimating(true);
-    try {
-      setEstimate(await api.post<PrintEstimate>(`/api/admin/print-lookbooks/${id}/print-estimate`, { quantity: copies }));
-    } catch (err) {
-      toast.error("Could not estimate", err instanceof ApiRequestError ? err.message : undefined);
-    } finally {
-      setEstimating(false);
-    }
-  }
-
   function downloadPdf() {
     if (!previewDoc) return;
     const w = window.open("", "_blank");
@@ -313,45 +276,7 @@ function LookbookEditor({ id, onBack }: { id: string; onBack: () => void }) {
             </p>
           )}
 
-          {/* Print & mail (beta) */}
-          <div className="admin-card space-y-3 p-5">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Print &amp; mail</h2>
-              <span className="rounded bg-navy/10 px-1.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-wider text-navy">Beta</span>
-            </div>
-            <p className="text-xs text-warmgrey">
-              Print this lookbook on demand and drop-ship a copy straight to your customers — one-click
-              from an uploaded list. Get a ballpark price for a run:
-            </p>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-warmgrey">Copies
-                <input type="number" min={1} max={500} className="admin-input ml-2 w-20 !py-1 text-xs" value={copies} onChange={(e) => setCopies(Math.max(1, Math.min(500, Number(e.target.value) || 1)))} />
-              </label>
-              <button type="button" className="btn btn-secondary !py-1 text-xs" disabled={estimating} onClick={() => void getEstimate()}>
-                {estimating ? "Estimating…" : "Estimate"}
-              </button>
-            </div>
-            {estimate && (
-              <div className="rounded-md bg-ink/5 p-3 text-xs">
-                <p className="text-warmgrey">
-                  ≈ <span className="font-medium text-ink">{estimate.pageCount} pages</span>, saddle-stitch full-colour magazine.
-                </p>
-                {estimate.configured && estimate.quote ? (
-                  <div className="mt-1.5 space-y-0.5 tabular-nums text-ink/80">
-                    <p><span className="font-semibold text-ink">{fmt(estimate.quote.perCopyRetailCents, estimate.quote.currency)}</span> per copy · {fmt(estimate.quote.retailCents, estimate.quote.currency)} for {estimate.quantity}</p>
-                    <p className="text-warmgrey">Print + postage {fmt(estimate.quote.wholesaleCents, estimate.quote.currency)} + {estimate.markupPct}% · estimate to a US address.</p>
-                  </div>
-                ) : estimate.configured && estimate.error ? (
-                  <p className="mt-1.5 text-terracotta">Couldn't price this yet: {estimate.error}</p>
-                ) : (
-                  <p className="mt-1.5 text-warmgrey">
-                    Print &amp; mail isn't switched on for the platform yet — this shows the shape of the issue.
-                    When it's live, you'll set your own price on top of print + postage.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+          <PrintOrderPanel lookbookId={id} />
         </div>
 
         {/* Live preview */}
