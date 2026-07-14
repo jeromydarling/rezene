@@ -432,25 +432,33 @@ adminPlatformRoutes.get("/lulu", async (c) => {
 adminPlatformRoutes.get("/lulu/test", async (c) => {
   const { luluConfigured, calculatePrintCost, MAGAZINE_POD_PACKAGE_ID } = await import("../services/lulu");
   if (!luluConfigured(c.env)) return c.json({ ok: false, error: "Lulu is not configured." });
-  try {
-    const cost = await calculatePrintCost(c.env, {
-      pageCount: 24,
-      quantity: 1,
-      shippingAddress: {
-        name: "Test",
-        street1: "123 Main St",
-        city: "New York",
-        state_code: "NY",
-        postcode: "10001",
-        country_code: "US",
-        phone_number: "+12125550100",
-      },
-      shippingLevel: "GROUND",
-    });
-    return c.json({ ok: true, podPackageId: MAGAZINE_POD_PACKAGE_ID, cost });
-  } catch (err) {
-    return c.json({ ok: false, podPackageId: MAGAZINE_POD_PACKAGE_ID, error: String(err).slice(0, 400) });
+  const address = {
+    name: "Test",
+    street1: "123 Main St",
+    city: "New York",
+    state_code: "NY",
+    postcode: "10001",
+    country_code: "US",
+    phone_number: "+12125550100",
+  } as const;
+  // A saddle-stitch booklet is light enough that Lulu offers it via MAIL /
+  // PRIORITY_MAIL, not GROUND (which is for heavier, boxed products). Probe the
+  // levels a magazine actually supports and report the first that prices — this
+  // validates the SKU AND surfaces which shipping options are available.
+  const levels = ["MAIL", "PRIORITY_MAIL", "GROUND", "EXPRESS"] as const;
+  let lastErr = "";
+  for (const shippingLevel of levels) {
+    try {
+      const cost = await calculatePrintCost(c.env, { pageCount: 24, quantity: 1, shippingAddress: address, shippingLevel });
+      return c.json({ ok: true, podPackageId: MAGAZINE_POD_PACKAGE_ID, shippingLevel, cost });
+    } catch (err) {
+      lastErr = String(err).slice(0, 400);
+      // A "no shipping option" error is level-specific — keep trying. Any other
+      // error (bad SKU, auth) will recur on every level and fall through below.
+      if (!/no shipping option/i.test(lastErr)) break;
+    }
   }
+  return c.json({ ok: false, podPackageId: MAGAZINE_POD_PACKAGE_ID, error: lastErr });
 });
 
 adminPlatformRoutes.post("/lulu/webhook", requireAdminOnly, async (c) => {
