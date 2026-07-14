@@ -11,6 +11,7 @@ import { recordAiUsage, estimateCostCents } from "./services/ai-usage";
 import { computeShopDay, rollupFleetMetrics } from "./services/shop-metrics";
 import { recordPlatformError, normalizePath } from "./services/platform-errors";
 import { fleetActivity } from "./services/fleet-activity";
+import { createLookbook, resolveRenderModel, updateLookbook, availableProducts } from "./services/lookbook";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -485,5 +486,53 @@ describe("fleet activity pulse", () => {
     // Tagged with the shop it came from.
     expect(items[paidIdx].shopId).toBe("shop_rezene");
     expect(items[paidIdx].shopName).toBe("Test Studio");
+  });
+});
+
+describe("lookbook composition", () => {
+  beforeAll(async () => {
+    // Two published, sellable pieces — one with a photo, one without; plus a
+    // draft that must NOT appear in a lookbook.
+    await run(db, `INSERT INTO products (id, slug, name, gender, category, base_price_cents, currency, availability, is_published, sort_order, editorial_story, fabric_composition)
+                   VALUES ('prod_a','linen-shirt','Linen Shirt','unisex','tops', 12000, 'USD','available',1,1,'Woven in Portugal.','100% linen')`);
+    await run(db, `INSERT INTO products (id, slug, name, gender, category, base_price_cents, currency, availability, is_published, sort_order)
+                   VALUES ('prod_b','wool-coat','Wool Coat','womens','outerwear', 48000, 'USD','available',1,2)`);
+    await run(db, `INSERT INTO products (id, slug, name, gender, category, base_price_cents, currency, availability, is_published, sort_order)
+                   VALUES ('prod_draft','secret','Secret Piece','unisex','tops', 9000, 'USD','draft',0,3)`);
+    await run(db, `INSERT INTO product_images (id, product_id, url, alt_text, sort_order) VALUES ('img_a','prod_a','/media/a.jpg','Linen shirt front',0)`);
+    await run(db, `INSERT INTO product_images (id, product_id, url, alt_text, sort_order) VALUES ('img_b','prod_b','/media/b.jpg','Wool coat',0)`);
+  });
+
+  it("lists only published + sellable products, with the lead image", async () => {
+    const products = await availableProducts(db);
+    const ids = products.map((p) => p.id);
+    expect(ids).toContain("prod_a");
+    expect(ids).toContain("prod_b");
+    expect(ids).not.toContain("prod_draft"); // draft excluded
+    const a = products.find((p) => p.id === "prod_a");
+    expect(a?.imageUrl).toBe("/media/a.jpg");
+    expect(a?.editorialStory).toBe("Woven in Portugal.");
+  });
+
+  it("auto-composes a spec from the catalogue and resolves live product data", async () => {
+    const created = await createLookbook(db, { title: "Autumn 2026" });
+    expect(created.spec.spreads.length).toBeGreaterThanOrEqual(2);
+    // The piece with a photo leads, on a hero layout.
+    expect(created.spec.spreads[0].productId).toBe("prod_a");
+    expect(created.spec.spreads[0].layout).toBe("hero");
+
+    const model = await resolveRenderModel(db, created.id);
+    expect(model).toBeTruthy();
+    expect(model!.spreads[0].product.name).toBe("Linen Shirt");
+    expect(model!.spreads[0].product.priceCents).toBe(12000);
+    expect(model!.catalog.length).toBeGreaterThanOrEqual(2);
+
+    // Reorder + drop: point one spread at a non-existent product; it must be
+    // silently dropped from the render (a lookbook never breaks on a dead ref).
+    await updateLookbook(db, created.id, {
+      spec: { spreads: [{ productId: "prod_b", layout: "clean" }, { productId: "gone", layout: "clean" }] },
+    });
+    const after = await resolveRenderModel(db, created.id);
+    expect(after!.spreads.map((s) => s.product.id)).toEqual(["prod_b"]);
   });
 });
