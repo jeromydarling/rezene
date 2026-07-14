@@ -217,7 +217,7 @@ adminPlatformRoutes.get("/revenue", async (c) => {
   const since = `-${days} days`;
   const empty = {
     days,
-    totals: { gmvCents: 0, orders: 0, refundsCents: 0, newCustomers: 0, aovCents: 0 },
+    totals: { gmvCents: 0, orders: 0, refundsCents: 0, newCustomers: 0, aovCents: 0, aiCostCents: 0 },
     currencies: [] as string[],
     byShop: [] as unknown[],
     byDay: [] as unknown[],
@@ -238,6 +238,9 @@ adminPlatformRoutes.get("/revenue", async (c) => {
       `SELECT DISTINCT currency FROM shop_metrics_daily WHERE day >= date('now', ?) AND gmv_cents > 0`,
       since,
     );
+    // Per-shop AI cost-to-serve over the same window, so HQ can read GMV net of
+    // the AI spend that produced it. Correlated subquery over the ai_usage
+    // ledger keyed by shop; the subquery's `since` binds before the outer one.
     const byShop = await all(
       c.env.DB,
       `SELECT m.shop_id AS shopId,
@@ -247,12 +250,22 @@ adminPlatformRoutes.get("/revenue", async (c) => {
               COALESCE(SUM(m.orders),0) AS orders,
               COALESCE(SUM(m.refunds_cents),0) AS refundsCents,
               COALESCE(SUM(m.new_customers),0) AS newCustomers,
-              MAX(m.currency) AS currency
+              MAX(m.currency) AS currency,
+              (SELECT COALESCE(SUM(a.cost_cents),0) FROM ai_usage a
+                 WHERE a.shop_id = m.shop_id AND a.created_at >= datetime('now', ?)) AS aiCostCents
          FROM shop_metrics_daily m LEFT JOIN shops s ON s.id = m.shop_id
         WHERE m.day >= date('now', ?)
         GROUP BY m.shop_id ORDER BY gmvCents DESC LIMIT 100`,
       since,
+      since,
     );
+    // Fleet AI spend attributed to a shop over the window (for the totals row).
+    const aiTotal = await first<{ aiCostCents: number }>(
+      c.env.DB,
+      `SELECT COALESCE(SUM(cost_cents),0) AS aiCostCents FROM ai_usage
+        WHERE shop_id IS NOT NULL AND created_at >= datetime('now', ?)`,
+      since,
+    ).catch(() => ({ aiCostCents: 0 }));
     const byDay = await all(
       c.env.DB,
       `SELECT day,
@@ -271,7 +284,7 @@ adminPlatformRoutes.get("/revenue", async (c) => {
     const aovCents = t.orders ? Math.round(t.gmvCents / t.orders) : 0;
     return c.json({
       days,
-      totals: { ...t, aovCents },
+      totals: { ...t, aovCents, aiCostCents: aiTotal?.aiCostCents ?? 0 },
       currencies: currencyRows.map((r) => r.currency),
       byShop,
       byDay,
@@ -291,6 +304,31 @@ adminPlatformRoutes.post("/revenue/rollup", requireAdminOnly, async (c) => {
   const { rollupFleetMetrics } = await import("../services/shop-metrics");
   const written = await rollupFleetMetrics(c.env);
   return c.json({ ok: true, shopDaysWritten: written });
+});
+
+/**
+ * Per-shop activation scorecard — turns the funnel into names. The funnel says
+ * "where does the fleet leak"; this says "which shops are stuck, at what step,
+ * and for how long," so a drop-off becomes a to-do list. Reads entirely from
+ * the platform (shops + activation_events); classification lives in the pure,
+ * unit-tested buildShopProgress helper.
+ */
+adminPlatformRoutes.get("/shop-progress", async (c) => {
+  const { buildShopProgress } = await import("../services/shop-progress");
+  const shops = await all<{ id: string; name: string; slug: string; status: string; plan: string | null; created_at: string }>(
+    c.env.DB,
+    `SELECT id, name, slug, status, plan, created_at FROM shops WHERE status != 'closed' ORDER BY created_at DESC`,
+  );
+  let events: { shop_id: string; event: string; created_at: string }[] = [];
+  try {
+    events = await all<{ shop_id: string; event: string; created_at: string }>(
+      c.env.DB,
+      `SELECT shop_id, event, created_at FROM activation_events`,
+    );
+  } catch {
+    /* table not migrated — every shop reads as no milestones */
+  }
+  return c.json(buildShopProgress(shops, events, Date.now()));
 });
 
 adminPlatformRoutes.get("/shops", async (c) => {

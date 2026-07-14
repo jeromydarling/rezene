@@ -20,6 +20,7 @@ interface ShopRow {
   refundsCents: number;
   newCustomers: number;
   currency: string;
+  aiCostCents: number;
 }
 interface DayRow {
   day: string;
@@ -29,7 +30,7 @@ interface DayRow {
 }
 interface RevenueReport {
   days: number;
-  totals: { gmvCents: number; orders: number; refundsCents: number; newCustomers: number; aovCents: number };
+  totals: { gmvCents: number; orders: number; refundsCents: number; newCustomers: number; aovCents: number; aiCostCents: number };
   currencies: string[];
   byShop: ShopRow[];
   byDay: DayRow[];
@@ -201,6 +202,8 @@ export function FleetRevenuePage() {
                       <th className="text-right">Orders</th>
                       <th className="text-right">AOV</th>
                       <th className="text-right">Refunds</th>
+                      <th className="text-right">AI cost</th>
+                      <th className="text-right">GMV − AI</th>
                       <th className="text-right">New customers</th>
                     </tr>
                   </thead>
@@ -214,6 +217,8 @@ export function FleetRevenuePage() {
                           {money(s.orders ? Math.round(s.gmvCents / s.orders) : 0, currencies)}
                         </td>
                         <td className="text-right tabular-nums text-warmgrey">{money(s.refundsCents, currencies)}</td>
+                        <td className="text-right tabular-nums text-warmgrey">{money(s.aiCostCents, currencies)}</td>
+                        <td className="text-right tabular-nums">{money(s.gmvCents - s.aiCostCents, currencies)}</td>
                         <td className="text-right tabular-nums text-warmgrey">{s.newCustomers.toLocaleString()}</td>
                       </tr>
                     ))}
@@ -228,7 +233,10 @@ export function FleetRevenuePage() {
               ? `Last rolled up ${formatDate(data.lastRollupAt)}. `
               : "Not yet rolled up. "}
             The nightly cron aggregates each shop's orders, refunds, and new customers into the
-            platform. GMV counts paid orders only.
+            platform. GMV counts paid orders only. “AI cost” is the estimated model/API spend
+            attributed to each shop over the window ({money(data.totals.aiCostCents, currencies)}{" "}
+            fleet-wide); “GMV − AI” is revenue net of that cost to serve — it is not full margin
+            (it excludes COGS, payment fees, and shipping).
           </p>
         </>
       )}

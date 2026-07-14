@@ -198,6 +198,7 @@ const NAV_SECTIONS: {
       { to: "/admin/crm/atlas", label: "Atlas", icon: Map },
       { to: "/admin/feedback", label: "Support tickets", icon: LifeBuoy },
       { to: "/admin/platform", label: "Verto Shops", icon: Store },
+      { to: "/admin/shop-progress", label: "Shop Progress", icon: Rocket },
       { to: "/admin/revenue", label: "Fleet Revenue", icon: CircleDollarSign },
       { to: "/admin/ai-usage", label: "AI Usage", icon: Gauge },
     ],
@@ -205,7 +206,7 @@ const NAV_SECTIONS: {
 ];
 
 /** Platform HQ routes — the only admin surface at bare verto.style/admin. */
-const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/revenue", "/admin/ai-usage"];
+const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/shop-progress", "/admin/revenue", "/admin/ai-usage"];
 
 function visibleSections(platformMode: boolean) {
   // Verto HQ lives at bare verto.style/admin (platform context, SuperAdmin
