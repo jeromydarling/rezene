@@ -404,6 +404,48 @@ adminPlatformRoutes.post("/errors/:id/resolve", requireAdminOnly, async (c) => {
   return c.json({ ok: true });
 });
 
+/**
+ * Lulu print fulfilment integration (platform-level). Lulu exposes no webhook
+ * UI, so register the status webhook here with one click. The endpoint the
+ * webhook points at is the platform's public Lulu hook.
+ */
+adminPlatformRoutes.get("/lulu", async (c) => {
+  const { luluConfigured, luluApiBase } = await import("../services/lulu");
+  const configured = luluConfigured(c.env);
+  const base = (c.env.APP_URL || "https://verto.style").replace(/\/$/, "");
+  const webhookUrl = `${base}/api/public/lulu/webhook`;
+  if (!configured) return c.json({ configured: false, webhookUrl, env: c.env.LULU_ENV ?? "sandbox", webhooks: [] });
+  try {
+    const { listLuluWebhooks } = await import("../services/lulu");
+    const webhooks = await listLuluWebhooks(c.env);
+    return c.json({ configured: true, webhookUrl, env: c.env.LULU_ENV ?? "sandbox", apiBase: luluApiBase(c.env), webhooks });
+  } catch (err) {
+    return c.json({ configured: true, webhookUrl, env: c.env.LULU_ENV ?? "sandbox", webhooks: [], error: String(err).slice(0, 200) });
+  }
+});
+
+adminPlatformRoutes.post("/lulu/webhook", requireAdminOnly, async (c) => {
+  const { luluConfigured, registerLuluWebhook } = await import("../services/lulu");
+  if (!luluConfigured(c.env)) return c.json({ error: "Lulu is not configured (set LULU_CLIENT_KEY / LULU_CLIENT_SECRET)." }, 400);
+  const base = (c.env.APP_URL || "https://verto.style").replace(/\/$/, "");
+  try {
+    const hook = await registerLuluWebhook(c.env, `${base}/api/public/lulu/webhook`);
+    return c.json({ ok: true, webhook: hook });
+  } catch (err) {
+    return c.json({ error: String(err).slice(0, 300) }, 502);
+  }
+});
+
+adminPlatformRoutes.delete("/lulu/webhook/:id", requireAdminOnly, async (c) => {
+  const { deleteLuluWebhook } = await import("../services/lulu");
+  try {
+    await deleteLuluWebhook(c.env, c.req.param("id"));
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: String(err).slice(0, 200) }, 502);
+  }
+});
+
 adminPlatformRoutes.get("/shops", async (c) => {
   const rows = await all(
     c.env.DB,
