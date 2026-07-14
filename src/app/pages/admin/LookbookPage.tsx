@@ -15,12 +15,14 @@ import {
 } from "../../../shared/lookbook";
 import type { BrandSettings } from "../../../shared/types";
 import { PageHeader, ErrorNote, LoadingTable, EmptyState } from "../../components/admin/ui";
+import { PrintOrderPanel } from "./LookbookOrderPanel";
 
 /**
  * Lookbook builder: compose a print-ready seasonal magazine from your own
  * products + brand identity. Auto-populates from your catalogue; reorder,
  * relayout, and add copy; preview live and Save as PDF at magazine trim.
  */
+
 
 function useBrand() {
   const settings = useFetch<BrandSettings>("/api/public/settings");
@@ -273,6 +275,8 @@ function LookbookEditor({ id, onBack }: { id: string; onBack: () => void }) {
               No published, sellable products yet — add and publish products to compose a lookbook from them.
             </p>
           )}
+
+          <PrintOrderPanel lookbookId={id} />
         </div>
 
         {/* Live preview */}

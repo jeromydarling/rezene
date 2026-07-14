@@ -247,6 +247,123 @@ async function notifyOwner(env: Env, shopDb: D1Database, row: JobRow, ok: boolea
   }
 }
 
+// ---- Lookbook print renders (Playwright HTML → interior + cover PDFs) ------
+// Same trust model: shared secret, shop in the path. The Action fetches the
+// composition (per part) and posts back two PDFs, then finalizes — which
+// submits the Lulu print jobs and captures the shop's authorized payment.
+
+renderCallbackRoutes.get("/lookbook/:shopId/:jobId/composition", async (c) => {
+  if (!secretOk(c)) return c.text("unauthorized", 401);
+  const shopId = c.req.param("shopId");
+  const shopDb = db(c.env, shopId);
+  const job = await first<{ lookbook_id: string }>(
+    shopDb,
+    `SELECT lookbook_id FROM lookbook_print_jobs WHERE id = ?`,
+    c.req.param("jobId"),
+  );
+  if (!job) return c.text("not found", 404);
+  const partRaw = c.req.query("part");
+  const part = partRaw === "cover" ? "cover" : partRaw === "interior" ? "interior" : "full";
+  const { buildLookbookComposition } = await import("../services/lookbook-print");
+  const html = await buildLookbookComposition(c.env, shopId, job.lookbook_id, part);
+  if (!html) return c.text("not found", 404);
+  return c.html(html);
+});
+
+renderCallbackRoutes.post("/lookbook/:shopId/:jobId/complete", async (c) => {
+  const form = await c.req.parseBody();
+  if (!renderSecretOk(c.env, (form.secret as string) || c.req.header("x-render-secret"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const shopId = c.req.param("shopId");
+  const jobId = c.req.param("jobId");
+  const shopDb = db(c.env, shopId);
+  const job = await first<{ id: string }>(shopDb, `SELECT id FROM lookbook_print_jobs WHERE id = ?`, jobId);
+  if (!job) return c.json({ error: "not found" }, 404);
+
+  async function storePdf(field: string, name: string): Promise<string | null> {
+    const file = form[field] as unknown as File | undefined;
+    if (!file || typeof file.arrayBuffer !== "function") return null;
+    const key = `${shopId}/lookbook/${jobId}/${name}.pdf`;
+    await c.env.FILES.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: "application/pdf" } });
+    const fileId = newId("file");
+    await run(
+      shopDb,
+      `INSERT INTO files (id, r2_key, filename, content_type, entity_type, entity_id, is_public, uploaded_by)
+       VALUES (?, ?, ?, 'application/pdf', 'general', ?, 1, NULL)`,
+      fileId,
+      key,
+      `${jobId}-${name}.pdf`,
+      jobId,
+    );
+    return fileId;
+  }
+
+  const interiorId = await storePdf("interior", "interior");
+  const coverId = await storePdf("cover", "cover");
+  if (!interiorId || !coverId) return c.json({ error: "missing interior/cover pdf" }, 400);
+  await run(
+    shopDb,
+    `UPDATE lookbook_print_jobs SET interior_file_id = ?, cover_file_id = ?, status = 'rendered', updated_at = datetime('now') WHERE id = ?`,
+    interiorId,
+    coverId,
+    jobId,
+  );
+  return c.json({ ok: true });
+});
+
+renderCallbackRoutes.post("/lookbook/:shopId/:jobId/finalize", async (c) => {
+  if (!secretOk(c)) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  const shopId = c.req.param("shopId");
+  const jobId = c.req.param("jobId");
+  const shopDb = db(c.env, shopId);
+  const job = await first<import("../services/lookbook-print").PrintJobRow>(
+    shopDb,
+    `SELECT * FROM lookbook_print_jobs WHERE id = ?`,
+    jobId,
+  );
+  if (!job) return c.json({ error: "not found" }, 404);
+  const { submitPrintJobToLulu, settlePrintPayment, luluConfigured } = await import("../services/lookbook-print");
+  const { applyMarkup, luluMarkup } = await import("../services/lulu");
+
+  if (!body.ok) {
+    await settlePrintPayment(c.env, shopDb, job, { ok: false });
+    await run(shopDb, `UPDATE lookbook_print_jobs SET status = 'failed', error = ?, updated_at = datetime('now') WHERE id = ?`, (body.error || "render failed").slice(0, 500), jobId);
+    return c.json({ ok: true });
+  }
+
+  // Rendered — submit to Lulu (drop-ships each copy), then capture on success.
+  if (!luluConfigured(c.env)) {
+    // PDFs are ready but fulfilment isn't configured: release the hold, leave rendered.
+    await settlePrintPayment(c.env, shopDb, job, { ok: false });
+    await run(shopDb, `UPDATE lookbook_print_jobs SET status = 'rendered', error = 'Lulu not configured', updated_at = datetime('now') WHERE id = ?`, jobId);
+    return c.json({ ok: true, note: "lulu not configured" });
+  }
+  try {
+    const result = await submitPrintJobToLulu(c.env, shopId, jobId);
+    if (result.submitted === 0) {
+      await settlePrintPayment(c.env, shopDb, job, { ok: false });
+      await run(shopDb, `UPDATE lookbook_print_jobs SET status = 'failed', error = 'all recipients failed at Lulu', updated_at = datetime('now') WHERE id = ?`, jobId);
+      return c.json({ ok: true });
+    }
+    const retail = applyMarkup(result.wholesaleCents, luluMarkup(c.env));
+    await settlePrintPayment(c.env, shopDb, { ...job }, { ok: true, captureCents: retail });
+    await run(
+      shopDb,
+      `UPDATE lookbook_print_jobs SET status = 'submitted', wholesale_cents = ?, error = ?, updated_at = datetime('now') WHERE id = ?`,
+      result.wholesaleCents,
+      result.failed ? `${result.failed} recipient(s) failed` : null,
+      jobId,
+    );
+    return c.json({ ok: true, submitted: result.submitted, failed: result.failed });
+  } catch (err) {
+    await settlePrintPayment(c.env, shopDb, job, { ok: false });
+    await run(shopDb, `UPDATE lookbook_print_jobs SET status = 'failed', error = ?, updated_at = datetime('now') WHERE id = ?`, String(err).slice(0, 500), jobId);
+    return c.json({ ok: true });
+  }
+});
+
 // ---- Pattern drape renders (Blender ghost-mannequin sims) ------------------
 // Same trust model as the video callbacks: authenticated by the shared
 // secret, shop addressed in the path. The Action posts one grey PNG per job;

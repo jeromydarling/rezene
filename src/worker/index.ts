@@ -37,6 +37,7 @@ import { adminWorkflowRoutes } from "./routes/admin-workflows";
 import { adminWebhookRoutes } from "./routes/admin-webhooks";
 import { adminApiKeyRoutes } from "./routes/admin-api-keys";
 import { publicHookRoutes } from "./routes/hooks";
+import { luluWebhookRoutes } from "./routes/lulu-webhook";
 import { clientPortalRoutes } from "./routes/client-portal";
 import { publicBookingRoutes, adminBookingRoutes } from "./routes/booking";
 import { adminFileRoutes } from "./routes/admin-files";
@@ -383,6 +384,7 @@ app.route("/api/public/account", accountRoutes);
 app.route("/api/public/portal", clientPortalRoutes);
 app.route("/api/public/booking", publicBookingRoutes);
 app.route("/api/public/hooks", publicHookRoutes);
+app.route("/api/public/lulu", luluWebhookRoutes);
 app.route("/api/wholesale", wholesalePortalRoutes);
 
 // Developer API — bearer-authenticated (personal access tokens), tenant scoped

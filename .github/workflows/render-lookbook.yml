@@ -1,0 +1,40 @@
+name: Render lookbook PDF
+
+# Triggered by the Worker (repository_dispatch) when a shop orders a printed
+# lookbook. Playwright renders the composition to interior + cover PDFs and
+# posts them back; the Worker then submits the Lulu print jobs and captures
+# payment on delivery.
+on:
+  repository_dispatch:
+    types: [render_lookbook]
+
+concurrency:
+  group: render-lookbook-${{ github.event.client_payload.jobId }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (for scripts/render-lookbook.mjs)
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright + Chromium
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install playwright@1.48.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+
+      - name: Render
+        env:
+          JOB_SHOP_ID: ${{ github.event.client_payload.shopId }}
+          JOB_ID: ${{ github.event.client_payload.jobId }}
+          CALLBACK_BASE: ${{ github.event.client_payload.callbackBase }}
+          RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
+        run: node scripts/render-lookbook.mjs
