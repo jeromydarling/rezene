@@ -10,6 +10,7 @@ import { mintApiKey, verifyApiKey, revokeApiKey } from "./services/api-keys";
 import { recordAiUsage, estimateCostCents } from "./services/ai-usage";
 import { computeShopDay, rollupFleetMetrics } from "./services/shop-metrics";
 import { recordPlatformError, normalizePath } from "./services/platform-errors";
+import { fleetActivity } from "./services/fleet-activity";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -86,11 +87,11 @@ beforeAll(async () => {
   // Minimal shop registry so verifyApiKey can resolve the slug. Using the
   // primary shop id makes getShopDb return the bound D1 (this same test db).
   await db.exec(
-    `CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, slug TEXT, name TEXT, status TEXT, custom_domain TEXT)`,
+    `CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, slug TEXT, name TEXT, status TEXT, custom_domain TEXT, plan TEXT, created_at TEXT DEFAULT (datetime('now')))`,
   );
   await run(
     db,
-    `INSERT INTO shops (id, slug, name, status) VALUES ('shop_rezene', 'teststudio', 'Test Studio', 'active')`,
+    `INSERT INTO shops (id, slug, name, status, created_at) VALUES ('shop_rezene', 'teststudio', 'Test Studio', 'active', datetime('now'))`,
   );
 
   env = { DB: db, BRAND_NAME: "Test Studio" } as unknown as Env;
@@ -448,5 +449,41 @@ describe("platform error/incident log", () => {
     );
     expect(after?.count).toBe(3);
     expect(after?.resolvedAt).toBeNull(); // re-opened
+  });
+});
+
+describe("fleet activity pulse", () => {
+  it("merges notable events across shops, newest first, and drops noise", async () => {
+    // The test DB is the primary shop's DO, so events here are the shop's spine.
+    await run(
+      db,
+      `INSERT INTO activity_events (id, kind, entity_type, entity_id, title, created_at)
+       VALUES ('act_f1', 'product.published', 'product', 'p1', 'Published the Linen Shirt', '2026-07-14 09:00:00')`,
+    );
+    await run(
+      db,
+      `INSERT INTO activity_events (id, kind, entity_type, entity_id, title, created_at)
+       VALUES ('act_f2', 'order.paid', 'order', 'o1', 'New order — $80', '2026-07-14 10:00:00')`,
+    );
+    // A non-notable kind must be filtered out of the pulse.
+    await run(
+      db,
+      `INSERT INTO activity_events (id, kind, entity_type, entity_id, title, created_at)
+       VALUES ('act_f3', 'settings.updated', 'settings', 's1', 'Changed a setting', '2026-07-14 11:00:00')`,
+    );
+
+    const { items, shopsScanned } = await fleetActivity(env, { limit: 50 });
+    expect(shopsScanned).toBeGreaterThanOrEqual(1);
+    const kinds = items.map((i) => i.kind);
+    expect(kinds).toContain("product.published");
+    expect(kinds).toContain("order.paid");
+    expect(kinds).not.toContain("settings.updated"); // noise filtered
+    // Newest first: the paid order (10:00) precedes the publish (09:00).
+    const paidIdx = items.findIndex((i) => i.kind === "order.paid");
+    const pubIdx = items.findIndex((i) => i.kind === "product.published");
+    expect(paidIdx).toBeLessThan(pubIdx);
+    // Tagged with the shop it came from.
+    expect(items[paidIdx].shopId).toBe("shop_rezene");
+    expect(items[paidIdx].shopName).toBe("Test Studio");
   });
 });

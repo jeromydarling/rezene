@@ -332,6 +332,22 @@ adminPlatformRoutes.get("/shop-progress", async (c) => {
 });
 
 /**
+ * Fleet activity pulse — the newest business-meaningful events across every
+ * shop (publishes, sales, deposits, commission moves, new clients…). Fans out
+ * over active shops' own activity spines and merges; read-only, on demand.
+ */
+adminPlatformRoutes.get("/activity", async (c) => {
+  const { fleetActivity } = await import("../services/fleet-activity");
+  const limit = Number(c.req.query("limit")) || 100;
+  try {
+    const result = await fleetActivity(c.env, { limit });
+    return c.json(result);
+  } catch {
+    return c.json({ items: [], shopsScanned: 0 });
+  }
+});
+
+/**
  * Error/incident view — what's breaking across the fleet, for whom, how often.
  * Reads the platform_errors log (written best-effort by the worker's onError
  * hook), open incidents first. Sentry holds the full stack trace; this is the
