@@ -424,6 +424,35 @@ adminPlatformRoutes.get("/lulu", async (c) => {
   }
 });
 
+/**
+ * Live connection test: authenticate, then run a real cost-calc for the
+ * magazine package to a sample US address. Confirms the credentials AND the
+ * pod_package_id in one shot — surfaces Lulu's exact error if the SKU is wrong.
+ */
+adminPlatformRoutes.get("/lulu/test", async (c) => {
+  const { luluConfigured, calculatePrintCost, MAGAZINE_POD_PACKAGE_ID } = await import("../services/lulu");
+  if (!luluConfigured(c.env)) return c.json({ ok: false, error: "Lulu is not configured." });
+  try {
+    const cost = await calculatePrintCost(c.env, {
+      pageCount: 24,
+      quantity: 1,
+      shippingAddress: {
+        name: "Test",
+        street1: "123 Main St",
+        city: "New York",
+        state_code: "NY",
+        postcode: "10001",
+        country_code: "US",
+        phone_number: "+12125550100",
+      },
+      shippingLevel: "GROUND",
+    });
+    return c.json({ ok: true, podPackageId: MAGAZINE_POD_PACKAGE_ID, cost });
+  } catch (err) {
+    return c.json({ ok: false, podPackageId: MAGAZINE_POD_PACKAGE_ID, error: String(err).slice(0, 400) });
+  }
+});
+
 adminPlatformRoutes.post("/lulu/webhook", requireAdminOnly, async (c) => {
   const { luluConfigured, registerLuluWebhook } = await import("../services/lulu");
   if (!luluConfigured(c.env)) return c.json({ error: "Lulu is not configured (set LULU_CLIENT_KEY / LULU_CLIENT_SECRET)." }, 400);
