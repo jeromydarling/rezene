@@ -129,7 +129,21 @@ function LuluIntegrationCard() {
   const { data, loading, reload } = useFetch<LuluInfo>("/api/admin/platform/lulu");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [test, setTest] = useState<{ ok: boolean; error?: string; cost?: { totalCents: number; currency: string }; podPackageId?: string } | null>(null);
+  const [testing, setTesting] = useState(false);
   if (loading || !data) return null;
+
+  async function runTest() {
+    setTesting(true);
+    setTest(null);
+    try {
+      setTest(await api.get("/api/admin/platform/lulu/test"));
+    } catch (e) {
+      setTest({ ok: false, error: e instanceof ApiRequestError ? e.message : "Test failed" });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function register() {
     setBusy(true);
@@ -177,6 +191,9 @@ function LuluIntegrationCard() {
           {err && <ErrorNote message={err} />}
           {data.error && <p className="mt-1 text-xs text-terracotta">{data.error}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" className="btn btn-secondary !px-3 !py-1 text-xs" disabled={testing} onClick={() => void runTest()}>
+              {testing ? "Testing…" : "Test connection"}
+            </button>
             {hasHook ? (
               <span className="text-xs font-medium text-palm">✓ Webhook registered</span>
             ) : (
@@ -191,6 +208,22 @@ function LuluIntegrationCard() {
               </span>
             ))}
           </div>
+          {test && (
+            <div className={`mt-2 rounded-md p-2.5 text-xs ${test.ok ? "bg-palm/10 text-palm" : "bg-terracotta/10 text-terracotta"}`}>
+              {test.ok ? (
+                <span>
+                  ✓ Connected &amp; priced. A 24-page copy to a NY address ={" "}
+                  {test.cost ? `${(test.cost.totalCents / 100).toFixed(2)} ${test.cost.currency}` : "—"} wholesale. The
+                  magazine package id is valid.
+                </span>
+              ) : (
+                <span>
+                  ✗ {test.error}
+                  {test.podPackageId && <span className="mt-1 block font-mono text-[0.7rem] text-terracotta/80">pod_package_id tried: {test.podPackageId}</span>}
+                </span>
+              )}
+            </div>
+          )}
           <p className="mt-2 text-[0.7rem] text-warmgrey">
             Not required to test — each order's “Refresh tracking” polls Lulu directly. The webhook
             just makes updates automatic.
