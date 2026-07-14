@@ -72,7 +72,9 @@ adminLookbookRoutes.post("/:id/print-estimate", async (c) => {
       pageCount,
       quantity,
       shippingAddress: ESTIMATE_DEST,
-      shippingLevel: "GROUND",
+      // A saddle-stitch booklet only ships via the mail tiers — GROUND is a
+      // courier tier Lulu doesn't offer for it. MAIL always prices.
+      shippingLevel: "MAIL",
     });
     const retailCents = applyMarkup(cost.totalCents, luluMarkup(c.env));
     return c.json({
@@ -173,7 +175,9 @@ adminLookbookRoutes.post("/:id/order", requireAdminWrite, async (c) => {
   if (!luluConfigured(c.env)) return c.json({ error: "Print & mail isn't switched on for the platform yet." }, 503);
 
   const copies = body.copies ?? 1;
-  const shippingLevel = (body.shippingLevel ?? "GROUND") as import("../services/lulu").LuluShippingLevel;
+  // Default to MAIL: a saddle-stitch booklet only ships via the mail tiers, so
+  // GROUND (the old default) would fail at Lulu with "no shipping option found".
+  const shippingLevel = (body.shippingLevel ?? "MAIL") as import("../services/lulu").LuluShippingLevel;
   const first = body.recipients[0];
   const sample = { ...first, country_code: first.country_code ?? "US", phone_number: first.phone_number ?? "+10000000000" };
 
