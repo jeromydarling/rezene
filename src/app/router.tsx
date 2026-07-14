@@ -74,6 +74,7 @@ import { ThreeDPage, FilesPage } from "./pages/admin/StudioPages";
 import { DesignStudioPage } from "./pages/admin/DesignStudioPage";
 import { BrandStudioPage } from "./pages/admin/BrandStudioPage";
 import { BrandPrintPage } from "./pages/admin/BrandPrintPage";
+import { LookbookPage as BrandLookbookPage } from "./pages/admin/LookbookPage";
 import { BrandGuidelinesPage } from "./pages/admin/BrandGuidelinesPage";
 const FittingStudioPage = lazy(() =>
   import("./pages/admin/FittingStudioPage").then((m) => ({ default: m.FittingStudioPage })),
@@ -230,6 +231,7 @@ export function AppRouter() {
           <Route path="ai-concepts" element={<DesignStudioPage />} />
           <Route path="brand" element={<BrandStudioPage />} />
           <Route path="brand/print" element={<BrandPrintPage />} />
+          <Route path="brand/lookbook" element={<BrandLookbookPage />} />
           <Route path="brand/guidelines" element={<BrandGuidelinesPage />} />
           <Route path="3d" element={<ThreeDPage />} />
           <Route path="clients" element={<ClientBookPage />} />

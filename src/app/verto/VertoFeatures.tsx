@@ -1484,6 +1484,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Brand Studio", "Your logo, palette and typography, set once — rendered across the storefront, the admin, line sheets, factory portals, emails and exports."],
       ["Brand-in-a-box", "Describe the label you're building and AI proposes a full identity — wordmark, palette, type pairing — applied with one click and yours to refine."],
       ["The Print Shop", "Print-ready PDFs in your identity: hang tags, care labels, thank-you cards, letterhead — from the same brand settings, no designer required."],
+      ["Lookbook builder", "Compose a print-ready seasonal magazine from your own pieces and brand identity — auto-drafted from your catalogue, arranged into spreads, Saved as PDF at magazine trim. One-click print & mail coming next."],
       ["Guidelines & brand kit", "A living brand-guidelines page and a downloadable kit — logo files, palette, type — ready to hand a printer or a collaborator."],
       ["Your own domain, automated", "Point a CNAME and Verto issues the certificate and activates the domain on first visit — no ticket, no waiting room."],
       ["Draft previews & scheduled publishing", "Share private preview links of unpublished pages, and schedule pages and journal posts to publish themselves."],

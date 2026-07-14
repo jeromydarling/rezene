@@ -104,4 +104,42 @@ On your own domain, SEO output (sitemaps, schema, meta) is served for that domai
 > [!TIP]
 > A product with lots of views but few sales (see [Analytics](/admin/support/kb/analytics)) often just needs a clearer title and description — Search Checkup is where you fix that.`,
   },
+  {
+    slug: "lookbook",
+    title: "Print a lookbook",
+    summary: "Compose a print-ready seasonal magazine from your own pieces and brand identity.",
+    part: "marketing",
+    moduleRoute: "/admin/brand/lookbook",
+    keywords: "lookbook magazine print pdf catalog catalogue seasonal brand mailing lulu",
+    updated: "2026-07-14",
+    body: `# Print a lookbook
+
+**Brand → Lookbook** turns your collection into a print-ready seasonal magazine — composed from your own pieces and your brand identity (logo, colours, type, voice), ready to Save as PDF at magazine trim (8.5×11 in).
+
+## Make one
+
+1. Click **New lookbook** — we auto-compose a first draft from your **published, sellable pieces** (the ones with photos come first).
+2. Give it a **title** and **subtitle** (e.g. "Autumn 2026 — The season in full") and, if you like, an **opening note** — a short editorial letter that opens the issue.
+3. Arrange the **spreads**: reorder with the arrows, remove pieces, or **Add a piece** from your catalogue. Each spread picks a layout:
+   - **Full bleed** — an edge-to-edge photo with the piece named over it.
+   - **Editorial** — the photo beside the piece's story (pulls its *editorial story* if it has one).
+   - **Clean** — the photo with name, price, and a fabric/origin caption.
+4. Watch the **live preview** update as you go. When it's right, hit **Save as PDF**.
+
+> [!NOTE]
+> A lookbook always reflects your **current** product data — price, story, and imagery are pulled fresh each time it renders. Update a product and the lookbook updates with it.
+
+## What fills the pages
+
+Pages are composed from your catalogue: product **photos**, **names**, **prices**, **fabric** and **origin**, and **editorial stories**, wrapped in your brand's colours and type. The cover uses your first piece's image; the back cover carries your wordmark, tagline, and web address.
+
+## Tips for a good issue
+
+- Give your hero pieces a strong first photo — the opening spread and the cover use it.
+- Write an **editorial story** on a few key pieces so the *Editorial* layout has something to say.
+- 12–24 pieces makes a satisfying issue; you can always split a big collection into two.
+
+> [!TIP]
+> Coming next: **one-click print & mail** — send a printed copy straight to your customers from an uploaded list, printed on demand and shipped for you.`,
+  },
 ];
