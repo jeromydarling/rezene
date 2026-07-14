@@ -170,7 +170,12 @@ adminLookbookRoutes.post("/:id/order", requireAdminWrite, async (c) => {
 
   const { getStripe } = await import("../services/stripe");
   const stripe = getStripe(c.env);
-  if (!stripe) return c.json({ error: "Connect payments (Stripe) to order printed lookbooks." }, 400);
+  // Sandbox never touches a live printer or a real card, so a sandbox order
+  // skips the Stripe authorization and renders straight away — this is how we
+  // exercise the full render → Lulu-sandbox → webhook loop end to end without a
+  // payment. Production (live Lulu) always goes through checkout.
+  const sandbox = (c.env.LULU_ENV ?? "sandbox").toLowerCase() !== "production";
+  if (!sandbox && !stripe) return c.json({ error: "Connect payments (Stripe) to order printed lookbooks." }, 400);
   const { luluConfigured } = await import("../services/lulu");
   if (!luluConfigured(c.env)) return c.json({ error: "Print & mail isn't switched on for the platform yet." }, 503);
 
@@ -235,6 +240,20 @@ adminLookbookRoutes.post("/:id/order", requireAdminWrite, async (c) => {
     );
   }
 
+  // Sandbox: skip payment and render immediately (mirrors the post-checkout
+  // /activate path). Nothing is charged and nothing hits a live printer.
+  if (sandbox) {
+    const { dispatchLookbookRender } = await import("../services/lookbook-print");
+    await run(c.var.db, `UPDATE lookbook_print_jobs SET status = 'rendering', updated_at = datetime('now') WHERE id = ?`, jobId);
+    const dispatched = await dispatchLookbookRender(c.env, { shopId: c.var.shopId, jobId, lookbookId: c.req.param("id") });
+    if (!dispatched.ok) {
+      await run(c.var.db, `UPDATE lookbook_print_jobs SET status = 'failed', error = ? WHERE id = ?`, dispatched.error ?? "dispatch failed", jobId);
+      return c.json({ error: `Couldn't reach the render service: ${dispatched.error ?? ""}`.trim() }, 502);
+    }
+    return c.json({ jobId, sandbox: true, status: "rendering", estimate: est });
+  }
+
+  if (!stripe) return c.json({ error: "Connect payments (Stripe) to order printed lookbooks." }, 400);
   const origin = new URL(c.req.url).origin;
   const shopBase = c.var.shopSlug ? `/${c.var.shopSlug}` : "";
   const appUrl = (c.env.APP_ENV === "development" ? origin : c.env.APP_URL || origin) + shopBase;
