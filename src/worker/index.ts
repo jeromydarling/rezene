@@ -151,7 +151,16 @@ import { buildProductLd, buildSitemap, buildStructuredData, getShopSeoConfig, in
 import { DEMO_SHOP_SLUG, getPrimaryShopBase, PRIMARY_SHOP_ID, resolveShop } from "./services/shops";
 import type { Context } from "hono";
 
-/** Storefront/app paths that existed before the shop prefix (for 301s). */
+/**
+ * Storefront/app paths that existed before the shop prefix (for 301s).
+ *
+ * NOTE: `/admin` is deliberately NOT here. After the platform split, the bare
+ * `verto.style/admin` IS Verto HQ (the SuperAdmin platform console), served in
+ * platform mode. Redirecting it into the flagship shop (`/rezene/admin`) made
+ * HQ unreachable at its own URL. A shop's own admin is reached explicitly at
+ * `/<slug>/admin` (e.g. `/rezene/admin`), which resolves a shop and never hits
+ * this legacy path.
+ */
 const LEGACY_SHOP_PREFIXES = [
   "/products",
   "/collections",
@@ -168,7 +177,6 @@ const LEGACY_SHOP_PREFIXES = [
   "/stockists",
   "/factory/",
   "/linesheet/",
-  "/admin",
 ];
 
 async function serveDocument(c: Context<AppContext>): Promise<Response> {
