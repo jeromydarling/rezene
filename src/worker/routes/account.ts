@@ -95,6 +95,7 @@ accountRoutes.post(
       });
       await sendBuyerEmail(c.env, {
         to: email,
+        db: c.var.db,
         subject: `Sign in to ${brand.name}`,
         text: `Sign in to ${brand.name}:\n\n${link}\n\nThis link works once and expires in ${LINK_MINUTES} minutes. If you didn't ask for it, ignore this email.`,
         html,

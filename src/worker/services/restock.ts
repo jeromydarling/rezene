@@ -48,6 +48,7 @@ export async function notifyRestock(env: Env, db: D1Database, productId: string,
         : undefined;
       await sendBuyerEmail(env, {
         to: sub.email,
+        db,
         subject: `${product.name} is back in stock`,
         text: `Good news — ${product.name} is available again.\n\n${link}\n\nPopular sizes go quickly.`,
         html,

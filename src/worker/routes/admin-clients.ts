@@ -376,6 +376,7 @@ adminClientRoutes.post("/:id/portal-link", requireAdminWrite, async (c) => {
       });
       await sendBuyerEmail(c.env, {
         to: client.email,
+        db: c.var.db,
         subject: `Your fitting portal at ${brand.name}`,
         text: `Open your portal at ${brand.name}:\n\n${link}\n\nThe link signs you in; it works once and lasts 14 days.`,
         html,

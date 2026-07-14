@@ -155,6 +155,7 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
     const brand = await getEmailBrand(env, env.DB);
     await sendBuyerEmail(env, {
       to: order.email,
+      db: env.DB,
       ...orderConfirmationEmail({
         brandName: brand.name,
         orderNumber: order.order_number,
@@ -561,6 +562,7 @@ async function handleCheckoutExpired(env: Env, session: Stripe.Checkout.Session)
 
   await sendBuyerEmail(env, {
     to: email,
+    db: env.DB,
     subject: `You left something behind`,
     text: `Still thinking it over? The pieces you were looking at are still here:\n\n${lines}\n\nPick up where you left off:\n${link}`,
     html,

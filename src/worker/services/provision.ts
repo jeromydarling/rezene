@@ -143,6 +143,7 @@ export async function provisionShop(
   // Credentials to the owner (best effort), heads-up to the founder.
   await sendBuyerEmail(env, {
     to: ownerEmail,
+    replyTo: env.MARKETING_REPLY_TO,
     fromName: "Verto",
     subject: `Your shop is live: ${shop.name} on Verto`,
     text: [

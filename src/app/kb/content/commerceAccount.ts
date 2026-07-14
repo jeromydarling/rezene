@@ -103,13 +103,14 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
     summary: "Your brand identity, integration status, and your own password.",
     part: "account",
     moduleRoute: "/admin/settings",
-    keywords: "settings brand name tagline integration stripe ai password change",
-    updated: "2026-07-06",
+    keywords: "settings brand name tagline integration stripe ai password change reply-to email replies",
+    updated: "2026-07-14",
     body: `# Settings & integrations
 
 **Account → Settings** holds the essentials.
 
 - **Brand** — name, tagline, and identity. Change them here and they update everywhere, from the storefront to your tech pack covers.
+- **Reply-to email** — where replies to your order confirmations and customer emails land. The sending address is a platform no-reply, so set this to an inbox you actually read; every buyer email your shop sends will carry it.
 - **Integrations** — at-a-glance status for Payments (Stripe) and LLM assistance. Connection keys live as encrypted secrets outside the app.
 - **Change password** — update your own password; all other sessions sign out.`,
   },

@@ -627,6 +627,7 @@ adminMarketingRoutes.post("/campaigns/:id/send-email", requireAdminWrite, async 
         const unsubscribe = `${appUrl}/api/public/unsubscribe?email=${encodeURIComponent(r.email)}&token=${token}${shopParam}`;
         await sendBuyerEmail(env, {
           to: r.email,
+          db: c.var.db,
           fromName: shopBrand,
           subject: asset.title!,
           text: `${bodyText}\n\n—\nYou're receiving this because you joined the list at ${appUrl}.\nUnsubscribe: ${unsubscribe}`,
@@ -738,6 +739,7 @@ adminMarketingRoutes.post("/broadcast", requireAdminWrite, async (c) => {
         });
         await sendBuyerEmail(env, {
           to: r.email,
+          db: c.var.db,
           fromName: brand.name,
           subject: body.subject,
           text: `${bodyText}\n\n—\nUnsubscribe: ${unsubscribe}`,

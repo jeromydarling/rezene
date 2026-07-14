@@ -61,6 +61,7 @@ BUYER_EMAIL_FROM = ""
 # HQ marketing (Verto's own audience): sender falls back to BUYER_EMAIL_FROM;
 # batch is sends per 5-min drain tick; postal address is the CAN-SPAM footer.
 MARKETING_EMAIL_FROM = ""
+MARKETING_REPLY_TO = "gardener@thecros.app"
 MARKETING_BATCH_PER_TICK = "10"
 MARKETING_POSTAL_ADDRESS = ""
 # Promo-video render backend. RENDER_REPO's GitHub Actions do the heavy

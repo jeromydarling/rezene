@@ -11,6 +11,15 @@ adminSettingsRoutes.get("/", async (c) => {
     c.var.db,
     `SELECT key, value, description FROM settings ORDER BY key`,
   );
+  // Editable keys that predate a shop's settings rows still need to show up
+  // in the form — surface reply_to_email even before it's ever been saved.
+  if (!rows.some((r) => r.key === "reply_to_email")) {
+    rows.push({
+      key: "reply_to_email",
+      value: "",
+      description: "Where replies to your order and customer emails land. The sending address is a no-reply, so set this to an inbox you actually read.",
+    });
+  }
   const integrations = await all(
     c.var.db,
     `SELECT provider, status, note, last_verified_at FROM integration_credentials_metadata`,
@@ -36,6 +45,9 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
     "brand_tagline",
     "default_currency",
     "production_home",
+    // Reply-To on buyer email — the From is the platform's no-reply address,
+    // so this is where customer replies actually land.
+    "reply_to_email",
     // Visual identity (managed from the Brand Studio) — JSON blobs.
     "brand_logo",
     "brand_palette",
@@ -49,6 +61,11 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
   ]);
   const updates = Object.entries(body).filter(([k]) => editable.has(k));
   if (updates.length === 0) return c.json({ error: "No editable settings provided" }, 400);
+  // A malformed Reply-To would bounce every customer reply — catch it here.
+  const replyTo = body.reply_to_email?.trim();
+  if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+    return c.json({ error: "Reply-to email doesn't look like an address." }, 400);
+  }
   for (const [key, value] of updates) {
     await run(
       c.var.db,

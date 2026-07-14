@@ -233,6 +233,7 @@ async function notifyOwner(env: Env, shopDb: D1Database, row: JobRow, ok: boolea
   if (ok) {
     await sendBuyerEmail(env, {
       to: user.email,
+      db: shopDb,
       fromName: name,
       subject: `Your ${name} promo video is ready`,
       text: `Good news — "${row.title}" finished rendering and is ready to download from your Marketing Suite → Promo Video.\n\nYou were only charged now that the finished video exists.`,
@@ -240,6 +241,7 @@ async function notifyOwner(env: Env, shopDb: D1Database, row: JobRow, ok: boolea
   } else {
     await sendBuyerEmail(env, {
       to: user.email,
+      db: shopDb,
       fromName: name,
       subject: `Your ${name} promo render needs another pass`,
       text: `"${row.title}" didn't finish rendering, so you were not charged. Open the Marketing Suite → Promo Video to retry — your composition is saved exactly as you left it.`,

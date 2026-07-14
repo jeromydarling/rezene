@@ -214,6 +214,7 @@ adminCrmRoutes.post("/contacts/:id/email", async (c) => {
   if (!contact) return c.json({ error: "Not found" }, 404);
   const sent = await sendBuyerEmail(c.env, {
     to: contact.email,
+    replyTo: c.env.MARKETING_REPLY_TO,
     subject: body.subject,
     text: body.text,
     fromName: body.fromName ?? "Verto",
