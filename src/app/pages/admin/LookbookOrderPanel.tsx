@@ -167,13 +167,18 @@ export function PrintOrderPanel({ lookbookId }: { lookbookId: string }) {
     }
     setPlacing(true);
     try {
-      const res = await api.post<{ checkoutUrl?: string; error?: string }>(`/api/admin/print-lookbooks/${lookbookId}/order`, {
+      const res = await api.post<{ checkoutUrl?: string; sandbox?: boolean; error?: string }>(`/api/admin/print-lookbooks/${lookbookId}/order`, {
         recipients,
         copies,
         shippingLevel: shipping,
       });
       if (res.checkoutUrl) {
         window.location.href = res.checkoutUrl; // to Stripe; returns with ?printed=jobId
+      } else if (res.sandbox) {
+        // Sandbox skips checkout and renders immediately — no redirect.
+        toast.success("Sandbox order placed", "Preparing print files now — no charge in sandbox.");
+        setRecipients([]);
+        orders.reload();
       }
     } catch (err) {
       toast.error("Couldn't place the order", err instanceof ApiRequestError ? err.message : undefined);
