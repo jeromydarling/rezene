@@ -47,11 +47,16 @@ export const LULU_SHIPPING_LEVELS: { id: LuluShippingLevel; label: string }[] = 
 ];
 
 /**
- * Full-colour saddle-stitch magazine at US Letter (8.5×11). SKU grammar:
- * Trim(0850X1100) + Color(FC) + Quality(STD) + Bind(SS) + Paper(060) +
- * PPI(UW) + Finish(444) + Linen(M) + Foil(NG). CONFIRM against the live API.
+ * Full-colour saddle-stitch magazine at US Letter (8.5×11). Lulu SKU grammar
+ * (dotted form 0850X1100.FC.PRE.SS.060UW444.GXX):
+ *   Trim(0850X1100) · Ink(FC full colour) · Quality(PRE premium — Lulu only
+ *   offers full colour in premium, not standard) · Bind(SS saddle stitch) ·
+ *   Paper(060UW444 = 60# uncoated white, 444 PPI) · Finish(GXX gloss cover).
+ * Every non-trim segment is copied verbatim from Lulu's own known-good
+ * full-colour saddle-stitch SKU (0500X0800FCPRESS060UW444GXX); only the trim
+ * differs. Verified live via the cost-calc probe.
  */
-export const MAGAZINE_POD_PACKAGE_ID = "0850X1100FCSTDSS060UW444MNG";
+export const MAGAZINE_POD_PACKAGE_ID = "0850X1100FCPRESS060UW444GXX";
 
 export function luluConfigured(env: Env): boolean {
   return Boolean(env.LULU_CLIENT_KEY && env.LULU_CLIENT_SECRET);
