@@ -80,8 +80,16 @@ export const VERTO_META: Record<string, RouteMeta> = {
 export function injectShopContext(
   html: string,
   shop: { slug: string; name: string; basePath: string } | null,
+  monitoring?: { sentryDsn?: string; env?: string },
 ): string {
-  const payload = JSON.stringify({ shop }).replaceAll("<", "\\u003c");
+  // The Sentry DSN is a publishable identifier (not a secret), so it's safe in
+  // the client payload — this lets the browser SDK report to the same project
+  // the worker already uses, without hardcoding the string in the bundle.
+  const payload = JSON.stringify({
+    shop,
+    sentryDsn: monitoring?.sentryDsn || undefined,
+    env: monitoring?.env || undefined,
+  }).replaceAll("<", "\\u003c");
   return html.replace("</head>", `    <script>window.__VERTO__=${payload}</script>\n  </head>`);
 }
 

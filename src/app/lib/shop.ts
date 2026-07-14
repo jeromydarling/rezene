@@ -15,7 +15,13 @@ export interface VertoShop {
 
 declare global {
   interface Window {
-    __VERTO__?: { shop: VertoShop | null };
+    __VERTO__?: {
+      shop: VertoShop | null;
+      /** Publishable Sentry DSN (client error reporting); absent if unconfigured. */
+      sentryDsn?: string;
+      /** Deploy environment (production/staging/…) for Sentry tagging. */
+      env?: string;
+    };
   }
 }
 

@@ -190,6 +190,7 @@ adminAiRoutes.post("/prompt-suggest", requireAdminWrite, async (c) => {
         "You write prompts for a text-to-image model (Flux) that generates fashion garment imagery. Return ONE vivid, concrete prompt (max 60 words) describing the garment, fabric, cut, colour, styling and shot. No preamble, no quotes, no lists — just the prompt.",
       prompt: `Design brief: ${body.brief}${fields ? `\nDetails — ${fields}` : ""}`,
       maxTokens: 160,
+      usage: { shopId: c.var.shopId, operation: "design.prompt" },
     });
     return c.json({ prompt: res.text.trim().replace(/^["']|["']$/g, "") });
   } catch {
@@ -315,8 +316,8 @@ adminAiRoutes.post("/concepts/:id/generate", requireAdminWrite, async (c) => {
       // Lock the seed when given (consistency); otherwise vary per image.
       const seed = body.seed != null ? body.seed + i : randomSeed();
       const { bytes, seed: usedSeed, model } = useRefs
-        ? await generateFluxWithReferences(c.env, { prompt, references, seed })
-        : await generateFluxImage(c.env, { prompt, seed });
+        ? await generateFluxWithReferences(c.env, { prompt, references, seed, usage: { shopId: c.var.shopId, operation: "design.references" } })
+        : await generateFluxImage(c.env, { prompt, seed, usage: { shopId: c.var.shopId, operation: "design.generate" } });
       const fileId = newId("file");
       const key = `uploads/concept/${id}/${fileId}.jpg`;
       await c.env.FILES.put(key, bytes, { httpMetadata: { contentType: "image/jpeg" } });

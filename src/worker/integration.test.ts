@@ -7,6 +7,10 @@ import { emit } from "./services/activity";
 import { savePipeline, resolvePipeline } from "./services/pipeline";
 import { sendClientMessage } from "./services/client-messages";
 import { mintApiKey, verifyApiKey, revokeApiKey } from "./services/api-keys";
+import { recordAiUsage, estimateCostCents } from "./services/ai-usage";
+import { computeShopDay, rollupFleetMetrics } from "./services/shop-metrics";
+import { recordPlatformError, normalizePath } from "./services/platform-errors";
+import { fleetActivity } from "./services/fleet-activity";
 import { first, all, run } from "./services/db";
 import type { Env } from "./types/env";
 
@@ -83,11 +87,11 @@ beforeAll(async () => {
   // Minimal shop registry so verifyApiKey can resolve the slug. Using the
   // primary shop id makes getShopDb return the bound D1 (this same test db).
   await db.exec(
-    `CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, slug TEXT, name TEXT, status TEXT, custom_domain TEXT)`,
+    `CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, slug TEXT, name TEXT, status TEXT, custom_domain TEXT, plan TEXT, created_at TEXT DEFAULT (datetime('now')))`,
   );
   await run(
     db,
-    `INSERT INTO shops (id, slug, name, status) VALUES ('shop_rezene', 'teststudio', 'Test Studio', 'active')`,
+    `INSERT INTO shops (id, slug, name, status, created_at) VALUES ('shop_rezene', 'teststudio', 'Test Studio', 'active', datetime('now'))`,
   );
 
   env = { DB: db, BRAND_NAME: "Test Studio" } as unknown as Env;
@@ -305,5 +309,181 @@ describe("webhook fan-out to external subscribers", () => {
     const parsed = JSON.parse(received!.body);
     expect(parsed.event).toBe("test.ping");
     expect(parsed.payload.name).toBe("Linen Shirt");
+  });
+});
+
+describe("AI usage ledger", () => {
+  it("estimates cost from the price table (tokens and units)", () => {
+    // Opus: $15/M in, $75/M out → 1M in + 1M out = $90 = 9000 cents.
+    expect(estimateCostCents({ provider: "anthropic", model: "claude-opus-4-8", tokensIn: 1_000_000, tokensOut: 1_000_000 })).toBeCloseTo(9000, 2);
+    // Workers AI (Llama/Flux) is per-neuron → treated as $0 here.
+    expect(estimateCostCents({ provider: "workers-ai", model: "@cf/meta/llama-4-scout", tokensIn: 5_000_000, tokensOut: 5_000_000 })).toBe(0);
+    expect(estimateCostCents({ provider: "workers-ai", model: "@cf/black-forest-labs/flux-1-schnell", units: 3 })).toBe(0);
+    // External try-on model at $0.075/unit → 2 units = $0.15 = 15 cents.
+    expect(estimateCostCents({ provider: "fashn", model: "fashn/tryon-v1.5", units: 2 })).toBeCloseTo(15, 2);
+  });
+
+  it("records rows to the platform ledger and aggregates by provider/model", async () => {
+    await recordAiUsage(env, { shopId: "shop_rezene", provider: "anthropic", model: "claude-sonnet-5", operation: "marketing.kit", tokensIn: 1000, tokensOut: 500 });
+    await recordAiUsage(env, { shopId: "shop_rezene", provider: "anthropic", model: "claude-sonnet-5", operation: "marketing.kit", tokensIn: 2000, tokensOut: 800 });
+    await recordAiUsage(env, { shopId: null, provider: "perplexity", model: "sonar-pro", operation: "research.ask", tokensIn: 4000, tokensOut: 1200 });
+
+    const byModel = await all<{ provider: string; model: string; calls: number; tokensIn: number; costCents: number }>(
+      db,
+      `SELECT provider, model, COUNT(*) AS calls, COALESCE(SUM(tokens_in),0) AS tokensIn, COALESCE(SUM(cost_cents),0) AS costCents
+         FROM ai_usage GROUP BY provider, model ORDER BY calls DESC`,
+    );
+    const sonnet = byModel.find((r) => r.model === "claude-sonnet-5");
+    expect(sonnet?.calls).toBe(2);
+    expect(sonnet?.tokensIn).toBe(3000);
+    // 3000 in @ $3/M + 1300 out @ $15/M = $0.009 + $0.0195 = $0.0285 = 2.85 cents.
+    expect(sonnet?.costCents).toBeCloseTo(2.85, 2);
+
+    const perplexity = byModel.find((r) => r.model === "sonar-pro");
+    expect(perplexity?.calls).toBe(1);
+
+    // NULL shop_id attributes to the platform, non-null to the shop.
+    const byShop = await all<{ shopId: string | null; calls: number }>(
+      db,
+      `SELECT shop_id AS shopId, COUNT(*) AS calls FROM ai_usage GROUP BY shop_id`,
+    );
+    expect(byShop.find((r) => r.shopId === "shop_rezene")?.calls).toBe(2);
+    expect(byShop.find((r) => r.shopId === null)?.calls).toBe(1);
+  });
+});
+
+describe("fleet revenue rollup", () => {
+  // The test DB doubles as the primary shop's DO (getShopDb(primary) → bound D1),
+  // so seeding orders/refunds/customers here is exactly what the rollup reads.
+  const today = new Date().toISOString().slice(0, 10);
+  const ts = `${today} 12:00:00`;
+
+  beforeAll(async () => {
+    await run(db, `INSERT INTO customers (id, email, name, created_at) VALUES ('cust_r1', 'a@example.com', 'A', ?)`, ts);
+    await run(
+      db,
+      `INSERT INTO orders (id, order_number, customer_id, currency, subtotal_cents, total_cents, payment_status, created_at)
+       VALUES ('ord_r1', 'RZ-1', 'cust_r1', 'USD', 5000, 5000, 'paid', ?)`,
+      ts,
+    );
+    await run(
+      db,
+      `INSERT INTO orders (id, order_number, currency, total_cents, payment_status, created_at)
+       VALUES ('ord_r2', 'RZ-2', 'USD', 3000, 'paid', ?)`,
+      ts,
+    );
+    // An unpaid order must NOT count toward GMV.
+    await run(
+      db,
+      `INSERT INTO orders (id, order_number, currency, total_cents, payment_status, created_at)
+       VALUES ('ord_r3', 'RZ-3', 'USD', 9999, 'pending', ?)`,
+      ts,
+    );
+    await run(
+      db,
+      `INSERT INTO refunds (id, order_id, amount_cents, currency, status, created_at)
+       VALUES ('ref_r1', 'ord_r1', 1000, 'USD', 'succeeded', ?)`,
+      ts,
+    );
+  });
+
+  it("aggregates one shop's day from its own DO (paid only)", async () => {
+    const m = await computeShopDay(env, "shop_rezene", today);
+    expect(m).toBeTruthy();
+    expect(m!.gmvCents).toBe(8000); // 5000 + 3000, pending excluded
+    expect(m!.orders).toBe(2);
+    expect(m!.refundsCents).toBe(1000);
+    expect(m!.newCustomers).toBe(1);
+    expect(m!.currency).toBe("USD");
+  });
+
+  it("rolls the fleet up into the platform shop_metrics_daily table", async () => {
+    const written = await rollupFleetMetrics(env, { days: [today] });
+    expect(written).toBeGreaterThanOrEqual(1);
+    const row = await first<{ gmv: number; orders: number; refunds: number; customers: number }>(
+      db,
+      `SELECT gmv_cents AS gmv, orders, refunds_cents AS refunds, new_customers AS customers
+         FROM shop_metrics_daily WHERE shop_id='shop_rezene' AND day=?`,
+      today,
+    );
+    expect(row?.gmv).toBe(8000);
+    expect(row?.orders).toBe(2);
+    expect(row?.refunds).toBe(1000);
+    expect(row?.customers).toBe(1);
+
+    // Idempotent: a second rollup overwrites, not doubles.
+    await rollupFleetMetrics(env, { days: [today] });
+    const again = await first<{ gmv: number }>(
+      db,
+      `SELECT gmv_cents AS gmv FROM shop_metrics_daily WHERE shop_id='shop_rezene' AND day=?`,
+      today,
+    );
+    expect(again?.gmv).toBe(8000);
+  });
+});
+
+describe("platform error/incident log", () => {
+  it("normalizes id-ish path segments so instances group", () => {
+    expect(normalizePath("/api/admin/products/ord_r1/items")).toBe("/api/admin/products/:id/items");
+    expect(normalizePath("/api/admin/shops")).toBe("/api/admin/shops");
+  });
+
+  it("dedupes by signature (count rises) and re-opens on recurrence", async () => {
+    const e = { method: "POST", path: "/api/admin/products/ord_9", status: 500, message: "TypeError: boom" };
+    await recordPlatformError(env, { ...e, shopId: "shop_rezene" });
+    await recordPlatformError(env, { ...e, shopId: "shop_rezene" });
+    const row = await first<{ id: number; count: number; path: string; resolvedAt: string | null }>(
+      db,
+      `SELECT id, count, path, resolved_at AS resolvedAt FROM platform_errors WHERE message = 'TypeError: boom'`,
+    );
+    expect(row?.count).toBe(2); // two hits, one row
+    expect(row?.path).toBe("/api/admin/products/:id"); // normalized
+
+    // Resolve it, then a recurrence must re-open it.
+    await run(db, `UPDATE platform_errors SET resolved_at = datetime('now') WHERE id = ?`, row!.id);
+    await recordPlatformError(env, { ...e, shopId: "shop_rezene" });
+    const after = await first<{ count: number; resolvedAt: string | null }>(
+      db,
+      `SELECT count, resolved_at AS resolvedAt FROM platform_errors WHERE id = ?`,
+      row!.id,
+    );
+    expect(after?.count).toBe(3);
+    expect(after?.resolvedAt).toBeNull(); // re-opened
+  });
+});
+
+describe("fleet activity pulse", () => {
+  it("merges notable events across shops, newest first, and drops noise", async () => {
+    // The test DB is the primary shop's DO, so events here are the shop's spine.
+    await run(
+      db,
+      `INSERT INTO activity_events (id, kind, entity_type, entity_id, title, created_at)
+       VALUES ('act_f1', 'product.published', 'product', 'p1', 'Published the Linen Shirt', '2026-07-14 09:00:00')`,
+    );
+    await run(
+      db,
+      `INSERT INTO activity_events (id, kind, entity_type, entity_id, title, created_at)
+       VALUES ('act_f2', 'order.paid', 'order', 'o1', 'New order — $80', '2026-07-14 10:00:00')`,
+    );
+    // A non-notable kind must be filtered out of the pulse.
+    await run(
+      db,
+      `INSERT INTO activity_events (id, kind, entity_type, entity_id, title, created_at)
+       VALUES ('act_f3', 'settings.updated', 'settings', 's1', 'Changed a setting', '2026-07-14 11:00:00')`,
+    );
+
+    const { items, shopsScanned } = await fleetActivity(env, { limit: 50 });
+    expect(shopsScanned).toBeGreaterThanOrEqual(1);
+    const kinds = items.map((i) => i.kind);
+    expect(kinds).toContain("product.published");
+    expect(kinds).toContain("order.paid");
+    expect(kinds).not.toContain("settings.updated"); // noise filtered
+    // Newest first: the paid order (10:00) precedes the publish (09:00).
+    const paidIdx = items.findIndex((i) => i.kind === "order.paid");
+    const pubIdx = items.findIndex((i) => i.kind === "product.published");
+    expect(paidIdx).toBeLessThan(pubIdx);
+    // Tagged with the shop it came from.
+    expect(items[paidIdx].shopId).toBe("shop_rezene");
+    expect(items[paidIdx].shopName).toBe("Test Studio");
   });
 });

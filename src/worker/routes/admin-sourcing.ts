@@ -51,6 +51,7 @@ adminSourcingRoutes.get("/export-intel", async (c) => {
         "You are a fashion trade & logistics analyst. For shipping FINISHED APPAREL from the given origin to the given destination, give current, practical export intelligence. Respond with ONLY a single JSON object and nothing before or after it. Use plain text in every value — NO markdown, NO ** bold **, NO citation markers like [1]. Keep each string field to 1-2 tight sentences. Shape: {\"agreement\":\"the trade agreement / tariff program that applies (or 'None')\",\"duties\":\"duty/tariff summary with concrete rates\",\"documents\":[\"required export & import documents\"],\"gotchas\":[\"non-obvious pitfalls — rules of origin (e.g. yarn-forward), quotas, certifications, de minimis thresholds, labeling\"],\"freight\":\"ballpark freight cost and transit time by air and by sea\",\"leadTime\":\"typical end-to-end logistics lead time\",\"asOf\":\"the time period this reflects\"}. Be concrete with numbers but concise so the JSON is complete.",
       prompt: `Finished apparel export lane: ${origin} → ${destination}.`,
       maxTokens: 2600,
+      usage: { shopId: c.var.shopId, operation: "sourcing.export-lane" },
     });
     const { parseModelJson } = await import("../services/anthropic");
     let sections: Record<string, unknown> = {};
@@ -117,6 +118,7 @@ adminSourcingRoutes.post("/search", requireAdminWrite, async (c) => {
         "You are a fashion production sourcing scout. Find REAL, currently-operating clothing manufacturers, tailors, ateliers and small cut-and-sew studios that match the brief. Favor makers that take small/low-MOQ orders and emerging brands. Only include makers you can find evidence for. For each maker, look up its FULL CONTACT DETAILS — street address, phone number, WhatsApp, and email — from its website, business listings, or directories, and include whatever you can verify. Respond with ONLY a JSON array (no prose) of up to 8 objects: {\"name\":\"\",\"city\":\"\",\"country\":\"\",\"address\":\"full street address if found, else null\",\"website\":\"\",\"email\":null,\"phone\":\"international format if found, else null\",\"whatsapp\":null,\"specialties\":[\"\"],\"moqUnits\":null,\"leadTimeDays\":null,\"whyFit\":\"one sentence\"}. Use null when a field is genuinely unknown — never invent a phone number or address.",
       prompt: `Find garment makers for this brief:\n${wants}`,
       maxTokens: 2600,
+      usage: { shopId: c.var.shopId, operation: "sourcing.find-makers" },
     });
     citations = research.citations;
     const { parseModelJson } = await import("../services/anthropic");
@@ -169,6 +171,7 @@ adminSourcingRoutes.post("/enrich", requireAdminWrite, async (c) => {
         "You are a sourcing researcher. Find the OFFICIAL CONTACT DETAILS for the ONE specific clothing maker named below, using its own website, Google Business listing, and reputable directories. Respond with ONLY a JSON object and nothing else, plain text values (no markdown, no citation markers): {\"address\":\"full street address or null\",\"phone\":\"phone in international format or null\",\"whatsapp\":\"WhatsApp number or null\",\"email\":\"contact email or null\"}. NEVER invent a value — use null for anything you cannot verify for THIS exact business.",
       prompt: `Maker: ${who}${body.website ? `\nWebsite: ${body.website}` : ""}\nFind their street address, phone number, WhatsApp, and email.`,
       maxTokens: 700,
+      usage: { shopId: c.var.shopId, operation: "sourcing.enrich-contact" },
     });
     const { parseModelJson } = await import("../services/anthropic");
     let out: Record<string, unknown> = {};

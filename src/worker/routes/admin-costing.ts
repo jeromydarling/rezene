@@ -131,6 +131,7 @@ adminCostingRoutes.post("/cost-sheets/ai-suggest", requireAdminWrite, async (c) 
         `You are an apparel costing analyst. Benchmark a realistic per-unit cost breakdown for the described garment, made at the given origin, for a small production run. All amounts are PER UNIT in ${currency} as plain numbers (major units, e.g. 8.5 not 850). Respond with ONLY a JSON object, plain-text values (no markdown, no citation markers): {"fabricCost":<num>,"trimCost":<num>,"cutSewMake":<num>,"packaging":<num>,"freightPerUnit":<num>,"targetRetail":<num>,"suggestedMarginPct":<num>,"notes":"one or two sentences on assumptions & the biggest cost driver"}. Base it on current market rates; be realistic for low volumes. Never invent precision you don't have — round sensibly.`,
       prompt: `Garment: ${body.garment}${body.materials ? ` (${body.materials})` : ""}\nMade in: ${body.origin || "unspecified"}\nSold in: ${body.targetMarket || "unspecified"}\nRun size: ${body.quantity || "small pilot"}.`,
       maxTokens: 1100,
+      usage: { shopId: c.var.shopId, operation: "costing.benchmark" },
     });
     const { parseModelJson } = await import("../services/anthropic");
     let out: Record<string, unknown> = {};
@@ -389,6 +390,7 @@ adminCostingRoutes.post("/duty-rules/ai-lookup", requireAdminWrite, async (c) =>
         "You are a customs & trade classification analyst for apparel. For the given finished garment and trade lane, identify the likely HS/HTS classification and the current import duty treatment. Respond with ONLY a JSON object, plain-text values (no markdown, no citation markers): {\"name\":\"short rule name e.g. 'US MFN — woven cotton shirt'\",\"hsCategory\":\"HS heading/subheading with a word of context\",\"qualifiesCondition\":\"the rule of origin or condition to get the preferential rate, or 'MFN / no program' \",\"dutyRateMinPct\":<number, percent>,\"dutyRateMaxPct\":<number, percent>,\"isPreferential\":<true if a free-trade program/preferential rate applies>,\"note\":\"one sentence on what drives the rate and any big caveat\"}. Percentages are numbers like 16.5 (not 0.165). If a preferential program exists, min can reflect the preferential (often 0) and max the MFN fallback. Never invent — if unsure, give the MFN range and say so.",
       prompt: `Garment: ${body.garment}${body.materials ? ` (${body.materials})` : ""}\nExport lane: ${body.origin} → ${body.destination}.`,
       maxTokens: 1200,
+      usage: { shopId: c.var.shopId, operation: "costing.duty-lookup" },
     });
     const { parseModelJson } = await import("../services/anthropic");
     let out: Record<string, unknown> = {};

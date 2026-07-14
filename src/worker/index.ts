@@ -85,6 +85,22 @@ app.onError((err, c) => {
     return c.json({ error: "Validation failed", details: err.details }, 400);
   }
   console.error(`[api] ${c.req.method} ${c.req.path}:`, err);
+  // Record the incident for the HQ error view (Sentry gets the full trace via
+  // the outer withSentry wrapper). Best-effort, off the response path.
+  try {
+    const record = import("./services/platform-errors").then(({ recordPlatformError }) =>
+      recordPlatformError(c.env, {
+        shopId: c.var.shopId ?? null,
+        method: c.req.method,
+        path: c.req.path,
+        status: 500,
+        message: String(err),
+      }),
+    );
+    c.executionCtx.waitUntil(record);
+  } catch {
+    /* executionCtx may be absent in some contexts — never block the error response */
+  }
   // Never leak stack traces or internals to clients.
   const message = c.env.APP_ENV === "development" ? String(err) : "Internal error";
   return c.json({ error: message }, 500);
@@ -224,7 +240,11 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
     const ld = await buildProductLd(c.env, shopDb, decodeURIComponent(productMatch[1]), canonicalUrl).catch(() => null);
     if (ld) html = html.replace("</head>", `    ${ld}\n  </head>`);
   }
-  html = injectShopContext(html, shop ? { slug: shop.slug, name: shop.name, basePath } : null);
+  html = injectShopContext(
+    html,
+    shop ? { slug: shop.slug, name: shop.name, basePath } : null,
+    { sentryDsn: c.env.SENTRY_DSN, env: c.env.APP_ENV },
+  );
   // The shell must never be stale: it pins the hashed bundle URL, and a
   // cached copy that outlives a deploy points at assets that no longer
   // exist — the whole app goes blank. no-cache = always revalidate.
@@ -492,6 +512,9 @@ export default Sentry.withSentry(
             // R&D: refresh watched brand dossiers / trend boards that went stale.
             const { researchWatchSweep } = await import("./services/research-lab");
             await researchWatchSweep(env).catch((err) => console.error("[research] watch sweep failed:", err));
+            // Fleet revenue: roll each shop's day up into the platform table for HQ.
+            const { rollupFleetMetrics } = await import("./services/shop-metrics");
+            await rollupFleetMetrics(env).catch((err) => console.error("[metrics] rollup failed:", err));
           }),
       );
     }

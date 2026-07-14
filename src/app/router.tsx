@@ -91,6 +91,11 @@ import { ShippingPage } from "./pages/admin/ShippingPage";
 import { MarketingPage } from "./pages/admin/MarketingPage";
 import { VideoStudioPage } from "./pages/admin/VideoStudioPage";
 import { PlatformPage } from "./pages/admin/PlatformPage";
+import { AiUsagePage } from "./pages/admin/AiUsagePage";
+import { FleetRevenuePage } from "./pages/admin/FleetRevenuePage";
+import { ShopProgressPage } from "./pages/admin/ShopProgressPage";
+import { PlatformErrorsPage } from "./pages/admin/PlatformErrorsPage";
+import { FleetActivityPage } from "./pages/admin/FleetActivityPage";
 import { CrmAtlasPage, CrmPage } from "./pages/admin/CrmPage";
 import { SearchCheckupPage } from "./pages/admin/SearchCheckupPage";
 import {
@@ -268,6 +273,11 @@ export function AppRouter() {
           <Route path="support" element={<KnowledgeBasePage />} />
           <Route path="support/kb/:slug" element={<KnowledgeBasePage />} />
           <Route path="platform" element={<PlatformPage />} />
+          <Route path="ai-usage" element={<AiUsagePage />} />
+          <Route path="revenue" element={<FleetRevenuePage />} />
+          <Route path="shop-progress" element={<ShopProgressPage />} />
+          <Route path="errors" element={<PlatformErrorsPage />} />
+          <Route path="activity" element={<FleetActivityPage />} />
           <Route path="feedback" element={<FeedbackInboxPage />} />
           <Route path="crm" element={<CrmPage />} />
           <Route path="crm/atlas" element={<CrmAtlasPage />} />

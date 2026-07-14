@@ -1,5 +1,6 @@
 import { askClaude, AnthropicNotConfiguredError } from "./anthropic";
 import { runWorkersAiChat } from "./workers-ai";
+import type { UsageContext } from "./ai-usage";
 import type { Env } from "../types/env";
 
 /**
@@ -22,11 +23,11 @@ export interface AiCompletion {
 
 export async function aiComplete(
   env: Env,
-  opts: { system: string; prompt: string; maxTokens?: number },
+  opts: { system: string; prompt: string; maxTokens?: number; usage?: UsageContext },
 ): Promise<AiCompletion> {
   if (env.ANTHROPIC_API_KEY) {
     try {
-      const result = await askClaude(env, opts);
+      const result = await askClaude(env, { ...opts, usage: opts.usage });
       if (result.text.trim()) return { text: result.text, provider: "anthropic" };
     } catch (err) {
       if (!(err instanceof AnthropicNotConfiguredError)) {
@@ -40,7 +41,7 @@ export async function aiComplete(
       { role: "system", content: opts.system },
       { role: "user", content: opts.prompt },
     ],
-    { maxTokens: opts.maxTokens ?? 2048 },
+    { maxTokens: opts.maxTokens ?? 2048, usage: opts.usage },
   );
   if (text) return { text, provider: "workers-ai" };
   throw new AiUnavailableError();

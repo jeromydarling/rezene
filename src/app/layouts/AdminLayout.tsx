@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
+  Activity,
   Zap,
   BookUser,
   BarChart3,
@@ -19,6 +20,8 @@ import {
   FileText,
   FlaskConical,
   FolderOpen,
+  Gauge,
+  TriangleAlert,
   Images,
   Landmark,
   LayoutDashboard,
@@ -197,12 +200,17 @@ const NAV_SECTIONS: {
       { to: "/admin/crm/atlas", label: "Atlas", icon: Map },
       { to: "/admin/feedback", label: "Support tickets", icon: LifeBuoy },
       { to: "/admin/platform", label: "Verto Shops", icon: Store },
+      { to: "/admin/shop-progress", label: "Shop Progress", icon: Rocket },
+      { to: "/admin/activity", label: "Fleet Activity", icon: Activity },
+      { to: "/admin/revenue", label: "Fleet Revenue", icon: CircleDollarSign },
+      { to: "/admin/ai-usage", label: "AI Usage", icon: Gauge },
+      { to: "/admin/errors", label: "Errors", icon: TriangleAlert },
     ],
   },
 ];
 
 /** Platform HQ routes — the only admin surface at bare verto.style/admin. */
-const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform"];
+const HQ_PREFIXES = ["/admin/crm", "/admin/feedback", "/admin/platform", "/admin/shop-progress", "/admin/activity", "/admin/revenue", "/admin/ai-usage", "/admin/errors"];
 
 function visibleSections(platformMode: boolean) {
   // Verto HQ lives at bare verto.style/admin (platform context, SuperAdmin
