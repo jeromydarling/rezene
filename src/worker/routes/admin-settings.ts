@@ -20,6 +20,13 @@ adminSettingsRoutes.get("/", async (c) => {
       description: "Where replies to your order and customer emails land. The sending address is a no-reply, so set this to an inbox you actually read.",
     });
   }
+  if (!rows.some((r) => r.key === "verto_badge")) {
+    rows.push({
+      key: "verto_badge",
+      value: "on",
+      description: `A quiet "Made with Verto" credit in your storefront footer. Type "off" to hide it.`,
+    });
+  }
   const integrations = await all(
     c.var.db,
     `SELECT provider, status, note, last_verified_at FROM integration_credentials_metadata`,
@@ -37,6 +44,27 @@ adminSettingsRoutes.get("/", async (c) => {
   return c.json({ settings: rows, integrations, secretStatus });
 });
 
+/**
+ * Refer-a-designer: the shop's share link plus what it has earned. Referral
+ * data lives in the platform registry (env.DB), keyed by this shop's id —
+ * readable from any shop admin session, never writable from here.
+ */
+adminSettingsRoutes.get("/referrals", async (c) => {
+  if (!c.var.shopSlug) return c.json({ error: "Not found" }, 404);
+  const base = (c.env.APP_URL || "https://verto.style").replace(/\/$/, "");
+  const link = `${base}/signup?ref=${encodeURIComponent(c.var.shopSlug)}`;
+  const credits = await all<{ side: string; status: string; months: number; created_at: string; other: string | null }>(
+    c.env.DB,
+    `SELECT rc.side, rc.status, rc.months, rc.created_at, s.name AS other
+       FROM referral_credits rc LEFT JOIN shops s ON s.id = rc.other_shop_id
+      WHERE rc.shop_id = ? ORDER BY rc.created_at DESC`,
+    c.var.shopId,
+  ).catch(() => []);
+  const pendingMonths = credits.filter((r) => r.status === "pending").reduce((a, r) => a + r.months, 0);
+  const appliedMonths = credits.filter((r) => r.status === "applied").reduce((a, r) => a + r.months, 0);
+  return c.json({ link, pendingMonths, appliedMonths, credits });
+});
+
 adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
   const body = await parseBody(c, settingsUpdateSchema);
   const editable = new Set([
@@ -48,6 +76,8 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
     // Reply-To on buyer email — the From is the platform's no-reply address,
     // so this is where customer replies actually land.
     "reply_to_email",
+    // "Made with Verto" storefront credit — "on" (default) or "off".
+    "verto_badge",
     // Visual identity (managed from the Brand Studio) — JSON blobs.
     "brand_logo",
     "brand_palette",
@@ -65,6 +95,9 @@ adminSettingsRoutes.patch("/", requireAdminOnly, async (c) => {
   const replyTo = body.reply_to_email?.trim();
   if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
     return c.json({ error: "Reply-to email doesn't look like an address." }, 400);
+  }
+  if (body.verto_badge !== undefined && !["on", "off"].includes(body.verto_badge.trim().toLowerCase())) {
+    return c.json({ error: `The Verto badge setting is just "on" or "off".` }, 400);
   }
   for (const [key, value] of updates) {
     await run(

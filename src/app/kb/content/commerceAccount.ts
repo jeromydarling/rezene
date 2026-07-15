@@ -111,6 +111,8 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
 
 - **Brand** — name, tagline, and identity. Change them here and they update everywhere, from the storefront to your tech pack covers.
 - **Reply-to email** — where replies to your order confirmations and customer emails land. The sending address is a platform no-reply, so set this to an inbox you actually read; every buyer email your shop sends will carry it.
+- **Verto badge** — a quiet "Made with Verto" credit in your storefront footer, on by default. Type \`off\` to hide it.
+- **Refer a designer** — your personal signup link. When a designer opens a shop through it, **you both get a month free** — earned months show right on the card.
 - **Integrations** — at-a-glance status for Payments (Stripe) and LLM assistance. Connection keys live as encrypted secrets outside the app.
 - **Change password** — update your own password; all other sessions sign out.`,
   },

@@ -235,6 +235,8 @@ export interface BrandSettings {
   logo?: BrandLogo | null;
   palette?: BrandPalette | null;
   typography?: BrandTypography | null;
+  /** "Made with Verto" storefront credit — on by default, shop can opt out. */
+  vertoBadge?: boolean;
 }
 
 export type LeadKind =

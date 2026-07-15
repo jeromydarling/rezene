@@ -51,6 +51,10 @@ const EXCLUDE = new Set([
   "0047_library_cache.sql",
   "0048_directory.sql",
   "0049_activation_events.sql",
+  // Referrals ALTER the platform `shops` registry, which this shop-DB harness
+  // deliberately doesn't have (0009 is excluded above). 0060/0061 stay in:
+  // they create standalone tables, so applying them here is harmless coverage.
+  "0062_referrals.sql",
 ]);
 
 beforeAll(async () => {

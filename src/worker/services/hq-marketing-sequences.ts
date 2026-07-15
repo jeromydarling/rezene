@@ -81,6 +81,25 @@ One piece is enough to go live. The rest can follow at your pace.
     ],
   },
   {
+    key: "milestone_testimonial",
+    label: "Testimonial ask",
+    description: "Shops that reach their first sale get one proud note asking for a quote we can feature.",
+    steps: [
+      {
+        afterDays: 0,
+        subject: "Congratulations on the first sale at {{shop}}",
+        bodyMd: `Hi {{name}},
+
+A first sale is a real milestone — congratulations. {{shop}} is officially a working label.
+
+A small ask: would you write a sentence or two about what running your label on Verto has been like? We feature designers' own words on the site (with your shop linked), and it means more than anything we could write ourselves. Just reply to this email — I read every one.
+
+Warmly,
+Verto`,
+      },
+    ],
+  },
+  {
     key: "winback",
     label: "Win-back",
     description: "Shops marked at-risk or churned get a single honest check-in.",
@@ -149,6 +168,15 @@ async function eligible(env: Env, key: string): Promise<Candidate[]> {
         `${base} AND ct.shop_id IS NOT NULL AND s.status = 'active' AND s.slug != 'maison'
            AND s.created_at <= datetime('now','-7 days')
            AND NOT EXISTS (SELECT 1 FROM activation_events ae WHERE ae.shop_id = ct.shop_id AND ae.event = 'product')`,
+        key,
+      );
+    case "milestone_testimonial":
+      // Crossed the 'share' milestone (shared / first sale) — the proudest
+      // moment to ask, and the answer doubles as marketing-site social proof.
+      return all<Candidate>(
+        env.DB,
+        `${base} AND ct.shop_id IS NOT NULL AND s.status = 'active' AND s.slug != 'maison'
+           AND EXISTS (SELECT 1 FROM activation_events ae WHERE ae.shop_id = ct.shop_id AND ae.event = 'share')`,
         key,
       );
     case "winback":

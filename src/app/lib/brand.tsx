@@ -28,6 +28,7 @@ const DEFAULT_BRAND: BrandSettings = {
   logo: null,
   palette: null,
   typography: null,
+  vertoBadge: true,
 };
 
 /** Point the browser tab's icon at the brand's favicon (or a derived one). */
@@ -74,6 +75,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           logo: settings.logo ?? null,
           palette: settings.palette ?? null,
           typography: settings.typography ?? null,
+          vertoBadge: settings.vertoBadge !== false,
         });
         if (settings.brandName) document.title = settings.brandName;
         if (settings.typography?.pairing) loadBrandFonts(settings.typography.pairing);

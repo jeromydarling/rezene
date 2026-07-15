@@ -54,10 +54,59 @@ interface SequenceRow {
   sent: number;
 }
 
+interface ReferralRow {
+  id: string;
+  side: string;
+  months: number;
+  status: string;
+  created_at: string;
+  shop_name: string;
+  shop_slug: string;
+  other_name: string | null;
+}
+
+interface ChangelogKit {
+  tweets: string[];
+  linkedin: string;
+  newsletter_md: string;
+}
+
 export function OutreachPage() {
   const toast = useToast();
   const overview = useFetch<Overview>("/api/admin/platform/marketing");
   const sequences = useFetch<SequenceRow[]>("/api/admin/platform/marketing/sequences");
+  const referrals = useFetch<ReferralRow[]>("/api/admin/platform/referrals");
+  const [kitNotes, setKitNotes] = useState("");
+  const [kit, setKit] = useState<ChangelogKit | null>(null);
+
+  async function generateKit() {
+    if (kitNotes.trim().length < 10) {
+      toast.error("Describe what shipped first");
+      return;
+    }
+    setBusy("kit");
+    try {
+      setKit(await api.post<ChangelogKit>("/api/admin/platform/marketing/changelog-kit", { notes: kitNotes }));
+    } catch (err) {
+      toast.error("Couldn't generate the kit", err instanceof ApiRequestError ? err.message : undefined);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function copy(text: string) {
+    void navigator.clipboard.writeText(text).then(() => toast.success("Copied"));
+  }
+
+  async function applyCredit(id: string) {
+    try {
+      await api.post(`/api/admin/platform/referrals/${id}/apply`);
+      toast.success("Credit marked applied");
+      referrals.reload();
+    } catch (err) {
+      toast.error("Couldn't apply", err instanceof ApiRequestError ? err.message : undefined);
+    }
+  }
 
   async function toggleSequence(s: SequenceRow) {
     try {
@@ -288,6 +337,106 @@ export function OutreachPage() {
             </button>
           </div>
         ))}
+      </div>
+
+      {/* Changelog → campaign kit */}
+      <div className="admin-card space-y-3 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Changelog kit</h2>
+        <p className="text-xs text-warmgrey">
+          Paste what shipped; get a tweet thread, a LinkedIn post, and a newsletter section in Verto's voice.
+        </p>
+        <textarea
+          className="admin-input min-h-[6rem] w-full text-sm"
+          placeholder="e.g. Shops can now print a seasonal lookbook and drop-ship copies to any mailing list — print on demand, no minimums, tracking included."
+          value={kitNotes}
+          onChange={(e) => setKitNotes(e.target.value)}
+        />
+        <button type="button" className="btn btn-secondary" onClick={generateKit} disabled={busy === "kit"}>
+          {busy === "kit" ? "Writing…" : "Generate kit"}
+        </button>
+        {kit && (
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="rounded border border-navy/10 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-warmgrey">Tweet thread</p>
+                <button type="button" className="text-xs text-terracotta" onClick={() => copy(kit.tweets.join("\n\n"))}>copy</button>
+              </div>
+              {kit.tweets.map((t, i) => (
+                <p key={i} className="mb-2 whitespace-pre-wrap text-xs">{t}</p>
+              ))}
+            </div>
+            <div className="rounded border border-navy/10 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-warmgrey">LinkedIn</p>
+                <button type="button" className="text-xs text-terracotta" onClick={() => copy(kit.linkedin)}>copy</button>
+              </div>
+              <p className="whitespace-pre-wrap text-xs">{kit.linkedin}</p>
+            </div>
+            <div className="rounded border border-navy/10 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-warmgrey">Newsletter</p>
+                <button
+                  type="button"
+                  className="text-xs text-terracotta"
+                  onClick={() => {
+                    setBodyMd(kit.newsletter_md);
+                    if (!subject) setSubject("News from Verto");
+                    toast.success("Loaded into the composer above");
+                  }}
+                >
+                  use as broadcast
+                </button>
+              </div>
+              <p className="whitespace-pre-wrap text-xs">{kit.newsletter_md}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Referral ledger */}
+      <div className="admin-card space-y-3 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Referrals</h2>
+        <p className="text-xs text-warmgrey">
+          Shops share verto.style/signup?ref=&lt;their-slug&gt;; both sides earn a free month. Mark a credit applied
+          once it's reflected on billing.
+        </p>
+        {referrals.data && referrals.data.length === 0 && (
+          <EmptyState title="No referrals yet" hint="Every shop's Settings page carries their share link." />
+        )}
+        {referrals.data && referrals.data.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-warmgrey">
+                  <th className="pb-2 pr-4">Shop</th>
+                  <th className="pb-2 pr-4">Side</th>
+                  <th className="pb-2 pr-4">Via</th>
+                  <th className="pb-2 pr-4">Months</th>
+                  <th className="pb-2 pr-4">Status</th>
+                  <th className="pb-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {referrals.data.map((r) => (
+                  <tr key={r.id} className="border-t border-navy/5">
+                    <td className="py-2 pr-4">{r.shop_name}</td>
+                    <td className="py-2 pr-4 text-warmgrey">{r.side}</td>
+                    <td className="py-2 pr-4 text-warmgrey">{r.other_name ?? "—"}</td>
+                    <td className="py-2 pr-4">{r.months}</td>
+                    <td className="py-2 pr-4">{r.status}</td>
+                    <td className="py-2 text-right">
+                      {r.status === "pending" && (
+                        <button type="button" className="text-xs text-terracotta" onClick={() => void applyCredit(r.id)}>
+                          mark applied
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Past broadcasts */}

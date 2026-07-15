@@ -1903,6 +1903,45 @@ function ApiKeysCard() {
   );
 }
 
+/** Refer a designer — the shop's share link, and the free months it has earned. */
+function ReferralCard() {
+  const { data } = useFetch<{ link: string; pendingMonths: number; appliedMonths: number }>(
+    "/api/admin/settings/referrals",
+  );
+  const [copied, setCopied] = useState(false);
+  if (!data) return null;
+  return (
+    <div className="admin-card p-5">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-warmgrey">Refer a designer</h2>
+      <p className="mb-3 text-sm text-ink/80">
+        Know a designer who should be on Verto? When they open a shop through your link, you <strong>both get a
+        month free</strong>.
+      </p>
+      <div className="flex gap-2">
+        <input className="input flex-1 text-xs" readOnly value={data.link} onFocus={(e) => e.target.select()} />
+        <button
+          type="button"
+          className="btn btn-secondary whitespace-nowrap"
+          onClick={() => {
+            void navigator.clipboard.writeText(data.link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? "Copied ✓" : "Copy link"}
+        </button>
+      </div>
+      {(data.pendingMonths > 0 || data.appliedMonths > 0) && (
+        <p className="mt-3 text-xs text-warmgrey">
+          Earned so far: {data.pendingMonths + data.appliedMonths} free month
+          {data.pendingMonths + data.appliedMonths === 1 ? "" : "s"}
+          {data.pendingMonths > 0 ? ` (${data.pendingMonths} on the way to your bill)` : ""}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { data, loading, error, reload } = useFetch<SettingsResponse>("/api/admin/settings");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -2010,6 +2049,7 @@ export function SettingsPage() {
               database or the browser.
             </p>
           </div>
+          <ReferralCard />
           <DataExportCard />
           <InboundWebhookCard />
           <ApiKeysCard />
