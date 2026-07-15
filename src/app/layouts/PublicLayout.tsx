@@ -189,6 +189,18 @@ export function PublicLayout() {
           <p>
             © {new Date().getFullYear()} {brand.brandName} · Produced in Casablanca, Morocco
           </p>
+          {brand.vertoBadge !== false && (
+            <p>
+              <a
+                href="https://verto.style/?utm_source=shop_badge&utm_medium=storefront"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-chalk/40 transition hover:text-chalk/70"
+              >
+                Made with Verto
+              </a>
+            </p>
+          )}
         </div>
       </footer>
     </div>

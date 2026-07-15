@@ -799,6 +799,8 @@ function VertoSignup() {
     setBusy(true);
     setError(null);
     try {
+      // A referral link (verto.style/signup?ref=<shop>) credits both sides.
+      const ref = new URLSearchParams(window.location.search).get("ref") || undefined;
       const res = await api.post<SignupResult>("/api/verto/signup", {
         shopName: form.shopName,
         slug: form.slug,
@@ -806,6 +808,7 @@ function VertoSignup() {
         plan: form.plan,
         note: form.note || undefined,
         website: form.website || undefined,
+        ref,
       });
       setDone(res);
     } catch (err) {

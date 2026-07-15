@@ -36,6 +36,7 @@ const EXCLUDE = new Set([
   "0057_platform_errors.sql", // Error/incident log — platform-wide, read by HQ
   "0060_hq_marketing.sql", // HQ marketing suite — Verto's own audience/sends, platform-only
   "0061_hq_sequences.sql", // HQ marketing lifecycle-sequence switches, platform-only
+  "0062_referrals.sql", // Referral program — shops registry + credits, platform-only
 ]);
 
 const files = readdirSync(dir)

@@ -26,6 +26,8 @@ const signupSchema = z.object({
   plan: z.enum(["starter", "label", "studio", "house"]).optional(),
   note: z.string().max(1000).optional(),
   website: z.string().max(200).optional(),
+  /** Referring shop's slug (from a share link) — both sides earn a free month. */
+  ref: z.string().max(40).optional(),
 });
 
 vertoRoutes.post(
@@ -39,18 +41,48 @@ vertoRoutes.post(
     const existing = await first(c.env.DB, `SELECT id FROM shops WHERE slug = ?`, body.slug);
     if (existing) return c.json({ error: "That address is taken — try another" }, 409);
 
+    // Referral: only a real, different shop counts — a bad ref never blocks signup.
+    let referrer: { id: string; slug: string } | null = null;
+    if (body.ref && body.ref !== body.slug) {
+      referrer = await first<{ id: string; slug: string }>(
+        c.env.DB,
+        `SELECT id, slug FROM shops WHERE slug = ? AND status = 'active'`,
+        body.ref,
+      );
+    }
+
     const id = newId("shop");
     await run(
       c.env.DB,
-      `INSERT INTO shops (id, slug, name, status, owner_email, plan, note)
-       VALUES (?, ?, ?, 'pending', ?, ?, ?)`,
+      `INSERT INTO shops (id, slug, name, status, owner_email, plan, note, referred_by_slug)
+       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`,
       id,
       body.slug,
       body.shopName,
       body.email.toLowerCase(),
       body.plan ?? null,
       body.note ?? null,
+      referrer?.slug ?? null,
     );
+
+    // Both sides of a referral earn a free month, held as pending credits the
+    // founder applies to billing from HQ.
+    if (referrer) {
+      await run(
+        c.env.DB,
+        `INSERT INTO referral_credits (id, shop_id, side, other_shop_id) VALUES (?, ?, 'referrer', ?)`,
+        newId("refc"),
+        referrer.id,
+        id,
+      );
+      await run(
+        c.env.DB,
+        `INSERT INTO referral_credits (id, shop_id, side, other_shop_id) VALUES (?, ?, 'referee', ?)`,
+        newId("refc"),
+        id,
+        referrer.id,
+      );
+    }
 
     // Activation funnel: signup is milestone zero.
     const { recordActivationEvent } = await import("../services/activation");
@@ -66,7 +98,7 @@ vertoRoutes.post(
       status: "trial",
       kind: "signup",
       subject: `Signed up: ${body.shopName} (/${body.slug})`,
-      metadata: { slug: body.slug, plan: body.plan ?? null, note: body.note ?? null },
+      metadata: { slug: body.slug, plan: body.plan ?? null, note: body.note ?? null, referredBy: referrer?.slug ?? null },
       geo: geoFromRequest(c.req.raw),
     });
 

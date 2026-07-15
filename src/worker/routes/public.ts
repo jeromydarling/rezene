@@ -46,7 +46,7 @@ publicRoutes.get("/settings", async (c) => {
   const rows = await all<{ key: string; value: string }>(
     c.var.db,
     `SELECT key, value FROM settings
-     WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero','nav_menus','supported_languages','brand_logo','brand_palette','brand_typography')`,
+     WHERE key IN ('brand_name','brand_tagline','default_currency','home_hero','nav_menus','supported_languages','brand_logo','brand_palette','brand_typography','verto_badge')`,
   );
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   const parse = <T>(value: string | undefined): T | null => {
@@ -67,6 +67,9 @@ publicRoutes.get("/settings", async (c) => {
     logo: parse<BrandSettings["logo"]>(map.brand_logo),
     palette: parse<BrandSettings["palette"]>(map.brand_palette),
     typography: parse<BrandSettings["typography"]>(map.brand_typography),
+    // On unless the shop explicitly turned it off — every storefront carries
+    // a quiet "Made with Verto" credit that links back with attribution.
+    vertoBadge: map.verto_badge !== "off",
   };
   return c.json(settings);
 });

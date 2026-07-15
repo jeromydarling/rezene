@@ -652,6 +652,64 @@ adminPlatformRoutes.post("/marketing/sequences/:key", async (c) => {
   }
 });
 
+/** Referral ledger: who referred whom, and the free months awaiting billing. */
+adminPlatformRoutes.get("/referrals", async (c) => {
+  const rows = await all(
+    c.env.DB,
+    `SELECT rc.id, rc.side, rc.months, rc.status, rc.created_at, rc.applied_at,
+            s.name AS shop_name, s.slug AS shop_slug,
+            o.name AS other_name, o.slug AS other_slug
+       FROM referral_credits rc
+       JOIN shops s ON s.id = rc.shop_id
+       LEFT JOIN shops o ON o.id = rc.other_shop_id
+      ORDER BY rc.created_at DESC LIMIT 200`,
+  );
+  return c.json(rows);
+});
+
+/** Mark a credit applied once it's reflected on the shop's billing. */
+adminPlatformRoutes.post("/referrals/:id/apply", async (c) => {
+  await run(
+    c.env.DB,
+    `UPDATE referral_credits SET status = 'applied', applied_at = datetime('now') WHERE id = ? AND status = 'pending'`,
+    c.req.param("id"),
+  );
+  await writeAudit(c.env.DB, c.var.userId!, "referral.apply", "referral_credit", c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+/**
+ * Changelog → campaign kit: paste what shipped, get a tweet thread, a LinkedIn
+ * post, and a newsletter section in Verto's voice — the newsletter can seed a
+ * broadcast draft directly.
+ */
+const kitSchema = z.object({ notes: z.string().min(10).max(6000) });
+adminPlatformRoutes.post("/marketing/changelog-kit", async (c) => {
+  const body = await parseBody(c, kitSchema);
+  const { askClaude } = await import("../services/anthropic");
+  try {
+    const res = await askClaude(c.env, {
+      system: `You turn a SaaS changelog entry into a small campaign kit for Verto, a fashion-tech platform for independent designers. Voice: warm, plain-language, editorial — never corporate or hypey. No emoji, no hashtags.
+
+Return STRICT JSON: {"tweets": ["...", "..."], "linkedin": "...", "newsletter_md": "..."}
+- tweets: 2-4 tweets forming a thread, each under 260 chars, first one hooks.
+- linkedin: one post, under 150 words, line breaks as \\n.
+- newsletter_md: a markdown section for the customer newsletter (heading + 2 short paragraphs, may use **bold** and [links](https://...)). Use {{name}} nowhere.
+Never invent features, numbers, or dates beyond the notes.`,
+      prompt: `What shipped:\n${body.notes}`,
+      maxTokens: 1500,
+      usage: { shopId: null, operation: "hq_changelog_kit" },
+    });
+    const m = res.text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("kit came back unstructured — try again");
+    const kit = JSON.parse(m[0]) as { tweets?: string[]; linkedin?: string; newsletter_md?: string };
+    if (!kit.tweets?.length || !kit.newsletter_md) throw new Error("kit missing pieces — try again");
+    return c.json(kit);
+  } catch (err) {
+    return c.json({ error: String(err instanceof Error ? err.message : err).slice(0, 300) }, 502);
+  }
+});
+
 adminPlatformRoutes.get("/marketing/suppression", async (c) => {
   return c.json(await all(c.env.DB, `SELECT email, reason, created_at FROM hq_marketing_suppression ORDER BY created_at DESC LIMIT 500`));
 });
