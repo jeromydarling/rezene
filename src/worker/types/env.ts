@@ -87,6 +87,9 @@ export interface Env {
   MARKETING_BATCH_PER_TICK?: string;
   /** Postal address for the CAN-SPAM footer on marketing email. */
   MARKETING_POSTAL_ADDRESS?: string;
+  /** Card-processing share of the Connect application fee (default "2.9" + "30"¢). */
+  VERTO_PROCESSING_FEE_PCT?: string;
+  VERTO_PROCESSING_FEE_FIXED_CENTS?: string;
 
   // Secrets
   /** Lulu Print API OAuth2 client key + secret (platform-brokered account). */

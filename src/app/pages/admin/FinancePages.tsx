@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatMoney, titleCase } from "../../lib/format";
@@ -1903,6 +1903,123 @@ function ApiKeysCard() {
   );
 }
 
+/**
+ * Payments & plan: Stripe Connect onboarding (get paid to YOUR bank) and the
+ * Verto subscription. Both redirect to Stripe-hosted pages; returning with
+ * ?stripe=… re-syncs the account state.
+ */
+function PaymentsPlanCard() {
+  const { data, loading, reload } = useFetch<{
+    stripeConfigured: boolean;
+    connected: boolean;
+    chargesEnabled: boolean;
+    detailsSubmitted: boolean;
+    plan: string | null;
+    billingStatus: string | null;
+    hasBillingCustomer: boolean;
+    plans: { key: string; name: string; monthlyCents: number; feePct: number }[];
+  }>("/api/admin/payments");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Back from Stripe onboarding → pull live status into the registry.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("stripe")) {
+      void api.post("/api/admin/payments/sync").then(() => reload()).catch(() => {});
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    if (params.get("billing")) {
+      // Plan lands via webhook moments later; a reload picks it up.
+      setTimeout(() => reload(), 1500);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function go(path: string, body?: unknown) {
+    setBusy(path);
+    setErr(null);
+    try {
+      const r = await api.post<{ url?: string; error?: string }>(path, body ?? {});
+      if (r.url) window.location.href = r.url;
+    } catch (e) {
+      setErr(e instanceof ApiRequestError ? e.message : "Something went wrong — try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (loading || !data) return null;
+  const payoutState = data.chargesEnabled
+    ? { label: "payments live", cls: "badge-success" }
+    : data.connected
+      ? { label: "onboarding incomplete", cls: "badge-neutral" }
+      : { label: "not connected", cls: "badge-neutral" };
+
+  return (
+    <div className="admin-card p-5">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-warmgrey">Payments &amp; plan</h2>
+
+      <div className="mb-1 flex items-center justify-between text-sm">
+        <span>Get paid (Stripe)</span>
+        <span className={`badge ${payoutState.cls}`}>{payoutState.label}</span>
+      </div>
+      <p className="mb-3 text-xs text-warmgrey">
+        {data.chargesEnabled
+          ? "Customer payments go straight to your bank account, minus your plan's combined rate."
+          : "Connect once and every sale pays out to your own bank account. Stripe walks you through identity and bank details — about five minutes."}
+      </p>
+      {!data.chargesEnabled && (
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!data.stripeConfigured || busy !== null}
+          onClick={() => void go("/api/admin/payments/connect")}
+        >
+          {busy === "/api/admin/payments/connect" ? "Opening Stripe…" : data.connected ? "Resume setup" : "Connect payouts"}
+        </button>
+      )}
+
+      <div className="mt-5 border-t border-navy/10 pt-4">
+        <div className="mb-1 flex items-center justify-between text-sm">
+          <span>Verto plan</span>
+          <span className={`badge ${data.billingStatus === "active" || data.billingStatus === "trialing" ? "badge-success" : "badge-neutral"}`}>
+            {data.plan ? `${data.plan}${data.billingStatus ? ` · ${data.billingStatus}` : ""}` : "no plan yet"}
+          </span>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {data.plans.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`rounded border p-2 text-left text-xs transition hover:border-terracotta ${data.plan === p.key ? "border-terracotta ring-1 ring-terracotta" : "border-navy/10"}`}
+              disabled={busy !== null}
+              onClick={() => void go("/api/admin/payments/billing/checkout", { plan: p.key })}
+            >
+              <span className="block font-semibold">{p.name}</span>
+              <span className="text-warmgrey">
+                ${(p.monthlyCents / 100).toFixed(0)}/mo · {p.feePct}% + processing
+              </span>
+            </button>
+          ))}
+        </div>
+        {data.hasBillingCustomer && (
+          <button
+            type="button"
+            className="btn btn-secondary mt-3"
+            disabled={busy !== null}
+            onClick={() => void go("/api/admin/payments/billing/portal")}
+          >
+            Manage billing
+          </button>
+        )}
+      </div>
+      {err && <p className="field-error mt-3">{err}</p>}
+    </div>
+  );
+}
+
 /** Refer a designer — the shop's share link, and the free months it has earned. */
 function ReferralCard() {
   const { data } = useFetch<{ link: string; pendingMonths: number; appliedMonths: number }>(
@@ -2049,6 +2166,7 @@ export function SettingsPage() {
               database or the browser.
             </p>
           </div>
+          <PaymentsPlanCard />
           <ReferralCard />
           <DataExportCard />
           <InboundWebhookCard />
