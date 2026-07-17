@@ -256,10 +256,28 @@ commerceRoutes.post(
     );
     const taxEnabled = taxRow?.value === "true";
 
+    // Stripe Connect: when this shop has a live Express account, the payment
+    // routes to it (destination charge) minus Verto's application fee — plan
+    // fee + card processing, computed on the goods subtotal. Shops without a
+    // connected account keep charging on the platform account as before.
+    const { getShopStripeState, platformFeeCents } = await import("../services/stripe-connect");
+    const connectShop = await getShopStripeState(c.env, c.var.shopId).catch(() => null);
+    const goodsSubtotalCents = resolved.reduce((sum, r) => sum + r.unitPriceCents * r.quantity, 0);
+    const connectParams =
+      connectShop?.stripe_account_id && connectShop.stripe_charges_enabled
+        ? {
+            payment_intent_data: {
+              transfer_data: { destination: connectShop.stripe_account_id },
+              application_fee_amount: platformFeeCents(c.env, connectShop.plan, goodsSubtotalCents),
+            },
+          }
+        : {};
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       client_reference_id: orderId,
       metadata: { order_id: orderId, order_number: orderNumber },
+      ...connectParams,
       line_items: resolved.map((r) => ({
         quantity: r.quantity,
         price_data: {

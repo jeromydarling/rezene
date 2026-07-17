@@ -110,6 +110,7 @@ Once connected, your storefront, SEO output, and sitemaps all serve on your doma
 **Account → Settings** holds the essentials.
 
 - **Brand** — name, tagline, and identity. Change them here and they update everywhere, from the storefront to your tech pack covers.
+- **Payments & plan** — connect Stripe once (about five minutes: identity + bank) and every sale pays out to **your own bank account**, minus your plan's combined rate (plan fee + card processing — one honest number, no separate Stripe bill). The same card is where you pick or change your **Verto plan** and manage billing.
 - **Reply-to email** — where replies to your order confirmations and customer emails land. The sending address is a platform no-reply, so set this to an inbox you actually read; every buyer email your shop sends will carry it.
 - **Verto badge** — a quiet "Made with Verto" credit in your storefront footer, on by default. Type \`off\` to hide it.
 - **Refer a designer** — your personal signup link. When a designer opens a shop through it, **you both get a month free** — earned months show right on the card.

@@ -98,9 +98,17 @@ adminReturnsRoutes.post("/:id/approve", requireAdminWrite, async (c) => {
     const stripe = getStripe(c.env);
     if (!stripe) return c.json({ error: "Connect Stripe to refund this return." }, 400);
     try {
+      // Destination charges (Stripe Connect) must reverse the transfer so the
+      // refunded amount comes back out of the shop's balance, not Verto's.
+      const pi = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id, {
+        expand: ["latest_charge"],
+      });
+      const charge = pi.latest_charge as import("stripe").Stripe.Charge | null;
+      const isDestinationCharge = Boolean(charge && typeof charge !== "string" && charge.transfer_data);
       const refund = await stripe.refunds.create({
         payment_intent: order.stripe_payment_intent_id,
         amount,
+        ...(isDestinationCharge ? { reverse_transfer: true } : {}),
       });
       stripeRefundId = refund.id;
     } catch (err) {

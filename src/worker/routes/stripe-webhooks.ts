@@ -84,6 +84,15 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
       case "customer.updated":
         await upsertCustomer(c.env.DB, event.data.object);
         break;
+      // Verto plan billing: subscription lifecycle → shop registry (plan +
+      // billing_status). The subscription carries shop_id in its metadata.
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const { applySubscriptionEvent } = await import("../services/stripe-connect");
+        await applySubscriptionEvent(c.env, event.data.object);
+        break;
+      }
       default:
         await run(
           c.env.DB,

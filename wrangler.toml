@@ -64,6 +64,11 @@ MARKETING_EMAIL_FROM = ""
 MARKETING_REPLY_TO = "gardener@thecros.app"
 MARKETING_BATCH_PER_TICK = "10"
 MARKETING_POSTAL_ADDRESS = ""
+# Stripe Connect application fee = shop's plan fee (see /pricing) + this
+# card-processing share (the platform pays Stripe's fees under destination
+# charges, so processing is folded into one honest combined rate).
+VERTO_PROCESSING_FEE_PCT = "2.9"
+VERTO_PROCESSING_FEE_FIXED_CENTS = "30"
 # Promo-video render backend. RENDER_REPO's GitHub Actions do the heavy
 # Playwright→ffmpeg render off-Worker; set the matching secrets with
 # `wrangler secret put RENDER_CALLBACK_SECRET` and `... GITHUB_DISPATCH_TOKEN`.

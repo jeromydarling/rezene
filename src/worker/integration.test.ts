@@ -55,6 +55,7 @@ const EXCLUDE = new Set([
   // deliberately doesn't have (0009 is excluded above). 0060/0061 stay in:
   // they create standalone tables, so applying them here is harmless coverage.
   "0062_referrals.sql",
+  "0063_stripe_connect_billing.sql", // also ALTERs the platform shops registry
 ]);
 
 beforeAll(async () => {
