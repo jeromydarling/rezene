@@ -188,7 +188,7 @@ export function PrintOrderPanel({ lookbookId }: { lookbookId: string }) {
   }
 
   return (
-    <div className="admin-card space-y-4 p-5">
+    <div data-tour="print-mail" className="admin-card space-y-4 p-5">
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Print &amp; mail</h2>
         <span className="rounded bg-navy/10 px-1.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-wider text-navy">Beta</span>

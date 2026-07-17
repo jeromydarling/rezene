@@ -168,4 +168,37 @@ The guide hides itself on the public demo shop, and once your shop is fully open
 > [!TIP]
 > Steps stay useful after they're green — each keeps a **Review** link so you can jump back to add another product, adjust a shipping rate, or check your published pages.`,
   },
+  {
+    slug: "guided-tours",
+    title: "Guided tours: Show me around",
+    summary: "Interactive coach-marks that walk you through a section on the real screen — replay them anytime from the compass button.",
+    part: "getting-started",
+    moduleRoute: "/admin",
+    keywords: "tour walkthrough onboarding coach marks show me around learn how to guide compass spotlight",
+    updated: "2026-07-17",
+    body: `# Guided tours
+
+Some things are easier shown than read. Guided tours walk you through a section **on the live screen** — a spotlight highlights the real button or panel while a short note explains what it's for and what to do first. Nothing is faked or mocked up: it's your actual shop underneath.
+
+## Starting a tour
+
+On pages that have one, a **“Show me around”** button (with a small compass) sits in the top bar next to the page path. Click it whenever you're curious — the first time you visit, or months later when you want a refresher. Tours currently live on:
+
+- **Dashboard** — where everything is and how to get around.
+- **Products** — the catalogue and adding your first piece.
+- **Settings** — payouts, plans, and your referral link.
+- **Lookbook** — composing an issue and printing & mailing real copies.
+
+## While a tour is running
+
+- **Next / Back** move through the steps; **Done** ends the walk.
+- Your keyboard works too: **→** and **←** to move, **Esc** to leave.
+- Clicking anywhere outside the card also closes the tour — it never traps you.
+- The page scrolls itself so the highlighted control is always in view.
+
+Steps that point at something not on your screen right now (say, a card that only appears once payouts are connected) are skipped automatically, so a tour always fits *your* shop's current state.
+
+> [!TIP]
+> Tours are for orientation; the **?** help-dots beside page titles open the full chapter here in the handbook when you want the deeper story. And the Companion can answer one-off questions in plain language anytime.`,
+  },
 ];

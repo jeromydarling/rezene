@@ -68,6 +68,8 @@ import { useBrand } from "../lib/brand";
 import { BrandMark } from "../components/BrandMark";
 import { getShop, isDemoShop } from "../lib/shop";
 import { Companion } from "../components/Companion";
+import { TourProvider, useTour } from "../lib/tour";
+import { tourForPath } from "../tours";
 
 const NAV_SECTIONS: {
   title: string;
@@ -322,7 +324,7 @@ export function AdminLayout() {
           {platformMode ? "Platform operations" : "The Fashion Desk"}
         </p>
       </Link>
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav data-tour="nav" className="flex-1 overflow-y-auto px-3 py-4">
         {visibleSections(platformMode).map((section) => {
           const active = section.items.some(
             (i) => location.pathname === i.to || (i.to !== "/admin" && location.pathname.startsWith(i.to)),
@@ -389,6 +391,7 @@ export function AdminLayout() {
   );
 
   return (
+    <TourProvider>
     <div className="flex min-h-screen bg-cream">
       {/* Sidebar (desktop, static) */}
       <aside className="fixed inset-y-0 hidden w-60 flex-col border-r border-ink/10 bg-navy text-chalk lg:flex">
@@ -450,7 +453,8 @@ export function AdminLayout() {
             <span className="mx-2 text-ink/25">—</span>
             <span className="text-ink">{breadcrumb}</span>
           </nav>
-          <div className="relative ml-auto w-full max-w-xs">
+          <TourButton />
+          <div data-tour="search" className="relative ml-auto w-full max-w-xs">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -484,5 +488,28 @@ export function AdminLayout() {
       </div>
       <Companion />
     </div>
+    </TourProvider>
+  );
+}
+
+/**
+ * "Show me around" — appears whenever the current page has a registered tour
+ * (src/app/tours.ts) and replays it on demand. Hidden mid-tour.
+ */
+function TourButton() {
+  const location = useLocation();
+  const { start, activeKey } = useTour();
+  const tour = tourForPath(location.pathname);
+  if (!tour || activeKey) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => start(tour)}
+      className="hidden items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1 text-[0.65rem] uppercase tracking-wider text-ink/60 transition hover:border-terracotta hover:text-terracotta sm:flex"
+      title={`Take the ${tour.label} tour`}
+    >
+      <Compass size={13} strokeWidth={1.8} />
+      Show me around
+    </button>
   );
 }

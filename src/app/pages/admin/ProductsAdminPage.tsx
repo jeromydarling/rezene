@@ -36,7 +36,7 @@ export function ProductsAdminPage() {
             <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>
               Import CSV
             </button>
-            <Link to="/admin/products/new" className="btn btn-primary">
+            <Link to="/admin/products/new" data-tour="new-product" className="btn btn-primary">
               New product
             </Link>
           </>

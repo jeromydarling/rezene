@@ -1510,6 +1510,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Digital Product Passport", "A public, printable passport per piece — composition, care, origin."],
       ["Team & roles", "Invite your team with admin, editor or viewer roles — every write is audited."],
       ["The manual", "A real handbook written like a book — deep guides on every module, a “?” on every page that opens the right chapter, and the same corpus the Companion cites."],
+      ["Guided tours", "Click “Show me around” on a page and a spotlight walks you through the real screen — where things live, what to click first, replayable whenever you're curious."],
     ],
   },
 ];
