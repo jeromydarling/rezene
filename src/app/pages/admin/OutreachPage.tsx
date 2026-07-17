@@ -242,7 +242,7 @@ export function OutreachPage() {
 
       {/* Audience segments */}
       {overview.data && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div data-tour="outreach-segments" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {overview.data.segments.map((s) => (
             <button
               key={s.key}
@@ -259,7 +259,7 @@ export function OutreachPage() {
       )}
 
       {/* Composer */}
-      <div className="admin-card space-y-4 p-5">
+      <div data-tour="outreach-composer" className="admin-card space-y-4 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">
           New broadcast — to {seg ? `${seg.label} (${seg.count})` : "…"}
         </h2>
@@ -311,7 +311,7 @@ export function OutreachPage() {
       </div>
 
       {/* Lifecycle sequences */}
-      <div className="admin-card space-y-3 p-5">
+      <div data-tour="outreach-automations" className="admin-card space-y-3 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Automations</h2>
         <p className="text-xs text-warmgrey">
           Behavior-keyed sequences over your own data — who signed up, who's stuck, who went quiet. The daily sweep
@@ -340,7 +340,7 @@ export function OutreachPage() {
       </div>
 
       {/* Changelog → campaign kit */}
-      <div className="admin-card space-y-3 p-5">
+      <div data-tour="outreach-changelog" className="admin-card space-y-3 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-warmgrey">Changelog kit</h2>
         <p className="text-xs text-warmgrey">
           Paste what shipped; get a tweet thread, a LinkedIn post, and a newsletter section in Verto's voice.

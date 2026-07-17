@@ -1958,7 +1958,7 @@ function PaymentsPlanCard() {
       : { label: "not connected", cls: "badge-neutral" };
 
   return (
-    <div className="admin-card p-5">
+    <div data-tour="payments-card" className="admin-card p-5">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-warmgrey">Payments &amp; plan</h2>
 
       <div className="mb-1 flex items-center justify-between text-sm">
@@ -2028,7 +2028,7 @@ function ReferralCard() {
   const [copied, setCopied] = useState(false);
   if (!data) return null;
   return (
-    <div className="admin-card p-5">
+    <div data-tour="referral-card" className="admin-card p-5">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-warmgrey">Refer a designer</h2>
       <p className="mb-3 text-sm text-ink/80">
         Know a designer who should be on Verto? When they open a shop through your link, you <strong>both get a
