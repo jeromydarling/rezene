@@ -1041,7 +1041,7 @@ const FEATURES: Feature[] = [
     body: "Product rich results, per-page tags and canonicals, social previews, self-updating sitemaps, alt-text tracking, an llms.txt index for LLM assistants — and a Search Checkup screen in plain merchant language. On Shopify this is an SEO app at $30–80/month, a structured-data app at $399/year, an llms.txt app on top, and — when the apps conflict — a freelancer from $500/month. Here it ships in the box and updates itself on every publish.",
     points: [
       "Product schema with price & availability — the $399/yr app, included",
-      "Search Checkup: findings + one-tap fixes + LLM-drafted descriptions",
+      "Search Checkup: a live audit sorted worst-first — warnings, quick wins, AI growth ideas, one-tap fixes",
       "LLM-search ready by default — llms.txt is a $99/mo tier elsewhere",
     ],
     screen: MiniSeoCheckup,

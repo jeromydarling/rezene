@@ -88,18 +88,28 @@ An interview-style assistant can draft page copy in your brand voice, and inline
     updated: "2026-07-06",
     body: `# Getting found: SEO & LLM search
 
-**Marketing & Content → Search Checkup** scores how findable your store is and fixes the gaps.
+**Marketing & Content → Search Checkup** audits how findable your store is — checked against your **live storefront**, not just your settings — and sorts every finding worst-first so you always know what to do next.
 
-## What it checks
+## How the findings are sorted
 
-- Page **titles and descriptions** (with LLM suggestions)
-- **Product schema** (structured data) so search engines understand your listings
-- **Sitemaps** — every published product and collection is included automatically
-- An **llms.txt** so LLM assistants can read your catalog
+- **Warnings** — something is actually blocking you (your shop is hidden from search, Search Console isn't connected, the sitemap came back empty). Fix these first.
+- **Quick wins** — small gaps with outsized payoff (a missing search description, an image without alt text, a title that's too long, no default share image).
+- **Growth ideas** — an article the AI suggests writing to pull in shoppers who don't know your name yet, grounded in your actual catalogue.
+- **Passing** — everything Verto already handles for you, listed so you can see it's covered.
+
+Each finding expands for the full explanation and a one-tap route to the fix. Hit **Re-run** after a change to watch a warning turn green.
+
+## What's automatic (and shows as passing)
+
+- **Fully-rendered pages** — your storefront is a live app, but real titles, descriptions, and social tags are rendered into the HTML at the edge, so Google and link previews see a finished page.
+- **Crawler rules & sitemap** — a correct robots.txt and a fresh sitemap of every published URL, regenerated on each publish.
+- **Product schema** (structured data) so listings are eligible for rich results.
+- **Canonical URLs, mobile viewport, and fast edge delivery.**
+- An **llms.txt** and clean structured data so ChatGPT, Claude, and Perplexity can read and cite your shop.
 
 ## Custom domains
 
-On your own domain, SEO output (sitemaps, schema, meta) is served for that domain too. See [Connect a custom domain](/admin/support/kb/domain).
+On your own domain, all of this SEO output is served for that domain too. See [Connect a custom domain](/admin/support/kb/domain).
 
 > [!TIP]
 > A product with lots of views but few sales (see [Analytics](/admin/support/kb/analytics)) often just needs a clearer title and description — Search Checkup is where you fix that.`,
