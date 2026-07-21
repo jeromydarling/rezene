@@ -1,68 +1,57 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  Lightbulb,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
 import { api } from "../../lib/api";
 import { useFetch } from "../../lib/useFetch";
 import { ErrorNote, LoadingTable, PageHeader } from "../../components/admin/ui";
-import { getShopBase } from "../../lib/shop";
 
 /**
- * Search Checkup — the SEO audit run against this shop's own content, in
- * merchant language. Everything structural (canonicals, per-page meta,
- * sitemaps, product schema, llms.txt) is automatic on Verto; this screen
- * covers the parts only the shop owner can supply — descriptions, alt
- * text, photography, verification — each with a one-tap route to the fix.
+ * Search Checkup — a categorised SEO / AI-visibility audit run against the
+ * shop's own content AND its live storefront (see services/seo-checkup.ts).
+ * Findings sort worst-first (Warnings → Tips → Growth → Passing) and expand
+ * for detail plus a one-tap fix. Structural plumbing (sitemaps, per-page tags,
+ * product schema, llms.txt) is automatic on Verto and shows as passing.
  */
 
-interface Checkup {
-  visibility: "public" | "hidden";
-  verification: { google: boolean; bing: boolean };
-  defaultOgImage: string | null;
-  pagesMissingMeta: { slug: string; title: string }[];
-  postsMissingMeta: { slug: string; title: string }[];
-  productsMissingImages: { slug: string; name: string }[];
-  mediaMissingAlt: number;
-  publishedPages: number;
-}
+type Tier = "warning" | "tip" | "growth" | "pass";
 
-function CheckRow({
-  ok,
-  title,
-  detail,
-  action,
-  children,
-}: {
-  ok: boolean;
+interface CheckItem {
+  id: string;
+  tier: Tier;
   title: string;
   detail: string;
-  action?: { label: string; to: string };
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="admin-card p-4">
-      <div className="flex items-start gap-3">
-        {ok ? (
-          <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-palm" />
-        ) : (
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-saffron" />
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{title}</p>
-          <p className="mt-0.5 text-sm text-warmgrey">{detail}</p>
-          {children}
-        </div>
-        {action && (
-          <Link to={action.to} className="btn btn-secondary shrink-0 !px-3 !py-1.5 text-xs">
-            {action.label}
-          </Link>
-        )}
-      </div>
-    </div>
-  );
+  fix?: { label: string; to?: string; href?: string };
+  control?: "visibility" | "verification" | "og_image";
+  specifics?: string[];
+  value?: string;
 }
 
+interface CheckupResult {
+  checks: CheckItem[];
+  counts: { warning: number; tip: number; growth: number; pass: number };
+  liveChecked: boolean;
+  poweredByAi: boolean;
+}
+
+const TIER_ORDER: Record<Tier, number> = { warning: 0, tip: 1, growth: 2, pass: 3 };
+
+const TIER_ICON: Record<Tier, { Icon: typeof AlertTriangle; color: string; bg: string }> = {
+  warning: { Icon: AlertTriangle, color: "text-saffron", bg: "bg-saffron/10" },
+  tip: { Icon: Lightbulb, color: "text-blue-500", bg: "bg-blue-500/10" },
+  growth: { Icon: TrendingUp, color: "text-purple-500", bg: "bg-purple-500/10" },
+  pass: { Icon: CheckCircle2, color: "text-palm", bg: "bg-palm/10" },
+};
+
 export function SearchCheckupPage() {
-  const { data, loading, error, reload } = useFetch<Checkup>("/api/admin/settings/seo-checkup");
+  const { data, loading, error, reload } = useFetch<CheckupResult>("/api/admin/settings/seo-checkup");
   const [saving, setSaving] = useState<string | null>(null);
 
   async function saveSetting(key: string, value: string) {
@@ -75,7 +64,18 @@ export function SearchCheckupPage() {
     }
   }
 
-  const shopBase = getShopBase();
+  const checks = data ? [...data.checks].sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier]) : [];
+  const c = data?.counts;
+  const summary = c
+    ? [
+        c.warning > 0 ? `${c.warning} to fix` : null,
+        c.tip > 0 ? `${c.tip} quick win${c.tip === 1 ? "" : "s"}` : null,
+        c.growth > 0 ? `${c.growth} growth idea${c.growth === 1 ? "" : "s"}` : null,
+        `${c.pass} passing`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   return (
     <div className="max-w-3xl">
@@ -83,165 +83,143 @@ export function SearchCheckupPage() {
         eyebrow="Content"
         title="Search Checkup"
         help="seo"
-        description="How your shop looks to Google and LLM assistants. The plumbing — sitemaps, per-page tags, product rich results — is automatic; these are the parts only you can supply."
+        description="How your shop looks to Google and AI assistants — checked against your live storefront. The plumbing is automatic; these are the parts that move the needle."
       />
       {error && <ErrorNote message={error} />}
-      {loading && <LoadingTable rows={5} />}
+      {loading && <LoadingTable rows={6} />}
       {data && (
-        <div className="space-y-3">
-          {/* Visibility */}
-          <CheckRow
-            ok={data.visibility === "public"}
-            title={data.visibility === "public" ? "Your shop is visible to search engines" : "Your shop is hidden from search engines"}
-            detail={
-              data.visibility === "public"
-                ? "Every published page is indexable and listed in the sitemap."
-                : "Every page carries a noindex tag and the shop is out of the sitemap — flip this on when you're ready to launch."
-            }
-          >
-            <label className="mt-2 flex items-center gap-2 text-sm">
+        <>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-warmgrey">{summary}</p>
+            <button
+              type="button"
+              onClick={reload}
+              className="inline-flex items-center gap-1.5 text-xs text-warmgrey transition hover:text-ink"
+            >
+              <RefreshCw size={13} /> Re-run
+            </button>
+          </div>
+          <div className="admin-card divide-y divide-black/5 overflow-hidden !p-0">
+            {checks.map((check) => (
+              <CheckRow key={check.id} check={check} saving={saving} onSave={saveSetting} />
+            ))}
+          </div>
+          {!data.liveChecked && (
+            <p className="mt-3 text-xs text-warmgrey">
+              Some live checks couldn't reach your storefront just now — re-run in a moment for the full picture.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function CheckRow({
+  check,
+  saving,
+  onSave,
+}: {
+  check: CheckItem;
+  saving: string | null;
+  onSave: (key: string, value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { Icon, color, bg } = TIER_ICON[check.tier];
+  const muted = check.tier === "pass";
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-black/[0.015]"
+      >
+        <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${bg}`}>
+          <Icon size={16} className={color} />
+        </span>
+        <span className={`min-w-0 flex-1 text-sm font-medium ${muted ? "text-warmgrey" : "text-ink"}`}>
+          {check.title}
+          {check.tier === "growth" && (
+            <span className="ml-2 align-middle text-[0.7rem] font-normal uppercase tracking-wider text-purple-500">
+              Powered by Verto AI
+            </span>
+          )}
+        </span>
+        <ChevronRight
+          size={16}
+          className={`shrink-0 text-warmgrey transition-transform ${open ? "rotate-90" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pl-[3.75rem]">
+          <p className="text-sm leading-relaxed text-warmgrey">{check.detail}</p>
+
+          {check.specifics && check.specifics.length > 0 && (
+            <p className="mt-2 text-xs text-warmgrey">
+              {check.specifics.slice(0, 8).join(" · ")}
+              {check.specifics.length > 8 && " · …"}
+            </p>
+          )}
+
+          {check.control === "visibility" && (
+            <label className="mt-3 flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={data.visibility === "public"}
+                checked={check.value === "public"}
                 disabled={saving === "search_visibility"}
-                onChange={(e) => void saveSetting("search_visibility", e.target.checked ? "public" : "hidden")}
+                onChange={(e) => onSave("search_visibility", e.target.checked ? "public" : "hidden")}
               />
               Visible to search engines
             </label>
-          </CheckRow>
+          )}
 
-          {/* Verification */}
-          <CheckRow
-            ok={data.verification.google}
-            title={data.verification.google ? "Google Search Console is connected" : "Connect Google Search Console"}
-            detail="Paste the content value from Google's HTML-tag verification method and we'll serve it on every page. Then submit your sitemap to see search performance."
-          >
-            <div className="mt-2 flex gap-2">
+          {check.control === "verification" && (
+            <div className="mt-3 space-y-2">
               <input
                 className="input !py-1.5 text-sm"
                 placeholder="google-site-verification content value"
-                defaultValue=""
                 onBlur={(e) => {
-                  if (e.target.value.trim()) void saveSetting("site_verification_google", e.target.value.trim());
+                  if (e.target.value.trim()) onSave("site_verification_google", e.target.value.trim());
+                }}
+              />
+              <input
+                className="input !py-1.5 text-sm"
+                placeholder="Bing msvalidate.01 value (optional)"
+                onBlur={(e) => {
+                  if (e.target.value.trim()) onSave("site_verification_bing", e.target.value.trim());
                 }}
               />
             </div>
-            <p className="mt-1.5 text-xs text-warmgrey">
-              <a
-                href="https://search.google.com/search-console"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 underline"
-              >
-                Open Search Console <ExternalLink size={10} />
-              </a>{" "}
-              · Bing works too — paste an msvalidate.01 value{" "}
-              <input
-                className="input !inline-block !w-40 !py-0.5 text-xs"
-                placeholder="Bing token"
-                onBlur={(e) => {
-                  if (e.target.value.trim()) void saveSetting("site_verification_bing", e.target.value.trim());
-                }}
-              />
-              {data.verification.bing && <span className="ml-1 text-palm">✓ set</span>}
-            </p>
-          </CheckRow>
+          )}
 
-          {/* Default social image */}
-          <CheckRow
-            ok={Boolean(data.defaultOgImage)}
-            title={data.defaultOgImage ? "Default share image is set" : "Set a default share image"}
-            detail="When a page has no hero image, links shared on social and in chat apps fall back to this. Upload to Files, copy its URL, paste here."
-            action={{ label: "Open Files", to: "/admin/files" }}
-          >
+          {check.control === "og_image" && (
             <input
-              className="input mt-2 !py-1.5 text-sm"
+              className="input mt-3 !py-1.5 text-sm"
               placeholder="/media/… or https://…"
-              defaultValue={data.defaultOgImage ?? ""}
-              onBlur={(e) => void saveSetting("default_og_image", e.target.value.trim())}
+              defaultValue={check.value ?? ""}
+              onBlur={(e) => onSave("default_og_image", e.target.value.trim())}
             />
-          </CheckRow>
+          )}
 
-          {/* Page descriptions */}
-          <CheckRow
-            ok={data.pagesMissingMeta.length === 0}
-            title={
-              data.pagesMissingMeta.length === 0
-                ? "Every page has a search description"
-                : `${data.pagesMissingMeta.length} page${data.pagesMissingMeta.length === 1 ? "" : "s"} missing a search description`
-            }
-            detail={
-              data.pagesMissingMeta.length === 0
-                ? `All ${data.publishedPages} published pages describe themselves to search results.`
-                : "Search engines write their own (often clumsy) snippet when a page has no description. The ✨ LLM draft button in the page editor writes one in your voice."
-            }
-            action={{ label: "Open Pages", to: "/admin/content/pages" }}
-          >
-            {data.pagesMissingMeta.length > 0 && (
-              <p className="mt-1.5 text-xs text-warmgrey">
-                {data.pagesMissingMeta.slice(0, 6).map((p) => p.title).join(" · ")}
-                {data.pagesMissingMeta.length > 6 && " · …"}
-              </p>
-            )}
-          </CheckRow>
-
-          {/* Journal */}
-          <CheckRow
-            ok={data.postsMissingMeta.length === 0}
-            title={
-              data.postsMissingMeta.length === 0
-                ? "Journal posts have excerpts"
-                : `${data.postsMissingMeta.length} journal post${data.postsMissingMeta.length === 1 ? "" : "s"} missing an excerpt`
-            }
-            detail="Excerpts double as the search snippet and the share preview."
-            action={{ label: "Open Journal", to: "/admin/content/journal" }}
-          />
-
-          {/* Product photography */}
-          <CheckRow
-            ok={data.productsMissingImages.length === 0}
-            title={
-              data.productsMissingImages.length === 0
-                ? "Every live product has photography"
-                : `${data.productsMissingImages.length} live product${data.productsMissingImages.length === 1 ? "" : "s"} without photography`
-            }
-            detail="Products with images are eligible for image search and rich results (we publish Product schema with price and availability automatically)."
-            action={{ label: "Open Products", to: "/admin/products" }}
-          >
-            {data.productsMissingImages.length > 0 && (
-              <p className="mt-1.5 text-xs text-warmgrey">
-                {data.productsMissingImages.slice(0, 6).map((p) => p.name).join(" · ")}
-                {data.productsMissingImages.length > 6 && " · …"}
-              </p>
-            )}
-          </CheckRow>
-
-          {/* Alt text */}
-          <CheckRow
-            ok={data.mediaMissingAlt === 0}
-            title={
-              data.mediaMissingAlt === 0
-                ? "Public images have alt text"
-                : `${data.mediaMissingAlt} public image${data.mediaMissingAlt === 1 ? "" : "s"} missing alt text`
-            }
-            detail="Alt text is how screen readers and image search understand your photography."
-            action={{ label: "Open Files", to: "/admin/files" }}
-          />
-
-          {/* Always-on plumbing */}
-          <CheckRow
-            ok
-            title="Sitemap, tags, and rich results are handled"
-            detail="Per-page titles and descriptions, canonical URLs, social previews, Product schema, and your sitemap are generated automatically on every publish — nothing to configure."
-          >
-            <p className="mt-1.5 text-xs text-warmgrey">
-              <a href="/sitemap.xml" target="_blank" rel="noreferrer" className="underline">
-                View sitemap
-              </a>{" "}
-              — your shop is listed in it{shopBase ? "" : " at the domain root"}, and on your own
-              domain it serves at yourdomain.com/sitemap.xml automatically.
-            </p>
-          </CheckRow>
+          {check.fix && (
+            <div className="mt-3">
+              {check.fix.to ? (
+                <Link to={check.fix.to} className="btn btn-secondary !px-3 !py-1.5 text-xs">
+                  {check.fix.label}
+                </Link>
+              ) : (
+                <a
+                  href={check.fix.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium underline"
+                >
+                  {check.fix.label} <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
