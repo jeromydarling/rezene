@@ -20,6 +20,22 @@ describe("buildStructuredData — platform marketing site", () => {
     expect(json).toContain('"highPrice":"399"');
     expect(json).toContain('"offerCount":4');
   });
+
+  it("emits NO review markup while there are no real testimonials", () => {
+    // Guardrail: review schema must never ship on an empty testimonials list.
+    expect(json).not.toContain('"@type":"Review"');
+    expect(json).not.toContain('"@type":"AggregateRating"');
+  });
+});
+
+describe("testimonials — review scaffolding stays honest", () => {
+  it("aggregateRating is null and hasTestimonials false until real ones exist", async () => {
+    const { TESTIMONIALS, hasTestimonials, aggregateRating } = await import("../../shared/testimonials");
+    // Ships empty by design — no fabricated reviews.
+    expect(TESTIMONIALS.length).toBe(0);
+    expect(hasTestimonials()).toBe(false);
+    expect(aggregateRating()).toBeNull();
+  });
 });
 
 describe("buildFaqLd — marketing FAQ", () => {

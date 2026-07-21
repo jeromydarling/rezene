@@ -14,6 +14,23 @@
 export interface FaqItem {
   q: string;
   a: string;
+  /** Optional stable slug. When absent, one is derived from the question. */
+  slug?: string;
+}
+
+/**
+ * Stable, URL-safe id for a question — used for deep-link anchors today
+ * (/faq#slug) and the foundation for promoting the most-searched questions to
+ * their own indexable pages later. Prefer an explicit `slug` for permanence.
+ */
+export function faqSlug(item: FaqItem): string {
+  if (item.slug) return item.slug;
+  return item.q
+    .toLowerCase()
+    .replace(/['".,?()]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
 }
 
 export interface FaqCategory {

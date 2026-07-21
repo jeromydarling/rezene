@@ -1,6 +1,7 @@
 import { all, first } from "./db";
 import { PLANS } from "./stripe-connect";
 import { FAQ_FLAT } from "../../shared/faq";
+import { TESTIMONIALS, aggregateRating } from "../../shared/testimonials";
 import type { Env } from "../types/env";
 
 /**
@@ -324,6 +325,37 @@ function softwareOffers() {
   };
 }
 
+/**
+ * Review + AggregateRating for the product schema — emitted ONLY when real,
+ * attributable testimonials exist (src/shared/testimonials.ts). Returns an
+ * empty object to spread when there are none, so no review markup ships until
+ * it's backed by content actually visible on the page.
+ */
+function softwareReviews(): Record<string, unknown> {
+  if (TESTIMONIALS.length === 0) return {};
+  const out: Record<string, unknown> = {
+    review: TESTIMONIALS.map((t) => ({
+      "@type": "Review",
+      reviewBody: t.quote,
+      author: { "@type": "Person", name: t.name },
+      ...(t.date ? { datePublished: t.date } : {}),
+      ...(typeof t.rating === "number"
+        ? { reviewRating: { "@type": "Rating", ratingValue: String(t.rating), bestRating: "5" } }
+        : {}),
+    })),
+  };
+  const agg = aggregateRating();
+  if (agg) {
+    out.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: String(agg.value),
+      reviewCount: String(agg.count),
+      bestRating: "5",
+    };
+  }
+  return out;
+}
+
 export function buildStructuredData(
   env: Env,
   shop: { slug: string; name: string; basePath: string } | null,
@@ -368,6 +400,7 @@ export function buildStructuredData(
           description:
             "The operating system for independent clothing labels — storefront, CMS, production, shipping, and AI marketing in one platform.",
           offers: softwareOffers(),
+          ...softwareReviews(),
         },
       ];
   const json = JSON.stringify(ld.length === 1 ? ld[0] : ld).replaceAll("<", "\\u003c");
