@@ -120,6 +120,13 @@ async function handleTrackingWebhook(c: Context<AppContext>): Promise<Response> 
           );
           if (open.length > 0) fulfillment = "shipped";
         }
+        // Prior order state gates the customer email so each transition mails once.
+        const ord = await first<{ fulfillment_status: string }>(
+          db,
+          `SELECT fulfillment_status FROM orders WHERE id = ?`,
+          shipment.order_id,
+        );
+        const prior = ord?.fulfillment_status ?? "";
         await run(
           db,
           `UPDATE orders SET fulfillment_status = ?, updated_at = datetime('now')
@@ -127,6 +134,22 @@ async function handleTrackingWebhook(c: Context<AppContext>): Promise<Response> 
           fulfillment,
           shipment.order_id,
         );
+        if (prior !== "cancelled") {
+          const kind =
+            fulfillment === "delivered" && prior !== "delivered"
+              ? "delivered"
+              : fulfillment === "shipped" && !["shipped", "delivered"].includes(prior)
+                ? "shipped"
+                : null;
+          if (kind) {
+            const { notifyShipmentStatus } = await import("../services/transactional-emails");
+            const slug = c.req.param("shop") ?? null;
+            // Off the response path — carriers want a fast 2xx.
+            c.executionCtx.waitUntil(
+              notifyShipmentStatus(c.env, db, { orderId: shipment.order_id, kind, shopSlug: slug }),
+            );
+          }
+        }
       }
     }
   }

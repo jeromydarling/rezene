@@ -291,6 +291,10 @@ accountRoutes.post("/orders/:id/returns", async (c) => {
       r[6],
     );
   }
+  // Acknowledge the request to the customer (best effort).
+  const { notifyReturnStatus } = await import("../services/transactional-emails");
+  await notifyReturnStatus(c.env, c.var.db, { orderId: order.id, kind: "received", shopSlug: c.var.shopSlug });
+
   return c.json({ id: returnId }, 201);
 });
 

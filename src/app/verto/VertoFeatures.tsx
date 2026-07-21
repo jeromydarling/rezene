@@ -1437,6 +1437,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
     items: [
       ["Get selling fast", "After the Launch Playbook, a guided setup that watches your real shop and ticks itself off as you add a priced product, connect payments, set shipping and publish — then tells you you're open for business."],
       ["Real checkout & payments", "Stripe checkout, live carrier rates, pre-orders that can't oversell."],
+      ["Emails that keep buyers posted", "Confirmed, on-its-way with tracking, delivered, and every return update — sent automatically in your brand's colours, replies routed to your inbox."],
       ["Discounts & tax", "Make a code your customers type; switch on sales tax/VAT with one toggle."],
       ["Search & merchandising", "Instant search, size/category/price facets, and “only N left” urgency."],
       ["Product reviews", "Only verified buyers can review — trustworthy by construction, great for SEO."],

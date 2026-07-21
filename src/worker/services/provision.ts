@@ -140,6 +140,17 @@ export async function provisionShop(
   const appUrl = env.APP_URL.replace(/\/$/, "");
   const loginUrl = `${appUrl}/${shop.slug}/admin`;
 
+  // Email-ownership proof: a confirm link the owner clicks once. Best effort —
+  // provisioning never blocks on it, but it records that the address is real.
+  let verifyLine = "";
+  try {
+    const { createEmailVerification } = await import("./email-verification");
+    const token = await createEmailVerification(env.DB, shop.id, ownerEmail);
+    verifyLine = `\nConfirm this email so we know it's really you:\n  ${appUrl}/api/verto/verify-email?token=${encodeURIComponent(token)}\n`;
+  } catch (err) {
+    console.error(`[provision] email verification token failed for ${shop.slug}: ${String(err)}`);
+  }
+
   // Credentials to the owner (best effort), heads-up to the founder.
   await sendBuyerEmail(env, {
     to: ownerEmail,
@@ -153,7 +164,7 @@ export async function provisionShop(
       `  Admin:      ${loginUrl}`,
       `  Email:      ${ownerEmail.toLowerCase()}`,
       `  Password:   ${password}`,
-      ``,
+      verifyLine,
       `Change the password after your first login (Settings → password).`,
       `Start with Content → Pages → “Site starter” — eight questions and`,
       `your story, FAQ, press page, and first post are drafted for you.`,

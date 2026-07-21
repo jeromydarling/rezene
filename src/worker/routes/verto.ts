@@ -148,6 +148,35 @@ vertoRoutes.get("/slug-check", async (c) => {
 });
 
 /**
+ * Confirm-your-email link from the provisioning welcome mail. A GET is fine:
+ * verifying only records proof of ownership, so a link-scanner prefetch that
+ * confirms early is harmless (and re-clicks are idempotent). Returns a small
+ * friendly HTML page rather than JSON — a human clicked it from their inbox.
+ */
+vertoRoutes.get("/verify-email", async (c) => {
+  const token = c.req.query("token") ?? "";
+  const { verifyEmailToken } = await import("../services/email-verification");
+  const outcome = token ? await verifyEmailToken(c.env.DB, token) : { ok: false as const };
+  const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
+  const ok = outcome.ok;
+  const title = ok ? "Email confirmed" : "Link expired";
+  const message = ok
+    ? "Thanks — your email address is confirmed. You're all set."
+    : "This confirmation link is invalid or has already been used. You can safely ignore it — your shop is still active.";
+  const esc = (s: string) => s.replace(/[&<>"]/g, (x) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]!));
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} — Verto</title></head>
+<body style="margin:0;background:#f6f4ef;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#2b2b2b;">
+<div style="max-width:460px;margin:14vh auto;padding:36px 28px;background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);text-align:center;">
+  <div style="font-size:34px;line-height:1;margin-bottom:14px;">${ok ? "✓" : "•"}</div>
+  <h1 style="font-family:Georgia,serif;font-weight:400;font-size:22px;margin:0 0 10px;">${esc(title)}</h1>
+  <p style="font-size:15px;line-height:1.6;color:#5b5b5b;margin:0 0 22px;">${esc(message)}</p>
+  <a href="${esc(appUrl)}" style="display:inline-block;background:#2b2b2b;color:#fff;text-decoration:none;font-size:14px;padding:11px 22px;border-radius:8px;">Go to Verto</a>
+</div>
+</body></html>`;
+  return c.html(html, ok ? 200 : 400);
+});
+
+/**
  * One-time bootstrap of the public demo shop. Unauthenticated by design:
  * it is fully idempotent and can only ever create the single fixed demo
  * shop with fixed content — there is no caller input to abuse.

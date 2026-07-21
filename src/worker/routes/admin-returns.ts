@@ -50,7 +50,11 @@ adminReturnsRoutes.get("/:id", async (c) => {
 adminReturnsRoutes.post("/:id/decline", requireAdminWrite, async (c) => {
   const id = c.req.param("id");
   const body = (await c.req.json().catch(() => ({}))) as { adminNote?: string };
-  const r = await first<{ status: string }>(c.var.db, `SELECT status FROM returns WHERE id = ?`, id);
+  const r = await first<{ status: string; order_id: string }>(
+    c.var.db,
+    `SELECT status, order_id FROM returns WHERE id = ?`,
+    id,
+  );
   if (!r) return c.json({ error: "Return not found" }, 404);
   await run(
     c.var.db,
@@ -59,6 +63,8 @@ adminReturnsRoutes.post("/:id/decline", requireAdminWrite, async (c) => {
     id,
   );
   await writeAudit(c.var.db, c.var.userId, "return.decline", "return", id, {});
+  const { notifyReturnStatus } = await import("../services/transactional-emails");
+  await notifyReturnStatus(c.env, c.var.db, { orderId: r.order_id, kind: "declined", shopSlug: c.var.shopSlug });
   return c.json({ ok: true });
 });
 
@@ -164,5 +170,13 @@ adminReturnsRoutes.post("/:id/approve", requireAdminWrite, async (c) => {
     id,
   );
   await writeAudit(c.var.db, c.var.userId, "return.approve", "return", id, { amount, restocked });
+  const { notifyReturnStatus } = await import("../services/transactional-emails");
+  await notifyReturnStatus(c.env, c.var.db, {
+    orderId: r.order_id,
+    kind: "refunded",
+    refundAmountCents: amount,
+    currency: r.currency,
+    shopSlug: c.var.shopSlug,
+  });
   return c.json({ ok: true, refundAmountCents: amount, stripeRefundId, restocked });
 });

@@ -17,6 +17,17 @@ export const commerceAccount: KbArticle[] = [
 
 An **order** is created when a customer checks out and pays via **Stripe**. Each order (under **Selling → Orders**) shows its items, payment status, and shipping. Paid orders decrement inventory automatically. Orders originate at checkout — they're a system record, so there's no manual "create order" here; fulfilment and shipments are managed on the order.
 
+## Emails your customer gets automatically
+
+Verto keeps buyers informed without you writing a thing — every message is branded in your palette and logo:
+
+- **Order confirmed** — the moment they pay.
+- **On its way** — when you add tracking or mark a shipment shipped, with a track-your-parcel button.
+- **Delivered** — when the carrier (or you) marks it delivered.
+- **Return received / declined / refunded** — as you work a return request.
+
+Replies go to your shop's **reply-to address** (set it under **Settings**), so a customer answering one of these reaches your real inbox. These send automatically once **buyer email is switched on for your shop**; until then they're skipped silently.
+
 ## Customers
 
 **Customers** accumulate as people buy — no manual entry. Each shows their order history, and Analytics tracks how many are repeat buyers.`,
