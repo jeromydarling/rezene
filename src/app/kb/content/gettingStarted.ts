@@ -134,7 +134,15 @@ The last remaining admin can't be removed or demoted, so you never lock yourself
 A small set of platform-level screens — the **Verto HQ CRM** and **Platform** tools — are visible only to Verto SuperAdmins, not to shops. If you don't see them, they're not meant for your account.
 
 > [!WARNING]
-> Connection keys (Stripe, LLM providers) are stored as encrypted secrets **outside** the database and never appear in the app or the browser. Never paste an API key into a note, product field, or chat.`,
+> Connection keys (Stripe, LLM providers) are stored as encrypted secrets **outside** the database and never appear in the app or the browser. Never paste an API key into a note, product field, or chat.
+
+## Confirming your email
+
+When your shop is provisioned, the welcome email includes a **"Confirm this email"** link. Clicking it proves the address is really yours — a one-time, one-click step. Your shop is live either way; confirming just puts a checkmark on your account.
+
+## Security emails
+
+Whenever your admin password is **reset or changed**, we send a short confirmation to your account email so you always know. If one arrives and it *wasn't* you, reset your password immediately from the sign-in page and let us know.`,
   },
   {
     slug: "get-selling-fast",

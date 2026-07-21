@@ -38,6 +38,7 @@ const EXCLUDE = new Set([
   "0061_hq_sequences.sql", // HQ marketing lifecycle-sequence switches, platform-only
   "0062_referrals.sql", // Referral program — shops registry + credits, platform-only
   "0063_stripe_connect_billing.sql", // Stripe Connect + plan billing on shops registry, platform-only
+  "0064_email_verification.sql", // Owner email verification — ALTERs the shops registry, platform-only
 ]);
 
 const files = readdirSync(dir)

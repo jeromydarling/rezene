@@ -129,6 +129,12 @@ authRoutes.post(
     // A password change orphans every existing session for that user.
     await run(c.var.db, `DELETE FROM sessions WHERE user_id = ?`, result.userId);
     await writeAudit(c.var.db, result.userId, "auth.reset_password", "user", result.userId);
+    // Security confirmation — but not for invite acceptance (that's a first
+    // password, not a change), where a "your password changed" note is noise.
+    if (result.purpose === "reset") {
+      const who = await first<{ email: string }>(c.var.db, `SELECT email FROM users WHERE id = ?`, result.userId);
+      if (who?.email) await sendPasswordChangedEmail(c, who.email);
+    }
     return c.json({ ok: true });
   },
 );
@@ -171,8 +177,27 @@ authRoutes.post("/change-password", async (c) => {
     c.var.sessionId,
   );
   await writeAudit(c.var.db, c.var.userId, "auth.change_password", "user", c.var.userId);
+  if (c.var.userEmail) await sendPasswordChangedEmail(c, c.var.userEmail);
   return c.json({ ok: true });
 });
+
+/**
+ * "Your password was changed" security confirmation. Best-effort and silent
+ * when email isn't configured — a login-security nicety, never a blocker.
+ */
+async function sendPasswordChangedEmail(c: Context<AppContext>, email: string): Promise<void> {
+  const { sendBuyerEmail } = await import("../services/buyer-email");
+  const { getBrandName } = await import("../services/brand");
+  const brand = await getBrandName(c.env);
+  const help = c.env.MARKETING_REPLY_TO || "your shop administrator";
+  await sendBuyerEmail(c.env, {
+    to: email.toLowerCase(),
+    db: c.var.db,
+    fromName: brand,
+    subject: `Your ${brand} password was changed`,
+    text: `The password for your ${brand} admin account was just changed.\n\nIf this was you, no action is needed.\n\nIf it WASN'T you, your account may be compromised — reset your password immediately from the sign-in page, and contact ${help}.`,
+  }).catch(() => {});
+}
 
 /**
  * Email gate for the public demo shop's admin. A visitor leaves their

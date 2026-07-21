@@ -120,3 +120,119 @@ ${closing}
   }
   return result;
 }
+
+/** "On its way" / "delivered" fulfilment update, with a tracking link when known. */
+export function shipmentEmail(
+  kind: "shipped" | "delivered",
+  opts: {
+    brandName: string;
+    orderNumber: string;
+    carrier?: string | null;
+    trackingNumber?: string | null;
+    trackingUrl?: string | null;
+    brand?: EmailBrand;
+  },
+): { subject: string; text: string; html?: string } {
+  const shipped = kind === "shipped";
+  const subject = shipped
+    ? `${opts.brandName} — order ${opts.orderNumber} is on its way`
+    : `${opts.brandName} — order ${opts.orderNumber} was delivered`;
+  const heading = shipped ? "Your order is on its way." : "Your order has arrived.";
+  const intro = shipped
+    ? "Good news — your order has shipped."
+    : "Your order was just marked delivered. We hope everything's perfect.";
+  const carrierLine =
+    opts.carrier && opts.trackingNumber
+      ? `${opts.carrier}: ${opts.trackingNumber}`
+      : opts.trackingNumber
+        ? `Tracking: ${opts.trackingNumber}`
+        : null;
+  const trackLine = opts.trackingUrl ? `\nTrack it: ${opts.trackingUrl}` : "";
+
+  const text = `${intro}
+
+Order:  ${opts.orderNumber}${carrierLine ? `\n${carrierLine}` : ""}${trackLine}
+
+Thank you for shopping with us.
+
+— ${opts.brandName}`;
+
+  const result: { subject: string; text: string; html?: string } = { subject, text };
+  if (opts.brand) {
+    const rows = [
+      { label: "Order", right: opts.orderNumber, muted: true },
+      ...(opts.carrier ? [{ label: "Carrier", right: opts.carrier }] : []),
+      ...(opts.trackingNumber ? [{ label: "Tracking", right: opts.trackingNumber }] : []),
+    ];
+    result.html = renderBrandedEmail({
+      brand: opts.brand,
+      preheader: shipped ? `Order ${opts.orderNumber} is on its way` : `Order ${opts.orderNumber} delivered`,
+      heading,
+      bodyHtml: `<p style="margin:0 0 12px;">${intro}</p>${itemsTableHtml(rows, opts.brand.palette.ink)}`,
+      cta: shipped && opts.trackingUrl ? { label: "Track your parcel", href: opts.trackingUrl } : undefined,
+      footerNote: shipped
+        ? "We'll email you again when it's delivered."
+        : "If anything isn't right, just reply to this email.",
+    });
+  }
+  return result;
+}
+
+/** Return-request lifecycle: received → declined | refunded. */
+export function returnEmail(
+  kind: "received" | "declined" | "refunded",
+  opts: {
+    brandName: string;
+    orderNumber: string;
+    refundAmountCents?: number;
+    currency?: string;
+    brand?: EmailBrand;
+  },
+): { subject: string; text: string; html?: string } {
+  const money =
+    opts.refundAmountCents != null && opts.currency
+      ? `${(opts.refundAmountCents / 100).toFixed(2)} ${opts.currency}`
+      : null;
+  const copy = {
+    received: {
+      subject: `${opts.brandName} — we've received your return request`,
+      heading: "We've got your return request.",
+      intro: `Thanks — we've received your return request for order ${opts.orderNumber}. We'll review it and be in touch shortly with the next steps.`,
+      footer: "You don't need to do anything right now.",
+    },
+    declined: {
+      subject: `${opts.brandName} — an update on your return`,
+      heading: "An update on your return.",
+      intro: `We've reviewed your return request for order ${opts.orderNumber}. We're not able to approve this one — please reply to this email and we'll explain and help find a solution.`,
+      footer: "We're happy to talk it through.",
+    },
+    refunded: {
+      subject: `${opts.brandName} — your refund is on its way`,
+      heading: "Your refund is on its way.",
+      intro: `Your return for order ${opts.orderNumber} is approved${money ? ` and a refund of ${money} has been issued` : " and your refund has been issued"}. It can take a few business days to appear on your statement, depending on your bank.`,
+      footer: "Thank you for your patience.",
+    },
+  }[kind];
+
+  const text = `${copy.intro}
+
+Order:  ${opts.orderNumber}${money && kind === "refunded" ? `\nRefund: ${money}` : ""}
+
+— ${opts.brandName}`;
+
+  const result: { subject: string; text: string; html?: string } = { subject: copy.subject, text };
+  if (opts.brand) {
+    const rows = [
+      { label: "Order", right: opts.orderNumber, muted: true },
+      ...(money && kind === "refunded" ? [{ label: "Refund", right: money }] : []),
+    ];
+    result.html = renderBrandedEmail({
+      brand: opts.brand,
+      preheader: copy.heading,
+      heading: copy.heading,
+      bodyHtml: `<p style="margin:0 0 12px;">${copy.intro}</p>${itemsTableHtml(rows, opts.brand.palette.ink)}`,
+      footerNote: copy.footer,
+    });
+  }
+  return result;
+}

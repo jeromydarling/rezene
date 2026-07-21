@@ -524,13 +524,19 @@ adminShippingRoutes.post("/orders/:orderId/shipments", requireAdminWrite, async 
 
   // Fulfillment: label bought → processing; tracking already moving → shipped.
   const nextFulfillment = status === "in_transit" ? "shipped" : "processing";
-  if (!["shipped", "delivered", "cancelled"].includes(order.fulfillment_status)) {
+  const wasOpen = !["shipped", "delivered", "cancelled"].includes(order.fulfillment_status);
+  if (wasOpen) {
     await run(
       c.var.db,
       `UPDATE orders SET fulfillment_status = ?, updated_at = datetime('now') WHERE id = ?`,
       nextFulfillment,
       orderId,
     );
+  }
+  // First transition into "shipped" → tell the customer it's on its way.
+  if (wasOpen && nextFulfillment === "shipped") {
+    const { notifyShipmentStatus } = await import("../services/transactional-emails");
+    await notifyShipmentStatus(c.env, c.var.db, { orderId, kind: "shipped", shopSlug: c.var.shopSlug });
   }
   await writeAudit(c.var.db, c.var.userId, "shipping.shipment.create", "order_shipment", id, {
     orderId,
@@ -563,6 +569,12 @@ adminShippingRoutes.patch("/shipments/:id", requireAdminWrite, async (c) => {
     c.req.param("id"),
   );
   if (!shipment) return c.json({ error: "Shipment not found" }, 404);
+  const order = await first<{ fulfillment_status: string }>(
+    c.var.db,
+    `SELECT fulfillment_status FROM orders WHERE id = ?`,
+    shipment.order_id,
+  );
+  const prior = order?.fulfillment_status ?? "";
   await run(
     c.var.db,
     `UPDATE order_shipments SET status = ?, updated_at = datetime('now') WHERE id = ?`,
@@ -577,6 +589,13 @@ adminShippingRoutes.patch("/shipments/:id", requireAdminWrite, async (c) => {
       body.status === "delivered" ? "delivered" : "shipped",
       shipment.order_id,
     );
+    // Notify the customer once per transition (guarding on the prior state).
+    const { notifyShipmentStatus } = await import("../services/transactional-emails");
+    if (body.status === "delivered" && prior !== "delivered" && prior !== "cancelled") {
+      await notifyShipmentStatus(c.env, c.var.db, { orderId: shipment.order_id, kind: "delivered", shopSlug: c.var.shopSlug });
+    } else if (body.status === "in_transit" && !["shipped", "delivered", "cancelled"].includes(prior)) {
+      await notifyShipmentStatus(c.env, c.var.db, { orderId: shipment.order_id, kind: "shipped", shopSlug: c.var.shopSlug });
+    }
   }
   return c.json({ ok: true });
 });
