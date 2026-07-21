@@ -40,6 +40,15 @@ const FUNNEL_STAGES: { event: string; label: string }[] = [
   { event: "share", label: "Shared / first sale" },
 ];
 
+// SEO / AI-visibility audit for the Verto marketing site itself (verto.style).
+adminPlatformRoutes.get("/marketing-seo", async (c) => {
+  const { runPlatformSeoCheckup } = await import("../services/seo-checkup");
+  const result = await runPlatformSeoCheckup({
+    appUrl: c.env.APP_URL || new URL(c.req.url).origin,
+  });
+  return c.json(result);
+});
+
 adminPlatformRoutes.get("/activation-funnel", async (c) => {
   const totalRow = await first<{ n: number }>(
     c.env.DB,

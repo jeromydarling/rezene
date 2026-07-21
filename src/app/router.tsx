@@ -94,6 +94,7 @@ import { VideoStudioPage } from "./pages/admin/VideoStudioPage";
 import { PlatformPage } from "./pages/admin/PlatformPage";
 import { AiUsagePage } from "./pages/admin/AiUsagePage";
 import { OutreachPage } from "./pages/admin/OutreachPage";
+import { MarketingSeoPage } from "./pages/admin/MarketingSeoPage";
 import { FleetRevenuePage } from "./pages/admin/FleetRevenuePage";
 import { ShopProgressPage } from "./pages/admin/ShopProgressPage";
 import { PlatformErrorsPage } from "./pages/admin/PlatformErrorsPage";
@@ -278,6 +279,7 @@ export function AppRouter() {
           <Route path="platform" element={<PlatformPage />} />
           <Route path="ai-usage" element={<AiUsagePage />} />
           <Route path="outreach" element={<OutreachPage />} />
+          <Route path="marketing-seo" element={<MarketingSeoPage />} />
           <Route path="revenue" element={<FleetRevenuePage />} />
           <Route path="shop-progress" element={<ShopProgressPage />} />
           <Route path="errors" element={<PlatformErrorsPage />} />

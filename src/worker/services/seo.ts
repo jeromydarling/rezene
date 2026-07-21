@@ -1,4 +1,5 @@
 import { all, first } from "./db";
+import { PLANS } from "./stripe-connect";
 import type { Env } from "../types/env";
 
 /**
@@ -31,7 +32,7 @@ export const VERTO_META: Record<string, RouteMeta> = {
   "/features": {
     title: "Features — the full tour — Verto",
     description:
-      "Production calendar, tech packs, factory portals, multi-carrier shipping, landed cost, block CMS, lookbooks, LLM marketing, translations, wholesale, analytics — one platform.",
+      "Production, tech packs, factory portals, multi-carrier shipping, landed cost, a block CMS, lookbooks, AI marketing, wholesale and analytics — one platform.",
     image: "/verto/atelier.jpg",
   },
   "/why": {
@@ -44,7 +45,7 @@ export const VERTO_META: Record<string, RouteMeta> = {
   "/stories": {
     title: "Four stories: zero to paying clients overnight — Verto",
     description:
-      "A stylist goes from signup to a paid $425 deposit in a day. A designer's pre-orders fund production. A founder prices her season on evidence, not vibes. A four-year-old label switches in one afternoon. What actually happens when you press create my shop.",
+      "A stylist takes a paid $425 deposit the day she signs up. A designer's pre-orders fund production. See what really happens when you press ‘create my shop.’",
     image: "/verto/dusk.jpg",
   },
   "/directory": {
@@ -296,6 +297,26 @@ export function injectMeta(html: string, meta: RouteMeta, canonicalUrl: string):
  * shop's home page. Injected only on home documents — one authoritative
  * statement of identity, not schema wallpaper on every route.
  */
+/** The plan catalogue as a schema.org AggregateOffer (prices in whole dollars). */
+function softwareOffers() {
+  const plans = Object.values(PLANS);
+  const prices = plans.map((p) => p.monthlyCents / 100);
+  return {
+    "@type": "AggregateOffer",
+    priceCurrency: "USD",
+    lowPrice: String(Math.min(...prices)),
+    highPrice: String(Math.max(...prices)),
+    offerCount: plans.length,
+    offers: plans.map((p) => ({
+      "@type": "Offer",
+      name: `Verto ${p.name}`,
+      price: String(p.monthlyCents / 100),
+      priceCurrency: "USD",
+      category: "monthly subscription",
+    })),
+  };
+}
+
 export function buildStructuredData(
   env: Env,
   shop: { slug: string; name: string; basePath: string } | null,
@@ -326,6 +347,20 @@ export function buildStructuredData(
           "@type": "WebSite",
           name: "Verto",
           url: base,
+        },
+        // The product itself, with real pricing — makes Verto eligible for
+        // product/pricing rich results and gives AI assistants structured
+        // facts about the plans. Prices come from the live plan catalogue.
+        {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Verto",
+          applicationCategory: "BusinessApplication",
+          operatingSystem: "Web",
+          url: base,
+          description:
+            "The operating system for independent clothing labels — storefront, CMS, production, shipping, and AI marketing in one platform.",
+          offers: softwareOffers(),
         },
       ];
   const json = JSON.stringify(ld.length === 1 ? ld[0] : ld).replaceAll("<", "\\u003c");

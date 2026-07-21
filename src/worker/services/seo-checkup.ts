@@ -395,6 +395,219 @@ export async function runSeoCheckup(
 }
 
 /**
+ * The same audit for the Verto MARKETING site (verto.style itself) — run from
+ * HQ. No per-shop database: it fetches each public marketing route over the
+ * platform origin and inspects the edge-rendered HTML, robots.txt, sitemap.xml,
+ * llms.txt, and structured data. Same categorised shape as the shop checkup.
+ */
+const MARKETING_ROUTES: { path: string; label: string }[] = [
+  { path: "/", label: "Home" },
+  { path: "/why", label: "Why Verto" },
+  { path: "/features", label: "Features" },
+  { path: "/compare", label: "Compare" },
+  { path: "/pricing", label: "Pricing" },
+  { path: "/stories", label: "Stories" },
+];
+
+export async function runPlatformSeoCheckup(opts: { appUrl: string }): Promise<CheckupResult> {
+  const origin = opts.appUrl.replace(/\/$/, "");
+  const checks: CheckItem[] = [];
+
+  const pages = await Promise.all(
+    MARKETING_ROUTES.map(async (r) => ({ ...r, res: await timedFetch(`${origin}${r.path}`) })),
+  );
+  const reached = pages.filter((p) => p.res);
+  const home = pages.find((p) => p.path === "/")?.res ?? null;
+  const [robots, sitemap, llms] = await Promise.all([
+    timedFetch(`${origin}/robots.txt`),
+    timedFetch(`${origin}/sitemap.xml`),
+    timedFetch(`${origin}/llms.txt`),
+  ]);
+  const liveChecked = reached.length > 0;
+
+  // ---- Rendered + reachable across all marketing pages --------------------
+  const unrendered = reached.filter((p) => {
+    const t = tag(p.res!.text, /<title>([^<]*)<\/title>/i);
+    return !p.res!.ok || !t || !/<meta[^>]+property=["']og:title["']/i.test(p.res!.text);
+  });
+  checks.push(
+    liveChecked && unrendered.length === 0
+      ? {
+          id: "mkt-rendered",
+          tier: "pass",
+          title: "Every marketing page renders for crawlers",
+          detail: `All ${reached.length} checked pages serve a real title and social tags in the HTML at the edge — Google and link previews see finished pages, not an empty app shell.`,
+        }
+      : {
+          id: "mkt-rendered",
+          tier: "warning",
+          title: `${unrendered.length || "Some"} marketing page${unrendered.length === 1 ? "" : "s"} aren't rendering fully`,
+          detail: "A page came back without a title or social tags. Add it to the platform meta map (VERTO_META in services/seo.ts).",
+          specifics: unrendered.map((p) => p.label),
+        },
+  );
+
+  // ---- Title / description length ----------------------------------------
+  const longOnes: string[] = [];
+  for (const p of reached) {
+    const t = tag(p.res!.text, /<title>([^<]*)<\/title>/i);
+    const d = tag(p.res!.text, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
+    if ((t && t.length > TITLE_MAX) || (d && d.length > DESC_MAX)) longOnes.push(p.label);
+  }
+  if (longOnes.length > 0) {
+    checks.push({
+      id: "mkt-length",
+      tier: "tip",
+      title: "Some titles or descriptions are too long",
+      detail: `Google truncates titles past ~${TITLE_MAX} characters and descriptions past ~${DESC_MAX}. Tighten these in VERTO_META so the whole line shows in results.`,
+      specifics: longOnes,
+    });
+  } else if (liveChecked) {
+    checks.push({
+      id: "mkt-length",
+      tier: "pass",
+      title: "Titles and descriptions are the right length",
+      detail: "Every marketing page's title and description fit inside Google's display limits.",
+    });
+  }
+
+  // ---- Social preview images ---------------------------------------------
+  const noImage = reached.filter((p) => !/<meta[^>]+property=["']og:image["']/i.test(p.res!.text));
+  if (liveChecked) {
+    checks.push(
+      noImage.length === 0
+        ? {
+            id: "mkt-og",
+            tier: "pass",
+            title: "Link previews carry an image everywhere",
+            detail: "Every marketing page ships an Open Graph image, so shared links render a rich card on social and in chat apps.",
+          }
+        : {
+            id: "mkt-og",
+            tier: "tip",
+            title: `${noImage.length} page${noImage.length === 1 ? "" : "s"} without a share image`,
+            detail: "Add an image to these routes in VERTO_META so shared links don't render a blank card.",
+            specifics: noImage.map((p) => p.label),
+          },
+    );
+  }
+
+  // ---- Structured data (Organization + WebSite + SoftwareApplication) -----
+  if (home) {
+    const hasOrg = /"@type"\s*:\s*"Organization"/.test(home.text);
+    const hasSite = /"@type"\s*:\s*"WebSite"/.test(home.text);
+    const hasApp = /"@type"\s*:\s*"SoftwareApplication"/.test(home.text);
+    checks.push(
+      hasOrg && hasSite && hasApp
+        ? {
+            id: "mkt-schema",
+            tier: "pass",
+            title: "Rich structured data is in place",
+            detail: "The home page publishes Organization, WebSite, and SoftwareApplication schema with your live pricing — so Verto is eligible for rich results and AI assistants get structured facts about the plans.",
+          }
+        : {
+            id: "mkt-schema",
+            tier: "tip",
+            title: "Structured data is incomplete",
+            detail: "Expected Organization, WebSite, and SoftwareApplication (with pricing) JSON-LD on the home page. Check buildStructuredData in services/seo.ts.",
+          },
+    );
+
+    checks.push(
+      home.ms <= 900
+        ? {
+            id: "mkt-speed",
+            tier: "pass",
+            title: "The site loads fast",
+            detail: `Home answered in ${home.ms} ms from the edge.`,
+          }
+        : {
+            id: "mkt-speed",
+            tier: "tip",
+            title: "Home is a little slow",
+            detail: `Home took ${home.ms} ms to respond — worth a look if it persists.`,
+          },
+    );
+  }
+
+  // ---- Crawler rules ------------------------------------------------------
+  if (robots) {
+    const ok = robots.ok && /sitemap:/i.test(robots.text);
+    checks.push(
+      ok
+        ? {
+            id: "mkt-robots",
+            tier: "pass",
+            title: "Crawler rules are in order",
+            detail: "robots.txt lets search engines in and points them at the sitemap.",
+            fix: { label: "View robots.txt", href: `${origin}/robots.txt` },
+          }
+        : {
+            id: "mkt-robots",
+            tier: "warning",
+            title: "Crawler rules need attention",
+            detail: "robots.txt was unreachable or is missing its sitemap reference.",
+            fix: { label: "View robots.txt", href: `${origin}/robots.txt` },
+          },
+    );
+  }
+
+  // ---- Sitemap coverage of the marketing routes --------------------------
+  if (sitemap) {
+    const locs = (sitemap.text.match(/<loc>/g) ?? []).length;
+    const missing = MARKETING_ROUTES.filter((r) => !sitemap.text.includes(`${origin}${r.path === "/" ? "/" : r.path}`)).map(
+      (r) => r.label,
+    );
+    checks.push(
+      sitemap.ok && locs > 0 && missing.length === 0
+        ? {
+            id: "mkt-sitemap",
+            tier: "pass",
+            title: "Your sitemap covers the marketing site",
+            detail: `The sitemap lists ${locs} URLs including every core marketing page, and it regenerates automatically.`,
+            fix: { label: "View sitemap", href: `${origin}/sitemap.xml` },
+          }
+        : {
+            id: "mkt-sitemap",
+            tier: missing.length > 0 && locs > 0 ? "tip" : "warning",
+            title: missing.length > 0 && locs > 0 ? "Some marketing pages aren't in the sitemap" : "Sitemap needs attention",
+            detail:
+              missing.length > 0 && locs > 0
+                ? "These routes are missing from sitemap.xml (buildSitemap in services/seo.ts)."
+                : "The sitemap came back empty or unreachable.",
+            specifics: missing.length > 0 ? missing : undefined,
+            fix: { label: "View sitemap", href: `${origin}/sitemap.xml` },
+          },
+    );
+  }
+
+  // ---- AI assistants / llms.txt ------------------------------------------
+  if (llms) {
+    checks.push(
+      llms.ok && /verto/i.test(llms.text)
+        ? {
+            id: "mkt-llms",
+            tier: "pass",
+            title: "AI assistants can read the site",
+            detail: "verto.style publishes an llms.txt index, so ChatGPT, Claude, and Perplexity can understand and cite the product.",
+            fix: { label: "View llms.txt", href: `${origin}/llms.txt` },
+          }
+        : {
+            id: "mkt-llms",
+            tier: "tip",
+            title: "llms.txt needs attention",
+            detail: "The llms.txt index was unreachable or empty.",
+            fix: { label: "View llms.txt", href: `${origin}/llms.txt` },
+          },
+    );
+  }
+
+  const counts = { warning: 0, tip: 0, growth: 0, pass: 0 };
+  for (const c of checks) counts[c.tier]++;
+  return { checks, counts, liveChecked, poweredByAi: false };
+}
+
+/**
  * One AI-suggested content topic grounded in the shop's real catalogue — the
  * "growth idea" row (Verto's answer to a keyword tool). Best-effort: any
  * failure (no AI key, bad JSON) simply omits the row.
