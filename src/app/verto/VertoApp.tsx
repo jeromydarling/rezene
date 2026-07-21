@@ -19,6 +19,7 @@ import { VertoDirectory, VertoMakers } from "./VertoDirectory";
 import { VertoJourneys } from "./VertoJourneys";
 import { VertoFeatures } from "./VertoFeatures";
 import { VertoFaq } from "./VertoFaq";
+import { TESTIMONIALS } from "../../shared/testimonials";
 
 /**
  * Verto — the platform's marketing site as a cinematic scroll journey.
@@ -584,8 +585,45 @@ function VertoHome() {
       <FeatureScenes />
       <AiMoment />
       <CapabilityIndex />
+      <Testimonials />
       <ClosingShot />
     </>
+  );
+}
+
+/**
+ * Real customer voices. Renders nothing until src/shared/testimonials.ts holds
+ * a real, attributable quote — at which point this section AND the Review
+ * structured data on the home page light up together (Google requires the
+ * review to be visible on the same page as the markup). Ready for growth.
+ */
+function Testimonials() {
+  if (TESTIMONIALS.length === 0) return null;
+  return (
+    <section className="mx-auto max-w-5xl px-5 py-20">
+      <Reveal>
+        <p className="eyebrow mb-2 text-center">In their words</p>
+      </Reveal>
+      <div className="mt-8 grid gap-5 md:grid-cols-2">
+        {TESTIMONIALS.map((t, i) => (
+          <Reveal key={t.name + i} delay={i * 80}>
+            <figure className="h-full rounded-lg border border-ink/10 bg-white p-6">
+              {typeof t.rating === "number" && (
+                <div className="mb-2 text-terracotta" aria-label={`${t.rating} out of 5`}>
+                  {"★".repeat(Math.round(t.rating))}
+                  <span className="text-ink/20">{"★".repeat(5 - Math.round(t.rating))}</span>
+                </div>
+              )}
+              <blockquote className="prose-editorial text-[0.95rem]">“{t.quote}”</blockquote>
+              <figcaption className="mt-3 text-sm font-medium text-ink">
+                {t.name}
+                {t.role && <span className="font-normal text-warmgrey"> · {t.role}</span>}
+              </figcaption>
+            </figure>
+          </Reveal>
+        ))}
+      </div>
+    </section>
   );
 }
 

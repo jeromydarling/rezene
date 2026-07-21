@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ChevronDown } from "lucide-react";
 import { Reveal } from "./cinema";
-import { FAQ } from "../../shared/faq";
+import { FAQ, faqSlug } from "../../shared/faq";
 
 /**
  * The marketing FAQ — real questions independent labels ask about web software
@@ -38,7 +38,7 @@ export function VertoFaq() {
               </h2>
               <div className="divide-y divide-ink/10 rounded-lg border border-ink/10 bg-white">
                 {category.items.map((item) => (
-                  <FaqRow key={item.q} q={item.q} a={item.a} />
+                  <FaqRow key={item.q} slug={faqSlug(item)} q={item.q} a={item.a} />
                 ))}
               </div>
             </section>
@@ -67,10 +67,19 @@ export function VertoFaq() {
   );
 }
 
-function FaqRow({ q, a }: { q: string; a: string }) {
+function FaqRow({ slug, q, a }: { slug: string; q: string; a: string }) {
   const [open, setOpen] = useState(false);
+
+  // Deep links: /faq#slug opens the question and scrolls it into view.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === `#${slug}`) {
+      setOpen(true);
+      document.getElementById(slug)?.scrollIntoView({ block: "center" });
+    }
+  }, [slug]);
+
   return (
-    <div>
+    <div id={slug} className="scroll-mt-24">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

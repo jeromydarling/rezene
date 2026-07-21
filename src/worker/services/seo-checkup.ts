@@ -2,6 +2,7 @@ import { all, first } from "./db";
 import { getShopSeoConfig } from "./seo";
 import { getBrandName } from "./brand";
 import { AiUnavailableError } from "./ai";
+import { hasTestimonials } from "../../shared/testimonials";
 import type { Env } from "../types/env";
 
 /**
@@ -602,6 +603,23 @@ export async function runPlatformSeoCheckup(opts: { appUrl: string }): Promise<C
           },
     );
   }
+
+  // ---- Growth: review stars (ready-to-activate, so it won't be forgotten) --
+  checks.push(
+    hasTestimonials()
+      ? {
+          id: "mkt-reviews",
+          tier: "pass",
+          title: "Review stars are live",
+          detail: "Real testimonials are published on the home page and marked up as Review + AggregateRating data, so Google can show rating stars in results.",
+        }
+      : {
+          id: "mkt-reviews",
+          tier: "growth",
+          title: "Add a testimonial to earn review stars",
+          detail: "As soon as one real, attributable customer quote lands in src/shared/testimonials.ts, a testimonials section appears on the home page and Review/AggregateRating schema is emitted — the star ratings that lift click-through in Google. Nothing is published until you add a genuine one.",
+        },
+  );
 
   const counts = { warning: 0, tip: 0, growth: 0, pass: 0 };
   for (const c of checks) counts[c.tier]++;
