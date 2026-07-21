@@ -1,5 +1,6 @@
 import { all, first } from "./db";
 import { PLANS } from "./stripe-connect";
+import { FAQ_FLAT } from "../../shared/faq";
 import type { Env } from "../types/env";
 
 /**
@@ -74,6 +75,12 @@ export const VERTO_META: Record<string, RouteMeta> = {
     title: "Open your shop — Verto",
     description: "Reserve your shop address and be first in when we onboard new labels.",
     image: "/verto/dusk.jpg",
+  },
+  "/faq": {
+    title: "Questions independent labels ask — Verto",
+    description:
+      "Straight answers on cost and fees, getting found on Google and in AI search, pre-orders, made-to-order, wholesale, owning your data, and switching — for people who actually make clothes.",
+    image: "/verto/atelier.jpg",
   },
 };
 
@@ -367,6 +374,25 @@ export function buildStructuredData(
   return `<script type="application/ld+json">${json}</script>`;
 }
 
+/**
+ * FAQPage structured data for the marketing /faq page. The questions and
+ * answers are real (see src/shared/faq.ts), which is what makes this schema
+ * legitimate — Google penalises FAQ markup that doesn't match visible content,
+ * so the same source feeds the rendered page and this JSON-LD.
+ */
+export function buildFaqLd(): string {
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ_FLAT.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+  return `<script type="application/ld+json">${JSON.stringify(ld).replaceAll("<", "\\u003c")}</script>`;
+}
+
 // ---------- Per-shop SEO configuration (settings-driven) ----------
 export interface ShopSeoConfig {
   /** 'hidden' shops noindex everything and vanish from sitemaps. */
@@ -534,6 +560,7 @@ export async function buildSitemap(env: Env): Promise<string> {
     { loc: "/features" },
     { loc: "/compare" },
     { loc: "/pricing" },
+    { loc: "/faq" },
   ];
   const { DEMO_SHOP_SLUG } = await import("./shops");
   const { getShopDb } = await import("./tenant-db");

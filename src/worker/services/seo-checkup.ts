@@ -407,6 +407,7 @@ const MARKETING_ROUTES: { path: string; label: string }[] = [
   { path: "/compare", label: "Compare" },
   { path: "/pricing", label: "Pricing" },
   { path: "/stories", label: "Stories" },
+  { path: "/faq", label: "FAQ" },
 ];
 
 export async function runPlatformSeoCheckup(opts: { appUrl: string }): Promise<CheckupResult> {
