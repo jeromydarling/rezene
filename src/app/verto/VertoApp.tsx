@@ -18,6 +18,7 @@ import { VertoCompare, VertoWhy } from "./VertoStory";
 import { VertoDirectory, VertoMakers } from "./VertoDirectory";
 import { VertoJourneys } from "./VertoJourneys";
 import { VertoFeatures } from "./VertoFeatures";
+import { VertoFaq } from "./VertoFaq";
 
 /**
  * Verto — the platform's marketing site as a cinematic scroll journey.
@@ -80,6 +81,7 @@ const NAV_ITEMS = [
   { to: "/features", label: "Features" },
   { to: "/compare", label: "Compare" },
   { to: "/pricing", label: "Pricing" },
+  { to: "/faq", label: "FAQ" },
 ];
 
 function VertoLayout({ children }: { children: ReactNode }) {
@@ -237,6 +239,9 @@ function VertoLayout({ children }: { children: ReactNode }) {
             </Link>
             <Link to="/pricing" className="hover:text-chalk">
               Pricing
+            </Link>
+            <Link to="/faq" className="hover:text-chalk">
+              FAQ
             </Link>
             <Link to="/changelog" className="hover:text-chalk">
               What's new
@@ -1117,6 +1122,7 @@ export function VertoApp() {
         <Route path="features" element={<VertoFeatures />} />
         <Route path="compare" element={<VertoCompare />} />
         <Route path="pricing" element={<VertoPricing />} />
+        <Route path="faq" element={<VertoFaq />} />
         <Route path="directory" element={<VertoDirectory />} />
         <Route path="makers" element={<VertoMakers />} />
         <Route path="signup" element={<VertoSignup />} />

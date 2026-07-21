@@ -149,7 +149,7 @@ app.get("/:shopSlug/media/:fileId", async (c) => {
 // domain) serves that shop's storefront — same SPA shell, with the shop
 // context and per-route SEO meta injected at the edge. Legacy Rezene-era
 // paths 301 to the shop-prefixed equivalents.
-import { buildProductLd, buildSitemap, buildStructuredData, getShopSeoConfig, injectMeta, injectShopContext, injectVerification, resolveRouteMeta, VERTO_META } from "./services/seo";
+import { buildFaqLd, buildProductLd, buildSitemap, buildStructuredData, getShopSeoConfig, injectMeta, injectShopContext, injectVerification, resolveRouteMeta, VERTO_META } from "./services/seo";
 import { DEMO_SHOP_SLUG, getPrimaryShopBase, PRIMARY_SHOP_ID, resolveShop } from "./services/shops";
 import type { Context } from "hono";
 
@@ -245,6 +245,10 @@ async function serveDocument(c: Context<AppContext>): Promise<Response> {
       "</head>",
       `    ${buildStructuredData(c.env, shop ? { slug: shop.slug, name: shop.name, basePath } : null, meta)}\n  </head>`,
     );
+  }
+  // FAQ rich results on the marketing FAQ page (real Q&A → legitimate markup).
+  if (!shop && url.pathname === "/faq") {
+    html = html.replace("</head>", `    ${buildFaqLd()}\n  </head>`);
   }
   // Product rich results on shop product pages.
   const productMatch = shop && strippedPath.match(/^\/products\/([^/]+)$/);
