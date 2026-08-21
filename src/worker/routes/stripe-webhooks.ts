@@ -41,11 +41,139 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
     return c.json({ error: "Invalid signature" }, 400);
   }
 
+  try {
+    const result = await handleStripeEvent(c.env, stripe, event, (p) =>
+      c.executionCtx.waitUntil(p),
+    );
+    return c.json(result);
+  } catch {
+    return c.json({ error: "Processing failed" }, 500);
+  }
+});
+
+/**
+ * Federation receiver: the CROS hub receives all Stripe events centrally and
+ * forwards each satellite's slice as a JSON envelope
+ * `{ hub_event_id, satellite_app, stripe_event, delivered_at }` signed with a
+ * shared secret (HMAC-SHA256 of the raw body, lowercase hex, in the
+ * X-CROS-Federation-Signature header). After verification the unwrapped
+ * stripe_event goes through handleStripeEvent — the exact code path the
+ * direct webhook runs after its own signature check — so the two delivery
+ * routes cannot drift, and the `webhooks` idempotency table dedupes an event
+ * that arrives on both.
+ */
+stripeWebhookRoutes.post("/federation-in", async (c) => {
+  const secret = c.env.FEDERATION_STRIPE_SECRET;
+  if (!secret) {
+    // Fail closed: without the shared secret nothing can be trusted.
+    return c.json({ ok: false, error: "federation_not_configured" }, 500);
+  }
+
+  // The signature covers the exact raw bytes — read them before any parsing.
+  const rawBody = await c.req.text();
+  const signature = c.req.header("X-CROS-Federation-Signature");
+  if (!signature) {
+    return c.json({ ok: false, error: "missing_federation_signature" }, 400);
+  }
+  const expected = await hmacHex(secret, rawBody);
+  if (!timingSafeEqualStr(expected, signature.trim().toLowerCase())) {
+    return c.json({ ok: false, error: "invalid_federation_signature" }, 400);
+  }
+
+  // Only now is the body trusted enough to parse.
+  let envelope: {
+    hub_event_id?: unknown;
+    satellite_app?: unknown;
+    stripe_event?: unknown;
+    delivered_at?: unknown;
+  };
+  try {
+    const parsed: unknown = JSON.parse(rawBody);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("shape");
+    envelope = parsed as typeof envelope;
+  } catch {
+    return c.json({ ok: false, error: "invalid_envelope" }, 400);
+  }
+  const stripeEvent = envelope.stripe_event as Stripe.Event | undefined;
+  if (
+    !stripeEvent ||
+    typeof stripeEvent !== "object" ||
+    typeof stripeEvent.id !== "string" ||
+    typeof stripeEvent.type !== "string"
+  ) {
+    return c.json({ ok: false, error: "invalid_stripe_event" }, 400);
+  }
+  if (
+    envelope.satellite_app !== undefined &&
+    envelope.satellite_app !== null &&
+    envelope.satellite_app !== "verto"
+  ) {
+    return c.json({ ok: false, error: "wrong_satellite" }, 400);
+  }
+
+  const stripe = getStripe(c.env);
+  if (!stripe) {
+    // Same degradation as the direct webhook: handling checkout events needs
+    // the Stripe client, so without STRIPE_SECRET_KEY we refuse clearly.
+    return c.json({ ok: false, error: "stripe_not_configured" }, 500);
+  }
+
+  try {
+    const result = await handleStripeEvent(c.env, stripe, stripeEvent, (p) =>
+      c.executionCtx.waitUntil(p),
+    );
+    return c.json({
+      ok: true,
+      received: true,
+      hub_event_id: envelope.hub_event_id ?? null,
+      ...(result.duplicate ? { duplicate: true } : {}),
+      ...(result.ignored ? { ignored: true } : {}),
+    });
+  } catch {
+    return c.json({ ok: false, error: "handler_failed" }, 502);
+  }
+});
+
+/** Lowercase-hex HMAC-SHA256 via WebCrypto (workerd has no node:crypto need). */
+async function hmacHex(secret: string, message: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Constant-time string comparison (XOR-accumulate; only length can leak). */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * Everything the webhook does AFTER signature verification: idempotency
+ * receipt, event dispatch, and receipt status bookkeeping. Shared by the
+ * direct Stripe webhook and the CROS federation receiver so their behavior
+ * cannot diverge. Returns the acknowledgement body; throws when a handler
+ * fails (callers translate that into their own retryable error status).
+ */
+export async function handleStripeEvent(
+  env: Env,
+  stripe: Stripe,
+  event: Stripe.Event,
+  waitUntil: (promise: Promise<unknown>) => void,
+): Promise<{ received: true; duplicate?: true; ignored?: true }> {
   // Idempotency: first insert wins; replays are acknowledged and ignored.
   const receiptId = newId("wh");
   try {
     await run(
-      c.env.DB,
+      env.DB,
       `INSERT INTO webhooks (id, provider, event_type, external_event_id, status)
        VALUES (?, 'stripe', ?, ?, 'received')`,
       receiptId,
@@ -53,7 +181,7 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
       event.id,
     );
   } catch {
-    return c.json({ received: true, duplicate: true });
+    return { received: true, duplicate: true };
   }
 
   try {
@@ -61,28 +189,28 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
       case "checkout.session.completed": {
         const session = event.data.object;
         if (session.metadata?.kind === "video_render") {
-          await handleVideoRenderAuthorized(c.env, session);
+          await handleVideoRenderAuthorized(env, session);
           break;
         }
-        const orderId = await handleCheckoutCompleted(c.env.DB, stripe, session);
-        if (orderId) c.executionCtx.waitUntil(notifyOrderPaid(c.env, orderId));
+        const orderId = await handleCheckoutCompleted(env.DB, stripe, session);
+        if (orderId) waitUntil(notifyOrderPaid(env, orderId));
         break;
       }
       case "payment_intent.succeeded":
-        await handlePaymentIntent(c.env.DB, event.data.object, "paid");
+        await handlePaymentIntent(env.DB, event.data.object, "paid");
         break;
       case "payment_intent.payment_failed":
-        await handlePaymentIntent(c.env.DB, event.data.object, "failed");
+        await handlePaymentIntent(env.DB, event.data.object, "failed");
         break;
       case "charge.refunded":
-        await handleChargeRefunded(c.env.DB, event.data.object);
+        await handleChargeRefunded(env.DB, event.data.object);
         break;
       case "checkout.session.expired":
-        c.executionCtx.waitUntil(handleCheckoutExpired(c.env, event.data.object));
+        waitUntil(handleCheckoutExpired(env, event.data.object));
         break;
       case "customer.created":
       case "customer.updated":
-        await upsertCustomer(c.env.DB, event.data.object);
+        await upsertCustomer(env.DB, event.data.object);
         break;
       // Verto plan billing: subscription lifecycle → shop registry (plan +
       // billing_status). The subscription carries shop_id in its metadata.
@@ -90,26 +218,26 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const { applySubscriptionEvent } = await import("../services/stripe-connect");
-        await applySubscriptionEvent(c.env, event.data.object);
+        await applySubscriptionEvent(env, event.data.object);
         break;
       }
       default:
         await run(
-          c.env.DB,
+          env.DB,
           `UPDATE webhooks SET status = 'ignored', processed_at = datetime('now') WHERE id = ?`,
           receiptId,
         );
-        return c.json({ received: true, ignored: true });
+        return { received: true, ignored: true };
     }
     await run(
-      c.env.DB,
+      env.DB,
       `UPDATE webhooks SET status = 'processed', processed_at = datetime('now') WHERE id = ?`,
       receiptId,
     );
-    return c.json({ received: true });
+    return { received: true };
   } catch (err) {
     await run(
-      c.env.DB,
+      env.DB,
       `UPDATE webhooks SET status = 'failed', error = ?, processed_at = datetime('now') WHERE id = ?`,
       String(err).slice(0, 500),
       receiptId,
@@ -118,10 +246,10 @@ stripeWebhookRoutes.post("/webhooks", async (c) => {
     // only for *successfully recorded* events, and failures re-enter here
     // under a new receipt row because the unique key already exists…
     // so mark this row consumed and let Stripe retry against the same id:
-    await run(c.env.DB, `DELETE FROM webhooks WHERE id = ?`, receiptId);
-    return c.json({ error: "Processing failed" }, 500);
+    await run(env.DB, `DELETE FROM webhooks WHERE id = ?`, receiptId);
+    throw err;
   }
-});
+}
 
 /**
  * Post-payment email fan-out: founder notification and buyer confirmation,

@@ -97,6 +97,12 @@ export interface Env {
   LULU_CLIENT_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /**
+   * Shared secret with the CROS federation hub. Signs the JSON envelope the
+   * hub POSTs to /api/stripe/federation-in (HMAC-SHA256, lowercase hex, in
+   * the X-CROS-Federation-Signature header). Unset → the route fails closed.
+   */
+  FEDERATION_STRIPE_SECRET?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   SESSION_SECRET?: string;
