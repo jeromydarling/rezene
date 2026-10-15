@@ -15,7 +15,7 @@
 # CI (.github/workflows/deploy.yml) syncs secrets to "verto" explicitly. Don't
 # run a bare `wrangler deploy` from this config — it would recreate a stray,
 # unrouted "rezene" script.
-name = "rezene"
+name = "verto"
 main = "./src/worker/index.ts"
 compatibility_date = "2026-01-01"
 compatibility_flags = ["nodejs_compat"]
