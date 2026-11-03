@@ -192,6 +192,10 @@ export async function handleStripeEvent(
           await handleVideoRenderAuthorized(env, session);
           break;
         }
+        if (session.metadata?.kind === "wholesale_invoice") {
+          await handleWholesaleInvoicePaid(env, session);
+          break;
+        }
         const orderId = await handleCheckoutCompleted(env.DB, stripe, session);
         if (orderId) waitUntil(notifyOrderPaid(env, orderId));
         break;
@@ -315,6 +319,25 @@ async function notifyOrderPaid(env: Env, orderId: string): Promise<void> {
  * GitHub Actions render. The hold is only captured when the finished MP4 lands
  * (see render-callbacks finalize), so an uncompleted render costs nothing.
  */
+/**
+ * A wholesale invoice was paid online. The session metadata carries the shop
+ * and order; the order lives in that shop's own database. Marks it paid,
+ * syncs the linked fulfilment order, and sends the receipts.
+ */
+async function handleWholesaleInvoicePaid(env: Env, session: Stripe.Checkout.Session): Promise<void> {
+  const shopId = session.metadata?.shop_id;
+  const orderId = session.metadata?.wholesale_order_id;
+  if (!shopId || !orderId) return;
+  const { getShopDb } = await import("../services/tenant-db");
+  const { PRIMARY_SHOP_ID } = await import("../services/shops");
+  const db = getShopDb(env, shopId, PRIMARY_SHOP_ID);
+  const { applyWholesalePaid } = await import("../services/wholesale");
+  await applyWholesalePaid(env, db, {
+    orderId,
+    paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+  });
+}
+
 async function handleVideoRenderAuthorized(env: Env, session: Stripe.Checkout.Session): Promise<void> {
   const jobId = session.metadata?.job_id;
   const shopId = session.metadata?.shop_id;

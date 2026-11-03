@@ -1441,7 +1441,7 @@ const MODERN_SHOP: { group: string; items: [string, string][] }[] = [
       ["Discounts & tax", "Make a code your customers type; switch on sales tax/VAT with one toggle."],
       ["Search & merchandising", "Instant search, size/category/price facets, and “only N left” urgency."],
       ["Product reviews", "Only verified buyers can review — trustworthy by construction, great for SEO."],
-      ["Wholesale portal", "Approved boutiques sign in and order at their own pricing, with net terms."],
+      ["Wholesale portal", "Approved boutiques sign in and order at their own pricing — trade discounts, volume tiers, even a per-buyer price list. Invoices are payable online into your own Stripe, and confirmed orders ship with the same labels, tracking, and emails as retail."],
     ],
   },
   {

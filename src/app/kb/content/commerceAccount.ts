@@ -63,7 +63,9 @@ Create a campaign for a product with a **goal** (units). Customers pre-order; Ve
 
 **Selling → Line Sheets** creates a shareable, priced catalog for wholesale buyers.
 
-Build a sheet, set per-item wholesale **price and minimums**, and share a **tokenized link** — buyers browse and register interest without a login. Revoke the link anytime. Create, edit item pricing, and remove sheets as your wholesale programme grows.`,
+Build a sheet, set per-item wholesale **price, minimums, and volume tiers** (quantity breaks like "12@40, 24@36"), and share a **tokenized link** — buyers browse, print the sheet as a PDF, and register interest without a login. Revoke the link anytime.
+
+Approved buyers go further: they order directly at their own pricing through the [buyer portal](/admin/support/kb/wholesale-portal), pay invoices online, and get tracking when you ship.`,
   },
   // ---- Account ----
   {
