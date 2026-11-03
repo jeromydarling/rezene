@@ -152,26 +152,41 @@ In their account's **Rewards** tab, customers see their credit balance and a sha
   {
     slug: "wholesale-portal",
     title: "Wholesale buyer portal",
-    summary: "Approve buyers and take orders at their own pricing, with net terms.",
+    summary: "Approve buyers, set their pricing, take orders, get paid online, and ship — the whole trade channel.",
     part: "commerce",
     moduleRoute: "/admin/line-sheets",
-    keywords: "wholesale b2b buyer portal account approve discount net terms order invoice moq",
-    updated: "2026-07-08",
+    keywords: "wholesale b2b buyer portal account approve discount net terms order invoice moq pay online stripe payment link price list volume tiers shipping tracking",
+    updated: "2026-11-03",
     body: `# Wholesale buyer portal
 
-Your line sheets are also a real ordering channel for boutiques.
+Your line sheets are also a real ordering channel for boutiques — from application to payment to the parcel's tracking number.
 
 ## Approving buyers
 
 A buyer applies at your \`/wholesale\` page. Under **Selling → Line Sheets → Buyers**, review each application and **approve** it with a **trade discount %** and **net terms** (payment days). A pending count shows on the button.
 
+## Pricing: discount, tiers, and custom price lists
+
+Three layers, from broadest to most specific:
+
+- **Trade discount %** — set per buyer at approval; applies to everything.
+- **Volume tiers** — quantity breaks per style, set on the line sheet ("12@40, 24@36" = $40 a unit from 12 pieces, $36 from 24). Buyers see their breaks and the price updates as they type quantities.
+- **Custom price list** — on an approved buyer, open **Custom price list** and set absolute per-style prices for that buyer alone. A custom price replaces the sheet price, tiers, and discount — it *is* the negotiated price.
+
 ## How they order
 
-Approved buyers sign in with an emailed link and browse your active line sheets at **their own pricing**, placing an order with your per-style minimums enforced.
+Approved buyers sign in with an emailed link and browse your active line sheets at **their own pricing**, with minimums enforced and a ship-to address collected with the order. They can print any sheet as a PDF at their prices.
 
-## Managing orders
+## Getting paid
 
-Under **Buyers'** sibling, **Orders**, move each wholesale order through *submitted → confirmed → invoiced → paid*. Marking it **invoiced** stamps a due date from that buyer's terms.`,
+Move each order through *submitted → confirmed → invoiced → paid*. Marking it **invoiced** stamps a due date from the buyer's terms and **emails them the invoice** with a sign-in-to-pay link. With Stripe connected, buyers pay online with **Pay now** in the portal — or use **Copy payment link** on the order and send it anywhere. Payment lands in your own Stripe payouts like any sale, the order flips to paid by itself, and both sides get a receipt. Bank-transfer buyers still work: just mark the order paid by hand.
+
+## Shipping it
+
+**Confirming** a wholesale order creates a matching order under **Selling → Orders**, where all the usual tools work: live shipping rates, label purchase, tracking, and the shipped/delivered emails to the buyer. The wholesale order shows an **Open in Orders →** link once confirmed.
+
+> [!NOTE]
+> Stock isn't decremented automatically for wholesale (orders are per style, not per size) — adjust inventory when you pick the run.`,
   },
   {
     slug: "data-export",

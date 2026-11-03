@@ -193,25 +193,35 @@ wholesalePortalRoutes.get("/line-sheets/:id", async (c) => {
     c.req.param("id"),
   );
   if (!sheet) return c.json({ error: "Line sheet not found" }, 404);
-  const rows = await all<{ product_id: string; wholesale_price_cents: number; min_qty: number; name: string; slug: string; image: string | null }>(
+  const rows = await all<{ product_id: string; wholesale_price_cents: number; min_qty: number; price_tiers: string | null; name: string; slug: string; image: string | null }>(
     c.var.db,
-    `SELECT i.product_id, i.wholesale_price_cents, i.min_qty, p.name, p.slug,
+    `SELECT i.product_id, i.wholesale_price_cents, i.min_qty, i.price_tiers, p.name, p.slug,
             (SELECT url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort_order LIMIT 1) AS image
      FROM line_sheet_items i JOIN products p ON p.id = i.product_id
      WHERE i.line_sheet_id = ? AND p.is_published = 1
      ORDER BY i.sort_order`,
     sheet.id,
   );
-  const factor = 1 - Math.max(0, Math.min(90, me.discount_pct)) / 100;
-  const items = rows.map((r) => ({
-    productId: r.product_id,
-    name: r.name,
-    slug: r.slug,
-    image: r.image,
-    minQty: r.min_qty,
-    priceCents: Math.round(r.wholesale_price_cents * factor),
-    listPriceCents: r.wholesale_price_cents,
-  }));
+  const { parsePriceTiers, resolveWholesaleUnitPrice, loadOverrides } = await import("../services/wholesale");
+  const overrides = await loadOverrides(c.var.db, me.account_id);
+  const items = rows.map((r) => {
+    const tiers = parsePriceTiers(r.price_tiers);
+    const overrideCents = overrides.get(r.product_id) ?? null;
+    const priceAt = (qty: number) =>
+      resolveWholesaleUnitPrice({ baseCents: r.wholesale_price_cents, tiers, qty, discountPct: me.discount_pct, overrideCents });
+    return {
+      productId: r.product_id,
+      name: r.name,
+      slug: r.slug,
+      image: r.image,
+      minQty: r.min_qty,
+      priceCents: priceAt(r.min_qty),
+      listPriceCents: r.wholesale_price_cents,
+      customPrice: overrideCents != null,
+      // The buyer's own quantity breaks (their discount applied), for display.
+      tiers: overrideCents == null ? tiers.map((t) => ({ minQty: t.minQty, priceCents: priceAt(t.minQty) })) : [],
+    };
+  });
   return c.json({ sheet, items, currency: sheet.currency, discountPct: me.discount_pct });
 });
 
@@ -223,6 +233,7 @@ wholesalePortalRoutes.post("/orders", async (c) => {
     lineSheetId?: string;
     note?: string;
     items?: { productId: string; quantity: number }[];
+    shipTo?: { name?: string; line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string };
   };
   if (!b.lineSheetId) return c.json({ error: "Missing line sheet." }, 400);
   const sheet = await first<{ id: string; currency: string }>(
@@ -234,12 +245,13 @@ wholesalePortalRoutes.post("/orders", async (c) => {
   const picks = (b.items ?? []).filter((i) => i.productId && i.quantity > 0);
   if (picks.length === 0) return c.json({ error: "Add at least one style." }, 400);
 
-  const factor = 1 - Math.max(0, Math.min(90, me.discount_pct)) / 100;
+  const { parsePriceTiers, resolveWholesaleUnitPrice, loadOverrides } = await import("../services/wholesale");
+  const overrides = await loadOverrides(c.var.db, me.account_id);
   const resolved: { productId: string; name: string; qty: number; unit: number }[] = [];
   for (const p of picks) {
-    const row = await first<{ wholesale_price_cents: number; min_qty: number; name: string }>(
+    const row = await first<{ wholesale_price_cents: number; min_qty: number; price_tiers: string | null; name: string }>(
       c.var.db,
-      `SELECT i.wholesale_price_cents, i.min_qty, pr.name
+      `SELECT i.wholesale_price_cents, i.min_qty, i.price_tiers, pr.name
        FROM line_sheet_items i JOIN products pr ON pr.id = i.product_id
        WHERE i.line_sheet_id = ? AND i.product_id = ?`,
       sheet.id,
@@ -248,17 +260,45 @@ wholesalePortalRoutes.post("/orders", async (c) => {
     if (!row) continue;
     if (p.quantity < row.min_qty)
       return c.json({ error: `${row.name} has a minimum of ${row.min_qty}.` }, 400);
-    resolved.push({ productId: p.productId, name: row.name, qty: p.quantity, unit: Math.round(row.wholesale_price_cents * factor) });
+    const unit = resolveWholesaleUnitPrice({
+      baseCents: row.wholesale_price_cents,
+      tiers: parsePriceTiers(row.price_tiers),
+      qty: p.quantity,
+      discountPct: me.discount_pct,
+      overrideCents: overrides.get(p.productId) ?? null,
+    });
+    resolved.push({ productId: p.productId, name: row.name, qty: p.quantity, unit });
   }
   if (resolved.length === 0) return c.json({ error: "Those styles aren't on this sheet." }, 400);
+
+  // Ship-to address (retail-pipeline shape, so shipping rates & labels work
+  // on the fulfilment order). Optional — the shop can fill it in later.
+  const ship = b.shipTo ?? {};
+  const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const country = clean(ship.country, 2).toUpperCase() || null;
+  const hasAddress = Boolean(clean(ship.line1, 200) && country);
+  const addressJson = hasAddress
+    ? JSON.stringify({
+        name: clean(ship.name, 160) || me.company || me.email,
+        address: {
+          line1: clean(ship.line1, 200),
+          line2: clean(ship.line2, 200) || undefined,
+          city: clean(ship.city, 120),
+          state: clean(ship.state, 120) || undefined,
+          postal_code: clean(ship.postalCode, 20),
+          country,
+        },
+      })
+    : null;
 
   const total = resolved.reduce((s, r) => s + r.qty * r.unit, 0);
   const orderId = newId("wo");
   const orderNumber = `WS-${Date.now().toString(36).toUpperCase().slice(-6)}`;
   await run(
     c.var.db,
-    `INSERT INTO wholesale_orders (id, account_id, line_sheet_id, order_number, status, currency, total_cents, note)
-     VALUES (?, ?, ?, ?, 'submitted', ?, ?, ?)`,
+    `INSERT INTO wholesale_orders (id, account_id, line_sheet_id, order_number, status, currency, total_cents, note,
+                                   shipping_address_json, shipping_country)
+     VALUES (?, ?, ?, ?, 'submitted', ?, ?, ?, ?, ?)`,
     orderId,
     me.account_id,
     sheet.id,
@@ -266,6 +306,8 @@ wholesalePortalRoutes.post("/orders", async (c) => {
     sheet.currency,
     total,
     (b.note ?? "").slice(0, 2000) || null,
+    addressJson,
+    country,
   );
   for (const r of resolved) {
     await run(
@@ -290,9 +332,35 @@ wholesalePortalRoutes.get("/orders", async (c) => {
   const rows = await all(
     c.var.db,
     `SELECT id, order_number AS orderNumber, status, total_cents AS totalCents, currency,
-            due_date AS dueDate, created_at AS createdAt
+            due_date AS dueDate, paid_at AS paidAt, created_at AS createdAt
      FROM wholesale_orders WHERE account_id = ? ORDER BY created_at DESC`,
     me.account_id,
   );
-  return c.json({ orders: rows });
+  const { getStripe } = await import("../services/stripe");
+  return c.json({ orders: rows, canPayOnline: Boolean(getStripe(c.env)) });
 });
+
+// ---- Pay an invoice online ----
+wholesalePortalRoutes.post(
+  "/orders/:id/pay",
+  rateLimit({ key: "wholesale_pay", limit: 10, windowSeconds: 3600 }),
+  async (c) => {
+    const me = await currentBuyer(c);
+    if (!me) return c.json({ error: "Not signed in" }, 401);
+    const owned = await first<{ id: string }>(
+      c.var.db,
+      `SELECT id FROM wholesale_orders WHERE id = ? AND account_id = ?`,
+      c.req.param("id"),
+      me.account_id,
+    );
+    if (!owned) return c.json({ error: "Order not found" }, 404);
+    const { createInvoiceCheckout } = await import("../services/wholesale");
+    const result = await createInvoiceCheckout(c.env, c.var.db, {
+      orderId: owned.id,
+      shopId: c.var.shopId,
+      baseUrl: await shopBaseUrl(c),
+    });
+    if ("error" in result) return c.json({ error: result.error }, 400);
+    return c.json(result);
+  },
+);

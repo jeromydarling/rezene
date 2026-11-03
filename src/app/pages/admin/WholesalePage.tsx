@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router";
 import { useFetch } from "../../lib/useFetch";
 import { api, ApiRequestError } from "../../lib/api";
 import { formatDate, formatMoney } from "../../lib/format";
@@ -29,6 +30,28 @@ interface LineSheetItemRow {
   msrp_cents: number;
   wholesale_price_cents: number;
   min_qty: number;
+  price_tiers: string | null;
+}
+
+/** "12@40, 24@36" ⇄ [{minQty:12, priceCents:4000}, …] for the compact tiers field. */
+function tiersToText(json: string | null): string {
+  try {
+    const tiers = JSON.parse(json ?? "[]") as { minQty: number; priceCents: number }[];
+    return tiers.map((t) => `${t.minQty}@${(t.priceCents / 100).toFixed(2).replace(/\.00$/, "")}`).join(", ");
+  } catch {
+    return "";
+  }
+}
+function textToTiers(text: string): { minQty: number; priceCents: number }[] | null {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  const tiers: { minQty: number; priceCents: number }[] = [];
+  for (const part of trimmed.split(",")) {
+    const m = part.trim().match(/^(\d+)\s*@\s*\$?(\d+(?:\.\d{1,2})?)$/);
+    if (!m) return null;
+    tiers.push({ minQty: parseInt(m[1], 10), priceCents: Math.round(parseFloat(m[2]) * 100) });
+  }
+  return tiers.filter((t) => t.minQty >= 2).slice(0, 6);
 }
 
 interface LineSheetDetail extends LineSheetRow {
@@ -303,7 +326,10 @@ function LineSheetDetailPanel({ id }: { id: string }) {
   );
   const [saving, setSaving] = useState<string | null>(null);
 
-  async function save(item: LineSheetItemRow, patch: { wholesalePriceCents?: number; minQty?: number }) {
+  async function save(
+    item: LineSheetItemRow,
+    patch: { wholesalePriceCents?: number; minQty?: number; priceTiers?: { minQty: number; priceCents: number }[] },
+  ) {
     setSaving(item.id);
     try {
       await api.patch(`/api/admin/wholesale/line-sheets/items/${item.id}`, patch);
@@ -333,6 +359,7 @@ function LineSheetDetailPanel({ id }: { id: string }) {
             <th>MSRP</th>
             <th>Wholesale</th>
             <th>Min qty</th>
+            <th>Volume tiers</th>
           </tr>
         </thead>
         <tbody>
@@ -369,13 +396,28 @@ function LineSheetDetailPanel({ id }: { id: string }) {
                   }}
                 />
               </td>
+              <td>
+                <input
+                  className="input !w-36 !py-1 text-xs"
+                  placeholder="12@40, 24@36"
+                  title="Quantity breaks: qty@price, comma-separated. Blank clears."
+                  defaultValue={tiersToText(item.price_tiers)}
+                  onBlur={(e) => {
+                    const tiers = textToTiers(e.target.value);
+                    if (tiers !== null && e.target.value.trim() !== tiersToText(item.price_tiers)) {
+                      void save(item, { priceTiers: tiers });
+                    }
+                  }}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
       <p className="text-xs text-warmgrey">
-        Edits save when you click away from a field. The shared page always shows current pricing.
+        Edits save when you click away from a field. Volume tiers are quantity breaks — “12@40, 24@36”
+        means $40 a unit from 12 pieces, $36 from 24. The shared page and portal always show current pricing.
       </p>
     </div>
   );
@@ -401,6 +443,8 @@ interface WOrderRow {
   totalCents: number;
   currency: string;
   dueDate: string | null;
+  paidAt: string | null;
+  fulfillmentOrderId: string | null;
   createdAt: string;
   company: string | null;
   email: string;
@@ -410,6 +454,7 @@ function BuyersPanel({ accounts, onChanged }: { accounts: BuyerRow[]; onChanged:
   const [editing, setEditing] = useState<string | null>(null);
   const [discount, setDiscount] = useState("0");
   const [terms, setTerms] = useState("0");
+  const [priceListFor, setPriceListFor] = useState<string | null>(null);
 
   async function approve(id: string) {
     await api.post(`/api/admin/wholesale/accounts/${id}/approve`, {
@@ -447,6 +492,19 @@ function BuyersPanel({ accounts, onChanged }: { accounts: BuyerRow[]; onChanged:
             </div>
             <StatusBadge status={a.status} />
           </div>
+
+          {a.status === "approved" && (
+            <div className="mt-2">
+              <button
+                type="button"
+                className="text-xs text-navy underline"
+                onClick={() => setPriceListFor(priceListFor === a.id ? null : a.id)}
+              >
+                {priceListFor === a.id ? "Hide price list" : "Custom price list"}
+              </button>
+              {priceListFor === a.id && <BuyerPriceList accountId={a.id} />}
+            </div>
+          )}
 
           {a.status === "pending" && (
             <div className="mt-2">
@@ -499,10 +557,80 @@ function BuyersPanel({ accounts, onChanged }: { accounts: BuyerRow[]; onChanged:
 
 const WO_STATUSES = ["submitted", "confirmed", "invoiced", "paid", "cancelled"];
 
+/**
+ * A buyer's custom price list: absolute unit prices per product that replace
+ * the line-sheet price, tiers, and trade discount for that buyer. Blank =
+ * standard pricing.
+ */
+function BuyerPriceList({ accountId }: { accountId: string }) {
+  const { data, loading, reload } = useFetch<{
+    products: { productId: string; name: string; listCents: number; overrideCents: number | null }[];
+  }>(`/api/admin/wholesale/accounts/${accountId}/overrides`);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  async function save(productId: string, unitPriceCents: number | null) {
+    setSaving(productId);
+    try {
+      await api.put(`/api/admin/wholesale/accounts/${accountId}/overrides`, { productId, unitPriceCents });
+      reload();
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  if (loading) return <p className="mt-2 text-xs text-warmgrey">Loading…</p>;
+  if (!data || data.products.length === 0)
+    return <p className="mt-2 text-xs text-warmgrey">No products on active line sheets yet.</p>;
+  return (
+    <div className="mt-2 space-y-1">
+      {data.products.map((p) => (
+        <div key={p.productId} className={`flex items-center gap-2 text-xs ${saving === p.productId ? "opacity-50" : ""}`}>
+          <span className="flex-1 truncate">{p.name}</span>
+          <span className="text-warmgrey">{formatMoney(p.listCents)}</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="input !w-24 !py-1 text-xs"
+            placeholder="custom"
+            defaultValue={p.overrideCents != null ? (p.overrideCents / 100).toFixed(2) : ""}
+            onBlur={(e) => {
+              const raw = e.target.value.trim();
+              const cents = raw === "" ? null : Math.round(Number.parseFloat(raw) * 100);
+              if (cents === null || (Number.isFinite(cents) && cents >= 0)) {
+                if (cents !== p.overrideCents) void save(p.productId, cents);
+              }
+            }}
+          />
+        </div>
+      ))}
+      <p className="pt-1 text-[0.65rem] text-warmgrey">
+        A custom price replaces the sheet price, tiers, and trade discount for this buyer. Blank = standard pricing.
+      </p>
+    </div>
+  );
+}
+
 function WholesaleOrdersPanel({ orders, onChanged }: { orders: WOrderRow[]; onChanged: () => void }) {
+  const [linkFor, setLinkFor] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
   async function setStatus(id: string, status: string) {
     await api.post(`/api/admin/wholesale/orders/${id}/status`, { status });
     onChanged();
+  }
+  async function copyPaymentLink(id: string) {
+    setLinkFor(id);
+    try {
+      const res = await api.post<{ url: string }>(`/api/admin/wholesale/orders/${id}/payment-link`);
+      await navigator.clipboard.writeText(res.url);
+      setCopied(id);
+      setTimeout(() => setCopied(null), 2500);
+    } catch (err) {
+      alert(err instanceof ApiRequestError ? err.message : "Couldn't create a payment link");
+    } finally {
+      setLinkFor(null);
+    }
   }
   if (orders.length === 0)
     return <p className="py-8 text-center text-sm text-warmgrey">No wholesale orders yet.</p>;
@@ -515,22 +643,43 @@ function WholesaleOrdersPanel({ orders, onChanged }: { orders: WOrderRow[]; onCh
               <p className="font-mono font-medium">{o.orderNumber}</p>
               <p className="text-xs text-warmgrey">
                 {o.company || o.email} · {formatDate(o.createdAt)}
-                {o.dueDate ? ` · due ${o.dueDate}` : ""}
+                {o.dueDate && o.status === "invoiced" ? ` · due ${o.dueDate}` : ""}
+                {o.paidAt ? " · paid" : ""}
               </p>
             </div>
             <span className="font-medium">{formatMoney(o.totalCents, o.currency)}</span>
           </div>
-          <select
-            className="input mt-2 !py-1 text-xs"
-            value={o.status}
-            onChange={(e) => void setStatus(o.id, e.target.value)}
-          >
-            {WO_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {titleCaseWord(s)}
-              </option>
-            ))}
-          </select>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <select
+              className="input !w-auto !py-1 text-xs"
+              value={o.status}
+              onChange={(e) => void setStatus(o.id, e.target.value)}
+            >
+              {WO_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {titleCaseWord(s)}
+                </option>
+              ))}
+            </select>
+            {(o.status === "invoiced" || o.status === "confirmed") && (
+              <button
+                type="button"
+                className="btn btn-secondary !px-2.5 !py-1 text-xs"
+                disabled={linkFor === o.id}
+                onClick={() => void copyPaymentLink(o.id)}
+              >
+                {copied === o.id ? "✓ Link copied" : linkFor === o.id ? "Creating…" : "Copy payment link"}
+              </button>
+            )}
+            {o.fulfillmentOrderId && (
+              <Link to="/admin/orders" className="text-xs text-navy underline">
+                Open in Orders →
+              </Link>
+            )}
+          </div>
+          {o.status === "confirmed" && !o.fulfillmentOrderId && (
+            <p className="mt-1 text-[0.65rem] text-warmgrey">Confirming creates a matching order under Selling → Orders for shipping & tracking.</p>
+          )}
         </div>
       ))}
     </div>

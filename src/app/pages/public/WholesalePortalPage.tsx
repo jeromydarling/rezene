@@ -24,6 +24,8 @@ interface SheetItem {
   minQty: number;
   priceCents: number;
   listPriceCents: number;
+  customPrice: boolean;
+  tiers: { minQty: number; priceCents: number }[];
 }
 interface WOrder {
   id: string;
@@ -32,7 +34,15 @@ interface WOrder {
   totalCents: number;
   currency: string;
   dueDate: string | null;
+  paidAt: string | null;
   createdAt: string;
+}
+
+/** The buyer's unit price at a quantity — their base price, or the deepest tier reached. */
+function unitPriceAt(item: SheetItem, qty: number): number {
+  let price = item.priceCents;
+  for (const t of item.tiers) if (qty >= t.minQty) price = t.priceCents;
+  return price;
 }
 
 export function WholesalePortalPage() {
@@ -163,21 +173,49 @@ function Apply({ onApplied }: { onApplied: () => void }) {
 }
 
 function Portal({ me, onSignOut }: { me: Me; onSignOut: () => void }) {
+  const toast = useToast();
   const [openSheet, setOpenSheet] = useState<string | null>(null);
   const [orders, setOrders] = useState<WOrder[]>([]);
+  const [canPayOnline, setCanPayOnline] = useState(false);
   const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [paying, setPaying] = useState<string | null>(null);
 
   const loadOrders = useCallback(() => {
-    api.get<{ orders: WOrder[] }>("/api/wholesale/orders").then((d) => setOrders(d.orders)).catch(() => {});
+    api
+      .get<{ orders: WOrder[]; canPayOnline: boolean }>("/api/wholesale/orders")
+      .then((d) => {
+        setOrders(d.orders);
+        setCanPayOnline(d.canPayOnline);
+      })
+      .catch(() => {});
   }, []);
   useEffect(() => {
     api.get<{ lineSheets: Sheet[] }>("/api/wholesale/line-sheets").then((d) => setSheets(d.lineSheets)).catch(() => {});
     loadOrders();
-  }, [loadOrders]);
+    // Back from a Stripe payment page — say so and refresh.
+    const url = new URL(window.location.href);
+    const paid = url.searchParams.get("paid");
+    if (paid) {
+      toast.success(`Payment received for ${paid}`, "Thank you — a receipt is on its way.");
+      url.searchParams.delete("paid");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [loadOrders, toast]);
 
   async function signOut() {
     await api.post("/api/wholesale/logout");
     onSignOut();
+  }
+
+  async function payNow(order: WOrder) {
+    setPaying(order.id);
+    try {
+      const res = await api.post<{ url: string }>(`/api/wholesale/orders/${order.id}/pay`);
+      window.location.href = res.url;
+    } catch (e) {
+      toast.error("Couldn't start payment", e instanceof ApiRequestError ? e.message : undefined);
+      setPaying(null);
+    }
   }
 
   return (
@@ -226,13 +264,26 @@ function Portal({ me, onSignOut }: { me: Me; onSignOut: () => void }) {
               <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wider text-ink/50">Your orders</h2>
               <div className="space-y-2">
                 {orders.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between rounded-lg border border-ink/10 px-4 py-3 text-sm">
+                  <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink/10 px-4 py-3 text-sm">
                     <div>
                       <span className="font-mono font-medium">{o.orderNumber}</span>
                       <span className="ml-2 text-xs uppercase tracking-wide text-ink/50">{o.status}</span>
-                      {o.dueDate && <span className="ml-2 text-xs text-ink/50">due {o.dueDate}</span>}
+                      {o.dueDate && o.status === "invoiced" && <span className="ml-2 text-xs text-ink/50">due {o.dueDate}</span>}
                     </div>
-                    <span className="font-medium">{formatMoney(o.totalCents, o.currency)}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{formatMoney(o.totalCents, o.currency)}</span>
+                      {canPayOnline && (o.status === "invoiced" || o.status === "confirmed") && (
+                        <button
+                          type="button"
+                          className="btn btn-primary !px-3 !py-1.5 text-xs"
+                          disabled={paying === o.id}
+                          onClick={() => void payNow(o)}
+                        >
+                          {paying === o.id ? "Opening…" : "Pay now"}
+                        </button>
+                      )}
+                      {o.status === "paid" && <span className="text-xs font-medium text-palm">✓ Paid</span>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -249,6 +300,7 @@ function OrderBuilder({ sheetId, onBack, onOrdered }: { sheetId: string; onBack:
   const [data, setData] = useState<{ sheet: Sheet; items: SheetItem[]; currency: string } | null>(null);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
+  const [ship, setShip] = useState({ name: "", line1: "", line2: "", city: "", state: "", postalCode: "", country: "" });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -257,7 +309,10 @@ function OrderBuilder({ sheetId, onBack, onOrdered }: { sheetId: string; onBack:
 
   if (!data) return <p className="py-10 text-center text-sm text-ink/50">Loading…</p>;
 
-  const total = data.items.reduce((s, it) => s + (qty[it.productId] || 0) * it.priceCents, 0);
+  const total = data.items.reduce((s, it) => {
+    const q = qty[it.productId] || 0;
+    return s + q * unitPriceAt(it, q || it.minQty);
+  }, 0);
   const units = Object.values(qty).reduce((s, n) => s + n, 0);
 
   async function submit() {
@@ -270,7 +325,12 @@ function OrderBuilder({ sheetId, onBack, onOrdered }: { sheetId: string; onBack:
     }
     setBusy(true);
     try {
-      const res = await api.post<{ orderNumber: string }>("/api/wholesale/orders", { lineSheetId: sheetId, items, note: note || undefined });
+      const res = await api.post<{ orderNumber: string }>("/api/wholesale/orders", {
+        lineSheetId: sheetId,
+        items,
+        note: note || undefined,
+        shipTo: ship.line1 && ship.country ? ship : undefined,
+      });
       toast.success(`Order ${res.orderNumber} placed`, "The shop will confirm and invoice you.");
       onOrdered();
     } catch (e) {
@@ -282,48 +342,82 @@ function OrderBuilder({ sheetId, onBack, onOrdered }: { sheetId: string; onBack:
 
   return (
     <div>
-      <button type="button" onClick={onBack} className="mb-4 text-sm text-ink/60 hover:text-ink">
-        ← All line sheets
-      </button>
+      <div className="mb-4 flex items-center justify-between print:hidden">
+        <button type="button" onClick={onBack} className="text-sm text-ink/60 hover:text-ink">
+          ← All line sheets
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="rounded border border-ink/20 px-3 py-1.5 text-xs uppercase tracking-wider text-ink/60 hover:border-ink/50"
+        >
+          Print / Save as PDF
+        </button>
+      </div>
       <h2 className="font-display text-2xl font-light">{data.sheet.title}</h2>
       {data.sheet.note && <p className="mt-1 text-sm text-ink/60">{data.sheet.note}</p>}
+      <p className="hidden text-xs text-ink/50 print:block">Pricing prepared for your account — confidential.</p>
 
       <div className="mt-5 space-y-2">
-        {data.items.map((it) => (
-          <div key={it.productId} className="flex items-center gap-3 rounded-lg border border-ink/10 p-3">
-            <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-cream">
-              {it.image && <img src={it.image} alt={it.name} className="h-full w-full object-cover" />}
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium">{it.name}</p>
-              <p className="text-xs text-ink/55">
-                {formatMoney(it.priceCents, data.currency)} · min {it.minQty}
-                {it.priceCents < it.listPriceCents && (
-                  <span className="ml-1 line-through">{formatMoney(it.listPriceCents, data.currency)}</span>
+        {data.items.map((it) => {
+          const q = qty[it.productId] || 0;
+          const unit = unitPriceAt(it, q || it.minQty);
+          return (
+            <div key={it.productId} className="flex items-center gap-3 rounded-lg border border-ink/10 p-3">
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-cream">
+                {it.image && <img src={it.image} alt={it.name} className="h-full w-full object-cover" />}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{it.name}</p>
+                <p className="text-xs text-ink/55">
+                  {formatMoney(unit, data.currency)} · min {it.minQty}
+                  {it.customPrice && <span className="ml-1 rounded bg-palm/15 px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wide text-palm">your price</span>}
+                  {!it.customPrice && unit < it.listPriceCents && (
+                    <span className="ml-1 line-through">{formatMoney(it.listPriceCents, data.currency)}</span>
+                  )}
+                </p>
+                {it.tiers.length > 0 && (
+                  <p className="mt-0.5 text-[0.7rem] text-ink/45">
+                    {it.tiers.map((t) => `${t.minQty}+ ${formatMoney(t.priceCents, data.currency)}`).join(" · ")}
+                  </p>
                 )}
-              </p>
+              </div>
+              <input
+                type="number"
+                min={0}
+                className="input w-20 text-sm print:hidden"
+                placeholder="0"
+                value={qty[it.productId] || ""}
+                onChange={(e) => setQty({ ...qty, [it.productId]: Math.max(0, parseInt(e.target.value) || 0) })}
+              />
             </div>
-            <input
-              type="number"
-              min={0}
-              className="input w-20 text-sm"
-              placeholder="0"
-              value={qty[it.productId] || ""}
-              onChange={(e) => setQty({ ...qty, [it.productId]: Math.max(0, parseInt(e.target.value) || 0) })}
-            />
-          </div>
-        ))}
+          );
+        })}
+      </div>
+
+      <div className="mt-5 rounded-lg border border-ink/10 p-4 print:hidden">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink/50">Ship to (optional)</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input className="input text-sm sm:col-span-2" placeholder="Boutique / receiver name" value={ship.name} onChange={(e) => setShip({ ...ship, name: e.target.value })} />
+          <input className="input text-sm" placeholder="Address line 1" value={ship.line1} onChange={(e) => setShip({ ...ship, line1: e.target.value })} />
+          <input className="input text-sm" placeholder="Address line 2" value={ship.line2} onChange={(e) => setShip({ ...ship, line2: e.target.value })} />
+          <input className="input text-sm" placeholder="City" value={ship.city} onChange={(e) => setShip({ ...ship, city: e.target.value })} />
+          <input className="input text-sm" placeholder="State / region" value={ship.state} onChange={(e) => setShip({ ...ship, state: e.target.value })} />
+          <input className="input text-sm" placeholder="Postal code" value={ship.postalCode} onChange={(e) => setShip({ ...ship, postalCode: e.target.value })} />
+          <input className="input text-sm" placeholder="Country (2 letters, e.g. US)" maxLength={2} value={ship.country} onChange={(e) => setShip({ ...ship, country: e.target.value.toUpperCase() })} />
+        </div>
+        <p className="mt-1.5 text-[0.7rem] text-ink/45">With an address the shop can quote shipping and send tracking straight to you.</p>
       </div>
 
       <textarea
-        className="input mt-4 w-full text-sm"
+        className="input mt-4 w-full text-sm print:hidden"
         rows={2}
         placeholder="Notes for the shop (optional)"
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
 
-      <div className="mt-4 flex items-center justify-between rounded-lg bg-cream/60 p-4">
+      <div className="mt-4 flex items-center justify-between rounded-lg bg-cream/60 p-4 print:hidden">
         <div className="text-sm">
           <span className="text-ink/60">{units} units · </span>
           <span className="font-medium">{formatMoney(total, data.currency)}</span>
