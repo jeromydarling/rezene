@@ -13,6 +13,14 @@ import { recordPlatformError, normalizePath } from "./services/platform-errors";
 import { fleetActivity } from "./services/fleet-activity";
 import { createLookbook, resolveRenderModel, updateLookbook, availableProducts } from "./services/lookbook";
 import { first, all, run } from "./services/db";
+import { Hono } from "hono";
+import { wholesalePortalRoutes } from "./routes/wholesale-portal";
+import { adminWholesaleRoutes } from "./routes/admin-wholesale";
+import { handleStripeEvent } from "./routes/stripe-webhooks";
+import { createInvoiceCheckout } from "./services/wholesale";
+import { newId, sha256Hex } from "./utils/id";
+import type Stripe from "stripe";
+import type { AppContext } from "./types/env";
 import type { Env } from "./types/env";
 
 /**
@@ -64,8 +72,10 @@ beforeAll(async () => {
     modules: true,
     script: "export default { fetch() { return new Response('ok'); } }",
     d1Databases: { DB: "verto-test" },
+    kvNamespaces: ["KV"],
   });
   db = (await mf.getD1Database("DB")) as unknown as D1Database;
+  const kv = await mf.getKVNamespace("KV");
 
   // Apply every migration in order — the same SQL the platform D1 and each
   // shop DO run. No triggers in these files, so a whole-file exec is safe.
@@ -101,7 +111,7 @@ beforeAll(async () => {
     `INSERT INTO shops (id, slug, name, status, created_at) VALUES ('shop_rezene', 'teststudio', 'Test Studio', 'active', datetime('now'))`,
   );
 
-  env = { DB: db, BRAND_NAME: "Test Studio" } as unknown as Env;
+  env = { DB: db, KV: kv, BRAND_NAME: "Test Studio" } as unknown as Env;
 }, 60_000);
 
 afterAll(async () => {
@@ -540,5 +550,242 @@ describe("lookbook composition", () => {
     });
     const after = await resolveRenderModel(db, created.id);
     expect(after!.spreads.map((s) => s.product.id)).toEqual(["prod_b"]);
+  });
+});
+
+/**
+ * Wholesale channel, end to end — the whole lifecycle through the REAL
+ * portal and admin routes (mounted with harness middleware standing in for
+ * tenant + session resolution), with only Stripe's own hop faked: the
+ * webhook lands as a crafted checkout.session.completed event driven through
+ * the real handleStripeEvent dispatcher. What the live $1 smoke test covers
+ * that this can't: Stripe actually creating a session and signing a webhook.
+ */
+describe("wholesale channel end to end (Stripe hop faked)", () => {
+  const portal = new Hono<AppContext>();
+  portal.use("*", async (c, next) => {
+    c.set("db", db);
+    c.set("shopId", "shop_rezene");
+    c.set("shopSlug", "teststudio");
+    await next();
+  });
+  portal.route("/", wholesalePortalRoutes);
+
+  const admin = new Hono<AppContext>();
+  admin.use("*", async (c, next) => {
+    c.set("db", db);
+    c.set("shopId", "shop_rezene");
+    c.set("shopSlug", "teststudio");
+    c.set("userId", "usr_wstest");
+    c.set("userEmail", "owner@teststudio.test");
+    c.set("roles", ["admin"]);
+    await next();
+  });
+  admin.route("/", adminWholesaleRoutes);
+
+  const json = (body: unknown, cookie?: string): RequestInit => ({
+    method: "POST",
+    headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  });
+  const COOKIE = "verto_wholesale=ws-e2e-token";
+  const BUYER = "buyer@boutique.test";
+
+  let accountId: string;
+  let sheetId: string;
+  let p1 = "";
+  let p2 = "";
+  let orderId: string;
+  let fulfillmentOrderId: string;
+
+  it("buyer applies, shop approves with discount + net terms", async () => {
+    // The harness admin user must exist — audit_logs carries an FK to users.
+    await run(db, `INSERT OR IGNORE INTO users (id, email) VALUES ('usr_wstest', 'owner@teststudio.test')`);
+    const res = await portal.request("/apply", json({ email: BUYER, company: "Test Boutique", contactName: "Bo Yer" }), env);
+    expect(res.status).toBe(200);
+    const acct = await first<{ id: string; status: string }>(
+      db, `SELECT id, status FROM wholesale_accounts WHERE email = ?`, BUYER);
+    expect(acct?.status).toBe("pending");
+    accountId = acct!.id;
+
+    const ok = await admin.request(`/accounts/${accountId}/approve`, json({ discountPct: 10, termsDays: 30 }), env);
+    expect(ok.status).toBe(200);
+    const approved = await first<{ status: string; discount_pct: number; terms_days: number }>(
+      db, `SELECT status, discount_pct, terms_days FROM wholesale_accounts WHERE id = ?`, accountId);
+    expect(approved).toMatchObject({ status: "approved", discount_pct: 10, terms_days: 30 });
+  });
+
+  it("shop builds a line sheet with volume tiers and a per-buyer override", async () => {
+    p1 = newId("prod");
+    p2 = newId("prod");
+    for (const [id, slug, name] of [[p1, "ws-coat", "Atlas Coat"], [p2, "ws-shirt", "Rif Shirt"]] as const) {
+      await run(
+        db,
+        `INSERT INTO products (id, slug, name, gender, category, base_price_cents, availability, is_published)
+         VALUES (?, ?, ?, 'unisex', 'outerwear', 20000, 'available', 1)`,
+        id, slug, name);
+    }
+    const created = await admin.request("/line-sheets", json({ title: "AW Trade", productIds: [p1, p2] }), env);
+    expect(created.status).toBe(201);
+    sheetId = ((await created.json()) as { id: string }).id;
+
+    const detail = (await (await admin.request(`/line-sheets/${sheetId}`, undefined, env)).json()) as {
+      items: { id: string; product_id: string }[];
+    };
+    const item1 = detail.items.find((i) => i.product_id === p1)!;
+    // $10 base from qty 2, $8 from a dozen.
+    const patched = await admin.request(`/line-sheets/items/${item1.id}`, {
+      ...json({ wholesalePriceCents: 1000, minQty: 2, priceTiers: [{ minQty: 12, priceCents: 800 }] }),
+      method: "PATCH",
+    }, env);
+    expect(patched.status).toBe(200);
+    // The negotiated price list: Rif Shirt at $42 flat for this buyer.
+    const override = await admin.request(`/accounts/${accountId}/overrides`, {
+      ...json({ productId: p2, unitPriceCents: 4200 }),
+      method: "PUT",
+    }, env);
+    expect(override.status).toBe(200);
+  });
+
+  it("the portal prices with discount, tiers, and the override", async () => {
+    await run(
+      db,
+      `INSERT INTO wholesale_sessions (id, account_id, token_hash, expires_at)
+       VALUES (?, ?, ?, datetime('now', '+1 day'))`,
+      newId("wsess"), accountId, await sha256Hex("ws-e2e-token"));
+
+    const res = await portal.request(`/line-sheets/${sheetId}`, { headers: { cookie: COOKIE } }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: { productId: string; priceCents: number; customPrice: boolean; tiers: { minQty: number; priceCents: number }[] }[];
+    };
+    const coat = body.items.find((i) => i.productId === p1)!;
+    const shirt = body.items.find((i) => i.productId === p2)!;
+    expect(coat.priceCents).toBe(900); // $10 − 10% trade discount
+    expect(coat.customPrice).toBe(false);
+    expect(coat.tiers).toEqual([{ minQty: 12, priceCents: 720 }]); // $8 tier − 10%
+    expect(shirt.priceCents).toBe(4200); // absolute override; discount ignored
+    expect(shirt.customPrice).toBe(true);
+    expect(shirt.tiers).toEqual([]);
+  });
+
+  it("enforces minimums, then places the order at tier + override pricing with a ship-to", async () => {
+    const tooFew = await portal.request("/orders", json({ lineSheetId: sheetId, items: [{ productId: p1, quantity: 1 }] }, COOKIE), env);
+    expect(tooFew.status).toBe(400);
+    expect(((await tooFew.json()) as { error: string }).error).toContain("minimum of 2");
+
+    const placed = await portal.request("/orders", json({
+      lineSheetId: sheetId,
+      items: [
+        { productId: p1, quantity: 12 }, // hits the tier: 12 × 720
+        { productId: p2, quantity: 3 },  // override: 3 × 4200
+      ],
+      shipTo: { name: "Test Boutique", line1: "1 Rue du Stock", city: "Casablanca", postalCode: "20000", country: "ma" },
+    }, COOKIE), env);
+    expect(placed.status).toBe(201);
+
+    const order = await first<{ id: string; total_cents: number; shipping_country: string; shipping_address_json: string }>(
+      db, `SELECT id, total_cents, shipping_country, shipping_address_json FROM wholesale_orders WHERE account_id = ? ORDER BY created_at DESC`, accountId);
+    orderId = order!.id;
+    expect(order!.total_cents).toBe(12 * 720 + 3 * 4200);
+    expect(order!.shipping_country).toBe("MA");
+    expect(JSON.parse(order!.shipping_address_json).address.line1).toBe("1 Rue du Stock");
+    const units = await all<{ unit_price_cents: number }>(
+      db, `SELECT unit_price_cents FROM wholesale_order_items WHERE order_id = ? ORDER BY unit_price_cents`, orderId);
+    expect(units.map((u) => u.unit_price_cents)).toEqual([720, 4200]);
+  });
+
+  it("confirming materialises a fulfilment order in the retail pipeline", async () => {
+    const res = await admin.request(`/orders/${orderId}/status`, json({ status: "confirmed" }), env);
+    expect(res.status).toBe(200);
+    const wo = await first<{ fulfillment_order_id: string | null; order_number: string }>(
+      db, `SELECT fulfillment_order_id, order_number FROM wholesale_orders WHERE id = ?`, orderId);
+    expect(wo?.fulfillment_order_id).toBeTruthy();
+    fulfillmentOrderId = wo!.fulfillment_order_id!;
+
+    const ord = await first<{ order_number: string; email: string; total_cents: number; payment_status: string; fulfillment_status: string; shipping_country: string }>(
+      db, `SELECT order_number, email, total_cents, payment_status, fulfillment_status, shipping_country FROM orders WHERE id = ?`, fulfillmentOrderId);
+    expect(ord).toMatchObject({
+      order_number: wo!.order_number,
+      email: BUYER,
+      total_cents: 12 * 720 + 3 * 4200,
+      payment_status: "pending",
+      fulfillment_status: "unfulfilled",
+      shipping_country: "MA",
+    });
+    const lines = await all<{ description: string }>(db, `SELECT description FROM order_items WHERE order_id = ?`, fulfillmentOrderId);
+    expect(lines.length).toBe(2);
+    expect(lines.every((l) => l.description.includes("Wholesale"))).toBe(true);
+
+    // Re-confirming must not duplicate the fulfilment order.
+    await admin.request(`/orders/${orderId}/status`, json({ status: "confirmed" }), env);
+    const again = await first<{ fulfillment_order_id: string }>(db, `SELECT fulfillment_order_id FROM wholesale_orders WHERE id = ?`, orderId);
+    expect(again!.fulfillment_order_id).toBe(fulfillmentOrderId);
+  });
+
+  it("invoicing stamps the due date from the buyer's net terms", async () => {
+    const before = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const res = await admin.request(`/orders/${orderId}/status`, json({ status: "invoiced" }), env);
+    const after = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    expect(res.status).toBe(200);
+    const wo = await first<{ status: string; due_date: string }>(db, `SELECT status, due_date FROM wholesale_orders WHERE id = ?`, orderId);
+    expect(wo?.status).toBe("invoiced");
+    expect([before, after]).toContain(wo?.due_date);
+  });
+
+  it("payment guards: degrades without Stripe, rejects a not-ready order with it", async () => {
+    const noStripe = await createInvoiceCheckout(env, db, { orderId, shopId: "shop_rezene", baseUrl: "http://test" });
+    expect("error" in noStripe && noStripe.error).toContain("isn't set up");
+
+    // A fresh, still-submitted order is not payable even with Stripe configured
+    // (the guard fires before any network call, so a fake key is safe here).
+    const stripeEnv = { ...(env as object), STRIPE_SECRET_KEY: "sk_test_fake" } as unknown as Env;
+    const placed = await portal.request("/orders", json({ lineSheetId: sheetId, items: [{ productId: p1, quantity: 2 }] }, COOKIE), env);
+    expect(placed.status).toBe(201);
+    const submitted = await first<{ id: string }>(
+      db, `SELECT id FROM wholesale_orders WHERE account_id = ? AND status = 'submitted' ORDER BY created_at DESC`, accountId);
+    const notReady = await portal.request(`/orders/${submitted!.id}/pay`, json({}, COOKIE), stripeEnv);
+    expect(notReady.status).toBe(400);
+    expect(((await notReady.json()) as { error: string }).error).toContain("isn't ready");
+  });
+
+  it("the faked Stripe webhook marks the order paid and syncs fulfilment — idempotently", async () => {
+    const event = {
+      id: "evt_ws_e2e_1",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: { kind: "wholesale_invoice", shop_id: "shop_rezene", wholesale_order_id: orderId },
+          payment_intent: "pi_ws_e2e_1",
+        },
+      },
+    } as unknown as Stripe.Event;
+    const res = await handleStripeEvent(env, null as unknown as Stripe, event, (p) => void deferred.push(p));
+    await flush();
+    expect(res.received).toBe(true);
+
+    const wo = await first<{ status: string; paid_at: string | null; stripe_payment_intent_id: string | null }>(
+      db, `SELECT status, paid_at, stripe_payment_intent_id FROM wholesale_orders WHERE id = ?`, orderId);
+    expect(wo).toMatchObject({ status: "paid", stripe_payment_intent_id: "pi_ws_e2e_1" });
+    expect(wo?.paid_at).toBeTruthy();
+    const ord = await first<{ payment_status: string }>(db, `SELECT payment_status FROM orders WHERE id = ?`, fulfillmentOrderId);
+    expect(ord?.payment_status).toBe("paid");
+
+    // Stripe retries: the same event id is swallowed by the receipt table…
+    const replay = await handleStripeEvent(env, null as unknown as Stripe, event, (p) => void deferred.push(p));
+    expect(replay.duplicate).toBe(true);
+    // …and even a NEW event for an already-paid order no-ops instead of double-applying.
+    const paidAt = wo!.paid_at;
+    await handleStripeEvent(env, null as unknown as Stripe, { ...event, id: "evt_ws_e2e_2" } as unknown as Stripe.Event, (p) => void deferred.push(p));
+    await flush();
+    const after = await first<{ paid_at: string | null; stripe_payment_intent_id: string | null }>(
+      db, `SELECT paid_at, stripe_payment_intent_id FROM wholesale_orders WHERE id = ?`, orderId);
+    expect(after).toMatchObject({ paid_at: paidAt, stripe_payment_intent_id: "pi_ws_e2e_1" });
+
+    // And a paid order can't be paid again from the portal.
+    const stripeEnv = { ...(env as object), STRIPE_SECRET_KEY: "sk_test_fake" } as unknown as Env;
+    const payAgain = await portal.request(`/orders/${orderId}/pay`, json({}, COOKIE), stripeEnv);
+    expect(payAgain.status).toBe(400);
+    expect(((await payAgain.json()) as { error: string }).error).toContain("already paid");
   });
 });
