@@ -783,7 +783,7 @@ function VertoPricing() {
         ))}
       </div>
       <p className="mt-8 text-center text-xs text-warmgrey">
-        14-day free trial on every plan, no card required. Payment processing (Stripe) is billed
+        30-day free trial on every plan, no card required. Payment processing (Stripe) is billed
         separately by Stripe at their standard rates.
       </p>
       <StackYouReplace />
@@ -1042,7 +1042,7 @@ function VertoSignup() {
             {busy ? "Building your shop… (~10s)" : "Create my shop"}
           </button>
           <p className="text-center text-xs text-warmgrey">
-            No card required. 14-day trial starts now.
+            No card required. 30-day trial starts now.
           </p>
         </form>
       </Reveal>
