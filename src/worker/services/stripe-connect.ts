@@ -164,7 +164,7 @@ export async function planCheckoutUrl(
     ...(shop.stripe_customer_id
       ? { customer: shop.stripe_customer_id }
       : { customer_email: userEmail ?? shop.owner_email ?? undefined }),
-    subscription_data: { metadata: { shop_id: shop.id, verto_plan: planKey } },
+    subscription_data: { trial_period_days: 30, metadata: { shop_id: shop.id, verto_plan: planKey } },
     metadata: { kind: "verto_plan", shop_id: shop.id, verto_plan: planKey },
     allow_promotion_codes: true,
     success_url: `${base}/${shop.slug}/admin/settings?billing=success`,
